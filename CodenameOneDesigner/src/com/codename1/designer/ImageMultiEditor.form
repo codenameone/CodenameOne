@@ -1,0 +1,217 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+
+<Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
+  <AuxValues>
+    <AuxValue name="FormSettings_autoResourcing" type="java.lang.Integer" value="0"/>
+    <AuxValue name="FormSettings_autoSetComponentName" type="java.lang.Boolean" value="true"/>
+    <AuxValue name="FormSettings_generateFQN" type="java.lang.Boolean" value="true"/>
+    <AuxValue name="FormSettings_generateMnemonicsCode" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_i18nAutoMode" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_layoutCodeTarget" type="java.lang.Integer" value="2"/>
+    <AuxValue name="FormSettings_listenerGenerationStyle" type="java.lang.Integer" value="1"/>
+    <AuxValue name="FormSettings_variablesLocal" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_variablesModifier" type="java.lang.Integer" value="2"/>
+  </AuxValues>
+
+  <Layout>
+    <DimensionLayout dim="0">
+      <Group type="103" groupAlignment="0" attributes="0">
+          <Group type="102" attributes="0">
+              <EmptySpace max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" alignment="0" attributes="0">
+                      <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="dpi" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="editImage" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="delete" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="scale" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="toJpeg" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="type" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="imageName" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="zoom" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="imageSize" min="-2" max="-2" attributes="0"/>
+                  </Group>
+                  <Group type="102" alignment="0" attributes="0">
+                      <Component id="preview" min="-2" pref="518" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="jScrollPane1" pref="480" max="32767" attributes="2"/>
+                  </Group>
+              </Group>
+              <EmptySpace max="-2" attributes="0"/>
+          </Group>
+          <Component id="jScrollPane2" alignment="0" pref="1052" max="32767" attributes="0"/>
+      </Group>
+    </DimensionLayout>
+    <DimensionLayout dim="1">
+      <Group type="103" groupAlignment="0" attributes="0">
+          <Group type="102" alignment="0" attributes="0">
+              <EmptySpace max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="3" attributes="0">
+                  <Component id="dpi" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel1" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="editImage" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="delete" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="type" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="imageName" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="zoom" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="imageSize" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="scale" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="toJpeg" alignment="3" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                  <Component id="jScrollPane1" max="32767" attributes="1"/>
+                  <Component id="preview" alignment="0" pref="310" max="32767" attributes="1"/>
+              </Group>
+              <EmptySpace max="-2" attributes="0"/>
+              <Component id="jScrollPane2" pref="157" max="32767" attributes="0"/>
+          </Group>
+      </Group>
+    </DimensionLayout>
+  </Layout>
+  <SubComponents>
+    <Component class="javax.swing.JComboBox" name="dpi">
+      <Properties>
+        <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
+          <StringArray count="6">
+            <StringItem index="0" value="Very Low Density 176x220 And Smaller"/>
+            <StringItem index="1" value="Low Density Up To 240x320"/>
+            <StringItem index="2" value="Medium Density Up To 360x480"/>
+            <StringItem index="3" value="Hi Density Up To 480x854"/>
+            <StringItem index="4" value="Very Hi Density Up To 1440x720"/>
+            <StringItem index="5" value="HD Up To 1920x1080"/>
+          </StringArray>
+        </Property>
+        <Property name="name" type="java.lang.String" value="dpi" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="dpiActionPerformed"/>
+      </Events>
+    </Component>
+    <Container class="javax.swing.JScrollPane" name="jScrollPane2">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="jScrollPane2" noResource="true"/>
+      </Properties>
+      <AuxValues>
+        <AuxValue name="autoScrollPane" type="java.lang.Boolean" value="true"/>
+      </AuxValues>
+
+      <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
+      <SubComponents>
+        <Component class="javax.swing.JTextPane" name="help">
+          <Properties>
+            <Property name="contentType" type="java.lang.String" value="text/html"/>
+            <Property name="editable" type="boolean" value="false"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&#xd;&#xa;  &lt;head&gt;&#xd;&#xa;&#xd;&#xa;  &lt;/head&gt;&#xd;&#xa;  &lt;body&gt;&#xd;&#xa;    &lt;p style=&quot;margin-top: 0&quot;&gt;&#xd;&#xa;      &#xd;Multi images allow complex elements such as icons to be specified on a per DPI(dots per inch) basis with classifications to several general DPI groups. Normally DPI isn&apos;t specified in reolution but since some devices don&apos;t provide the means to query the actual DPI it is &quot;faked&quot; on those devices using the resolution.&#xa;    &lt;/p&gt;&#xd;&#xa;    &lt;p&gt;&#xa;      Notice that multi-images aren&apos;t intended for use as a replacement for scaling/tiling, or anything of that kind since that would become prohibitively expensive as the resource grows and would also be ineffective since phones tend to change their resolution during runtime e.g. by rotation or poping up some types of virtual keyboards.&#xa;    &lt;/p&gt;&#xa;    &lt;p&gt;&#xa;     The multi-image is very similar in spirit to LWUIT&apos;s SVG support and is mostly targeted at designers who have raster images rather than vector resources or those who would normally target devices without SVG. &#xa;    &lt;/p&gt;&#xa;    &lt;p&gt;&#xa;     Working with the multi-image is seamless and LWUIT will replace the images on loading during runtime (this is 100% seamless to developers). Use the combo box at the top to select the proper DPI/resolution and create an icon that would look decent in that resolution. Keep in mind that you do not need to support all resolutions and that LWUIT will pick the &quot;best&quot; image it can if none is defined for a specific DPI. E.g. if an image isn&apos;t defined for the very low resolution LWUIT will look to higher resolution resources until it finds an image. &#xa;    &lt;/p&gt;&#xa;  &lt;/body&gt;&#xd;&#xa;&lt;/html&gt;&#xd;&#xa;" noResource="true"/>
+            <Property name="name" type="java.lang.String" value="help" noResource="true"/>
+          </Properties>
+        </Component>
+      </SubComponents>
+    </Container>
+    <Component class="javax.swing.JLabel" name="jLabel1">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="DPI"/>
+        <Property name="name" type="java.lang.String" value="jLabel1" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JButton" name="editImage">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="..."/>
+        <Property name="toolTipText" type="java.lang.String" value="Pick Image"/>
+        <Property name="name" type="java.lang.String" value="editImage" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="editImageActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JLabel" name="type">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Multi-Image"/>
+        <Property name="name" type="java.lang.String" value="type" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JLabel" name="imageName">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Image Name"/>
+        <Property name="name" type="java.lang.String" value="imageName" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JSpinner" name="zoom">
+      <Properties>
+        <Property name="toolTipText" type="java.lang.String" value="Zoom"/>
+        <Property name="name" type="java.lang.String" value="zoom" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="zoomStateChanged"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JLabel" name="imageSize">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="width X height"/>
+        <Property name="name" type="java.lang.String" value="imageSize" noResource="true"/>
+      </Properties>
+    </Component>
+    <Container class="javax.swing.JPanel" name="preview">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="preview" noResource="true"/>
+      </Properties>
+
+      <Layout class="org.netbeans.modules.form.compat2.layouts.DesignBorderLayout"/>
+    </Container>
+    <Container class="javax.swing.JScrollPane" name="jScrollPane1">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="jScrollPane1" noResource="true"/>
+      </Properties>
+      <AuxValues>
+        <AuxValue name="autoScrollPane" type="java.lang.Boolean" value="true"/>
+      </AuxValues>
+
+      <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
+      <SubComponents>
+        <Component class="javax.swing.JList" name="componentList">
+          <Properties>
+            <Property name="name" type="java.lang.String" value="componentList" noResource="true"/>
+          </Properties>
+        </Component>
+      </SubComponents>
+    </Container>
+    <Component class="javax.swing.JButton" name="delete">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Delete"/>
+        <Property name="toolTipText" type="java.lang.String" value="Delete this resolution"/>
+        <Property name="name" type="java.lang.String" value="delete" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="deleteActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="scale">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Scale"/>
+        <Property name="name" type="java.lang.String" value="scale" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="scaleActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="toJpeg">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="To JPEG"/>
+        <Property name="toolTipText" type="java.lang.String" value="Convert Multi-Image to JPEG"/>
+        <Property name="name" type="java.lang.String" value="toJpeg" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="toJpegActionPerformed"/>
+      </Events>
+    </Component>
+  </SubComponents>
+</Form>

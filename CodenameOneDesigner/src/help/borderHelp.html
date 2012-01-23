@@ -1,0 +1,119 @@
+<!--
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title></title>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  </head>
+  <body>
+    <a name="border"><h1>Preface</h1></a>
+    <p>
+        Borders represent the line/pattern around a component and optionally behind the component (in which case
+        it supercedes the other background definitions for the component). There are several types of borders detailed
+        bellow. Borders are usually drawn at the edge of the component space, unlike CSS which has a specific area
+        for border space LWUIT uses the edge of the padding space for the border. This effectively means that a
+        theme must make sure to have component padding that is large enough to fit the border within it.
+    </p>
+    <a name="empty"><h1>Empty/Null Border</h1></a>
+    <p>
+        This effectively indicates the component has no border, the main difference between empty border and null
+        border related to style inheritance. E.g. in the case of a Button a default border exists, if we were to define the
+        border as null the value would not override the buttons border.<br>
+        However, defining the border as empty works as expected by removing the border from the button.
+    </p>
+    <a name="bevel"><h1>Bevel</h1></a>
+    <p>
+        The bevel border type presents a simple 3D style border that can appear lowered or raised thus
+        providing simple depth perception e.g. for button presses. The bevel border is comprised of 4 colors
+        representing its appearance, it can accept these in the color pickers or use the "theme colors" checkbox
+        to automatically derive colors from the theme (using the components foreground/background colors to
+        calculate a proper color for the border).<br>
+        bevel lowered<br>
+        <img src="border_bevel_lower.png"><br><br>
+        bevel raised<br>
+        <img src="border_bevel_raised.png"><br><br>
+    </p>
+    <a name="etched"><h1>Etched</h1></a>
+    <p>
+        The etched border type provides a look similar to an engraved line, like the bevel border it too can appear
+        raised or lowered. The etched border is comprised of 2 colors
+        representing its appearance, it can accept these in the color pickers or use the "theme colors" checkbox
+        to automatically derive colors from the theme (using the components foreground/background colors to
+        calculate a proper color for the border).<br>
+        etched lowered<br>
+        <img src="border_etched_lower.png"><br><br>
+        etched raised<br>
+        <img src="border_etched_raised.png"><br><br>
+    </p>
+    <a name="line"><h1>Line</h1></a>
+    <p>
+        The line border just draws a rectangle around the component with the option of defining the thickness/color
+        of said rectangle. The line border can also use the "theme colors" checkbox
+        to use the components foreground color.
+    </p>
+    <a name="round"><h1>Round</h1></a>
+    <p>
+        The round border draws a rounded rectangle and optionally fills the background appropriately.
+        <b>PERFORMANCE WARNING:</b> the round border might be very expensive! A round border is
+        cheap for a completely opaque solid color. However, when using features such as gradients, images or
+        alpha channel the round border effect is calculated on the fly! This is hugely expensive, we recommend
+        trying to achieve these same effects with the image borders which are cheaper.<br>
+        The round border allows defining its color (or using the theme color) it also allows defining the size
+        of the arcs rounding the border.<br>
+        <img src="border_rounded.png"><br><br>
+    </p>
+    <a name="image"><h1>Image</h1></a>
+    <p>
+        The image border option will only appear when images exist in the resource file, you can read more
+        on creating image borders in the image border wizard. Image borders come in 4 flavors:
+        <ol>
+            <li>9 part - 9 or 8 images are used to represent the border for the component. using this structure:<br>
+                <img src="9patchdemo.png" /><br>
+                  Notice that the center image is optional... The top, bottom, left &amp; right images are tiled while
+                  the corners are kept in place. The center image (if defined) is also tiled. This allows LWUIT to
+                  resize the component without any scaling, degradation, performance cost, or memory overhead.
+                  One limitation one should keep in mind is that drawing an image is an expensive operation and
+                  so images in the image border shouldn't be too small e.g. a common designer mistake is to produce
+                  a single pixel image for tiling, LWUIT will seamlessly crop a tiled image so you should make an effort
+                  to make it more reasonably sized (when in doubt use something in the area of 80-100 pixels).
+            </li>
+            <li>
+                3 part - The 3 part is somewhat unique to LWUIT and relies on MIDP's fast rotation drawing, it assumes
+                perfectly rectangular images and draws the top left image rotated to produce all corners and does the
+                same for the top image (center is again optional and used as usual). Thus the 3 part border can produce
+                some attractive results in a smaller size.
+            </li>
+            <li>
+                Horizontal/Vertical - the image border is highly biased to symmetric shapes that can be enlarged
+                to all directions. However some shapes (such as the iPhone's angular back button) cannot be cut
+                into a 9 patch image without causing artifacts. The Horizontal and Vertical Image borders accept
+                3 images each and only grow on one axis. We don't recommend using them for most cases since
+                even when text (which can vary wildly in size) isn't used, one often needs to align to text thus requiring
+                such resizing.
+            </li>
+        </ol>
+    </p>
+  </body>
+</html>

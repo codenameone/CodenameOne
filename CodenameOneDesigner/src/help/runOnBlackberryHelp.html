@@ -1,0 +1,68 @@
+<!--
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>Run On Blackberry Help</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  </head>
+  <body>
+      <h1>Running A UI/Theme on a RIM Blackberry Device</h1>
+    <p>
+        Codename One supports generating a "preview application" on the fly to allow designers
+        to preview their UI on an actual device. This requires some work to configure
+        for the first time and isn't intended as a "production" tool, however once
+        configured this is an immensly powerful tool for a designer providing the
+        designer with the "feel" of the theme on a specific device.
+    </p>
+    <p>
+        Running on RIM devices requires a device with OS 4.7 or newer and requires
+        a RIM JDE installation (it is assumed the Java JDK required by RIM is
+        already installed, although the Codename One Designer can be run with the JRE alone).
+        RIM's JRE can be downloaded from their website at
+        <a href="http://us.blackberry.com/developers/javaappdev/javadevenv.jsp">http://us.blackberry.com/developers/javaappdev/javadevenv.jsp</a>
+    </p>
+    <p>
+        When running the wizard for the first time one has to point at the directory
+        where the JRE is installed if it was not installed at the default location.
+        A RIM device needs to be connected to the machine with a USB cable for the
+        wizard to work as expected.
+    </p>
+    <p>
+        If the wizard fails in uploading to the device or building you can look
+        within the details tab for the reason for the failure. While the details
+        tab is quite technical once this actually works on a machine it can be
+        ignored. Notice that unless you exited the application (the red button
+        minimizes and doesn't exit on RIM!) the device will reboot and an upload
+        to the device will take allot of time!
+    </p>
+    <p>
+        When a UI is executed on the device a combo box is presented allowing you
+        to pick the UI form to start with. This is useful for a designer to preview
+        starting from an arbitrary form in the middle of the application and not
+        necessarily going through the full application flow which might not be
+        applicable without application code.
+    </p>
+  </body>
+</html>

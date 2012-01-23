@@ -1,0 +1,235 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+
+<Form version="1.5" maxVersion="1.5" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
+  <Properties>
+    <Property name="name" type="java.lang.String" value="Form" noResource="true"/>
+  </Properties>
+  <AuxValues>
+    <AuxValue name="FormSettings_autoResourcing" type="java.lang.Integer" value="0"/>
+    <AuxValue name="FormSettings_autoSetComponentName" type="java.lang.Boolean" value="true"/>
+    <AuxValue name="FormSettings_generateFQN" type="java.lang.Boolean" value="true"/>
+    <AuxValue name="FormSettings_generateMnemonicsCode" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_i18nAutoMode" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_layoutCodeTarget" type="java.lang.Integer" value="2"/>
+    <AuxValue name="FormSettings_listenerGenerationStyle" type="java.lang.Integer" value="1"/>
+    <AuxValue name="FormSettings_variablesLocal" type="java.lang.Boolean" value="false"/>
+    <AuxValue name="FormSettings_variablesModifier" type="java.lang.Integer" value="2"/>
+  </AuxValues>
+
+  <Layout>
+    <DimensionLayout dim="0">
+      <Group type="103" groupAlignment="0" attributes="0">
+          <Group type="102" alignment="1" attributes="0">
+              <EmptySpace max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="1" attributes="0">
+                  <Component id="jScrollPane1" alignment="0" pref="650" max="32767" attributes="0"/>
+                  <Group type="102" alignment="0" attributes="0">
+                      <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="locales" pref="0" max="32767" attributes="0"/>
+                      <EmptySpace min="-2" pref="7" max="-2" attributes="0"/>
+                      <Component id="addLocale" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="removeLocale" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="exportResource" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="importResource" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="syncWithUI" linkSize="2" min="-2" max="-2" attributes="0"/>
+                  </Group>
+                  <Group type="102" alignment="0" attributes="0">
+                      <Component id="addProperty" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="removeProperty" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                      <Component id="renameProperty" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="editText" linkSize="2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="editHTML" linkSize="2" min="-2" max="-2" attributes="0"/>
+                  </Group>
+                  <Group type="102" alignment="0" attributes="0">
+                      <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="searchField" pref="616" max="32767" attributes="0"/>
+                  </Group>
+              </Group>
+              <EmptySpace max="-2" attributes="0"/>
+          </Group>
+      </Group>
+    </DimensionLayout>
+    <DimensionLayout dim="1">
+      <Group type="103" groupAlignment="0" attributes="0">
+          <Group type="102" alignment="0" attributes="0">
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="3" attributes="0">
+                  <Component id="jLabel1" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="locales" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="addLocale" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="removeLocale" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="importResource" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="exportResource" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="syncWithUI" alignment="3" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="3" attributes="0">
+                  <Component id="jLabel2" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="searchField" alignment="3" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Component id="jScrollPane1" pref="203" max="32767" attributes="0"/>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="3" attributes="0">
+                  <Component id="addProperty" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="removeProperty" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="editText" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="editHTML" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="renameProperty" alignment="3" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+          </Group>
+      </Group>
+    </DimensionLayout>
+  </Layout>
+  <SubComponents>
+    <Container class="javax.swing.JScrollPane" name="jScrollPane1">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="jScrollPane1" noResource="true"/>
+      </Properties>
+      <AuxValues>
+        <AuxValue name="autoScrollPane" type="java.lang.Boolean" value="true"/>
+      </AuxValues>
+
+      <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
+      <SubComponents>
+        <Component class="javax.swing.JTable" name="bundleTable">
+          <Properties>
+            <Property name="name" type="java.lang.String" value="bundleTable" noResource="true"/>
+          </Properties>
+          <AuxValues>
+            <AuxValue name="JavaCodeGenerator_CreateCodeCustom" type="java.lang.String" value="createTable()"/>
+          </AuxValues>
+        </Component>
+      </SubComponents>
+    </Container>
+    <Component class="javax.swing.JLabel" name="jLabel1">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Locale"/>
+        <Property name="name" type="java.lang.String" value="jLabel1" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JComboBox" name="locales">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="locales" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JButton" name="removeLocale">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Remove Locale"/>
+        <Property name="name" type="java.lang.String" value="removeLocale" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeLocaleActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="addLocale">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Add Locale"/>
+        <Property name="name" type="java.lang.String" value="addLocale" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="addLocaleActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="addProperty">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Add Property"/>
+        <Property name="name" type="java.lang.String" value="addProperty" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="addPropertyActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="removeProperty">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Remove Property"/>
+        <Property name="enabled" type="boolean" value="false"/>
+        <Property name="name" type="java.lang.String" value="removeProperty" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removePropertyActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JLabel" name="jLabel2">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Filter"/>
+        <Property name="name" type="java.lang.String" value="jLabel2" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JTextField" name="searchField">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="searchField" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JButton" name="importResource">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Import"/>
+        <Property name="toolTipText" type="java.lang.String" value="Import the locale from a properties file"/>
+        <Property name="name" type="java.lang.String" value="importResource" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="importResourceActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="exportResource">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Export"/>
+        <Property name="toolTipText" type="java.lang.String" value="Export the selected locale to a resource bundle"/>
+        <Property name="name" type="java.lang.String" value="exportResource" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="exportResourceActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="editText">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Edit Text"/>
+        <Property name="enabled" type="boolean" value="false"/>
+        <Property name="name" type="java.lang.String" value="editText" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="editTextActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="editHTML">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Edit HTML"/>
+        <Property name="enabled" type="boolean" value="false"/>
+        <Property name="name" type="java.lang.String" value="editHTML" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="editHTMLActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="syncWithUI">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Sync With UI"/>
+        <Property name="name" type="java.lang.String" value="syncWithUI" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="syncWithUIActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="renameProperty">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Rename Property"/>
+        <Property name="enabled" type="boolean" value="false"/>
+        <Property name="name" type="java.lang.String" value="renameProperty" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="renamePropertyActionPerformed"/>
+      </Events>
+    </Component>
+  </SubComponents>
+</Form>

@@ -1,0 +1,91 @@
+<!--
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>Theme Editor Help</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  </head>
+  <body>
+      <h1>Introduction</h1>
+    <p>
+        The theme editor allows designers to customize the appearance of a LWUIT
+        application or GUI builder UI and see a live preview of said changes
+        in the preview pane on the right side. The preview pane is "live" and
+        supports keyboard/mouse interaction, it can also be customized extensively
+        by clicking its options button.
+    </p>
+    <p>
+        By default the LWUIT Demo application is presented in the preview pane
+        however you can pick a custom LWUIT MIDlet or use any form from the GUI
+        builder builtin to this tool.
+    </p>
+    <p>
+        To gain a deep understanding of the tool and its full potential we suggest
+        you check out the tutorials in the help menu that are based on video
+        screen casts.
+    </p>
+      <h1>Basics</h1>
+    <p>
+        If you are familiar with CSS then the theme editor is a much simplified
+        version of that with simpler selectors and more refined attributes.
+        LWUIT applications are comprised of components each of which has a UIID
+        (User Interface ID), the UIID defaults to the component type (e.g. a
+        button has the "Button" UIID) however a developer/designer may change
+        the UIID to provide greater range (more on that later).<br>
+        A UIID is the main part of the "selector" it allows a theme to
+        define the element to customize, a selector is matched by a set
+        of values indicating what is being customized.
+    </p>
+    <p>
+        E.g. If you would like all the buttons to be drawn in blue you
+        can add a Button entry and set its foreground color to Blue.<br>
+        However, this will only work for some of the buttons since a selector
+        has another important part based on the state of the component.
+        LWUIT components can be unselected (unfocused), selected (focused),
+        pressed (only buttons support this) or disabled. To make the button
+        blue for all cases we will need to define the button as blue in all
+        4 tabs (we can ease this using inheritance).
+    </p>
+    <p>
+        Each selector (UIID + state) can have a style associated with it, a style
+        contains multiple attribute values that can either be inherited or
+        replaced with your custom settings (e.g. foreground color). For more
+        information click the "Add" button bellow and select the help tab.
+    </p>
+      <h1>Inheritance</h1>
+    <p>
+        LWUIT has a base style for every component state, this base style determines
+        the "starting point" for a component specific style. E.g. if I want all
+        components to be blue I can change the default style to blue, I will need
+        to do this for disabled, pressed and selected tabs as well.
+    </p>
+    <p>
+        Other than that LWUIT has no implicit inheritance (although it has some
+        elaborate default settings for components), it does have explicit inheritance
+        where its possible to define a UIID from which to derive the attribute
+        values.
+    </p>
+  </body>
+</html>
