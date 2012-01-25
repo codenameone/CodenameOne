@@ -448,7 +448,9 @@ public class ResourceEditorView extends FrameView {
         String recentFileString = Preferences.userNodeForPackage(getClass()).get("recentFiles", null);
         if(recentFileString != null) {
             for(String f : recentFileString.split(";")) {
-                recentFiles.add(f);
+                if(new File(f).exists()) {
+                    recentFiles.add(f);
+                }
             }
         }
 
@@ -3740,12 +3742,16 @@ public static void openInIDE(File f, int lineNumber) {
                         InputStream i = new FileInputStream(codenameone_settings);
                         projectGeneratorSettings.load(i);
                         i.close();
-                        projectGeneratorSettings.put("userClassAbs",
-                                new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
-                        if(projectGeneratorSettings.containsKey("netbeans")) {
-                            manualIDESettings = projectGeneratorSettings.getProperty("netbeans");
+                        if(projectGeneratorSettings.getProperty("guiResource", selection.getName()).equals(selection.getName())) {
+                            projectGeneratorSettings.put("userClassAbs",
+                                    new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
+                            if(projectGeneratorSettings.containsKey("netbeans")) {
+                                manualIDESettings = projectGeneratorSettings.getProperty("netbeans");
+                            }
+                            JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
+                        } else {
+                            projectGeneratorSettings = null;                        
                         }
-                        JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
                     } else {
                         projectGeneratorSettings = null;
                     }

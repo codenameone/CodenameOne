@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <!-- 
+
+    IMPORTANT!!! When building for ios: if you don't supply the certificate/provisioning profile etc. you will not 
+    be able to run on a regular device (only on jailbroken devices) in that case your package name MUST be: com.codename1.demos.lwuitdemo
+
+    Required attributes for the task:
+
+    jarFile - the application jar file resulting from the build
+
+    displayName - display name for the application in the UI
+
+    Either packageName and mainClassName or fullClassName:
+    mainClassName - the name of the main class not including the package name
+
+    packageName - the package in which the main class resides, this will also 
+    be used to classify the application. It is recommended you give this some thought since
+    package names are impossible to change later on some stores!
+
+    fullClassName - combination of packageName.mainClassName
+
+    icon - a 512x512 pixel icon in PNG format, it will be adjusted for the proper resolutions. 
+    Notice that this icon SHOULDN'T include the iphone tint effect since that effect is overlayed 
+    by the iphone build process
+
+    targetType - the device target, one of the following: iphone, android, rim, me (for j2me support), 
+    win (for Windows Phone 7 support - pending)
+
+    vendor - the vendor name
+    
+    Optional attributes for iphone development these are REQUIRED if you want to distribute an application for
+    any purpose. For details on obtaining these files please go to codenameone.com:
+    certificate - optional for the iPhone project, the p12 certificate file for signing
+    certPassword - required if the certificate is specified
+    ProvisioningProfile - if the certificate is specified a mobile_provisioning file received from Apple must be supplied too
+
+    userName - login information from codenameone.com
+
+    password - the password matching your login from codenameone.com
+
+    subtitle - iphone secondary title
+
+    version - the version number for the application as a floating point value
+
+    -->
+<project name="GeneratedProject" default="default" basedir=".">
+    <description>Builds, tests, and runs the project GeneratedProject</description>
+    <import file="nbproject/build-impl.xml"/>
+    <property file="codenameone_settings.properties"/>
+    <taskdef name="codeNameOne" classname="com.codename1.build.client.CodeNameOneBuildTask" classpath="CodeNameOneBuildClient.jar"/>
+
+    <target name="-pre-compile">
+        <echo>Compile is forcing CLDC 1.1 level API compliance for maximum device compatibility. This allows smaller
+        code size and wider device support</echo>
+        <javac destdir="${build.classes.dir}"
+            source="1.1"
+            target="1.1"
+            bootclasspath="CLDC11.jar"
+            classpath="${javac.classpath}:${build.classes.dir}">
+            <src path="${src.dir}"/>
+        </javac>        
+    </target>
+
+    <target name="build-for-ios-device" depends="clean,jar">
+        <codeNameOne 
+            url="http://localhost:8888"
+            jarFile="${dist.jar}"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            
+            targetType="iphone"
+            certificate="${codename1.ios.debug.certificate}"
+            certPassword="${codename1.ios.debug.certificatePassword}"
+            provisioningProfile="${codename1.ios.debug.provision}"
+            appid="${codename1.ios.appid}"
+            />
+    </target>
+
+    <target name="build-for-ios-device-release" depends="clean,jar">
+        <codeNameOne 
+            url="http://localhost:8888"
+            jarFile="${dist.jar}"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            
+            targetType="iphone"
+            certificate="${codename1.ios.release.certificate}"
+            certPassword="${codename1.ios.release.certificatePassword}"
+            provisioningProfile="${codename1.ios.release.provision}"
+            appid="${codename1.ios.appid}"
+            />
+    </target>
+
+    <target name="build-for-android-device" depends="clean,jar">
+        <codeNameOne 
+            jarFile="${dist.jar}"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            
+            targetType="android"
+            keystoreAlias="${codename1.android.keystoreAlias}"
+            keystore="${codename1.android.keystore}"
+            certPassword="${codename1.android.keystorePassword}"
+            />
+    </target>
+
+    <target name="build-for-rim-device" depends="clean,jar">
+        <codeNameOne 
+            jarFile="${dist.jar}"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+
+            targetType="rim"
+            signtoolDb="${codename1.rim.signtoolDb}"
+            certPassword="${codename1.rim.certificatePassword}"
+            signtoolCsk="${codename1.rim.signtoolCsk}"
+            />
+    </target>
+
+
+    <target name="build-for-j2me-device" depends="clean,jar">
+        <codeNameOne
+            jarFile="${dist.jar}"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            
+            targetType="me"            
+            />
+    </target>
+</project>

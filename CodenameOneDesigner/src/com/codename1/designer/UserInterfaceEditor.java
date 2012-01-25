@@ -69,8 +69,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -84,6 +87,8 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javax.swing.AbstractAction;
 import javax.swing.AbstractCellEditor;
@@ -3970,6 +3975,8 @@ public class UserInterfaceEditor extends BaseForm {
         simulateDevice = new javax.swing.JButton();
         useNativeTheme = new javax.swing.JCheckBox();
         jLabel4 = new javax.swing.JLabel();
+        jLabel5 = new javax.swing.JLabel();
+        initialForm = new javax.swing.JButton();
         jScrollPane5 = new javax.swing.JScrollPane();
         help = new javax.swing.JTextPane();
         leftSidePanel = new javax.swing.JPanel();
@@ -4350,6 +4357,14 @@ public class UserInterfaceEditor extends BaseForm {
         jLabel4.setText("Simulator Native Theme");
         jLabel4.setName("jLabel4"); // NOI18N
 
+        jLabel5.setText("Set As Main Form");
+        jLabel5.setName("jLabel5"); // NOI18N
+
+        initialForm.setText("Initial Form");
+        initialForm.setToolTipText("<html>Makes this form into the first form shown<br>when the application loads if applicable");
+        initialForm.setName("initialForm"); // NOI18N
+        initialForm.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout jPanel9Layout = new org.jdesktop.layout.GroupLayout(jPanel9);
         jPanel9.setLayout(jPanel9Layout);
         jPanel9Layout.setHorizontalGroup(
@@ -4359,21 +4374,26 @@ public class UserInterfaceEditor extends BaseForm {
                     .add(jLabel2)
                     .add(jLabel1)
                     .add(jLabel3)
-                    .add(jLabel4))
+                    .add(jLabel4)
+                    .add(jLabel5))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel9Layout.createSequentialGroup()
-                        .add(addPreviewTheme)
-                        .add(191, 191, 191))
-                    .add(jPanel9Layout.createSequentialGroup()
-                        .add(previewTheme, 0, 79, Short.MAX_VALUE)
-                        .add(187, 187, 187))
-                    .add(jPanel9Layout.createSequentialGroup()
-                        .add(simulateDevice)
-                        .add(191, 191, 191))
-                    .add(jPanel9Layout.createSequentialGroup()
-                        .add(useNativeTheme)
-                        .add(198, 198, 198))))
+                        .add(initialForm)
+                        .add(169, 169, 169))
+                    .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                        .add(jPanel9Layout.createSequentialGroup()
+                            .add(addPreviewTheme)
+                            .add(191, 191, 191))
+                        .add(jPanel9Layout.createSequentialGroup()
+                            .add(previewTheme, 0, 98, Short.MAX_VALUE)
+                            .add(187, 187, 187))
+                        .add(jPanel9Layout.createSequentialGroup()
+                            .add(simulateDevice)
+                            .add(191, 191, 191))
+                        .add(jPanel9Layout.createSequentialGroup()
+                            .add(useNativeTheme)
+                            .add(198, 198, 198)))))
         );
         jPanel9Layout.setVerticalGroup(
             jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -4390,13 +4410,17 @@ public class UserInterfaceEditor extends BaseForm {
                     .add(jLabel3)
                     .add(simulateDevice))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(useNativeTheme)
+                    .add(jLabel4))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel4)
-                    .add(useNativeTheme))
-                .addContainerGap(183, Short.MAX_VALUE))
+                    .add(jLabel5)
+                    .add(initialForm))
+                .addContainerGap(153, Short.MAX_VALUE))
         );
 
-        propertyAndEventTabs.addTab("Preview", jPanel9);
+        propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
 
         jScrollPane5.setName("jScrollPane5"); // NOI18N
 
@@ -4541,6 +4565,9 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == simulateDevice) {
                 UserInterfaceEditor.this.simulateDeviceActionPerformed(evt);
+            }
+            else if (evt.getSource() == initialForm) {
+                UserInterfaceEditor.this.initialFormActionPerformed(evt);
             }
         }
 
@@ -5123,6 +5150,30 @@ private void codenameOneMediaPlayerActionPerformed(java.awt.event.ActionEvent ev
         addComponentToContainer(new com.codename1.components.MediaPlayer(), "MediaPlayer");
 }//GEN-LAST:event_codenameOneMediaPlayerActionPerformed
 
+private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_initialFormActionPerformed
+    Properties p = view.getProjectGeneratorSettings();
+    if(p != null) {
+        p.setProperty("mainForm", name);
+        File codenameone_settings = new File(ResourceEditorView.getLoadedFile().getParentFile().getParentFile(), "codenameone_settings.properties");
+        if(codenameone_settings.exists()) {
+            OutputStream o = null;
+            try {
+                o = new FileOutputStream(codenameone_settings);
+                projectGeneratorSettings.store(o, "");
+                o.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error In Saving Settings: " + ex, "Error", JOptionPane.ERROR_MESSAGE);
+            } finally {
+                try {
+                    o.close();
+                } catch (IOException ex) {
+                }
+            }
+        }
+    }
+}//GEN-LAST:event_initialFormActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5260,10 +5311,12 @@ private void codenameOneMediaPlayerActionPerformed(java.awt.event.ActionEvent ev
     private javax.swing.JButton embedContainer;
     private javax.swing.JButton fileTree;
     private javax.swing.JTextPane help;
+    private javax.swing.JButton initialForm;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;

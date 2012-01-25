@@ -49,87 +49,24 @@ import javax.swing.JTextField;
  */
 public class GenerateHelper {
     static final String[] GENERATED_PROJECT_FOLDER_NAMES = {
-        "/GeneratedProject/Android",
-        "/GeneratedProject/Android/assets",
-        "/GeneratedProject/Android/bin",
-        "/GeneratedProject/Android/libs",
-        "/GeneratedProject/Android/nbproject",
-        "/GeneratedProject/Android/res",
-        "/GeneratedProject/Android/src",
-        "/GeneratedProject/Android/nbproject/private",
-        "/GeneratedProject/Android/res/layout",
-        "/GeneratedProject/Android/res/values",
-        "/GeneratedProject/Android/src/com/mycompany",
-        "/GeneratedProject/Desktop",
-        "/GeneratedProject/MIDP",
         "/GeneratedProject/nbproject",
-        "/GeneratedProject/RIM",
-        "/GeneratedProject/src",
-        "/GeneratedProject/Desktop/nbproject",
-        "/GeneratedProject/Desktop/src",
-        "/GeneratedProject/Desktop/test",
-        "/GeneratedProject/Desktop/nbproject/private",
-        "/GeneratedProject/Desktop/src/desktop",
-        "/GeneratedProject/MIDP/nbproject",
-        "/GeneratedProject/MIDP/src",
-        "/GeneratedProject/MIDP/nbproject/private",
-        "/GeneratedProject/MIDP/src/userclasses",
         "/GeneratedProject/nbproject/private",
-        "/GeneratedProject/RIM/nbproject",
-        "/GeneratedProject/RIM/src",
-        "/GeneratedProject/RIM/nbproject/private",
-        "/GeneratedProject/RIM/src/userclasses",
+        "/GeneratedProject/src",
         "/GeneratedProject/src/generated",
         "/GeneratedProject/src/userclasses",
     };
     static final String[] GENERATED_PROJECT_FILE_NAMES = {
         "/GeneratedProject/build.xml",
-        "/GeneratedProject/IO.jar",
-        "/GeneratedProject/IO_SE.jar",
-        "/GeneratedProject/README.TXT",
-        "/GeneratedProject/UI.jar",
-        "/GeneratedProject/UI_RIM.jar",
-        "/GeneratedProject/UI_RIM_Touch.jar",
-        "/GeneratedProject/UI_SE.jar",
-        "/GeneratedProject/Android/AndroidManifest.xml",
-        "/GeneratedProject/Android/build.properties",
-        "/GeneratedProject/Android/build.xml",
-        "/GeneratedProject/Android/default.properties",
-        "/GeneratedProject/Android/local.properties",
-        "/GeneratedProject/Android/proguard.cfg",
-        "/GeneratedProject/Android/libs/IO_Android.jar",
-        "/GeneratedProject/Android/libs/UI_Android.jar",
-        "/GeneratedProject/Android/nbproject/project.xml",
-        "/GeneratedProject/Android/nbproject/private/private.xml",
-        "/GeneratedProject/Android/res/layout/main.xml",
-        "/GeneratedProject/Android/res/values/strings.xml",
-        "/GeneratedProject/Android/src/com/mycompany/MainActivity.java",
-        "/GeneratedProject/Android/src/com/mycompany/R.java",
-        "/GeneratedProject/Desktop/build.xml",
-        "/GeneratedProject/Desktop/manifest.mf",
-        "/GeneratedProject/Desktop/nbproject/build-impl.xml",
-        "/GeneratedProject/Desktop/nbproject/genfiles.properties",
-        "/GeneratedProject/Desktop/nbproject/project.properties",
-        "/GeneratedProject/Desktop/nbproject/project.xml",
-        "/GeneratedProject/Desktop/src/desktop/LWUITApplet.java",
-        "/GeneratedProject/Desktop/src/desktop/Main.java",
-        "/GeneratedProject/MIDP/build.xml",
-        "/GeneratedProject/MIDP/nbproject/build-impl.xml",
-        "/GeneratedProject/MIDP/nbproject/genfiles.properties",
-        "/GeneratedProject/MIDP/nbproject/project.properties",
-        "/GeneratedProject/MIDP/nbproject/project.xml",
-        "/GeneratedProject/MIDP/src/userclasses/MainMIDlet.java",
+        "/GeneratedProject/CLDC11.jar",
+        "/GeneratedProject/CodeNameOneBuildClient.jar",
+        "/GeneratedProject/JavaSE.jar",
+        "/GeneratedProject/icon.png",
         "/GeneratedProject/nbproject/build-impl.xml",
         "/GeneratedProject/nbproject/genfiles.properties",
         "/GeneratedProject/nbproject/project.properties",
         "/GeneratedProject/nbproject/project.xml",
-        "/GeneratedProject/RIM/build.xml",
-        "/GeneratedProject/RIM/nbproject/build-impl.xml",
-        "/GeneratedProject/RIM/nbproject/genfiles.properties",
-        "/GeneratedProject/RIM/nbproject/project.properties",
-        "/GeneratedProject/RIM/nbproject/project.xml",
-        "/GeneratedProject/RIM/src/userclasses/MainMIDlet.java",
-        "/GeneratedProject/src/userclasses/StateMachine.java"
+        "/GeneratedProject/nbproject/private/private.properties",
+        "/GeneratedProject/src/userclasses/StateMachine.j"
     };
 
 
@@ -157,126 +94,97 @@ public class GenerateHelper {
             if(loadedResources == null) {
                 return null;
             }
-            String uiResourceName = v.pickMainScreenForm();
-            if(uiResourceName == null) {
-                JOptionPane.showMessageDialog(mainPanel, "This feature is designed for use with the GUI Builder", "Add A UI Form", JOptionPane.ERROR_MESSAGE);
+            if(loadedResources.getUIResourceNames() == null || loadedResources.getUIResourceNames().length == 0) {
+                JOptionPane.showMessageDialog(mainPanel, "This feature is designed for use with the GUI Builder", 
+                        "Add A UI Form", JOptionPane.ERROR_MESSAGE);
+                return null;
+            }
+            
+            GenerateNetBeansProjectDialog generateDialog = new GenerateNetBeansProjectDialog(mainPanel, loadedResources);
+            if(generateDialog.canceled()) {
                 return null;
             }
 
-            JTextField projectName = new JTextField("NewProject");
-            int res = JOptionPane.showConfirmDialog(mainPanel, projectName, "Enter Name For Project", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-            if(res != JOptionPane.OK_OPTION) {
-                return null;
+            File destFolder = new File(generateDialog.getDestinationDirectory());
+            if(!destFolder.exists()) {
+                destFolder.mkdirs();
             }
-            File[] f = ResourceEditorView.showSaveDirFileChooser();
-            if(f != null && f.length == 1) {
-                File destFolder;
-                if(!f[0].exists()) {
-                    f[0].mkdirs();
-                }
-                if(f[0].getName().equalsIgnoreCase(projectName.getText())) {
-                    destFolder = f[0];
+            if(!destFolder.getName().equalsIgnoreCase(generateDialog.getProjectName())) {
+                destFolder = new File(destFolder, generateDialog.getProjectName());
+                destFolder.mkdirs();
+            }
+
+            File srcDir = new File(destFolder, "src");
+            File generatedDir = new File(srcDir, "generated");
+            File nbprojectDir = new File(destFolder, "nbproject");
+            File nbprojectPrivateDir = new File(nbprojectDir, "private");
+
+            srcDir.mkdirs();
+            generatedDir.mkdirs();
+            nbprojectDir.mkdirs();
+
+
+            if(loadedFile == null) {
+                loadedFile = new File(srcDir, ResourceEditorView.normalizeFormName(generateDialog.getProjectName()) + ".res");
+            } else {
+                loadedFile = new File(srcDir, loadedFile.getName());
+            }
+            v.setLoadedFile(loadedFile);
+            OutputStream out = new FileOutputStream(loadedFile);
+            loadedResources.save(out);
+            out.close();
+            v.addToRecentMenu(loadedFile);
+
+            String packageName = v.generateStateMachineCode(generateDialog.getInitialForm(), new File(generatedDir, "StateMachineBase.java"), false);
+
+            Properties projectGeneratorSettings = new Properties();
+            projectGeneratorSettings.load(getClass().getResourceAsStream("/GeneratedProject/codenameone_settings.properties"));
+            projectGeneratorSettings.put("mainForm", generateDialog.getInitialForm());
+            projectGeneratorSettings.put("package", packageName);
+            File codenameOnePropertiesFile = new File(destFolder, "codenameone_settings.properties");
+            out = new FileOutputStream(codenameOnePropertiesFile);
+            projectGeneratorSettings.store(out, "Generated by the Codename One Designer");
+            projectGeneratorSettings.put("userClassAbs",
+                    new File(destFolder, projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
+            out.close();
+
+            for(String folderName : GENERATED_PROJECT_FOLDER_NAMES) {
+                new File(destFolder, folderName.replace("/GeneratedProject/", "")).mkdirs();
+            }
+            File generatePackageFolder = new File(srcDir, generateDialog.getPackageName().replace('.', File.separatorChar));
+            generatePackageFolder.mkdirs();
+            
+            for(String fileName : GENERATED_PROJECT_FILE_NAMES) {
+                if(fileName.endsWith(".j")) {
+                    createFileInDir(fileName, new File(destFolder, fileName.replace("/GeneratedProject/", "") + "ava"));
                 } else {
-                    destFolder = new File(f[0], projectName.getText());
-                    destFolder.mkdirs();
-                }
-
-                File srcDir = new File(destFolder, "src");
-                File generatedDir = new File(srcDir, "generated");
-                File nbprojectDir = new File(destFolder, "nbproject");
-
-                srcDir.mkdirs();
-                generatedDir.mkdirs();
-                nbprojectDir.mkdirs();
-
-                File midletFolder = new File(destFolder, "MIDP");
-                File midletUserclassesDir = new File(midletFolder, "src/userclasses");
-
-                File rimFolder = new File(destFolder, "RIM");
-                File rimUserclassesDir = new File(rimFolder, "src/userclasses");
-
-                if(loadedFile == null) {
-                    loadedFile = new File(srcDir, ResourceEditorView.normalizeFormName(projectName.getText()) + ".res");
-                } else {
-                    loadedFile = new File(srcDir, loadedFile.getName());
-                }
-                v.setLoadedFile(loadedFile);
-                OutputStream out = new FileOutputStream(loadedFile);
-                loadedResources.save(out);
-                out.close();
-                v.addToRecentMenu(loadedFile);
-
-                String packageName = v.generateStateMachineCode(uiResourceName, new File(generatedDir, "StateMachineBase.java"), false);
-
-                Properties projectGeneratorSettings = new Properties();
-                projectGeneratorSettings.load(getClass().getResourceAsStream("/GeneratedProject/codenameone_settings.properties"));
-                projectGeneratorSettings.put("mainForm", uiResourceName);
-                projectGeneratorSettings.put("package", packageName);
-                File codenameOnePropertiesFile = new File(destFolder, "codenameone_settings.properties");
-                out = new FileOutputStream(codenameOnePropertiesFile);
-                projectGeneratorSettings.store(out, "Generated by the Codename One Designer");
-                projectGeneratorSettings.put("userClassAbs",
-                        new File(destFolder, projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
-                out.close();
-
-                for(String folderName : GENERATED_PROJECT_FOLDER_NAMES) {
-                    new File(destFolder, folderName.replace("/GeneratedProject/", "")).mkdirs();
-                }
-                for(String fileName : GENERATED_PROJECT_FILE_NAMES) {
                     createFileInDir(fileName, new File(destFolder, fileName.replace("/GeneratedProject/", "")));
                 }
-
-                replaceStringInFiles("GeneratedProject", projectName.getText(), new File(destFolder, "build.xml"),
-                        new File(nbprojectDir, "build-impl.xml"),
-                        new File(nbprojectDir, "project.properties"),
-                        new File(nbprojectDir, "project.xml"));
-
-                replaceStringInFiles("AndroidGenerated", projectName.getText() + "_Android", new File(destFolder, "Android/build.xml"),
-                        new File(destFolder, "Android/nbproject/project.xml"));
-
-                replaceStringInFiles("DesktopGenerated", projectName.getText() + "_Desktop", new File(destFolder, "Desktop/build.xml"),
-                        new File(destFolder, "Desktop/nbproject/build-impl.xml"),
-                        new File(destFolder, "Desktop/nbproject/project.properties"),
-                        new File(destFolder, "Desktop/nbproject/project.xml"));
-
-                replaceStringInFiles("GeneratedProject", projectName.getText(), new File(destFolder, "Desktop/build.xml"),
-                        new File(destFolder, "Desktop/nbproject/build-impl.xml"),
-                        new File(destFolder, "Desktop/nbproject/project.properties"),
-                        new File(destFolder, "Desktop/nbproject/project.xml"));
-
-                replaceStringInFiles("MIDPGenerated", projectName.getText() + "_MIDP", new File(destFolder, "MIDP/build.xml"),
-                        new File(destFolder, "MIDP/nbproject/build-impl.xml"),
-                        new File(destFolder, "MIDP/nbproject/project.properties"),
-                        new File(destFolder, "MIDP/nbproject/project.xml"));
-
-                replaceStringInFiles("GeneratedProject", projectName.getText(), new File(destFolder, "MIDP/build.xml"),
-                        new File(destFolder, "MIDP/nbproject/build-impl.xml"),
-                        new File(destFolder, "MIDP/nbproject/project.properties"),
-                        new File(destFolder, "MIDP/nbproject/project.xml"));
-
-                replaceStringInFiles("RIMGenerated", projectName.getText() + "_RIM", new File(destFolder, "RIM/build.xml"),
-                        new File(destFolder, "RIM/nbproject/build-impl.xml"),
-                        new File(destFolder, "RIM/nbproject/project.properties"),
-                        new File(destFolder, "RIM/nbproject/project.xml"));
-
-                replaceStringInFiles("GeneratedProject", projectName.getText(), new File(destFolder, "RIM/build.xml"),
-                        new File(destFolder, "RIM/nbproject/build-impl.xml"),
-                        new File(destFolder, "RIM/nbproject/project.properties"),
-                        new File(destFolder, "RIM/nbproject/project.xml"));
-
-                replaceStringInFiles("res_file.res", loadedFile.getName(), new File(midletUserclassesDir, "MainMIDlet.java"),
-                        new File(rimUserclassesDir, "MainMIDlet.java"),
-                        new File(destFolder, "Android/src/com/mycompany/MainActivity.java"),
-                        new File(destFolder, "Desktop/src/desktop/Main.java"),
-                        new File(destFolder, "Desktop/src/desktop/LWUITApplet.java"));
-
-                ResourceEditorView.openInIDE(rimFolder, -1);
-                ResourceEditorView.openInIDE(midletFolder, -1);
-                ResourceEditorView.openInIDE(new File(destFolder, "Desktop"), -1);
-                ResourceEditorView.openInIDE(new File(destFolder, "Android"), -1);
-                ResourceEditorView.openInIDE(destFolder, -1);
-                return projectGeneratorSettings;
             }
+
+            File mainClassFile = new File(generatePackageFolder, generateDialog.getMainClassName() + ".java");
+            createFileInDir("/GeneratedProject/src/MainClass.j", mainClassFile);
+            replaceStringInFiles("MainClass", generateDialog.getMainClassName(), mainClassFile, 
+                    new File(destFolder, "codenameone_settings.properties"), 
+                    new File(nbprojectPrivateDir, "private.properties"));
+
+            replaceStringInFiles("resourceFileName.res", loadedFile.getName(), mainClassFile, 
+                    new File(destFolder, "codenameone_settings.properties"));
+            
+            replaceStringInFiles("MainFormName", generateDialog.getInitialForm(),
+                    new File(destFolder, "codenameone_settings.properties"));
+            
+            replaceStringInFiles("mainPackageName", generateDialog.getPackageName(), mainClassFile, 
+                    new File(destFolder, "codenameone_settings.properties"), 
+                    new File(nbprojectPrivateDir, "private.properties"));
+
+            replaceStringInFiles("GeneratedProject", generateDialog.getProjectName(), new File(destFolder, "build.xml"),
+                    new File(nbprojectDir, "build-impl.xml"),
+                    new File(nbprojectDir, "project.properties"),
+                    new File(nbprojectDir, "project.xml"));
+            
+            ResourceEditorView.openInIDE(destFolder, -1);
+            return projectGeneratorSettings;
         } catch(IOException err) {
             err.printStackTrace();
             JOptionPane.showMessageDialog(mainPanel, "IO Error occured during creation: " + err, "IO Error", JOptionPane.ERROR_MESSAGE);
