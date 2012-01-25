@@ -71,6 +71,15 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target name="-pre-compile">
+        <copy file="../../Skins/android.skin" todir="src" />
+        <copy file="../../Skins/feature_phone.skin" todir="src" />
+        <copy file="../../Skins/ipad.skin" todir="src" />
+        <copy file="../../Skins/nexus.skin" todir="src" />
+        <copy file="../../Skins/iphone3gs.skin" todir="src" />
+        <copy file="../../Skins/iphone4.skin" todir="src" />
+    </target>
+    
     <target name="-post-compile">
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="lib/jmf.jar" dest="build/classes" /> 
