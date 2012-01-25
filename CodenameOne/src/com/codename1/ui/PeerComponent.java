@@ -275,4 +275,15 @@ public class PeerComponent extends Component {
      */
     protected void onPositionSizeChange() {
     }
+    
+    /**
+     * An optional callback for peers indicating that the peer is now rendered as part of
+     * a transition or some other state and is thus not truly visible. In this case the
+     * peer should either make itself invisible or render itself as an image instead of
+     * natively
+     * 
+     * @param l true to enable lightweight mode, false to disable it
+     */
+    protected void setLightweightMode(boolean l) {
+    }
 }

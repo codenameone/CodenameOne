@@ -54,6 +54,7 @@ public class WebBrowser extends Container {
             isNative = false;
             internal = new HTMLComponent(new AsyncDocumentRequestHandlerImpl());
         }
+        addComponent(BorderLayout.CENTER, internal);
     }
 
     /**

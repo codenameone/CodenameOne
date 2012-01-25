@@ -131,6 +131,29 @@ public class EncodedImage extends Image {
     }
 
     /**
+     * Creates an image from the given byte array with the variables set appropriately.
+     * This saves LWUIT allot of resources since it doesn't need to actually traverse the 
+     * pixels of an image to find out details about it.
+     * 
+     * @param data the data of the image
+     * @param width the width of the image
+     * @param height the height of the image
+     * @param opacity true for an opaque image
+     * @return newly created encoded image
+     */
+    public static EncodedImage create(byte[] data, int width, int height, boolean opacity) {
+        if(data == null) {
+            throw new NullPointerException();
+        }
+        EncodedImage e = new EncodedImage(new byte[][] {data});
+        e.width = width;
+        e.height = height;
+        e.opaque = opacity;
+        e.opaqueChecked = true;
+        return e;
+    }
+    
+    /**
      * @inheritDoc
      */
     public Object getImage() {

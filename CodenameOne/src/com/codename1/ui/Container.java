@@ -1361,6 +1361,15 @@ public class Container extends Component {
         }
     }
 
+    /**
+     * This is a callback method for the peer component class
+     */
+    void setLightweightMode(boolean l) {
+        int size = getComponentCount();
+        for(int iter = 0 ; iter < size ; iter++) {
+            getComponentAt(iter).setLightweightMode(l);
+        }
+    }
 
     /**
      * @inheritDoc
@@ -1612,6 +1621,12 @@ public class Container extends Component {
                 default:
                     if (!started) {
                         t.init(current, next);
+                        if(current != null) {
+                            current.setLightweightMode(true);
+                        }
+                        if(next != null) {
+                            next.setLightweightMode(true);
+                        }
                         t.initTransition();
                         started = true;
                         if (thisContainer.cmpTransitions == null) {

@@ -1133,6 +1133,12 @@ public final class Display {
          try {
             dest.setVisible(true);
             transition.init(source, dest);
+            if(source != null) {
+                source.setLightweightMode(true);
+            }
+            if(dest != null) {
+                dest.setLightweightMode(true);
+            }
             animationQueue.addElement(transition);
 
             if (animationQueue.size() == 1) {

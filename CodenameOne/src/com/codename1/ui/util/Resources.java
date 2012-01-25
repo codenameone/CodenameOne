@@ -781,6 +781,12 @@ public class Resources {
                 case 0xf2:
                     byte[] data = new byte[input.readInt()];
                     input.readFully(data, 0, data.length);
+                    if(minorVersion > 3) {
+                        int width = input.readShort();
+                        int height = input.readShort();
+                        boolean opaque = input.readBoolean();
+                        return EncodedImage.create(data, width, height, opaque);
+                    }
                     return EncodedImage.create(data);
 
                 // Indexed image

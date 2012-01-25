@@ -3358,6 +3358,12 @@ public class Component implements Animation, StyleListener {
         }
         return null;
     }
+    
+    /**
+     * This is a callback method for the peer component class
+     */
+    void setLightweightMode(boolean l) {
+    }
 
     /**
      * Indicates whether scrolling this component should jump to a specific location

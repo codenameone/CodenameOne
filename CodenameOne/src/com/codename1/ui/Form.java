@@ -1256,6 +1256,7 @@ public class Form extends Container {
     }
 
     void onShowCompletedImpl() {
+        setLightweightMode(false);
         onShowCompleted();
         if(showListener != null) {
             showListener.fireActionEvent(new ActionEvent(this));
