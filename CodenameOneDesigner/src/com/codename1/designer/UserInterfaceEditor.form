@@ -408,8 +408,8 @@
                                         <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
-                                        <Property name="text" type="java.lang.String" value="HTML"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;HTMLComponent&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Simple HTML component without JavaScript support but with support for most of the HTML4 tags and&lt;br&gt;&#xa;some CSS. This component doesn&apos;t support accessing remote files (http/https) etc. for that look at&lt;br&gt;&#xa;the WebBrowser component in LWUIT4IO bellow.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="text" type="java.lang.String" value="Web View"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;WebBrowser&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Browser component that allows viewing HTML and optionally uses the platform native browser component if available&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -518,22 +518,6 @@
                                       </Properties>
                                       <Events>
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rssReaderActionPerformed"/>
-                                      </Events>
-                                    </Component>
-                                    <Component class="javax.swing.JButton" name="webBrowser">
-                                      <Properties>
-                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
-                                        </Property>
-                                        <Property name="text" type="java.lang.String" value="Web Browser"/>
-                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
-                                          <Border info="null"/>
-                                        </Property>
-                                        <Property name="horizontalAlignment" type="int" value="2"/>
-                                        <Property name="name" type="java.lang.String" value="webBrowser" noResource="true"/>
-                                      </Properties>
-                                      <Events>
-                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="webBrowserActionPerformed"/>
                                       </Events>
                                     </Component>
                                     <Component class="javax.swing.JButton" name="fileTree">

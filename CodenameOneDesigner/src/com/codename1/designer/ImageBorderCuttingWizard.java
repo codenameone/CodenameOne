@@ -25,6 +25,7 @@
 package com.codename1.designer;
 
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.resource.util.ImageTools;
 import com.codename1.ui.util.EditableResources;
 import java.awt.AlphaComposite;
 import java.awt.Dimension;
@@ -455,6 +456,15 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         BufferedImage leftImage = img.getSubimage(0, get(top), get(left), img.getHeight() - get(top) - get(bottom));
         BufferedImage rightImage = img.getSubimage(img.getWidth() - get(right), get(top), get(right), img.getHeight() - get(top) - get(bottom));
 
+        // optimize the size of the center/top/left/bottom/right images which is a HUGE performance deterant
+        if(center.getWidth() < 10 || center.getHeight() < 10) {
+            center = ImageTools.getScaledInstance(center, Math.max(20, center.getWidth()), Math.max(20, center.getHeight()));
+            topImage = ImageTools.getScaledInstance(topImage, Math.max(20, topImage.getWidth()), topImage.getHeight());
+            leftImage = ImageTools.getScaledInstance(leftImage, leftImage.getWidth(), Math.max(20, leftImage.getHeight()));
+            rightImage = ImageTools.getScaledInstance(rightImage, rightImage.getWidth(), Math.max(20, rightImage.getHeight()));
+            bottomImage = ImageTools.getScaledInstance(bottomImage, Math.max(20, bottomImage.getWidth()), bottomImage.getHeight());
+        }
+        
         com.codename1.ui.EncodedImage topLeftLwuit = com.codename1.ui.EncodedImage.create(toPng(topLeft));
         com.codename1.ui.EncodedImage topRightLwuit = com.codename1.ui.EncodedImage.create(toPng(topRight));
         com.codename1.ui.EncodedImage bottomLeftLwuit = com.codename1.ui.EncodedImage.create(toPng(bottomLeft));

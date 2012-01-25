@@ -926,7 +926,7 @@ public class UserInterfaceEditor extends BaseForm {
                     value = em.getValueAt(row, column, true);
                 }
                 if(rowClass == String.class) {
-                    if(getSelectedComponents()[0] instanceof com.codename1.ui.html.HTMLComponent) {
+                    if(getSelectedComponents()[0] instanceof com.codename1.components.WebBrowser) {
                         if(table.getValueAt(row, 0).equals("body")) {
                             currentEditor = new HTMLBodyEditor();
                             registerListeners();
@@ -1665,7 +1665,7 @@ public class UserInterfaceEditor extends BaseForm {
                     }
                     com.codename1.ui.Image img = com.codename1.ui.Image.createImage(cmp.getWidth(), cmp.getHeight());
                     cmp.paintComponent(img.getGraphics());
-                    return new LWUITImageIcon(img);
+                    return new CodenameOneImageIcon(img);
                 } catch(Exception e) {
                     e.printStackTrace();
                 }
@@ -1698,9 +1698,8 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneContainerList, com.codename1.ui.list.ContainerList.class, "ContainerList", null);
         makeDraggable(codenameOneComponentGroup, com.codename1.ui.ComponentGroup.class, "ComponentGroup", null);
         makeDraggable(codenameOneTree, com.codename1.ui.tree.Tree.class, "Tree", null);
-        makeDraggable(codenameOneHTMLComponent, com.codename1.ui.html.HTMLComponent.class, "HTMLComponent", null);
+        makeDraggable(codenameOneHTMLComponent, com.codename1.components.WebBrowser.class, "WebBrowser", null);
         makeDraggable(rssReader, com.codename1.components.RSSReader.class, "RSSReader", null);
-        makeDraggable(webBrowser, com.codename1.components.WebBrowser.class, "WebBrowser", null);
         makeDraggable(fileTree, com.codename1.components.FileTree.class, "FileTree", null);
         makeDraggable(embedContainer, EmbeddedContainer.class, "EmbeddedContainer", null);
 
@@ -1847,8 +1846,8 @@ public class UserInterfaceEditor extends BaseForm {
                         setPropertyModified(cmp, PROPERTY_LIST_ITEMS);
                     }
                 } else {
-                    if(cmp instanceof com.codename1.ui.html.HTMLComponent) {
-                        ((com.codename1.ui.html.HTMLComponent)cmp).setHTML("<html><head><title>HTMLComponent</title></head><body>To use the HTML component you need to set a page or assign a jar/res URL in the code</body></html>", "UTF-8", null, true);
+                    if(cmp instanceof com.codename1.components.WebBrowser) {
+                        ((com.codename1.components.WebBrowser)cmp).setPage("<html><head><title>Web Component</title></head><body>To use the HTML component you need to set a page or assign a jar/res URL in the code</body></html>", null);
                         setCustomPropertyModified(cmp, "body");
                     }
                 }
@@ -3945,7 +3944,6 @@ public class UserInterfaceEditor extends BaseForm {
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
-        webBrowser = new javax.swing.JButton();
         fileTree = new javax.swing.JButton();
         jPanel8 = new javax.swing.JPanel();
         userComponents = new javax.swing.JPanel();
@@ -4150,8 +4148,8 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneExtraComponents.add(codenameOneTree);
 
         codenameOneHTMLComponent.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
-        codenameOneHTMLComponent.setText("HTML");
-        codenameOneHTMLComponent.setToolTipText("<html><body><b>HTMLComponent</b><br> \n<p>\nSimple HTML component without JavaScript support but with support for most of the HTML4 tags and<br>\nsome CSS. This component doesn't support accessing remote files (http/https) etc. for that look at<br>\nthe WebBrowser component in LWUIT4IO bellow.\n</p> </body> </html>"); // NOI18N
+        codenameOneHTMLComponent.setText("Web View");
+        codenameOneHTMLComponent.setToolTipText("<html><body><b>WebBrowser</b><br> \n<p>\nBrowser component that allows viewing HTML and optionally uses the platform native browser component if available\n</p> </body> </html>"); // NOI18N
         codenameOneHTMLComponent.setBorder(null);
         codenameOneHTMLComponent.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneHTMLComponent.setName("codenameOneHTMLComponent"); // NOI18N
@@ -4202,14 +4200,6 @@ public class UserInterfaceEditor extends BaseForm {
         rssReader.setName("rssReader"); // NOI18N
         rssReader.addActionListener(formListener);
         codenameOneIOComponents.add(rssReader);
-
-        webBrowser.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
-        webBrowser.setText("Web Browser");
-        webBrowser.setBorder(null);
-        webBrowser.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
-        webBrowser.setName("webBrowser"); // NOI18N
-        webBrowser.addActionListener(formListener);
-        codenameOneIOComponents.add(webBrowser);
 
         fileTree.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         fileTree.setText("File Tree");
@@ -4510,11 +4500,11 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneComponentGroup) {
                 UserInterfaceEditor.this.codenameOneComponentGroupActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneMediaPlayer) {
+                UserInterfaceEditor.this.codenameOneMediaPlayerActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
-            }
-            else if (evt.getSource() == webBrowser) {
-                UserInterfaceEditor.this.webBrowserActionPerformed(evt);
             }
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
@@ -4551,9 +4541,6 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == simulateDevice) {
                 UserInterfaceEditor.this.simulateDeviceActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneMediaPlayer) {
-                UserInterfaceEditor.this.codenameOneMediaPlayerActionPerformed(evt);
             }
         }
 
@@ -4684,7 +4671,7 @@ public class UserInterfaceEditor extends BaseForm {
             lockForDragging = false;
             return;
         }
-        addComponentToContainer(new com.codename1.ui.html.HTMLComponent(), "HTMLComponent");
+        addComponentToContainer(new com.codename1.components.WebBrowser(), "WebBrowser");
 }//GEN-LAST:event_codenameOneHTMLComponentActionPerformed
 
     private void codenameOneTabsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneTabsActionPerformed
@@ -4944,14 +4931,6 @@ public class UserInterfaceEditor extends BaseForm {
         }
         addComponentToContainer(new com.codename1.components.RSSReader(), "RSSReader");
 }//GEN-LAST:event_rssReaderActionPerformed
-
-    private void webBrowserActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_webBrowserActionPerformed
-        if(lockForDragging) {
-            lockForDragging = false;
-            return;
-        }
-        addComponentToContainer(new com.codename1.components.WebBrowser(), "WebBrowser");
-}//GEN-LAST:event_webBrowserActionPerformed
 
     private void fileTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fileTreeActionPerformed
         if(lockForDragging) {
@@ -5313,7 +5292,6 @@ private void codenameOneMediaPlayerActionPerformed(java.awt.event.ActionEvent ev
     private javax.swing.JPanel uiPreview;
     private javax.swing.JCheckBox useNativeTheme;
     private javax.swing.JPanel userComponents;
-    private javax.swing.JButton webBrowser;
     private org.jdesktop.swingx.JXButton whyAreEventsDisabled;
     // End of variables declaration//GEN-END:variables
 

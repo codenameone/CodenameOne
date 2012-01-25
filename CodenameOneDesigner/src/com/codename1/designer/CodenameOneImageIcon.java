@@ -34,19 +34,19 @@ import javax.swing.Icon;
  *
  * @author Shai Almog
  */
-public class LWUITImageIcon implements Icon {
+public class CodenameOneImageIcon implements Icon {
     private com.codename1.ui.Image img;
     private int width;
     private int height;
-    public LWUITImageIcon(com.codename1.ui.Image img) {
+    public CodenameOneImageIcon(com.codename1.ui.Image img) {
         this(img, 16, 16);
     }
 
-    public static LWUITImageIcon create(com.codename1.ui.Image img) {
-        return new LWUITImageIcon(img, img.getWidth(), img.getHeight());
+    public static CodenameOneImageIcon create(com.codename1.ui.Image img) {
+        return new CodenameOneImageIcon(img, img.getWidth(), img.getHeight());
     }
 
-    public LWUITImageIcon(com.codename1.ui.Image img, int width, int height) {
+    public CodenameOneImageIcon(com.codename1.ui.Image img, int width, int height) {
         this.img = img;
         this.width = width;
         this.height = height;

@@ -54,11 +54,11 @@ import javax.swing.SwingUtilities;
  *
  * @author Shai Almog
  */
-public class LWUITImageRenderer extends JComponent implements MouseListener, MouseMotionListener {
+public class CodenameOneImageRenderer extends JComponent implements MouseListener, MouseMotionListener {
     private com.codename1.ui.Image image;
     private BufferedImage[] buffer;
     private int currentFrame = 0;
-    private static List<WeakReference<LWUITImageRenderer>> allAnimations = new ArrayList<WeakReference<LWUITImageRenderer>>();
+    private static List<WeakReference<CodenameOneImageRenderer>> allAnimations = new ArrayList<WeakReference<CodenameOneImageRenderer>>();
     private JTable animationObjectList;
 
     // variables related to animations
@@ -78,8 +78,8 @@ public class LWUITImageRenderer extends JComponent implements MouseListener, Mou
     static {
         javax.swing.Timer t = new javax.swing.Timer(200, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                for(WeakReference<LWUITImageRenderer> img : allAnimations) {
-                    LWUITImageRenderer r = img.get();
+                for(WeakReference<CodenameOneImageRenderer> img : allAnimations) {
+                    CodenameOneImageRenderer r = img.get();
                     if(r != null) {
                         r.updateFrameAnimation();
                     } else {
@@ -131,13 +131,13 @@ public class LWUITImageRenderer extends JComponent implements MouseListener, Mou
         }
     }
     
-    public LWUITImageRenderer(com.codename1.ui.Image image) {
+    public CodenameOneImageRenderer(com.codename1.ui.Image image) {
         this.image = image;
         buffer = new BufferedImage[] {new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB)};
         buffer[0].setRGB(0, 0, image.getWidth(), image.getHeight(), image.getRGB(), 0, image.getWidth());
         if(image instanceof Timeline) {
             totalAnimationTime = ((Timeline)image).getDuration();
-            allAnimations.add(new WeakReference<LWUITImageRenderer>(this));
+            allAnimations.add(new WeakReference<CodenameOneImageRenderer>(this));
         } 
         setPreferredSize(new Dimension(image.getWidth(), image.getHeight()));
     }
@@ -222,9 +222,9 @@ public class LWUITImageRenderer extends JComponent implements MouseListener, Mou
         }
     }
     
-    public static LWUITImageRenderer create(File file) throws IOException {
+    public static CodenameOneImageRenderer create(File file) throws IOException {
         InputStream i = new FileInputStream(file);
-        LWUITImageRenderer r = new LWUITImageRenderer(com.codename1.ui.EncodedImage.create(i));
+        CodenameOneImageRenderer r = new CodenameOneImageRenderer(com.codename1.ui.EncodedImage.create(i));
         i.close();
         return r;
     }

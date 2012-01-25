@@ -1917,7 +1917,7 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         } else {
             previewImage.paintComponent(g);
         }
-        return new LWUITImageIcon(tempImage, 100, 32);
+        return new CodenameOneImageIcon(tempImage, 100, 32);
     }
 
     class ThemeRenderer extends DefaultTableCellRenderer {
@@ -1940,7 +1940,7 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
                 } else {
                     if(value instanceof com.codename1.ui.Image) {
                         super.getTableCellRendererComponent(table, "", isSelected, hasFocus, row, column);
-                        setIcon(new LWUITImageIcon((com.codename1.ui.Image)value, 32, 32));
+                        setIcon(new CodenameOneImageIcon((com.codename1.ui.Image)value, 32, 32));
                         return this;
                     }
                 }

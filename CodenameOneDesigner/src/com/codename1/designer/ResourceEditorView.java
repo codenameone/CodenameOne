@@ -217,7 +217,7 @@ public class ResourceEditorView extends FrameView {
         imageList = new HorizontalList(loadedResources, this, 40) {
             @Override
             public Icon getIconImage(String current) {
-                return new LWUITImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
+                return new CodenameOneImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
             }
 
             @Override
@@ -228,7 +228,7 @@ public class ResourceEditorView extends FrameView {
         imageListMain = new HorizontalList(loadedResources, this, 40) {
             @Override
             public Icon getIconImage(String current) {
-                return new LWUITImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
+                return new CodenameOneImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
             }
 
             @Override
@@ -248,7 +248,7 @@ public class ResourceEditorView extends FrameView {
         imageListSVG = new HorizontalList(loadedResources, this, 40) {
             @Override
             public Icon getIconImage(String current) {
-                return new LWUITImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
+                return new CodenameOneImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
             }
 
             @Override
@@ -267,7 +267,7 @@ public class ResourceEditorView extends FrameView {
         imageListMulti = new HorizontalList(loadedResources, this, 40) {
             @Override
             public Icon getIconImage(String current) {
-                return new LWUITImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
+                return new CodenameOneImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
             }
 
             @Override
@@ -286,7 +286,7 @@ public class ResourceEditorView extends FrameView {
         imageListTimeline = new HorizontalList(loadedResources, this, 40) {
             @Override
             public Icon getIconImage(String current) {
-                return new LWUITImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
+                return new CodenameOneImageIcon(loadedResources.getImage(current), getSettingsIconWidth(), getSettingsIconHeight());
             }
 
             @Override
@@ -2711,7 +2711,7 @@ public static void initImagesComboBox(JComboBox cb, final EditableResources res,
                 }
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if(!n) {
-                    setIcon(new LWUITImageIcon(res.getImage((String)value), 24, 24));
+                    setIcon(new CodenameOneImageIcon(res.getImage((String)value), 24, 24));
                 } else {
                     setIcon(null);
                 }
@@ -2766,7 +2766,7 @@ public static void initImagesComboBox(JComboBox cb, final EditableResources res,
                 }
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if(i != null) {
-                    setIcon(new LWUITImageIcon(i, 24, 24));
+                    setIcon(new CodenameOneImageIcon(i, 24, 24));
                 } else {
                     setIcon(null);
                 }

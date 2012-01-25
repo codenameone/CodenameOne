@@ -26,8 +26,10 @@ package com.codename1.designer;
 
 import com.codename1.ui.EncodedImage;
 import com.codename1.designer.ResourceEditorView;
+import com.codename1.ui.resource.util.ImageTools;
 import com.codename1.ui.util.EditableResources;
 import java.awt.Component;
+import java.awt.Desktop;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -35,6 +37,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -43,6 +46,7 @@ import javax.imageio.ImageIO;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -65,7 +69,7 @@ public class ImageMultiEditor extends BaseForm {
             com.codename1.ui.Display.DENSITY_HD
     };
     private EditableResources.MultiImage multi;
-    private LWUITImageRenderer renderer;
+    private CodenameOneImageRenderer renderer;
     
     /** Creates new form ImageMultiEditor */
     public ImageMultiEditor(EditableResources res, String name, ResourceEditorView view) {
@@ -116,7 +120,7 @@ public class ImageMultiEditor extends BaseForm {
         }
     }
 
-    private com.codename1.ui.Image getByDPI(EditableResources.MultiImage m, int dpi) {
+    private com.codename1.ui.EncodedImage getByDPI(EditableResources.MultiImage m, int dpi) {
         for(int iter = 0 ; iter < m.getDpi().length ; iter++) {
             if(m.getDpi()[iter] == dpi) {
                 return m.getInternalImages()[iter];
@@ -134,7 +138,7 @@ public class ImageMultiEditor extends BaseForm {
             preview.repaint();
             return;
         }
-        renderer = new LWUITImageRenderer(img);
+        renderer = new CodenameOneImageRenderer(img);
         renderer.scale(((Number)zoom.getValue()).doubleValue());
         if(img instanceof com.codename1.ui.EncodedImage) {
             int s = ((com.codename1.ui.EncodedImage)img).getImageData().length;
@@ -171,6 +175,7 @@ public class ImageMultiEditor extends BaseForm {
         delete = new javax.swing.JButton();
         scale = new javax.swing.JButton();
         toJpeg = new javax.swing.JButton();
+        editExternal = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -229,6 +234,11 @@ public class ImageMultiEditor extends BaseForm {
         toJpeg.setName("toJpeg"); // NOI18N
         toJpeg.addActionListener(formListener);
 
+        editExternal.setText("Edit");
+        editExternal.setToolTipText("Edit the image with an external tool");
+        editExternal.setName("editExternal"); // NOI18N
+        editExternal.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
@@ -242,6 +252,8 @@ public class ImageMultiEditor extends BaseForm {
                         .add(dpi, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(editImage)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(editExternal)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(delete)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -259,9 +271,9 @@ public class ImageMultiEditor extends BaseForm {
                     .add(layout.createSequentialGroup()
                         .add(preview, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 518, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 480, Short.MAX_VALUE)))
+                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 577, Short.MAX_VALUE)))
                 .addContainerGap())
-            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 1052, Short.MAX_VALUE)
+            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 1149, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -277,7 +289,8 @@ public class ImageMultiEditor extends BaseForm {
                     .add(zoom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(imageSize)
                     .add(scale)
-                    .add(toJpeg))
+                    .add(toJpeg)
+                    .add(editExternal))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                     .add(jScrollPane1)
@@ -306,6 +319,9 @@ public class ImageMultiEditor extends BaseForm {
             }
             else if (evt.getSource() == toJpeg) {
                 ImageMultiEditor.this.toJpegActionPerformed(evt);
+            }
+            else if (evt.getSource() == editExternal) {
+                ImageMultiEditor.this.editExternalActionPerformed(evt);
             }
         }
 
@@ -377,6 +393,40 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
         setImage(newImage);
 }//GEN-LAST:event_toJpegActionPerformed
 
+private void editExternalActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editExternalActionPerformed
+        try {
+            final File tempImage = File.createTempFile("Image", ".png");
+            tempImage.deleteOnExit();
+            com.codename1.ui.EncodedImage img = getByDPI(multi, DPIS[dpi.getSelectedIndex()]);
+            
+            FileOutputStream os = new FileOutputStream(tempImage);
+            os.write(img.getImageData());
+            os.close();
+            Desktop.getDesktop().edit(tempImage);
+            new Thread() {
+                public void run() {
+                    long tstamp = tempImage.lastModified();
+                    File f = ResourceEditorView.getLoadedFile();
+                    while(f == ResourceEditorView.getLoadedFile() && tempImage.exists()) {
+                        if(tstamp != tempImage.lastModified()) {
+                            tstamp = tempImage.lastModified();
+                            pickFile(tempImage);
+                        }
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }.start();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "An error occured working with the file: " + ex,
+                    "Error", JOptionPane.ERROR_MESSAGE);            
+        }
+}//GEN-LAST:event_editExternalActionPerformed
+
     public static EditableResources.MultiImage scaleMultiImage(int fromDPI, int toDPI, int scaledWidth, int scaledHeight, EditableResources.MultiImage multi) {
         try {
             int[] dpis = multi.getDpi();
@@ -415,11 +465,7 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
             buffer.setRGB(0, 0, sourceImage.getWidth(), sourceImage.getHeight(), sourceImage.getRGB(), 0, sourceImage.getWidth());
             sourceImage.getRGB();
             sourceImage.getWidth();
-            BufferedImage scaled = new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = scaled.createGraphics();
-            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2d.drawImage(buffer, 0, 0, scaled.getWidth(), scaled.getHeight(), null);
-            g2d.dispose();
+            BufferedImage scaled = ImageTools.getScaledInstance(buffer, scaledWidth, scaledHeight);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             ImageIO.write(scaled, "png", output);
             output.close();
@@ -429,6 +475,8 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
             return newImage;
         } catch (IOException ex) {
             ex.printStackTrace();
+            JOptionPane.showMessageDialog(JFrame.getFrames()[0], "An error occured working with the file: " + ex,
+                    "Error", JOptionPane.ERROR_MESSAGE);            
         }
         return null;
     }
@@ -463,13 +511,8 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
         }
     }
 
-    private void pickFile() {
+    private void pickFile(File selection) {
         try {
-            File[] files = ResourceEditorView.showOpenFileChooser("Images", ".gif", ".png", ".jpg");
-            if (files == null) {
-                return;
-            }
-            File selection = files[0];
             byte[] data = new byte[(int) selection.length()];
             DataInputStream di = new DataInputStream(new FileInputStream(selection));
             di.readFully(data);
@@ -507,12 +550,22 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
                 "IO Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+    
+    private void pickFile() {
+        File[] files = ResourceEditorView.showOpenFileChooser("Images", ".gif", ".png", ".jpg");
+        if (files == null) {
+            return;
+        }
+        File selection = files[0];
+        pickFile(selection);
+    }
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JList componentList;
     private javax.swing.JButton delete;
     private javax.swing.JComboBox dpi;
+    private javax.swing.JButton editExternal;
     private javax.swing.JButton editImage;
     private javax.swing.JTextPane help;
     private javax.swing.JLabel imageName;

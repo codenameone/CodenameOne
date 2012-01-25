@@ -71,7 +71,7 @@ import org.w3c.dom.NodeList;
  * @author Shai
  */
 public class TimelineEditor extends BaseForm {
-    private LWUITImageRenderer renderer;
+    private CodenameOneImageRenderer renderer;
     private EditableResources res;
     private String name;
     private javax.swing.Timer refreshTimeline;
@@ -329,7 +329,7 @@ public class TimelineEditor extends BaseForm {
         /*for(int iter = 0 ; iter < image.getAnimationCount() ; iter++) {
             model.addElement(image.getAnimation(iter));
         }*/
-        renderer = new LWUITImageRenderer(image);
+        renderer = new CodenameOneImageRenderer(image);
         renderer.setAnimationObjectList(animationObjectList, this);
         animationPanel.add(BorderLayout.CENTER, renderer);
         animationPanel.revalidate();

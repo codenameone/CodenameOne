@@ -84,7 +84,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 3;
+    private static final short MINOR_VERSION = 4;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -1147,6 +1147,9 @@ public class EditableResources extends Resources implements TreeModel {
                     byte[] data = ((EncodedImage)image).getImageData();
                     output.writeInt(data.length);
                     output.write(data);
+                    output.writeInt(image.getWidth());
+                    output.writeInt(image.getHeight());
+                    output.writeBoolean(image.isOpaque());
                 } else {
                     writeImageAsPNG(image,type, output);
                 }

@@ -26,6 +26,8 @@
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="editImage" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
+                      <Component id="editExternal" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
                       <Component id="delete" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="scale" min="-2" max="-2" attributes="0"/>
@@ -43,12 +45,12 @@
                   <Group type="102" alignment="0" attributes="0">
                       <Component id="preview" min="-2" pref="518" max="-2" attributes="0"/>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                      <Component id="jScrollPane1" pref="480" max="32767" attributes="2"/>
+                      <Component id="jScrollPane1" pref="577" max="32767" attributes="2"/>
                   </Group>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
           </Group>
-          <Component id="jScrollPane2" alignment="0" pref="1052" max="32767" attributes="0"/>
+          <Component id="jScrollPane2" alignment="0" pref="1149" max="32767" attributes="0"/>
       </Group>
     </DimensionLayout>
     <DimensionLayout dim="1">
@@ -66,6 +68,7 @@
                   <Component id="imageSize" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="scale" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="toJpeg" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="editExternal" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" max="-2" attributes="0">
@@ -211,6 +214,16 @@
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="toJpegActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="editExternal">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Edit"/>
+        <Property name="toolTipText" type="java.lang.String" value="Edit the image with an external tool"/>
+        <Property name="name" type="java.lang.String" value="editExternal" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="editExternalActionPerformed"/>
       </Events>
     </Component>
   </SubComponents>

@@ -50,7 +50,7 @@ import javax.swing.SpinnerNumberModel;
 public class ImageRGBEditor extends BaseForm {
     private EditableResources res;
     private String name;
-    private LWUITImageRenderer renderer;
+    private CodenameOneImageRenderer renderer;
     private ResourceEditorView view;
 
     /** Creates new form ImageRGBEditor */
@@ -76,7 +76,7 @@ public class ImageRGBEditor extends BaseForm {
     }
 
     public void setImage(com.codename1.ui.Image img) {
-        renderer = new LWUITImageRenderer(img);
+        renderer = new CodenameOneImageRenderer(img);
         if(img instanceof com.codename1.ui.EncodedImage) {
             int s = ((com.codename1.ui.EncodedImage)img).getImageData().length;
             imageSize.setText(img.getWidth() + "x" + img.getHeight() + " " + (s / 1024) + "kb (" + s + " bytes)");
@@ -270,7 +270,7 @@ public class ImageRGBEditor extends BaseForm {
             if(renderer != null) {
                 preview.removeAll();
             }
-            renderer = new LWUITImageRenderer(createImage(selection));
+            renderer = new CodenameOneImageRenderer(createImage(selection));
             preview.add(BorderLayout.CENTER, renderer);
             res.setImage(name, renderer.getImage());
             preview.revalidate();
@@ -338,7 +338,7 @@ public class ImageRGBEditor extends BaseForm {
                                     l.getStyle().setBorder(b);
                                     l.setSize(new com.codename1.ui.geom.Dimension(borderWidth, borderHeight));
                                     l.paintComponent(img.getGraphics());
-                                    LWUITImageIcon icon = new LWUITImageIcon(img, borderWidth, borderHeight);
+                                    CodenameOneImageIcon icon = new CodenameOneImageIcon(img, borderWidth, borderHeight);
                                     borderPreview.setIcon(icon);
                                 }
                             }

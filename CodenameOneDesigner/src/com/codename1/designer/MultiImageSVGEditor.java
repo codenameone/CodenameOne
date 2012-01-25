@@ -46,7 +46,7 @@ import javax.swing.event.TableModelListener;
 public class MultiImageSVGEditor extends javax.swing.JPanel {
     private EditableResources res;
     private String name;
-    private LWUITImageRenderer renderer;
+    private CodenameOneImageRenderer renderer;
 
     /** Creates new form MultiImageSVGEditor */
     public MultiImageSVGEditor(EditableResources res, String name) {
@@ -186,7 +186,7 @@ public class MultiImageSVGEditor extends javax.swing.JPanel {
                 dpiTable.setValueAt(s.getHeightForDPI()[iter], row, 3);
             }
         }
-        renderer = new LWUITImageRenderer(img);
+        renderer = new CodenameOneImageRenderer(img);
         preview.removeAll();
         preview.add(BorderLayout.CENTER, renderer);
         preview.revalidate();
@@ -408,7 +408,7 @@ public class MultiImageSVGEditor extends javax.swing.JPanel {
             if(renderer != null) {
                 preview.removeAll();
             }
-            renderer = new LWUITImageRenderer(createImage(selection));
+            renderer = new CodenameOneImageRenderer(createImage(selection));
             preview.add(BorderLayout.CENTER, renderer);
             res.setImage(name, renderer.getImage());
             preview.revalidate();
