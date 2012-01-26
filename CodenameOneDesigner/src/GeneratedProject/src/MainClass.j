@@ -21,7 +21,7 @@ public class MainClass {
      * Invoked to start or resume the application
      */
     public void start() {
-        new StateMachine("/resourceFileName.res");
+        new StateMachine("/resourceFileNameNoExt");
     }
     
     /**

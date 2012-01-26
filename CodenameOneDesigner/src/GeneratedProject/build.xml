@@ -131,9 +131,9 @@
             subtitle="${codename1.secondaryTitle}"
 
             targetType="rim"
-            signtoolDb="${codename1.rim.signtoolDb}"
+            sigtoolDb="${codename1.rim.signtoolDb}"
             certPassword="${codename1.rim.certificatePassword}"
-            signtoolCsk="${codename1.rim.signtoolCsk}"
+            sigtoolCsk="${codename1.rim.signtoolCsk}"
             />
     </target>
 

@@ -3822,4 +3822,13 @@ public abstract class CodenameOneImplementation {
      * @return the name of the platform e.g. ios, rim, win, and, me
      */
     public abstract String getPlatformName();
+
+    /**
+     * Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
+     * 
+     * @return a string array with the proper order of resource override layers
+     */
+    public String[] getPlatformOverrides() {
+        return new String[0];
+    }
 }

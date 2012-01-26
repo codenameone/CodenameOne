@@ -2853,4 +2853,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     public String getPlatformName() {
         return "me";
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPlatformOverrides() {
+        return new String[] {"phone", "me"};
+    }
 }

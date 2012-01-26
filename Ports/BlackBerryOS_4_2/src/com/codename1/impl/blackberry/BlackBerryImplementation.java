@@ -2553,4 +2553,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public String getPlatformName() {
         return "rim";
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPlatformOverrides() {
+        return new String[] {"phone", "rim"};
+    }
 }

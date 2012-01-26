@@ -168,8 +168,10 @@ public class GenerateHelper {
                     new File(destFolder, "codenameone_settings.properties"), 
                     new File(nbprojectPrivateDir, "private.properties"));
 
-            replaceStringInFiles("resourceFileName.res", loadedFile.getName(), mainClassFile, 
+            String loadedFileName = loadedFile.getName();
+            replaceStringInFiles("resourceFileName.res", loadedFileName, 
                     new File(destFolder, "codenameone_settings.properties"));
+            replaceStringInFiles("resourceFileNameNoExt", loadedFileName.substring(0, loadedFileName.length() - 4), mainClassFile);
             
             replaceStringInFiles("MainFormName", generateDialog.getInitialForm(),
                     new File(destFolder, "codenameone_settings.properties"));

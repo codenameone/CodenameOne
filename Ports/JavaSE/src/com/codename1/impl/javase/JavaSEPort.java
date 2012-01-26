@@ -157,6 +157,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private java.awt.Rectangle landscapeScreenCoordinates;
     private static Class clsInstance;
 
+    private String platformName;
+    private String[] platformOverrides = new String[0];
+    
     public static void setBaseResourceDir(File f) {
         baseResourceDir = f;
     }
@@ -778,6 +781,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
             initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+
+            platformName = props.getProperty("platformName", "se");
+            platformOverrides = props.getProperty("overrideNames", "").split(",");
 
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
@@ -2593,9 +2599,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getPlatformName() {
-        return "se";
+        return platformName;
     }
     
+    /**
+     * @inheritDoc
+     */
+    public String[] getPlatformOverrides() {
+        return platformOverrides;
+    }
+
     class CodenameOneMediaPlayer implements Media, ControllerListener {
 
         private Runnable onCompletion;

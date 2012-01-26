@@ -71,4 +71,7 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target name="-pre-compile">
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="src/GeneratedProject" />
+    </target>
 </project>

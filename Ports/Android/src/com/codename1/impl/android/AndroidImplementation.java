@@ -2479,6 +2479,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return "and";
     }
 
+    /**
+     * @inheritDoc
+     */
+    public String[] getPlatformOverrides() {
+        if(isTablet()) {
+            return new String[] {"tablet", "android", "android-tab"};
+        } else {
+            return new String[] {"phone", "android", "android-phone"};
+        }
+    }
+
     public class Video extends AndroidImplementation.AndroidPeer implements Media {
 
         private VideoView nativeVideo;

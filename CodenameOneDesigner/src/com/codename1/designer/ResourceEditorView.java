@@ -188,7 +188,7 @@ public class ResourceEditorView extends FrameView {
             "android-tab",
             "win",
             "rim",
-            "j2me",
+            "me",
             "tablet",
             "phone",
     };
@@ -509,6 +509,7 @@ public class ResourceEditorView extends FrameView {
             overrideDir.mkdirs();
             if(platformOverrides.getSelectedIndex() > 0) {
                 String name = loadedFile.getName();
+                name = name.substring(0, name.length() - 4);
                 name.substring(0, name.length() - 4);
                 return new File(overrideDir, name + "_" + OVERRIDE_NAMES[platformOverrides.getSelectedIndex()] + ".ovr");
             }
@@ -2034,7 +2035,7 @@ private void showSourcesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         a.setWrapStyleWord(true);
         a.setLineWrap(true);
         String text = "try {\n" +
-                  "    Resources res = Resources.open(\"/" + loadedFile.getName() + "\");\n";
+                  "    Resources res = Resources.openLayered(\"/" + loadedFile.getName() + "\");\n";
         if(loadedResources.getThemeResourceNames() != null && loadedResources.getThemeResourceNames().length > 0) {
             text += "    UIManager.getInstance().setThemeProps(res.getTheme(" + loadedResources.getThemeResourceNames()[0] + "));\n";
         }
@@ -2296,7 +2297,7 @@ private void uiBuilderSourceActionPerformed(java.awt.event.ActionEvent evt) {//G
             w.write("        if(loadTheme) {\n");
             w.write("            if(res == null) {\n");
             w.write("                try {\n");
-            w.write("                    res = Resources.open(resPath);\n");
+            w.write("                    res = Resources.openLayered(resPath);\n");
             w.write("                } catch(java.io.IOException err) { err.printStackTrace(); }\n");
             w.write("            }\n");
             w.write("            initTheme(res);\n");
@@ -2325,7 +2326,7 @@ private void uiBuilderSourceActionPerformed(java.awt.event.ActionEvent evt) {//G
             w.write("        if(loadTheme) {\n");
             w.write("            if(res == null) {\n");
             w.write("                try {\n");
-            w.write("                    res = Resources.open(resPath);\n");
+            w.write("                    res = Resources.openLayered(resPath);\n");
             w.write("                } catch(java.io.IOException err) { err.printStackTrace(); }\n");
             w.write("            }\n");
             w.write("            initTheme(res);\n");
@@ -3742,7 +3743,7 @@ public static void openInIDE(File f, int lineNumber) {
                         InputStream i = new FileInputStream(codenameone_settings);
                         projectGeneratorSettings.load(i);
                         i.close();
-                        if(projectGeneratorSettings.getProperty("guiResource", selection.getName()).equals(selection.getName())) {
+                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null))) {
                             projectGeneratorSettings.put("userClassAbs",
                                     new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
                             if(projectGeneratorSettings.containsKey("netbeans")) {

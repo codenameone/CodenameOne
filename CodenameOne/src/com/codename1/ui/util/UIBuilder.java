@@ -1317,7 +1317,11 @@ public class UIBuilder {
             if (resourceFile != null) {
                 return resourceFile;
             }
-            return Resources.open(getResourceFilePath());
+            String p = getResourceFilePath();
+            if(p.indexOf('.') > -1) {
+                return Resources.open(p);
+            }
+            return Resources.openLayered(p);
         } catch (IOException ex) {
             ex.printStackTrace();
             return null;

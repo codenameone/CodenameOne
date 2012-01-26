@@ -2466,4 +2466,13 @@ public final class Display {
     public String getPlatformName() {
         return impl.getPlatformName();
     }    
+
+    /**
+     * Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
+     * 
+     * @return a string array with the proper order of resource override layers
+     */
+    public String[] getPlatformOverrides() {
+        return impl.getPlatformOverrides();
+    }
 }

@@ -548,6 +548,29 @@ public class Resources {
                 b == MAGIC_INDEXED_IMAGE_LEGACY || b == MAGIC_IMAGE ||
                 b == MAGIC_TIMELINE;
     }
+
+    /**
+     * Opens a multi-layer resource file that supports overriding features on a specific 
+     * platform. Notice that the ".res" extension MUST not be given to this method!
+     * 
+     * @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
+     * however <b>the extension MUST not be included in the name!</b> E.g. to reference /x.res use /x
+     * @return a resource object
+     * @throws java.io.IOException if opening/reading the resource fails
+     */
+    public static Resources openLayered(String resource) throws IOException {
+        Resources r = open(resource + ".res");
+        
+        String[] over = Display.getInstance().getPlatformOverrides();
+        for(int iter = 0 ; iter < over.length ; iter++) {
+            InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr");
+            if(i != null) {
+                r.override(i);
+            }
+        }
+        
+        return r;
+    }
     
     /**
      * Creates a resource object from the local JAR resource identifier
