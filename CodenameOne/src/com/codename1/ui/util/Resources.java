@@ -183,9 +183,7 @@ public class Resources {
         keyOffset = 0;
         for(int iter = 0 ; iter < resourceCount ; iter++) {
             byte magic = this.input.readByte();
-            System.out.println("Element " + iter + ", magic " + Integer.toHexString(magic & 0xff));
             String id = this.input.readUTF();
-            System.out.println("Id of the entry: " + id);
             if(password) {
                 magic = (byte)decode(magic & 0xff);
                 char[] chars = id.toCharArray();
