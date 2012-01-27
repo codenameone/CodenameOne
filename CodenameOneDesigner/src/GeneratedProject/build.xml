@@ -61,9 +61,8 @@
         </javac>        
     </target>
 
-    <target name="build-for-ios-device" depends="clean,jar">
+    <target name="build-for-ios-device" depends="clean,copy-ios-override,jar,clean-override">
         <codeNameOne 
-            url="http://localhost:8888"
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
             packageName = "${codename1.packageName}"
@@ -81,9 +80,8 @@
             />
     </target>
 
-    <target name="build-for-ios-device-release" depends="clean,jar">
+    <target name="build-for-ios-device-release" depends="clean,copy-ios-override,jar,clean-override">
         <codeNameOne 
-            url="http://localhost:8888"
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
             packageName = "${codename1.packageName}"
@@ -101,7 +99,55 @@
             />
     </target>
 
-    <target name="build-for-android-device" depends="clean,jar">
+    <target name="copy-android-override">
+        <mkdir dir="${build.classes.dir}" />
+        <mkdir dir="override" />
+        <copy todir="${build.classes.dir}">
+            <fileset dir="override" includes="**/*_android.ovr"/>
+            <fileset dir="override" includes="**/*_android-phone.ovr"/>
+            <fileset dir="override" includes="**/*_android-tab.ovr"/>
+            <fileset dir="override" includes="**/*_phone.ovr"/>
+            <fileset dir="override" includes="**/*_tablet.ovr"/>
+        </copy>
+    </target>
+    
+    <target name="copy-ios-override">
+        <mkdir dir="${build.classes.dir}" />
+        <mkdir dir="override" />
+        <copy todir="${build.classes.dir}">
+            <fileset dir="override" includes="**/*_ios.ovr"/>
+            <fileset dir="override" includes="**/*_iphone.ovr"/>
+            <fileset dir="override" includes="**/*_ipad.ovr"/>
+            <fileset dir="override" includes="**/*_phone.ovr"/>
+            <fileset dir="override" includes="**/*_tablet.ovr"/>
+        </copy>
+    </target>
+        
+    <target name="copy-rim-override">
+        <mkdir dir="${build.classes.dir}" />
+        <mkdir dir="override" />
+        <copy todir="${build.classes.dir}">
+            <fileset dir="override" includes="**/*_rim.ovr"/>
+            <fileset dir="override" includes="**/*_phone.ovr"/>
+        </copy>
+    </target>
+
+    <target name="copy-j2me-override">
+        <mkdir dir="${build.classes.dir}" />
+        <mkdir dir="override" />
+        <copy todir="${build.classes.dir}">
+            <fileset dir="override" includes="**/*_me.ovr"/>
+            <fileset dir="override" includes="**/*_phone.ovr"/>
+        </copy>
+    </target>
+
+    <target name="clean-override">
+        <delete>
+            <fileset dir="build/classes" includes="**/*.ovr"/>
+        </delete>
+    </target>
+    
+    <target name="build-for-android-device" depends="clean,copy-android-override,jar,clean-override">
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -119,7 +165,7 @@
             />
     </target>
 
-    <target name="build-for-rim-device" depends="clean,jar">
+    <target name="build-for-rim-device" depends="clean,copy-rim-override,jar,clean-override">
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -138,7 +184,7 @@
     </target>
 
 
-    <target name="build-for-j2me-device" depends="clean,jar">
+    <target name="build-for-j2me-device" depends="clean,copy-j2me-override,jar,clean-override">
         <codeNameOne
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
