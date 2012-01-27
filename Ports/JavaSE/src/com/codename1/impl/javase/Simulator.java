@@ -59,30 +59,9 @@ public class Simulator {
             urls[iter] = dir.toURI().toURL();
         }
         URLClassLoader ldr = new URLClassLoader(urls);
-        Class c = ldr.loadClass(argv[0]);
-        try {
-            Method m = c.getDeclaredMethod("main", String[].class);
-            m.invoke(null, new Object[]{null});
-        } catch (NoSuchMethodException noMain) {
-            try {
-                Method m = c.getDeclaredMethod("startApp");
-                m.invoke(c.newInstance());
-            } catch (NoSuchMethodException noStartApp) {
-                try {
-                    if (Display.isInitialized()) {
-                        Display.deinitialize();
-                    }
-                    Display.init(null);
-                    Method m = c.getDeclaredMethod("init", Object.class);
-                    Object o = c.newInstance();
-                    m.invoke(o, new Object[]{null});
-                    m = c.getDeclaredMethod("start", new Class[0]);
-                    m.invoke(o, new Object[0]);
-                } catch (NoSuchMethodException err) {
-                    System.out.println("Couldn't find a main or a startup in " + argv[0]);
-                }
-            }
-        }
+        Class c = ldr.loadClass("com.codename1.impl.javase.Executor");
+        Method m = c.getDeclaredMethod("main", String[].class);
+        m.invoke(null, new Object[]{argv});        
     }
 
     public static class FixedJavaSoundRenderer extends com.sun.media.renderer.audio.JavaSoundRenderer {
