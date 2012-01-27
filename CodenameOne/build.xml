@@ -72,9 +72,6 @@
 
     -->
     <target depends="init,-javadoc-build" description="Build Javadoc." name="javadoc">
-        <copydir src="dist/javadoc" dest="../../Docs" />
-        <exec command="git add ." dir="../../Docs" />
-        <exec command="git commit -m &quot;Javadoc update&quot;" dir="../../Docs" />
-        <exec command="git push" dir="../../Docs" />
+        <copydir src="dist/javadoc" dest="javadoc" />
     </target>
 </project>
