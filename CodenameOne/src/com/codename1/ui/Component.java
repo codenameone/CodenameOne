@@ -2149,7 +2149,7 @@ public class Component implements Animation, StyleListener {
 
     void startTensile(int offset, int dest) {
         if(tensileDragEnabled) {
-            draggedMotion = Motion.createSplineMotion(offset, dest, 100);
+            draggedMotion = Motion.createDecelerationMotion(offset, dest, 500);
             draggedMotion.start();
         } else {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);

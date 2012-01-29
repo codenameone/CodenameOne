@@ -44,6 +44,8 @@ public class Motion {
 
     private static final int FRICTION = 2;
 
+    private static final int DECELERATION = 3;
+    
     private int sourceValue;
     private int destinationValue;
     private int duration;
@@ -111,6 +113,21 @@ public class Motion {
         return spline;
     }
 
+    /**
+     * Creates a deceleration motion starting from source value all the way to destination value
+     * 
+     * @param sourceValue the number from which we are starting (usually indicating animation start position)
+     * @param destinationValue the number to which we are heading (usually indicating animation destination)
+     * @param duration the length in milliseconds of the motion (time it takes to get from sourceValue to
+     * destinationValue)
+     * @return new motion object
+     */
+    public static Motion createDecelerationMotion(int sourceValue, int destinationValue, int duration) {
+        Motion  deceleration = new Motion(sourceValue, destinationValue, duration);
+        deceleration.motionType = DECELERATION;
+        return  deceleration;
+    }
+    
     /**
      * Creates a friction motion starting from source with initial speed and the friction
      *
@@ -236,6 +253,9 @@ public class Motion {
             case FRICTION:
                 lastReturnedValue = getFriction();
                 break;
+            case DECELERATION:
+                lastReturnedValue = getRubber();
+                break;
             default:
                 lastReturnedValue = getLinear();
                 break;
@@ -280,6 +300,35 @@ public class Motion {
         }
     }
 
+    private int getRubber() {
+        if(isFinished()){
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if(currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        currentTime = Math.min(currentTime, totalTime);
+        int p = Math.abs(destinationValue - sourceValue);
+        float centerTime = totalTime/2;
+        float l = p / (centerTime * centerTime);
+        int x;
+        int dis =  (int) (l * (-centerTime * centerTime + 2 * centerTime * currentTime -
+                currentTime * currentTime / 2));
+        
+        if (sourceValue < destinationValue) {
+                x = Math.max(sourceValue, sourceValue + dis);
+                x = Math.min(destinationValue, x);
+                
+        } else {
+                x = Math.min(sourceValue, sourceValue - dis);
+                x = Math.max(destinationValue, x);
+        }
+        return x;
+    }
+    
     /**
      * The number from which we are starting (usually indicating animation start position)
      * 
