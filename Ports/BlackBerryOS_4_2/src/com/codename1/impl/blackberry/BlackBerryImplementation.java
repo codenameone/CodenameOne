@@ -106,6 +106,7 @@ import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.system.ApplicationDescriptor;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.system.EventInjector.KeyEvent;
 
 
 /**
@@ -2522,7 +2523,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                                 String path = entry.getPath();
                                 //close the camera
                                 UiApplication.getUiApplication().removeFileSystemJournalListener(this);
-                                EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0);
+                                EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
                                 inject.post();
                                 inject.post();
                                 

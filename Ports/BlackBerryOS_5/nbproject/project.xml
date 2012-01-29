@@ -15,7 +15,7 @@
             <reference>
                 <foreign-project>BlackBerryOS_4_2</foreign-project>
                 <artifact-type>jar</artifact-type>
-                <script>${build.script.reference.BlackBerryOS_4_2}</script>
+                <script>${project.BlackBerryOS_4_2}/build.xml</script>
                 <target>jar</target>
                 <clean-target>clean</clean-target>
                 <id>jar</id>

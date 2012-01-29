@@ -579,7 +579,7 @@ is divided into following sections:
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-jar.properties}"/>
             <param location="${project.BlackBerryOS_4_2}" name="call.subproject"/>
-            <param location="${build.script.reference.BlackBerryOS_4_2}" name="call.script"/>
+            <param location="${project.BlackBerryOS_4_2}/build.xml" name="call.script"/>
             <param name="call.target" value="jar"/>
             <param name="transfer.built-jar.properties" value="${built-jar.properties}"/>
         </antcall>
@@ -1030,7 +1030,7 @@ is divided into following sections:
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-clean.properties}"/>
             <param location="${project.BlackBerryOS_4_2}" name="call.subproject"/>
-            <param location="${build.script.reference.BlackBerryOS_4_2}" name="call.script"/>
+            <param location="${project.BlackBerryOS_4_2}/build.xml" name="call.script"/>
             <param name="call.target" value="clean"/>
             <param name="transfer.built-clean.properties" value="${built-clean.properties}"/>
         </antcall>
