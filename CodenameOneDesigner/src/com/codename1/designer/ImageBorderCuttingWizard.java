@@ -583,7 +583,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
     }
 
 
-    private byte[] toPng(BufferedImage b) {
+    public static byte[] toPng(BufferedImage b) {
         try {
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             ImageIO.write(b, "png", bo);
