@@ -74,4 +74,16 @@
     <target name="-pre-compile">
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="src/GeneratedProject" />
     </target>
+    <target name="release" depends="jar">        
+      <jar destfile="dist/tempJar.jar">
+        <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>          
+      </jar>
+      <jar destfile="dist/designer.jar">
+        <zipfileset src="dist/CodenameOneDesigner.jar" excludes="META-INF/**" />
+        <zipfileset src="dist/tempJar.jar" excludes="META-INF/**" />
+        <manifest>
+            <attribute name="Main-Class" value="com.codename1.designer.ResourceEditorApp" />
+        </manifest>
+      </jar>
+    </target>
 </project>
