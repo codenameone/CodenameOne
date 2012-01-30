@@ -74,7 +74,7 @@ public class BaseForm extends JPanel {
         r.setGlassPane(new JLabel());
     }
     
-    public void setOverrideMode(boolean overrideMode, java.awt.Component c) {
+    public synchronized void setOverrideMode(boolean overrideMode, java.awt.Component c) {
         RootPaneContainer r = (RootPaneContainer)SwingUtilities.windowForComponent(c);
         if(overrideMode) {
             if(overrideImage == null) {
