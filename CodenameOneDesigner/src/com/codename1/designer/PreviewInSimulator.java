@@ -168,7 +168,7 @@ public class PreviewInSimulator {
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(null, "Error While Running In Simulator: " + ex, "Error", JOptionPane.ERROR);
+                    JOptionPane.showMessageDialog(null, "Error While Running In Simulator: " + ex, "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
