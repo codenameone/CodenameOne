@@ -16,11 +16,11 @@
 
   <Layout class="org.netbeans.modules.form.compat2.layouts.DesignBorderLayout"/>
   <SubComponents>
-    <Container class="javax.swing.JSplitPane" name="jSplitPane1">
+    <Container class="javax.swing.JSplitPane" name="arrangeLeftRight">
       <Properties>
         <Property name="dividerLocation" type="int" value="450"/>
         <Property name="resizeWeight" type="double" value="0.5"/>
-        <Property name="name" type="java.lang.String" value="jSplitPane1" noResource="true"/>
+        <Property name="name" type="java.lang.String" value="arrangeLeftRight" noResource="true"/>
         <Property name="oneTouchExpandable" type="boolean" value="true"/>
       </Properties>
       <Constraints>
@@ -40,7 +40,7 @@
           </Properties>
           <Constraints>
             <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JSplitPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JSplitPaneSupportLayout$JSplitPaneConstraintsDescription">
-              <JSplitPaneConstraints position="right"/>
+              <JSplitPaneConstraints position="left"/>
             </Constraint>
           </Constraints>
 
@@ -622,13 +622,13 @@
                           <Group type="102" attributes="0">
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="bindOnCreate" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="bindActionEvent" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="bindBeforeShow" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="bindPostShow" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="bindExitForm" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="bindListModel" alignment="0" pref="351" max="32767" attributes="0"/>
-                                  <Component id="whyAreEventsDisabled" alignment="0" pref="351" max="32767" attributes="0"/>
+                                  <Component id="bindOnCreate" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="bindActionEvent" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="bindBeforeShow" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="bindPostShow" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="bindExitForm" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="bindListModel" alignment="0" pref="389" max="32767" attributes="0"/>
+                                  <Component id="whyAreEventsDisabled" alignment="0" pref="389" max="32767" attributes="0"/>
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
                           </Group>
@@ -1042,7 +1042,7 @@
           </Properties>
           <Constraints>
             <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JSplitPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JSplitPaneSupportLayout$JSplitPaneConstraintsDescription">
-              <JSplitPaneConstraints position="left"/>
+              <JSplitPaneConstraints position="right"/>
             </Constraint>
           </Constraints>
 

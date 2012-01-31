@@ -3918,7 +3918,7 @@ public class UserInterfaceEditor extends BaseForm {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        jSplitPane1 = new javax.swing.JSplitPane();
+        arrangeLeftRight = new javax.swing.JSplitPane();
         jSplitPane2 = new javax.swing.JSplitPane();
         propertyAndEventTabs = new javax.swing.JTabbedPane();
         palettePanel = new javax.swing.JScrollPane();
@@ -3990,10 +3990,10 @@ public class UserInterfaceEditor extends BaseForm {
 
         setLayout(new java.awt.BorderLayout());
 
-        jSplitPane1.setDividerLocation(450);
-        jSplitPane1.setResizeWeight(0.5);
-        jSplitPane1.setName("jSplitPane1"); // NOI18N
-        jSplitPane1.setOneTouchExpandable(true);
+        arrangeLeftRight.setDividerLocation(450);
+        arrangeLeftRight.setResizeWeight(0.5);
+        arrangeLeftRight.setName("arrangeLeftRight"); // NOI18N
+        arrangeLeftRight.setOneTouchExpandable(true);
 
         jSplitPane2.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
         jSplitPane2.setResizeWeight(0.5);
@@ -4280,13 +4280,13 @@ public class UserInterfaceEditor extends BaseForm {
             .add(jPanel4Layout.createSequentialGroup()
                 .addContainerGap()
                 .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE)
-                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 351, Short.MAX_VALUE))
+                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel4Layout.setVerticalGroup(
@@ -4456,16 +4456,16 @@ public class UserInterfaceEditor extends BaseForm {
 
         jSplitPane2.setBottomComponent(leftSidePanel);
 
-        jSplitPane1.setRightComponent(jSplitPane2);
+        arrangeLeftRight.setLeftComponent(jSplitPane2);
 
         uiPreview.setMaximumSize(new java.awt.Dimension(2147483646, 2147483646));
         uiPreview.setMinimumSize(new java.awt.Dimension(50, 50));
         uiPreview.setName("uiPreview"); // NOI18N
         uiPreview.setPreferredSize(new java.awt.Dimension(400, 400));
         uiPreview.setLayout(new java.awt.BorderLayout());
-        jSplitPane1.setLeftComponent(uiPreview);
+        arrangeLeftRight.setRightComponent(uiPreview);
 
-        add(jSplitPane1, java.awt.BorderLayout.CENTER);
+        add(arrangeLeftRight, java.awt.BorderLayout.CENTER);
     }
 
     // Code for dispatching events from components to event handlers.
@@ -5280,6 +5280,7 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton addPreviewTheme;
+    private javax.swing.JSplitPane arrangeLeftRight;
     private javax.swing.JButton bindActionEvent;
     private javax.swing.JButton bindBeforeShow;
     private javax.swing.JButton bindExitForm;
@@ -5330,7 +5331,6 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
-    private javax.swing.JSplitPane jSplitPane1;
     private javax.swing.JSplitPane jSplitPane2;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JPanel leftSidePanel;

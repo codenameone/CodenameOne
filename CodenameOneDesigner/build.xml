@@ -86,4 +86,12 @@
         </manifest>
       </jar>
     </target>
+    <target name="windows_native">
+        <taskdef name="jsmoothgen" classname="net.charabia.jsmoothgen.ant.JSmoothGen"
+            classpath="jsmoothgen-ant.jar"/>
+        <jsmoothgen project="smooth.jsmooth" skeletonroot="skeletons" />
+    </target>
+    <target name="mac_os">
+        <copy file="dist/designer.jar" todir="Designer.app/Contents/Resources/Java" />
+    </target>
 </project>
