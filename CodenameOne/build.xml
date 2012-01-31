@@ -74,4 +74,55 @@
     <target depends="init,-javadoc-build" description="Build Javadoc." name="javadoc">
         <copydir src="dist/javadoc" dest="javadoc" />
     </target>
+    
+    <target name="release" depends="init,-javadoc-build">
+        <delete dir="build/CodenameOneDist" />        
+        <mkdir dir="build/CodenameOneDist/CodenameOne" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/docs" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/docs/api" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
+        <mkdir dir="../nightly_builds" />
+
+        <copy file="../LICENSE" todir="build/CodenameOneDist/CodenameOne" />
+        <copy file="../Docs/Release_Notes.txt" todir="build/CodenameOneDist/CodenameOne/docs" />
+        <copydir src="dist/javadoc" dest="build/CodenameOneDist/CodenameOne/docs/api" />
+        <copydir src="../Demos/TZoneFriends" dest="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
+        
+        <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
+        <copy file="../CodenameOneDesigner/dist/designer.jar" todir="build/CodenameOneDist/CodenameOne" />
+
+        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="copy_codename1_jar" />
+        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="zipme" />
+        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="nbm" />
+        <copy file="../../CodenameOne/NBPlugin/CodenameOnePlugin/build/com-codename1.nbm" todir="build/CodenameOneDist/CodenameOne" />        
+        
+        <tstamp>
+            <format property="tstamp" pattern="yyyyMMdd" />
+        </tstamp>
+        <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Generic_${tstamp}.zip" />
+        
+        <delete file="build/CodenameOneDist/CodenameOne/designer.jar" />
+        
+        <!-- Windows Version -->
+        <copy file="../CodenameOneDesigner/designer.exe" todir="build/CodenameOneDist/CodenameOne" />
+        <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Windows_${tstamp}.zip" />
+
+        <delete file="build/CodenameOneDist/CodenameOne/designer.exe" />
+
+        <!-- Copy loses Unix permissions which are essential for this tool hence we need to use cp -->
+        <!-- copydir src="../CodenameOneDesigner/Designer.app" dest="build/CodenameOneDist/Designer.app" / -->
+        <exec executable="cp">
+            <arg value="-R" />
+            <arg file="../CodenameOneDesigner/Designer.app" />
+            <arg file="build/CodenameOneDist" />
+        </exec>
+        
+        <delete file="../nightly_builds/CodenameOne_Generic_${tstamp}.dmg" />
+        <exec executable="hdiutil">
+            <arg value="create" />
+            <arg value="-srcfolder" />
+            <arg value="build/CodenameOneDist" />
+            <arg value="../nightly_builds/CodenameOne_Generic_${tstamp}.dmg" />
+        </exec>
+    </target>
 </project>
