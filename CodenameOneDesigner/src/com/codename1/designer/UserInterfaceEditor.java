@@ -478,6 +478,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         this.name = name;
         initComponents();
+        simulateDevice.setEnabled(projectGeneratorSettings != null);
         
         String themeList = Preferences.userNodeForPackage(getClass()).get("ThemeList", null);
         String themeListSelection = Preferences.userNodeForPackage(getClass()).get("ThemeListSelection", null);

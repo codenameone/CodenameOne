@@ -145,6 +145,7 @@ public class ThemeEditor extends BaseForm {
         previewOptionsPanel.add(formPicker);        
         JButton previewInSimulator = new JButton("Simulator");
         previewInSimulator.setToolTipText("Open the current form in the device simulator");
+        previewInSimulator.setEnabled(view.getProjectGeneratorSettings() != null);
         previewInSimulator.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ae) {
                 simulatorActionPerformed(ae);
