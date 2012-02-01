@@ -56,6 +56,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -2859,5 +2860,32 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      */
     public String[] getPlatformOverrides() {
         return new String[] {"phone", "me"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean hasNativeTheme() {
+        InputStream i = getResourceAsStream(getClass(), "/nativeJ2METheme.res");
+        try {
+            if(i != null) {
+                i.close();
+                return true;
+            }
+        } catch (IOException ex) {
+        }
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void installNativeTheme() {
+        try {
+            Resources r = Resources.open("/nativeJ2METheme.res");
+            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+        } catch(Throwable t) {
+            t.printStackTrace();
+        }
     }
 }
