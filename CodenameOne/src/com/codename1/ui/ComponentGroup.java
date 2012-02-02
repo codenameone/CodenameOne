@@ -41,6 +41,7 @@ import com.codename1.ui.layouts.BoxLayout;
  */
 public class ComponentGroup extends Container {
     private String elementUIID = "GroupElement";
+    private String buttonUIID = "ButtonGroup";
     private String groupFlag = "ComponentGroupBool";
     private boolean uiidsDirty;
  
@@ -91,6 +92,14 @@ public class ComponentGroup extends Container {
         }
         updateUIIDs();
     }
+    
+    private String elementPrefix(Component c) {
+        if(c.getClass() == Button.class) {
+            return buttonUIID;
+        } else {
+            return elementUIID;
+        }
+    }
 
     private void updateUIIDs() {
         if(!getUIManager().isThemeConstant(groupFlag, false)) {
@@ -100,13 +109,17 @@ public class ComponentGroup extends Container {
         if(count > 0) {
             uiidsDirty = true;
             if(count == 1) {
-                updateUIID(elementUIID + "Only", getComponentAt(0));
+                Component c = getComponentAt(0);
+                updateUIID(elementPrefix(c) + "Only", c);
             } else {
-                updateUIID(elementUIID + "First", getComponentAt(0));
+                Component c = getComponentAt(0);
+                updateUIID(elementPrefix(c) + "First", c);
                 if(count > 1) {
-                    updateUIID(elementUIID + "Last", getComponentAt(count - 1));
+                    c = getComponentAt(count - 1);
+                    updateUIID(elementPrefix(c) + "Last", c);
                     for(int iter = 1 ; iter < count - 1 ; iter++) {
-                        updateUIID(elementUIID, getComponentAt(iter));
+                        c = getComponentAt(iter);
+                        updateUIID(elementPrefix(c), c);
                     }
                 }
             }
@@ -165,6 +178,7 @@ public class ComponentGroup extends Container {
      */
     public void setElementUIID(String elementUIID) {
         this.elementUIID = elementUIID;
+        buttonUIID = elementUIID;
         updateUIIDs();
     }
 
