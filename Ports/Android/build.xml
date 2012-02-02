@@ -71,6 +71,9 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target name="-pre-compile">
+        <copy file="../../Themes/androidTheme.res" todir="src" />
+    </target>
 
     <target name="-post-jar">
         <delete file="${dist.jar}.old" />
