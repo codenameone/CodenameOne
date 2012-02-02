@@ -41,8 +41,6 @@ import com.codename1.ui.util.Resources;
 import javax.microedition.io.ConnectionNotFoundException;
 import javax.microedition.media.MediaException;
 import javax.microedition.media.Player;
-import javax.microedition.media.PlayerListener;
-import javax.microedition.media.control.VideoControl;
 import javax.microedition.midlet.MIDlet;
 import net.rim.device.api.ui.Screen;
 import net.rim.device.api.system.Application;
@@ -93,20 +91,17 @@ import com.codename1.io.NetworkManager;
 // requires signing
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
-import com.codename1.ui.layouts.BorderLayout;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.device.api.system.CodeModuleGroup;
 import net.rim.device.api.system.CodeModuleGroupManager;
 import net.rim.blackberry.api.phone.Phone;
-import net.rim.device.api.io.Base64OutputStream;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.system.ApplicationDescriptor;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.EventInjector;
-import net.rim.device.api.system.EventInjector.KeyEvent;
 
 
 /**
@@ -1715,9 +1710,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if(!testedNativeTheme) {
             testedNativeTheme = true;
             try {
-                InputStream is = getResourceAsStream(getClass(), "/blackberryTheme.res");
+                InputStream is = getResourceAsStream(getClass(), "/blackberry_theme.res");
                 nativeThemeAvailable = is != null;
-                is.close();
+                if(is != null) {
+                    is.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1732,7 +1729,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void installNativeTheme() {
         if(nativeThemeAvailable) {
             try {
-                InputStream is = getResourceAsStream(getClass(), "/blackberryTheme.res");
+                InputStream is = getResourceAsStream(getClass(), "/blackberry_theme.res");
                 Resources r = Resources.open(is);
                 UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
                 is.close();

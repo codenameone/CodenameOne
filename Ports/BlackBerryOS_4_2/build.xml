@@ -86,4 +86,7 @@
         </jar>
         <delete file="${dist.jar}.old" />
     </target>    
+    <target name="-pre-compile">
+        <copy file="../../Themes/blackberry_theme.res" todir="src" />
+    </target>
 </project>
