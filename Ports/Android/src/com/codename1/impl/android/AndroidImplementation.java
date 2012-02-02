@@ -1,6 +1,7 @@
 package com.codename1.impl.android;
 
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.view.MotionEvent;
 import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
 
@@ -67,6 +68,7 @@ import android.database.Cursor;
 import android.media.MediaPlayer;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.view.WindowManager;
 import android.widget.MediaController;
 import android.widget.VideoView;
 import com.codename1.io.BufferedInputStream;
@@ -143,11 +145,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void init(Object m) {
         this.activity = (Activity) m;
 
-        if (m instanceof CodenameOneActivity) {
-            ((CodenameOneActivity) m).setIntentResultListener(this);
-        }
-
         try {
+            System.out.println("android.os.Build.VERSION.SDK_INT " + android.os.Build.VERSION.SDK_INT);
             if (android.os.Build.VERSION.SDK_INT < 11) {
                 activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
             }
@@ -155,6 +154,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Exception e) {
             Log.d("Codename One", "No idea why this throws a Runtime Error", e);
         }
+        
+        if (m instanceof CodenameOneActivity) {
+            ((CodenameOneActivity) m).setIntentResultListener(this);
+        }
+        
         int hardwareAcceleration = 16777216;
         activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
         /**
@@ -184,13 +188,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Display.getInstance().registerVirtualKeyboard(vkb);
         Display.getInstance().setDefaultVirtualKeyboard(vkb);
 
-//        activity.runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() {
-//                InPlaceEditView.endEdit();
-//            }
-//        });
         saveTextEditingState();
+        
+        activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
         if (nativePeers.size() > 0) {
             AndroidPeer[] peers = new AndroidPeer[nativePeers.size()];
@@ -1416,7 +1416,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         case AndroidImplementation.DROID_IMPL_KEY_RIGHT:
                         case AndroidImplementation.DROID_IMPL_KEY_UP:
                         case AndroidImplementation.DROID_IMPL_KEY_DOWN:
-                            Log.d("Codename One", "sending keycode: " + lastDirectionalKeyEventReceivedByWrapper);
                             Display.getInstance().keyPressed(lastDirectionalKeyEventReceivedByWrapper);
                             Display.getInstance().keyReleased(lastDirectionalKeyEventReceivedByWrapper);
                             break;
@@ -1471,14 +1470,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.v = vv;
             clear.setColor(0xAA000000);
             clear.setStyle(Style.FILL);
-
-            Log.d("Codename One", "created peer component for " + vv);
         }
 
         @Override
         public void setVisible(boolean visible) {
-            Log.d("Codename One", "setVisible " + visible);
-            // EDT
             super.setVisible(visible);
             this.doSetVisibility(visible);
         }
@@ -1497,9 +1492,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void deinitialize() {
-            // EDT
-            Log.d("Codename One", "PeerComponent remove " + this);
-
             super.deinitialize();
             synchronized (nativePeers) {
                 nativePeers.remove(this);
@@ -1525,8 +1517,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void initComponent() {
-            Log.d("Codename One", "PeerComponent initComponent");
-            // EDT
             super.initComponent();
             synchronized (nativePeers) {
                 nativePeers.add(this);
@@ -1541,7 +1531,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                          */
                         layoutWrapper = new AndroidRelativeLayout(activity, AndroidPeer.this, v);
                         v.setFocusable(AndroidPeer.this.isFocusable());
-                        v.setFocusableInTouchMode(AndroidPeer.this.isFocusable());
+                        v.setFocusableInTouchMode(false);
                         ArrayList<View> viewList = new ArrayList<View>();
                         viewList.add(layoutWrapper);
                         v.addFocusables(viewList, View.FOCUS_DOWN);
@@ -1583,8 +1573,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                         + v.isInTouchMode());
                             }
                         });
+                        layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
+
+                            public boolean onTouch(View v, MotionEvent me) {
+                               return false;//myView.onTouchEvent(me);
+                            }
+                        });
                     }
-                    Log.d("Codename One", "PeerComponent addView " + layoutWrapper);
                     AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
 
                 }
@@ -1650,7 +1645,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 public void run() {
                     v.setFocusable(focusable);
-                    v.setFocusableInTouchMode(focusable);
                 }
             });
         }

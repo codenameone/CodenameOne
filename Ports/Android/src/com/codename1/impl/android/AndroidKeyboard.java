@@ -4,15 +4,6 @@
  */
 package com.codename1.impl.android;
 
-import android.app.Activity;
-import android.content.Context;
-import android.text.Editable;
-import android.text.SpannableStringBuilder;
-import android.view.View;
-import android.view.inputmethod.BaseInputConnection;
-import android.view.inputmethod.CompletionInfo;
-import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -42,6 +33,7 @@ public class AndroidKeyboard implements VirtualKeyboardInterface {
 //            manager.toggleSoftInputFromWindow(myView.getWindowToken(), 0, 0);
 //            this.keyboardShowing = show;
 //        }
+        System.out.println("showKeyboard " + show);
         Form current = Display.getInstance().getCurrent();
         if(current != null){
             Component cmp = current.getFocused();
@@ -51,6 +43,8 @@ public class AndroidKeyboard implements VirtualKeyboardInterface {
                     Display.getInstance().editString(txt, txt.getMaxSize(), txt.getConstraint(), txt.getText(), 0);
                 }
             }
+        }else{
+            InPlaceEditView.endEdit();
         }
 //        if(!show){
 //            impl.saveTextEditingState();

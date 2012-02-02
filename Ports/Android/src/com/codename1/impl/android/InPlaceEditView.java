@@ -174,8 +174,6 @@ public class InPlaceEditView extends FrameLayout {
      * @param initialText The text that appears in the Codename One text are before the call to startEditing
      */
     private synchronized void startEditing(Activity activity, TextArea textArea, String initialText, int codenameOneInputType) {
-        Log.d(TAG, "startEditing");
-
         if (mEditText != null) {
             throw new IllegalArgumentException("Cannot edit - already in edit mode");
         }
@@ -286,7 +284,6 @@ public class InPlaceEditView extends FrameLayout {
         if (mEditText == null) {
             return;
         }
-        Log.d(TAG, "endEditing");
         setVisibility(GONE);
         mLastEndEditReason = reason;
 
@@ -331,8 +328,6 @@ public class InPlaceEditView extends FrameLayout {
      * @param actionCode
      */
     void onEditorAction(int actionCode) {
-        Log.d(TAG, "onEditorAction actionCode=" + actionCode);
-
         if(actionCode == EditorInfo.IME_ACTION_NEXT){
             Component next = mTextArea.getComponentForm().findNextFocusVertical(true);
             if(next instanceof TextArea){
@@ -371,7 +366,6 @@ public class InPlaceEditView extends FrameLayout {
      * @param inputType One of the TextArea's input-type constants
      */
     public static String edit(final AndroidImplementation impl, final Component component, final int inputType) {
-        Log.d(TAG, "edit");
         if (impl.activity == null) {
             throw new IllegalArgumentException("activity is null");
         }

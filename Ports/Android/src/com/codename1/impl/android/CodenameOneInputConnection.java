@@ -55,7 +55,6 @@ public class CodenameOneInputConnection extends BaseInputConnection {
     }
 
     public Editable getEditable() {
-        Log.d("Codename One", "getEditable");
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             Component txtCmp = Display.getInstance().getCurrent().getFocused();
             if (txtCmp != null && txtCmp instanceof TextField) {
@@ -71,9 +70,7 @@ public class CodenameOneInputConnection extends BaseInputConnection {
 
     @Override
     public boolean commitText(CharSequence text, int newCursorPosition) {
-        Log.d("Codename One", "commitText " + text);
-
-
+        
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             Component txtCmp = Display.getInstance().getCurrent().getFocused();
             if (txtCmp != null && txtCmp instanceof TextField) {
@@ -82,7 +79,7 @@ public class CodenameOneInputConnection extends BaseInputConnection {
                 int cursorPosition = t.getCursorPosition();
                 StringBuilder sb = new StringBuilder(textFieldText);
                 if (text.equals("\n")) {
-                    System.out.println("hello backslash");
+                    //System.out.println("hello backslash");
                 }
 
                 if (composingText.length() > 0) {
@@ -106,7 +103,6 @@ public class CodenameOneInputConnection extends BaseInputConnection {
 
     @Override
     public boolean setComposingText(CharSequence text, int newCursorPosition) {
-        Log.d("Codename One", "setComposingText " + text);
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             Component txtCmp = Display.getInstance().getCurrent().getFocused();
             if (txtCmp != null && txtCmp instanceof TextField) {
@@ -128,7 +124,6 @@ public class CodenameOneInputConnection extends BaseInputConnection {
 
     @Override
     public CharSequence getTextBeforeCursor(int length, int flags) {
-        Log.d("Codename One", "getTextBeforeCursor");
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             Component txtCmp = Display.getInstance().getCurrent().getFocused();
             if (txtCmp != null && txtCmp instanceof TextField) {
@@ -150,7 +145,6 @@ public class CodenameOneInputConnection extends BaseInputConnection {
 
     @Override
     public CharSequence getTextAfterCursor(int length, int flags) {
-        Log.d("Codename One", "getTextAfterCursor");
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             Component txtCmp = Display.getInstance().getCurrent().getFocused();
             if (txtCmp != null && txtCmp instanceof TextField) {
@@ -177,7 +171,6 @@ public class CodenameOneInputConnection extends BaseInputConnection {
 
     @Override
     public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
-        Log.d("Codename One", "getExtractedText ");
         if (Display.isInitialized() && Display.getInstance().getCurrent() != null) {
             this.request = request;
             ExtractedText et = new ExtractedText();

@@ -116,9 +116,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
         width = androidDisplay.getWidth();
         height = androidDisplay.getHeight();
         initBitmaps(width, height);
-        
-        Log.d("Codename One", "view created");
-        
     }
 
     //@Override
@@ -164,7 +161,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
 
     private void visibilityChangedTo(boolean visible) {
         boolean changed = visible;
-        Log.d("Codename One", " visibilityChangedTo " + visible);
         if (this.implementation.getCurrentForm() != null && changed) {
             if (visible) {
                 this.implementation.showNotifyPublic();
@@ -174,7 +170,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
                  */
                 this.implementation.getCurrentForm().repaint();
                 //android.os.Debug.startMethodTracing("calc");
-                Log.d("Codename One", " repaint ");
             } else {
                 this.implementation.hideNotifyPublic();
                 //android.os.Debug.stopMethodTracing();
@@ -188,7 +183,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
         // method used for View implementation. is it still
         // required with a SurfaceView?
         super.onWindowVisibilityChanged(visibility);
-            Log.d("Codename One", "visibility: " + visibility + " " + View.VISIBLE);
         this.visibilityChangedTo(visibility == View.VISIBLE);
     }
 
