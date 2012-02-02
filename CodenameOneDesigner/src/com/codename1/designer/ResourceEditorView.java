@@ -726,6 +726,12 @@ public class ResourceEditorView extends FrameView {
         importRes = new javax.swing.JMenuItem();
         exportRes = new javax.swing.JMenuItem();
         setupNetbeans = new javax.swing.JMenuItem();
+        lookAndFeelMenu = new javax.swing.JMenu();
+        systemLFMenu = new javax.swing.JRadioButtonMenuItem();
+        crossPlatformLFMenu = new javax.swing.JRadioButtonMenuItem();
+        jSeparator6 = new javax.swing.JSeparator();
+        checkerboardColors = new javax.swing.JMenuItem();
+        jSeparator4 = new javax.swing.JSeparator();
         jSeparator1 = new javax.swing.JSeparator();
         exitMenuItem = new javax.swing.JMenuItem();
         editMenu = new javax.swing.JMenu();
@@ -735,11 +741,6 @@ public class ResourceEditorView extends FrameView {
         undoItem = new javax.swing.JMenuItem();
         redoItem = new javax.swing.JMenuItem();
         midletMenu = new javax.swing.JMenu();
-        jMenu1 = new javax.swing.JMenu();
-        iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
-        android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
-        blackberryNativeTheme = new javax.swing.JRadioButtonMenuItem();
-        customNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jSeparator5 = new javax.swing.JSeparator();
         generateNetbeansProject = new javax.swing.JMenuItem();
         jMenu6 = new javax.swing.JMenu();
@@ -751,6 +752,11 @@ public class ResourceEditorView extends FrameView {
         signup = new javax.swing.JMenuItem();
         login = new javax.swing.JMenuItem();
         livePreview = new javax.swing.JMenuItem();
+        jMenu1 = new javax.swing.JMenu();
+        iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
+        android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
+        blackberryNativeTheme = new javax.swing.JRadioButtonMenuItem();
+        customNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu4 = new javax.swing.JMenu();
         addMultiImages = new javax.swing.JMenuItem();
         addImages = new javax.swing.JMenuItem();
@@ -762,12 +768,6 @@ public class ResourceEditorView extends FrameView {
         imageBorderWizardMenuItem = new javax.swing.JMenuItem();
         jMenu5 = new javax.swing.JMenu();
         pulsateEffect = new javax.swing.JMenuItem();
-        lookAndFeelMenu = new javax.swing.JMenu();
-        systemLFMenu = new javax.swing.JRadioButtonMenuItem();
-        crossPlatformLFMenu = new javax.swing.JRadioButtonMenuItem();
-        jSeparator6 = new javax.swing.JSeparator();
-        checkerboardColors = new javax.swing.JMenuItem();
-        jSeparator4 = new javax.swing.JSeparator();
         helpMenu = new javax.swing.JMenu();
         introductionAndWalkthroughTutorial = new javax.swing.JMenuItem();
         jMenu7 = new javax.swing.JMenu();
@@ -1222,6 +1222,37 @@ public class ResourceEditorView extends FrameView {
         setupNetbeans.addActionListener(formListener);
         fileMenu.add(setupNetbeans);
 
+        lookAndFeelMenu.setMnemonic('L');
+        lookAndFeelMenu.setText("Look & Feel");
+        lookAndFeelMenu.setName("lookAndFeelMenu"); // NOI18N
+
+        buttonGroup1.add(systemLFMenu);
+        systemLFMenu.setMnemonic('S');
+        systemLFMenu.setText("System");
+        systemLFMenu.setName("systemLFMenu"); // NOI18N
+        systemLFMenu.addActionListener(formListener);
+        lookAndFeelMenu.add(systemLFMenu);
+
+        buttonGroup1.add(crossPlatformLFMenu);
+        crossPlatformLFMenu.setMnemonic('C');
+        crossPlatformLFMenu.setText("Cross Platform");
+        crossPlatformLFMenu.setName("crossPlatformLFMenu"); // NOI18N
+        crossPlatformLFMenu.addActionListener(formListener);
+        lookAndFeelMenu.add(crossPlatformLFMenu);
+
+        jSeparator6.setName("jSeparator6"); // NOI18N
+        lookAndFeelMenu.add(jSeparator6);
+
+        checkerboardColors.setText("Checkerboard Color");
+        checkerboardColors.setName("checkerboardColors"); // NOI18N
+        checkerboardColors.addActionListener(formListener);
+        lookAndFeelMenu.add(checkerboardColors);
+
+        jSeparator4.setName("jSeparator4"); // NOI18N
+        lookAndFeelMenu.add(jSeparator4);
+
+        fileMenu.add(lookAndFeelMenu);
+
         jSeparator1.setName("jSeparator1"); // NOI18N
         fileMenu.add(jSeparator1);
 
@@ -1269,36 +1300,6 @@ public class ResourceEditorView extends FrameView {
         midletMenu.setMnemonic('M');
         midletMenu.setText("Application");
         midletMenu.setName("midletMenu"); // NOI18N
-
-        jMenu1.setText("Native Theme");
-        jMenu1.setName("jMenu1"); // NOI18N
-
-        nativeThemeButtonGroup.add(iosNativeTheme);
-        iosNativeTheme.setSelected(true);
-        iosNativeTheme.setText("iOS Theme");
-        iosNativeTheme.setName("iosNativeTheme"); // NOI18N
-        iosNativeTheme.addActionListener(formListener);
-        jMenu1.add(iosNativeTheme);
-
-        nativeThemeButtonGroup.add(android2NativeTheme);
-        android2NativeTheme.setText("Android (2.3) Theme");
-        android2NativeTheme.setName("android2NativeTheme"); // NOI18N
-        android2NativeTheme.addActionListener(formListener);
-        jMenu1.add(android2NativeTheme);
-
-        nativeThemeButtonGroup.add(blackberryNativeTheme);
-        blackberryNativeTheme.setText("Blackberry Theme");
-        blackberryNativeTheme.setName("blackberryNativeTheme"); // NOI18N
-        blackberryNativeTheme.addActionListener(formListener);
-        jMenu1.add(blackberryNativeTheme);
-
-        nativeThemeButtonGroup.add(customNativeTheme);
-        customNativeTheme.setText("Custom Theme");
-        customNativeTheme.setName("customNativeTheme"); // NOI18N
-        customNativeTheme.addActionListener(formListener);
-        jMenu1.add(customNativeTheme);
-
-        midletMenu.add(jMenu1);
 
         jSeparator5.setName("jSeparator5"); // NOI18N
         midletMenu.add(jSeparator5);
@@ -1358,6 +1359,36 @@ public class ResourceEditorView extends FrameView {
 
         menuBar.add(jMenu8);
 
+        jMenu1.setText("Native Theme");
+        jMenu1.setName("jMenu1"); // NOI18N
+
+        nativeThemeButtonGroup.add(iosNativeTheme);
+        iosNativeTheme.setSelected(true);
+        iosNativeTheme.setText("iOS Theme");
+        iosNativeTheme.setName("iosNativeTheme"); // NOI18N
+        iosNativeTheme.addActionListener(formListener);
+        jMenu1.add(iosNativeTheme);
+
+        nativeThemeButtonGroup.add(android2NativeTheme);
+        android2NativeTheme.setText("Android (2.3) Theme");
+        android2NativeTheme.setName("android2NativeTheme"); // NOI18N
+        android2NativeTheme.addActionListener(formListener);
+        jMenu1.add(android2NativeTheme);
+
+        nativeThemeButtonGroup.add(blackberryNativeTheme);
+        blackberryNativeTheme.setText("Blackberry Theme");
+        blackberryNativeTheme.setName("blackberryNativeTheme"); // NOI18N
+        blackberryNativeTheme.addActionListener(formListener);
+        jMenu1.add(blackberryNativeTheme);
+
+        nativeThemeButtonGroup.add(customNativeTheme);
+        customNativeTheme.setText("Custom Theme");
+        customNativeTheme.setName("customNativeTheme"); // NOI18N
+        customNativeTheme.addActionListener(formListener);
+        jMenu1.add(customNativeTheme);
+
+        menuBar.add(jMenu1);
+
         jMenu4.setText("Images");
         jMenu4.setName("jMenu4"); // NOI18N
 
@@ -1414,37 +1445,6 @@ public class ResourceEditorView extends FrameView {
         jMenu4.add(jMenu5);
 
         menuBar.add(jMenu4);
-
-        lookAndFeelMenu.setMnemonic('L');
-        lookAndFeelMenu.setText("Look & Feel");
-        lookAndFeelMenu.setName("lookAndFeelMenu"); // NOI18N
-
-        buttonGroup1.add(systemLFMenu);
-        systemLFMenu.setMnemonic('S');
-        systemLFMenu.setText("System");
-        systemLFMenu.setName("systemLFMenu"); // NOI18N
-        systemLFMenu.addActionListener(formListener);
-        lookAndFeelMenu.add(systemLFMenu);
-
-        buttonGroup1.add(crossPlatformLFMenu);
-        crossPlatformLFMenu.setMnemonic('C');
-        crossPlatformLFMenu.setText("Cross Platform");
-        crossPlatformLFMenu.setName("crossPlatformLFMenu"); // NOI18N
-        crossPlatformLFMenu.addActionListener(formListener);
-        lookAndFeelMenu.add(crossPlatformLFMenu);
-
-        jSeparator6.setName("jSeparator6"); // NOI18N
-        lookAndFeelMenu.add(jSeparator6);
-
-        checkerboardColors.setText("Checkerboard Color");
-        checkerboardColors.setName("checkerboardColors"); // NOI18N
-        checkerboardColors.addActionListener(formListener);
-        lookAndFeelMenu.add(checkerboardColors);
-
-        jSeparator4.setName("jSeparator4"); // NOI18N
-        lookAndFeelMenu.add(jSeparator4);
-
-        menuBar.add(lookAndFeelMenu);
 
         helpMenu.setMnemonic('H');
         helpMenu.setText("Help");
@@ -1584,14 +1584,14 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == livePreview) {
                 ResourceEditorView.this.livePreviewActionPerformed(evt);
             }
+            else if (evt.getSource() == addMultiImages) {
+                ResourceEditorView.this.addMultiImagesActionPerformed(evt);
+            }
             else if (evt.getSource() == addImages) {
                 ResourceEditorView.this.addImagesActionPerformed(evt);
             }
             else if (evt.getSource() == addSVGImages) {
                 ResourceEditorView.this.addSVGImagesActionPerformed(evt);
-            }
-            else if (evt.getSource() == addMultiImages) {
-                ResourceEditorView.this.addMultiImagesActionPerformed(evt);
             }
             else if (evt.getSource() == findMultiImages) {
                 ResourceEditorView.this.findMultiImagesActionPerformed(evt);
