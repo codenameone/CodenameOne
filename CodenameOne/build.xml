@@ -87,13 +87,18 @@
         <copy file="../Docs/Release_Notes.txt" todir="build/CodenameOneDist/CodenameOne/docs" />
         <copydir src="dist/javadoc" dest="build/CodenameOneDist/CodenameOne/docs/api" />
         <copydir src="../Demos/TZoneFriends" dest="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
+        <copydir src="../Demos/NativeDemo" dest="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/TZoneFriends" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/NativeDemo" />
+        <delete dir="../Demos/TZoneFriends/dist" />        
+        <delete dir="../Demos/TZoneFriends/build" />        
+        <delete dir="../Demos/NativeDemo/dist" />        
+        <delete dir="../Demos/NativeDemo/build" />        
         
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
         <copy file="../CodenameOneDesigner/dist/designer.jar" todir="build/CodenameOneDist/CodenameOne" />
 
-        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="copy_codename1_jar" />
-        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="zipme" />
-        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="nbm" />
+        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" />
         <copy file="../../CodenameOne/NBPlugin/CodenameOnePlugin/build/com-codename1.nbm" todir="build/CodenameOneDist/CodenameOne" />        
         
         <tstamp>
