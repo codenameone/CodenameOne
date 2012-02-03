@@ -933,7 +933,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                 break;
         }
         CodenameOneComponentWrapper w = (CodenameOneComponentWrapper)imageBorderPreview;
-        Button b = (Button)w.getLWUITComponent();
+        Button b = (Button)w.getCodenameOneComponent();
         b.setPreferredSize(new com.codename1.ui.geom.Dimension(200, 50));
         b.getSelectedStyle().setPadding(20, 20, 20, 20);
         b.getUnselectedStyle().setPadding(20, 20, 20, 20);

@@ -769,11 +769,6 @@ public class ResourceEditorView extends FrameView {
         jMenu5 = new javax.swing.JMenu();
         pulsateEffect = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
-        introductionAndWalkthroughTutorial = new javax.swing.JMenuItem();
-        jMenu7 = new javax.swing.JMenu();
-        howDoIChangeTheLookOfAComponent = new javax.swing.JMenuItem();
-        howDoIGenerateNetbeansProject = new javax.swing.JMenuItem();
-        showSources = new javax.swing.JMenuItem();
         jSeparator8 = new javax.swing.JSeparator();
         about = new javax.swing.JMenuItem();
         toolbar = new javax.swing.JToolBar();
@@ -1450,33 +1445,6 @@ public class ResourceEditorView extends FrameView {
         helpMenu.setText("Help");
         helpMenu.setName("helpMenu"); // NOI18N
 
-        introductionAndWalkthroughTutorial.setText("Introduction & Walkthrough Video");
-        introductionAndWalkthroughTutorial.setName("introductionAndWalkthroughTutorial"); // NOI18N
-        introductionAndWalkthroughTutorial.addActionListener(formListener);
-        helpMenu.add(introductionAndWalkthroughTutorial);
-
-        jMenu7.setText("How Do I?");
-        jMenu7.setName("jMenu7"); // NOI18N
-
-        howDoIChangeTheLookOfAComponent.setText("Change The Look Of A Component");
-        howDoIChangeTheLookOfAComponent.setName("howDoIChangeTheLookOfAComponent"); // NOI18N
-        howDoIChangeTheLookOfAComponent.addActionListener(formListener);
-        jMenu7.add(howDoIChangeTheLookOfAComponent);
-
-        howDoIGenerateNetbeansProject.setText("Connect To IDE/Source Code");
-        howDoIGenerateNetbeansProject.setName("howDoIGenerateNetbeansProject"); // NOI18N
-        howDoIGenerateNetbeansProject.addActionListener(formListener);
-        jMenu7.add(howDoIGenerateNetbeansProject);
-
-        helpMenu.add(jMenu7);
-
-        showSources.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.SHIFT_MASK | java.awt.event.InputEvent.CTRL_MASK));
-        showSources.setMnemonic('S');
-        showSources.setText("Show Source For Using");
-        showSources.setName("showSources"); // NOI18N
-        showSources.addActionListener(formListener);
-        helpMenu.add(showSources);
-
         jSeparator8.setName("jSeparator8"); // NOI18N
         helpMenu.add(jSeparator8);
 
@@ -1542,23 +1510,20 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == setupNetbeans) {
                 ResourceEditorView.this.setupNetbeansActionPerformed(evt);
             }
+            else if (evt.getSource() == systemLFMenu) {
+                ResourceEditorView.this.systemLFMenuActionPerformed(evt);
+            }
+            else if (evt.getSource() == crossPlatformLFMenu) {
+                ResourceEditorView.this.crossPlatformLFMenuActionPerformed(evt);
+            }
+            else if (evt.getSource() == checkerboardColors) {
+                ResourceEditorView.this.checkerboardColorsActionPerformed(evt);
+            }
             else if (evt.getSource() == renameItem) {
                 ResourceEditorView.this.renameItemActionPerformed(evt);
             }
             else if (evt.getSource() == duplicateItem) {
                 ResourceEditorView.this.duplicateItemActionPerformed(evt);
-            }
-            else if (evt.getSource() == iosNativeTheme) {
-                ResourceEditorView.this.iosNativeThemeActionPerformed(evt);
-            }
-            else if (evt.getSource() == android2NativeTheme) {
-                ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
-            }
-            else if (evt.getSource() == blackberryNativeTheme) {
-                ResourceEditorView.this.blackberryNativeThemeActionPerformed(evt);
-            }
-            else if (evt.getSource() == customNativeTheme) {
-                ResourceEditorView.this.customNativeThemeActionPerformed(evt);
             }
             else if (evt.getSource() == generateNetbeansProject) {
                 ResourceEditorView.this.generateNetbeansProjectActionPerformed(evt);
@@ -1583,6 +1548,18 @@ public class ResourceEditorView extends FrameView {
             }
             else if (evt.getSource() == livePreview) {
                 ResourceEditorView.this.livePreviewActionPerformed(evt);
+            }
+            else if (evt.getSource() == iosNativeTheme) {
+                ResourceEditorView.this.iosNativeThemeActionPerformed(evt);
+            }
+            else if (evt.getSource() == android2NativeTheme) {
+                ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
+            }
+            else if (evt.getSource() == blackberryNativeTheme) {
+                ResourceEditorView.this.blackberryNativeThemeActionPerformed(evt);
+            }
+            else if (evt.getSource() == customNativeTheme) {
+                ResourceEditorView.this.customNativeThemeActionPerformed(evt);
             }
             else if (evt.getSource() == addMultiImages) {
                 ResourceEditorView.this.addMultiImagesActionPerformed(evt);
@@ -1610,27 +1587,6 @@ public class ResourceEditorView extends FrameView {
             }
             else if (evt.getSource() == pulsateEffect) {
                 ResourceEditorView.this.pulsateEffectActionPerformed(evt);
-            }
-            else if (evt.getSource() == systemLFMenu) {
-                ResourceEditorView.this.systemLFMenuActionPerformed(evt);
-            }
-            else if (evt.getSource() == crossPlatformLFMenu) {
-                ResourceEditorView.this.crossPlatformLFMenuActionPerformed(evt);
-            }
-            else if (evt.getSource() == checkerboardColors) {
-                ResourceEditorView.this.checkerboardColorsActionPerformed(evt);
-            }
-            else if (evt.getSource() == introductionAndWalkthroughTutorial) {
-                ResourceEditorView.this.introductionAndWalkthroughTutorialActionPerformed(evt);
-            }
-            else if (evt.getSource() == howDoIChangeTheLookOfAComponent) {
-                ResourceEditorView.this.howDoIChangeTheLookOfAComponentActionPerformed(evt);
-            }
-            else if (evt.getSource() == howDoIGenerateNetbeansProject) {
-                ResourceEditorView.this.howDoIGenerateNetbeansProjectActionPerformed(evt);
-            }
-            else if (evt.getSource() == showSources) {
-                ResourceEditorView.this.showSourcesActionPerformed(evt);
             }
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
@@ -2015,7 +1971,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 }
                 protected com.codename1.ui.Component createComponentInstance(String componentType, Class cls) {
                     if(cls.getName().startsWith("com.codename1.ui.")) {
-                        // subpackage of LWUIT should be registered
+                        // subpackage of CodenameOne should be registered
                         if(cls.getName().lastIndexOf(".") > 15) {
                             nameToClassLookup.put(componentType, cls.getName());
                         }
@@ -2028,70 +1984,6 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             b.createContainer(loadedResources, currentResourceName);
         }
     }
-
-private void showSourcesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showSourcesActionPerformed
-    if(loadedFile != null && loadedResources != null) {
-        JTextArea a = new JTextArea();
-        a.setWrapStyleWord(true);
-        a.setLineWrap(true);
-        String text = "try {\n" +
-                  "    Resources res = Resources.openLayered(\"/" + loadedFile.getName() + "\");\n";
-        if(loadedResources.getThemeResourceNames() != null && loadedResources.getThemeResourceNames().length > 0) {
-            text += "    UIManager.getInstance().setThemeProps(res.getTheme(" + loadedResources.getThemeResourceNames()[0] + "));\n";
-        }
-        if(loadedResources.getUIResourceNames() != null && loadedResources.getUIResourceNames().length > 0) {
-            String uiResourceName;
-            if(loadedResources.getUIResourceNames().length > 1) {
-                uiResourceName = pickMainScreenForm();
-                if(uiResourceName == null) {
-                    return;
-                }
-            } else {
-                uiResourceName = loadedResources.getUIResourceNames()[0];
-            }
-            final Map<String, String> nameToClassLookup = new HashMap<String, String>();
-            final Map<String, Integer> commandMap = new HashMap<String, Integer>();
-            initCommandMapAndNameToClassLookup(nameToClassLookup, commandMap, null, null, null);
-
-            if(commandMap.size() > 0) {
-                String commandRows = "";
-                for(String key : commandMap.keySet()) {
-                    commandRows += "    public static final int COMMAND_" + key + " = " + commandMap.get(key) + ";\n";
-                }
-                text = commandRows + text;
-            }
-
-            text += "    UIBuilder builder = new UIBuilder();\n";
-            for(String currentName : nameToClassLookup.keySet()) {
-                text += "    UIBuilder.registerCustomComponent(\"" + currentName + "\", " +
-                        nameToClassLookup.get(currentName) + ".class);\n";
-            }
-
-            text += "    Form frm = (Form)builder.createContainer(res, \"" + uiResourceName + "\");\n";
-            if(commandMap.size() > 0) {
-                text += "    frm.addCommandListener(new ActionListener() {\n" +
-                        "        public void actionPerformed(ActionEvent ev) {\n" +
-                        "            switch(ev.getId()) {\n";
-
-                for(String key : commandMap.keySet()) {
-                    text += "            case COMMAND_" + key + ": break;\n";
-                }
-
-                text += "            }\n" +
-                        "        }\n" +
-                        "    };\n";
-            }
-            text += "    frm.show();\n";
-        }
-        text +=   "catch(IOException err} {\n" +
-                  "    err.printStackTrace();\n" +
-                  "}\n";
-        a.setText(text);
-        JScrollPane s = new JScrollPane(a);
-        s.setPreferredSize(new java.awt.Dimension(800, 400));
-        JOptionPane.showMessageDialog(mainPanel, s, "Sample", JOptionPane.PLAIN_MESSAGE);
-    }
-}//GEN-LAST:event_showSourcesActionPerformed
 
     private File pickJavaSourceLocation() {
        File[] files = showOpenFileChooser("Java Source File", ".java");
@@ -2253,7 +2145,7 @@ private void uiBuilderSourceActionPerformed(java.awt.event.ActionEvent evt) {//G
             w.write(" * This class is designed for subclassing that way the code generator can overwrite it\n");
             w.write(" * anytime without erasing your changes which should exist in a subclass!\n");
             w.write(" * For details about this file and how it works please read this blog post:\n");
-            w.write(" * http://lwuit.blogspot.com/2010/10/ui-builder-class-how-to-actually-use.html\n");
+            w.write(" * http://codenameone.blogspot.com/2010/10/ui-builder-class-how-to-actually-use.html\n");
             w.write("*/\n");
             if(packageString.length() > 0) {
                 w.write("package " + packageString + ";\n\n");
@@ -2913,21 +2805,9 @@ private void resPasswordActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         c.setVisible(true);
     }//GEN-LAST:event_checkerboardColorsActionPerformed
 
-    private void introductionAndWalkthroughTutorialActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_introductionAndWalkthroughTutorialActionPerformed
-        helpVideo("http://lwuit.blogspot.com/2011/04/resource-editor-tutorial-rebooted.html");
-}//GEN-LAST:event_introductionAndWalkthroughTutorialActionPerformed
-
-    private void howDoIChangeTheLookOfAComponentActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_howDoIChangeTheLookOfAComponentActionPerformed
-            helpVideo("http://lwuit.blogspot.com/2011/04/mini-tutorial-on-editing-theme.html");
-    }//GEN-LAST:event_howDoIChangeTheLookOfAComponentActionPerformed
-
     private void resetNetbeansSettingsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_resetNetbeansSettingsActionPerformed
             Preferences.userNodeForPackage(ResourceEditorView.class).remove("netbeansInstall");
     }//GEN-LAST:event_resetNetbeansSettingsActionPerformed
-
-    private void howDoIGenerateNetbeansProjectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_howDoIGenerateNetbeansProjectActionPerformed
-            helpVideo("http://lwuit.blogspot.com/2011/04/generating-netbeans-project-from.html");
-    }//GEN-LAST:event_howDoIGenerateNetbeansProjectActionPerformed
 
     private void findMultiImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_findMultiImagesActionPerformed
         new FindMultiImages(mainPanel, loadedResources);
@@ -4043,7 +3923,7 @@ public static void openInIDE(File f, int lineNumber) {
                 StringBuilder buildXML = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<project name=\"Export\" default=\"generateResource\" basedir=\".\">\n" +
                     "<target name=\"generateResource\">\n<taskdef classpath=\"editor.jar\" " +
-                    "classname=\"com.codename1.ui.tools.resourcebuilder.LWUITTask\" name=\"build\" />\n    <build dest=\"output.res\">\n"
+                    "classname=\"com.codename1.ui.tools.resourcebuilder.CodenameOneTask\" name=\"build\" />\n    <build dest=\"output.res\">\n"
                 );
 
                 if(loadedResources.getFontResourceNames().length > 0) {
@@ -4442,9 +4322,9 @@ public static void openInIDE(File f, int lineNumber) {
         public void exectute() {
             try {
                 // create a temporary file for the resource editory PDF
-                File f = File.createTempFile("LWUITDesigner", ".pdf");
+                File f = File.createTempFile("CodenameOneDesigner", ".pdf");
                 FileOutputStream out = new FileOutputStream(f);
-                InputStream input = getClass().getResourceAsStream("/LWUIT-Designer.pdf");
+                InputStream input = getClass().getResourceAsStream("/CodenameOne-Designer.pdf");
                 byte[] buffer = new byte[65536];
                 int size = input.read(buffer);
                 while(size > -1) {
@@ -4538,19 +4418,15 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JScrollPane fontsScroll;
     private javax.swing.JMenuItem generateNetbeansProject;
     private javax.swing.JMenu helpMenu;
-    private javax.swing.JMenuItem howDoIChangeTheLookOfAComponent;
-    private javax.swing.JMenuItem howDoIGenerateNetbeansProject;
     private javax.swing.JMenuItem imageBorderWizardMenuItem;
     private javax.swing.JScrollPane imageScroll;
     private javax.swing.JMenuItem imageSizes;
     private javax.swing.JMenuItem importRes;
-    private javax.swing.JMenuItem introductionAndWalkthroughTutorial;
     private javax.swing.JRadioButtonMenuItem iosNativeTheme;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu4;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenu jMenu6;
-    private javax.swing.JMenu jMenu7;
     private javax.swing.JMenu jMenu8;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
@@ -4598,7 +4474,6 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem saveAsMenuItem;
     private javax.swing.JMenuItem saveMenuItem;
     private javax.swing.JMenuItem setupNetbeans;
-    private javax.swing.JMenuItem showSources;
     private javax.swing.JMenuItem signup;
     private javax.swing.ButtonGroup svgGroup;
     private javax.swing.JScrollPane svgImages;

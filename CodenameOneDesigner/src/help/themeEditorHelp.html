@@ -30,15 +30,15 @@
   <body>
       <h1>Introduction</h1>
     <p>
-        The theme editor allows designers to customize the appearance of a LWUIT
+        The theme editor allows designers to customize the appearance of a CodenameOne
         application or GUI builder UI and see a live preview of said changes
         in the preview pane on the right side. The preview pane is "live" and
         supports keyboard/mouse interaction, it can also be customized extensively
         by clicking its options button.
     </p>
     <p>
-        By default the LWUIT Demo application is presented in the preview pane
-        however you can pick a custom LWUIT MIDlet or use any form from the GUI
+        By default the CodenameOne Demo application is presented in the preview pane
+        however you can pick a custom CodenameOne application or use any form from the GUI
         builder builtin to this tool.
     </p>
     <p>
@@ -50,7 +50,7 @@
     <p>
         If you are familiar with CSS then the theme editor is a much simplified
         version of that with simpler selectors and more refined attributes.
-        LWUIT applications are comprised of components each of which has a UIID
+        CodenameOne applications are comprised of components each of which has a UIID
         (User Interface ID), the UIID defaults to the component type (e.g. a
         button has the "Button" UIID) however a developer/designer may change
         the UIID to provide greater range (more on that later).<br>
@@ -63,7 +63,7 @@
         can add a Button entry and set its foreground color to Blue.<br>
         However, this will only work for some of the buttons since a selector
         has another important part based on the state of the component.
-        LWUIT components can be unselected (unfocused), selected (focused),
+        CodenameOne components can be unselected (unfocused), selected (focused),
         pressed (only buttons support this) or disabled. To make the button
         blue for all cases we will need to define the button as blue in all
         4 tabs (we can ease this using inheritance).
@@ -76,13 +76,13 @@
     </p>
       <h1>Inheritance</h1>
     <p>
-        LWUIT has a base style for every component state, this base style determines
+        CodenameOne has a base style for every component state, this base style determines
         the "starting point" for a component specific style. E.g. if I want all
         components to be blue I can change the default style to blue, I will need
         to do this for disabled, pressed and selected tabs as well.
     </p>
     <p>
-        Other than that LWUIT has no implicit inheritance (although it has some
+        Other than that CodenameOne has no implicit inheritance (although it has some
         elaborate default settings for components), it does have explicit inheritance
         where its possible to define a UIID from which to derive the attribute
         values.

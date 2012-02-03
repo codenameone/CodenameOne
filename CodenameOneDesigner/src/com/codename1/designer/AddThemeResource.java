@@ -89,7 +89,7 @@ public class AddThemeResource extends javax.swing.JDialog {
         jLabel2.setText("Template");
         jLabel2.setName("jLabel2"); // NOI18N
 
-        template.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Native_Theme", "Blank", "LWUIT_Touch", "LWUIT_Feature", "tzone_theme", "tipster_theme", "Blackberry", "LWUIT_Classic_Theme", "Wood", "Accessability_Big_Theme", "Accessability_Black_Theme", "Accessability_White_Theme", "Accessability_Yellow_Theme" }));
+        template.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Native_Theme", "Blank", "CodenameOne_Touch", "CodenameOne_Feature", "tzone_theme", "tipster_theme", "Blackberry", "Wood", "Accessability_Big_Theme", "Accessability_Black_Theme", "Accessability_White_Theme", "Accessability_Yellow_Theme" }));
         template.setName("template"); // NOI18N
         template.addActionListener(formListener);
 

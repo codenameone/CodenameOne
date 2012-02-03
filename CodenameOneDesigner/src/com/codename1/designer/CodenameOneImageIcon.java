@@ -30,7 +30,7 @@ import java.awt.image.BufferedImage;
 import javax.swing.Icon;
 
 /**
- * An icon that renders a LWUIT image at 16x16 for renderers
+ * An icon that renders a CodenameOne image at 16x16 for renderers
  *
  * @author Shai Almog
  */

@@ -295,8 +295,6 @@
                               <Component id="removeThemeEntry" linkSize="1" min="-2" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="manageStyles" linkSize="1" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="helpVideo" linkSize="1" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Component id="stylesTabbedPane" alignment="0" min="0" pref="0" max="32767" attributes="2"/>
                       </Group>
@@ -321,7 +319,6 @@
                           <Component id="editEntry" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="removeThemeEntry" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="manageStyles" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="helpVideo" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
@@ -630,15 +627,6 @@
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="borderWizardActionPerformed"/>
-              </Events>
-            </Component>
-            <Component class="javax.swing.JButton" name="helpVideo">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Help Video"/>
-                <Property name="name" type="java.lang.String" value="helpVideo" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="helpVideoActionPerformed"/>
               </Events>
             </Component>
           </SubComponents>

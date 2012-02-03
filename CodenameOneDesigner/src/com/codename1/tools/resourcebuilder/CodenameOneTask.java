@@ -73,7 +73,7 @@ public class CodenameOneTask extends MatchingTask {
 
     @Override
     public void execute() throws BuildException {
-        System.out.println("LWUITBuilder generating resource file");
+        System.out.println("CodenameOneBuilder generating resource file");
         DataOutputStream resFile = null;
         try {
             if (dest == null) {

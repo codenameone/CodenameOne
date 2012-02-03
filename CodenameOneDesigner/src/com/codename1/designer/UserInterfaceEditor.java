@@ -27,7 +27,7 @@ package com.codename1.designer;
 import com.l2fprod.common.swing.JOutlookBar;
 import com.codename1.ui.Display;
 import com.codename1.ui.resource.util.CodenameOneComponentWrapper;
-import com.codename1.ui.LWUITAccessor;
+import com.codename1.ui.CodenameOneAccessor;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.resource.util.SwingRenderer;
@@ -140,7 +140,7 @@ import org.jdesktop.swingx.tree.DefaultXTreeCellRenderer;
 public class UserInterfaceEditor extends BaseForm {
     private javax.swing.Timer repainter;
     private static final Object PROPERTIES_DIFFER_IN_VALUE = new Object();
-    private static final DataFlavor LWUIT_COMPONENT_FLAVOR = new DataFlavor(com.codename1.ui.Component.class, "LWUIT Component");
+    private static final DataFlavor CODENAMEONE_COMPONENT_FLAVOR = new DataFlavor(com.codename1.ui.Component.class, "CodenameOne Component");
     static final int PROPERTY_CUSTOM = 1000;
     static final int LAYOUT_BOX_X = 5002;
     static final int LAYOUT_BOX_Y = 5003;
@@ -1570,7 +1570,7 @@ public class UserInterfaceEditor extends BaseForm {
                         index = assumedParent.getParent().getComponentIndex(assumedParent);
                         parent = assumedParent.getParent();
                     }
-                    com.codename1.ui.Component cmp = (com.codename1.ui.Component)support.getTransferable().getTransferData(LWUIT_COMPONENT_FLAVOR);
+                    com.codename1.ui.Component cmp = (com.codename1.ui.Component)support.getTransferable().getTransferData(CODENAMEONE_COMPONENT_FLAVOR);
                     Object constraint = null;
                     com.codename1.ui.Container contentPane = parent;
                     if(parent instanceof com.codename1.ui.Form) {
@@ -1650,7 +1650,7 @@ public class UserInterfaceEditor extends BaseForm {
                     findName("Button", (com.codename1.ui.Component)ts);
                 }
                 final Object o = ts;
-                return new LWUITComponentTransferable((com.codename1.ui.Component)o);
+                return new CodenameOneComponentTransferable((com.codename1.ui.Component)o);
             }
 
             @Override
@@ -1664,7 +1664,7 @@ public class UserInterfaceEditor extends BaseForm {
             @Override
             public Icon getVisualRepresentation(Transferable t) {
                 try {
-                    com.codename1.ui.Component cmp = (com.codename1.ui.Component)t.getTransferData(LWUIT_COMPONENT_FLAVOR);
+                    com.codename1.ui.Component cmp = (com.codename1.ui.Component)t.getTransferData(CODENAMEONE_COMPONENT_FLAVOR);
                     if(cmp.getWidth() <= 0 || cmp.getHeight() <= 0) {
                         cmp.setWidth(cmp.getPreferredW());
                         cmp.setHeight(cmp.getPreferredH());
@@ -1680,7 +1680,7 @@ public class UserInterfaceEditor extends BaseForm {
 
             public boolean canImport(JComponent comp, DataFlavor[] transferFlavors) {
                 for(DataFlavor f : transferFlavors) {
-                    if(f == LWUIT_COMPONENT_FLAVOR) {
+                    if(f == CODENAMEONE_COMPONENT_FLAVOR) {
                         return true;
                     }
                 }
@@ -1869,7 +1869,7 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
-    private void makeDraggable(final JButton b, final Class lwuitClass, final String namePrefix, final CustomComponent custom) {
+    private void makeDraggable(final JButton b, final Class codenameOneClass, final String namePrefix, final CustomComponent custom) {
         DragSource.getDefaultDragSource().createDefaultDragGestureRecognizer(b,
                 TransferHandler.MOVE, new DragGestureListener() {
             public void dragGestureRecognized(DragGestureEvent dge) {
@@ -1882,20 +1882,20 @@ public class UserInterfaceEditor extends BaseForm {
                         if(b.getIcon() != null) {
                             DragSource.getDefaultDragSource().startDrag(dge, DragSource.DefaultMoveDrop,
                                     ((ImageIcon)b.getIcon()).getImage(), new Point(0, 0),
-                                    new LWUITComponentTransferable(cmp), new DragSourceAdapter() {
+                                    new CodenameOneComponentTransferable(cmp), new DragSourceAdapter() {
                                 });
                         } else {
                             DragSource.getDefaultDragSource().startDrag(dge, DragSource.DefaultMoveDrop,
-                                new LWUITComponentTransferable(cmp), new DragSourceAdapter() {
+                                new CodenameOneComponentTransferable(cmp), new DragSourceAdapter() {
                                 });
                         }
                         return;
                     }
-                    if(lwuitClass == com.codename1.ui.Component.class) {
+                    if(codenameOneClass == com.codename1.ui.Component.class) {
                         // special case for custom component which has a protected constructor
                         cmp = new com.codename1.ui.Component() {};
                     } else {
-                        cmp = (com.codename1.ui.Component)lwuitClass.newInstance();
+                        cmp = (com.codename1.ui.Component)codenameOneClass.newInstance();
                     }
                     cmp.putClientProperty(TYPE_KEY, namePrefix);
                     cmp.setName(findUniqueName(namePrefix));
@@ -1905,7 +1905,7 @@ public class UserInterfaceEditor extends BaseForm {
                         cmp.putClientProperty(TYPE_KEY, custom.getType());
                     }
                     DragSource.getDefaultDragSource().startDrag(dge, DragSource.DefaultMoveDrop,
-                            new LWUITComponentTransferable(cmp), new DragSourceAdapter() {
+                            new CodenameOneComponentTransferable(cmp), new DragSourceAdapter() {
                             });
                 } catch(Exception e) {
                     e.printStackTrace();
@@ -2315,11 +2315,11 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
-    public void addCustomComponent(String componentType, String className, String lwuitType) {
+    public void addCustomComponent(String componentType, String className, String codenameOneType) {
         /*CustomComponent c = new CustomComponent();
         c.setType(componentType);
         c.setClassName(className);
-        c.setLwuitBaseClass(lwuitType);
+        c.setCodenameOneBaseClass(codenameOneType);
         customComponents.add(c);
         createCustomComponentButton(c);*/
     }
@@ -2332,8 +2332,8 @@ public class UserInterfaceEditor extends BaseForm {
             b.setBorder(null);
             userComponents.add(b);
             b.putClientProperty("CustomComponent", c);
-            final Class lwuitBaseClass = c.getCls();
-            makeDraggable(b, lwuitBaseClass, c.getType(), c);
+            final Class codenameOneBaseClass = c.getCls();
+            makeDraggable(b, codenameOneBaseClass, c.getType(), c);
             b.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
                     if(lockForDragging) {
@@ -2352,7 +2352,7 @@ public class UserInterfaceEditor extends BaseForm {
                             addComponentToContainer(cmp, t);
                             return;
                         }
-                        com.codename1.ui.Component cmp = (com.codename1.ui.Component)lwuitBaseClass.newInstance();
+                        com.codename1.ui.Component cmp = (com.codename1.ui.Component)codenameOneBaseClass.newInstance();
                         cmp.putClientProperty("CustomComponent", c);
                         cmp.putClientProperty(TYPE_KEY, c.getType());
                         initializeComponentText(cmp);
@@ -2395,7 +2395,7 @@ public class UserInterfaceEditor extends BaseForm {
             for(CustomComponent current : customComponents) {
                 d.writeUTF(current.getType());
                 d.writeUTF(current.getClassName());
-                d.writeUTF(current.getLwuitBaseClass());
+                d.writeUTF(current.getCodenameOneBaseClass());
             }*/
 
             persistComponent(c, d);
@@ -2512,11 +2512,11 @@ public class UserInterfaceEditor extends BaseForm {
             com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
             if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_X)) {
                 out.writeInt(PROPERTY_SCROLLABLE_X);
-                out.writeBoolean(LWUITAccessor.isScrollableX(cnt));
+                out.writeBoolean(CodenameOneAccessor.isScrollableX(cnt));
             }
             if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_Y)) {
                 out.writeInt(PROPERTY_SCROLLABLE_Y);
-                out.writeBoolean(LWUITAccessor.isScrollableY(cnt));
+                out.writeBoolean(CodenameOneAccessor.isScrollableY(cnt));
             }
             if(cmp instanceof com.codename1.ui.Tabs) {
                 com.codename1.ui.Tabs tab = (com.codename1.ui.Tabs)cmp;
@@ -3563,24 +3563,24 @@ public class UserInterfaceEditor extends BaseForm {
                             return cmps[0].getClientProperty("%base_form%");
 
                         case PROPERTY_SCROLLABLE_X:
-                            boolean valX = LWUITAccessor.isScrollableX((com.codename1.ui.Container)cmps[0]);
+                            boolean valX = CodenameOneAccessor.isScrollableX((com.codename1.ui.Container)cmps[0]);
                             if(noDiffer) {
                                 return valX;
                             }
                             for(com.codename1.ui.Component cmp : cmps) {
-                                if(valX != LWUITAccessor.isScrollableX((com.codename1.ui.Container)cmp)) {
+                                if(valX != CodenameOneAccessor.isScrollableX((com.codename1.ui.Container)cmp)) {
                                     return PROPERTIES_DIFFER_IN_VALUE;
                                 }
                             }
                             return valX;
 
                         case PROPERTY_SCROLLABLE_Y:
-                            boolean valY = LWUITAccessor.isScrollableY((com.codename1.ui.Container)cmps[0]);
+                            boolean valY = CodenameOneAccessor.isScrollableY((com.codename1.ui.Container)cmps[0]);
                             if(noDiffer) {
                                 return valY;
                             }
                             for(com.codename1.ui.Component cmp : cmps) {
-                                if(valY != LWUITAccessor.isScrollableY((com.codename1.ui.Container)cmp)) {
+                                if(valY != CodenameOneAccessor.isScrollableY((com.codename1.ui.Container)cmp)) {
                                     return PROPERTIES_DIFFER_IN_VALUE;
                                 }
                             }
@@ -3660,13 +3660,13 @@ public class UserInterfaceEditor extends BaseForm {
 
                     case PROPERTY_SCROLLABLE_X:
                         for(com.codename1.ui.Component cmp : cmps) {
-                            LWUITAccessor.setScrollableX((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
+                            CodenameOneAccessor.setScrollableX((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
                         }
                         return;
 
                     case PROPERTY_SCROLLABLE_Y:
                         for(com.codename1.ui.Component cmp : cmps) {
-                            LWUITAccessor.setScrollableY((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
+                            CodenameOneAccessor.setScrollableY((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
                         }
                         return;
 
@@ -3827,14 +3827,14 @@ public class UserInterfaceEditor extends BaseForm {
 
     class ComponentHierarchyModel implements TreeModel {
         private List<TreeModelListener> listeners = new ArrayList<TreeModelListener>();
-        private com.codename1.ui.Container lwuitContainer;
+        private com.codename1.ui.Container codenameOneContainer;
 
-        public ComponentHierarchyModel(com.codename1.ui.Container lwuitContainer) {
-            this.lwuitContainer = lwuitContainer;
+        public ComponentHierarchyModel(com.codename1.ui.Container codenameOneContainer) {
+            this.codenameOneContainer = codenameOneContainer;
         }
 
         public Object getRoot() {
-            return lwuitContainer;
+            return codenameOneContainer;
         }
 
         public Object getChild(Object parent, int index) {
@@ -4066,7 +4066,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneList.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"))); // NOI18N
         codenameOneList.setText("List");
-        codenameOneList.setToolTipText("<html><body><b>List</b><br> \n<p>\nOne of the most elaborate components in LWUIT, the list contains arbitrary items which can<br>\nbe \"rendered\" in unique ways. A list can be laid out horizontally or vertically and its content<br>\ncan be easily generated programmatically or via the model in the properties table.<br>\nTo customize the way the list shows its elements you need to set up a renderer for the list.\n</p> </body> </html>"); // NOI18N
+        codenameOneList.setToolTipText("<html><body><b>List</b><br> \n<p>\nOne of the most elaborate components in Codename One, the list contains arbitrary items which can<br>\nbe \"rendered\" in unique ways. A list can be laid out horizontally or vertically and its content<br>\ncan be easily generated programmatically or via the model in the properties table.<br>\nTo customize the way the list shows its elements you need to set up a renderer for the list.\n</p> </body> </html>"); // NOI18N
         codenameOneList.setBorder(null);
         codenameOneList.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneList.setName("codenameOneList"); // NOI18N
@@ -4166,7 +4166,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneContainerList.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneContainerList.setText("ContainerList");
-        codenameOneContainerList.setToolTipText("<html><body><b>ContainerList</b><br> \n<p>\nA container that acts like a List, providing a model and renderer approach but doesn't<br>\nenable component addition. This allows mapping list functionality and model to a Container<br>\nand using standard LWUIT layout managers to arrange the content of the container.\n</p> </body> </html>"); // NOI18N
+        codenameOneContainerList.setToolTipText("<html><body><b>ContainerList</b><br> \n<p>\nA container that acts like a List, providing a model and renderer approach but doesn't<br>\nenable component addition. This allows mapping list functionality and model to a Container<br>\nand using standard Codename One layout managers to arrange the content of the container.\n</p> </body> </html>"); // NOI18N
         codenameOneContainerList.setBorder(null);
         codenameOneContainerList.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneContainerList.setName("codenameOneContainerList"); // NOI18N
@@ -5362,7 +5362,7 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
 
                 public void dragOver(DropTargetDragEvent dtde) {
                     try {
-                        draggedComponent = (com.codename1.ui.Component)dtde.getTransferable().getTransferData(LWUIT_COMPONENT_FLAVOR);
+                        draggedComponent = (com.codename1.ui.Component)dtde.getTransferable().getTransferData(CODENAMEONE_COMPONENT_FLAVOR);
                     } catch(Exception e) {
                         e.printStackTrace();
                     }
@@ -5605,7 +5605,7 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
                         }
 
                         DragSource.getDefaultDragSource().startDrag(dge, DragSource.DefaultMoveDrop,
-                                new LWUITComponentTransferable(cmp), new DragSourceAdapter() {
+                                new CodenameOneComponentTransferable(cmp), new DragSourceAdapter() {
                                 });
                     } catch(Exception e) {
                         e.printStackTrace();
@@ -5762,18 +5762,18 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         }
     }
 
-    class LWUITComponentTransferable implements Transferable {
+    class CodenameOneComponentTransferable implements Transferable {
         private com.codename1.ui.Component c;
-        public LWUITComponentTransferable(com.codename1.ui.Component c) {
+        public CodenameOneComponentTransferable(com.codename1.ui.Component c) {
             this.c = c;
         }
 
         public DataFlavor[] getTransferDataFlavors() {
-            return new DataFlavor[] {LWUIT_COMPONENT_FLAVOR};
+            return new DataFlavor[] {CODENAMEONE_COMPONENT_FLAVOR};
         }
 
         public boolean isDataFlavorSupported(DataFlavor flavor) {
-            return LWUIT_COMPONENT_FLAVOR == flavor;
+            return CODENAMEONE_COMPONENT_FLAVOR == flavor;
         }
 
         public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {

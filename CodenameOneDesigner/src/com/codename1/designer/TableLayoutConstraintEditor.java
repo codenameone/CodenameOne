@@ -156,7 +156,7 @@ public class TableLayoutConstraintEditor extends javax.swing.JPanel {
 
         jEditorPane1.setContentType("text/html");
         jEditorPane1.setEditable(false);
-        jEditorPane1.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rAn entry within a table layout can be configured in various ways most of which are very similar\nto the familiar HTML table tag in part because this layout is used by the LWUIT HTML component\nin order to implement the HTML table tag...<br>\nA cell can be positioned in an absolute row/column (to use the default set the value to -1). \nThe width/height of a cell (and thus its neighboring cells) can be determined as a percentage \nof the available space for the table. \n    </p>\r\n    <p>      \nCells can be spanned horizontally or vertically which causes a component to occupy several \ncells thus producing elaborate layout effects. Spanning defaults to 1 which means no spanning.\nIf a cell content is smaller than the cell itself it can be aligned horizontally or vertically, the\ndefault indicates that an entry should fill the cell bounds.\n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
+        jEditorPane1.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rAn entry within a table layout can be configured in various ways most of which are very similar\nto the familiar HTML table tag in part because this layout is used by the CodenameOne HTML component\nin order to implement the HTML table tag...<br>\nA cell can be positioned in an absolute row/column (to use the default set the value to -1). \nThe width/height of a cell (and thus its neighboring cells) can be determined as a percentage \nof the available space for the table. \n    </p>\r\n    <p>      \nCells can be spanned horizontally or vertically which causes a component to occupy several \ncells thus producing elaborate layout effects. Spanning defaults to 1 which means no spanning.\nIf a cell content is smaller than the cell itself it can be aligned horizontally or vertically, the\ndefault indicates that an entry should fill the cell bounds.\n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
         jEditorPane1.setName("jEditorPane1"); // NOI18N
         jScrollPane1.setViewportView(jEditorPane1);
 
@@ -197,7 +197,7 @@ public class TableLayoutConstraintEditor extends javax.swing.JPanel {
             .add(layout.createSequentialGroup()
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(org.jdesktop.layout.GroupLayout.LEADING, jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 204, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 274, Short.MAX_VALUE)
                     .add(org.jdesktop.layout.GroupLayout.LEADING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                             .add(jLabel1)

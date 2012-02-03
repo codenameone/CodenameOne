@@ -38,7 +38,7 @@ import com.codename1.designer.UserInterfaceEditor;
 import com.codename1.ui.EditorFont;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
-import com.codename1.ui.LWUITAccessor;
+import com.codename1.ui.CodenameOneAccessor;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Motion;
@@ -1058,7 +1058,7 @@ public class EditableResources extends Resources implements TreeModel {
         output.writeBoolean(bitmapIncluded);
         if(bitmapIncluded) {
             com.codename1.ui.Font bitmapFont = f.getBitmapFont();
-            com.codename1.ui.Image cache = LWUITAccessor.getImage(bitmapFont);
+            com.codename1.ui.Image cache = CodenameOneAccessor.getImage(bitmapFont);
             int[] imageArray = cache.getRGB();
             for(int iter = 0 ; iter < imageArray.length ; iter++) {
                 imageArray[iter] = (imageArray[iter] >> 8) & 0xff0000;
@@ -1067,8 +1067,8 @@ public class EditableResources extends Resources implements TreeModel {
             String charset = bitmapFont.getCharset();
             int charCount = charset.length();
             output.writeShort(charCount);
-            int[] cutOffsets = LWUITAccessor.getOffsets(bitmapFont);
-            int[] charWidth = LWUITAccessor.getWidths(bitmapFont);
+            int[] cutOffsets = CodenameOneAccessor.getOffsets(bitmapFont);
+            int[] charWidth = CodenameOneAccessor.getWidths(bitmapFont);
             for(int iter = 0 ; iter < charCount ; iter++) {
                 output.writeShort(cutOffsets[iter]);
             }

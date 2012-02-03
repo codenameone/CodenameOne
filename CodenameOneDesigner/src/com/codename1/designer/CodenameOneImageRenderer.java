@@ -50,7 +50,7 @@ import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 
 /**
- * Renders an image from Codename One on a Swing canvas including support for LWUIT animations
+ * Renders an image from Codename One on a Swing canvas including support for CodenameOne animations
  *
  * @author Shai Almog
  */

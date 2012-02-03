@@ -33,7 +33,7 @@ import java.awt.Graphics;
 import javax.swing.JLabel;
 
 /**
- * Wraps a LWUIT component in a Swing component for preview purposes, this is
+ * Wraps a CodenameOne component in a Swing component for preview purposes, this is
  * effectively the "live preview" API
  *
  * @author Shai Almog
@@ -87,11 +87,11 @@ public class CodenameOneComponentWrapper extends JLabel {
         return "";
     }
     
-    public Component getLWUITComponent() {
+    public Component getCodenameOneComponent() {
         return codenameOneCmp;
     }
 
-    public void setLWUITComponent(com.codename1.ui.Component l) {
+    public void setCodenameOneComponent(com.codename1.ui.Component l) {
         codenameOneCmp = l;
     }
     

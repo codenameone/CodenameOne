@@ -29,7 +29,7 @@ import java.util.prefs.Preferences;
 
 /**
  * Allows changing the background checkerboard of the images wshown in the preview
- * UI's through ImagePanel and LWUITImageRenderer
+ * UI's through ImagePanel and CodenameOneImageRenderer
  *
  * @author Shai Almog
  */

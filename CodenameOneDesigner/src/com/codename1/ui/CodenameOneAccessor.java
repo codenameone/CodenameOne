@@ -29,7 +29,7 @@ package com.codename1.ui;
  *
  * @author Shai Almog
  */
-public class LWUITAccessor {
+public class CodenameOneAccessor {
     public static com.codename1.ui.Image getImage(com.codename1.ui.Font f) {
         return ((com.codename1.ui.CustomFont)f).cache;
     }

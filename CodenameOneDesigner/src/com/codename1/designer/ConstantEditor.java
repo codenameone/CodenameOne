@@ -34,7 +34,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.JTextComponent;
 
 /**
- * Allows adding constants to the LWUIT theme
+ * Allows adding constants to the CodenameOne theme
  *
  * @author Shai Almog
  */
@@ -62,7 +62,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("radioSelectedImage", "Valid values: image name. Indicates the image of the selected radio button");
         helpMap.put("radioUnselectedImage", "Valid values: image name. Indicates the image of the unselected radio button");
         helpMap.put("dialogButtonCommandsBool", "Valid values: true/false. Indicates that commands added to dialogs should appear as buttons, useful for blackberry and touch devices where softbuttons aren't the norm");
-        helpMap.put("dialogPosition", "Valid values (<b>case sensitive</b>): North, South, East, West, Center. Indicates the default position for LWUIT dialogs on the screen");
+        helpMap.put("dialogPosition", "Valid values (<b>case sensitive</b>): North, South, East, West, Center. Indicates the default position for CodenameOne dialogs on the screen");
         helpMap.put("dialogTransitionIn", "Valid values: slide, fade. Indicates the default transition when entering a dialog");
         helpMap.put("dialogTransitionOut", "Valid values: slide, fade. Indicates the default transition when leaving a dialog");
         helpMap.put("disabledColor", "Valid values: hexedecimal number e.g. cccccc. Indicates the text color for a disabled component");

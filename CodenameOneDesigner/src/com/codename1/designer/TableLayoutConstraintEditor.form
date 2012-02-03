@@ -50,7 +50,7 @@
           <Group type="102" alignment="0" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="1" attributes="0">
-                  <Component id="jScrollPane1" alignment="0" pref="204" max="32767" attributes="0"/>
+                  <Component id="jScrollPane1" alignment="0" pref="274" max="32767" attributes="0"/>
                   <Group type="102" alignment="0" attributes="0">
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="jLabel1" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -217,7 +217,7 @@
           <Properties>
             <Property name="contentType" type="java.lang.String" value="text/html"/>
             <Property name="editable" type="boolean" value="false"/>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&#xd;&#xa;  &lt;head&gt;&#xd;&#xa;&#xd;&#xa;  &lt;/head&gt;&#xd;&#xa;  &lt;body&gt;&#xd;&#xa;    &lt;p style=&quot;margin-top: 0&quot;&gt;&#xd;&#xa;      &#xd;An entry within a table layout can be configured in various ways most of which are very similar&#xa;to the familiar HTML table tag in part because this layout is used by the LWUIT HTML component&#xa;in order to implement the HTML table tag...&lt;br&gt;&#xa;A cell can be positioned in an absolute row/column (to use the default set the value to -1). &#xa;The width/height of a cell (and thus its neighboring cells) can be determined as a percentage &#xa;of the available space for the table. &#xa;    &lt;/p&gt;&#xd;&#xa;    &lt;p&gt;      &#xa;Cells can be spanned horizontally or vertically which causes a component to occupy several &#xa;cells thus producing elaborate layout effects. Spanning defaults to 1 which means no spanning.&#xa;If a cell content is smaller than the cell itself it can be aligned horizontally or vertically, the&#xa;default indicates that an entry should fill the cell bounds.&#xa;    &lt;/p&gt;&#xa;  &lt;/body&gt;&#xd;&#xa;&lt;/html&gt;&#xd;&#xa;" noResource="true"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&#xd;&#xa;  &lt;head&gt;&#xd;&#xa;&#xd;&#xa;  &lt;/head&gt;&#xd;&#xa;  &lt;body&gt;&#xd;&#xa;    &lt;p style=&quot;margin-top: 0&quot;&gt;&#xd;&#xa;      &#xd;An entry within a table layout can be configured in various ways most of which are very similar&#xa;to the familiar HTML table tag in part because this layout is used by the CodenameOne HTML component&#xa;in order to implement the HTML table tag...&lt;br&gt;&#xa;A cell can be positioned in an absolute row/column (to use the default set the value to -1). &#xa;The width/height of a cell (and thus its neighboring cells) can be determined as a percentage &#xa;of the available space for the table. &#xa;    &lt;/p&gt;&#xd;&#xa;    &lt;p&gt;      &#xa;Cells can be spanned horizontally or vertically which causes a component to occupy several &#xa;cells thus producing elaborate layout effects. Spanning defaults to 1 which means no spanning.&#xa;If a cell content is smaller than the cell itself it can be aligned horizontally or vertically, the&#xa;default indicates that an entry should fill the cell bounds.&#xa;    &lt;/p&gt;&#xa;  &lt;/body&gt;&#xd;&#xa;&lt;/html&gt;&#xd;&#xa;" noResource="true"/>
             <Property name="name" type="java.lang.String" value="jEditorPane1" noResource="true"/>
           </Properties>
         </Component>

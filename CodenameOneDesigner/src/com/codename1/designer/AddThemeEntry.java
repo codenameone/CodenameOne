@@ -537,7 +537,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
             customizeBorder.setEnabled(true);
             deriveBorder.setSelected(false);
             borderLabel.setText(Accessor.toString((Border)value));
-            ((CodenameOneComponentWrapper)borderLabel).getLWUITComponent().getStyle().setBorder((Border)value);
+            ((CodenameOneComponentWrapper)borderLabel).getCodenameOneComponent().getStyle().setBorder((Border)value);
             borderLabel.repaint();
             if(value != null && value instanceof Border) {
                 currentBorder = (Border)value;
@@ -2595,7 +2595,7 @@ private void imageBorderWizardActionPerformed(java.awt.event.ActionEvent evt) {/
     Border b = (Border)resources.getTheme(themeName).get(uiid);
     if(b != null) {
         currentBorder = b;
-        ((CodenameOneComponentWrapper)borderLabel).getLWUITComponent().getStyle().setBorder(b);
+        ((CodenameOneComponentWrapper)borderLabel).getCodenameOneComponent().getStyle().setBorder(b);
         borderLabel.repaint();
     }
 }//GEN-LAST:event_imageBorderWizardActionPerformed
@@ -2673,7 +2673,7 @@ private void alignmentComboActionPerformed(java.awt.event.ActionEvent evt) {//GE
 }//GEN-LAST:event_alignmentComboActionPerformed
 
 private void videoTutorialActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_videoTutorialActionPerformed
-    ResourceEditorView.helpVideo("http://lwuit.blogspot.com/2011/04/mini-tutorial-on-editing-theme.html");
+    ResourceEditorView.helpVideo("http://codenameone.blogspot.com/2011/04/mini-tutorial-on-editing-theme.html");
 }//GEN-LAST:event_videoTutorialActionPerformed
 
 private void paddingLeftUnitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_paddingLeftUnitActionPerformed

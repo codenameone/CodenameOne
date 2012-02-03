@@ -223,7 +223,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="List"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;List&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;One of the most elaborate components in LWUIT, the list contains arbitrary items which can&lt;br&gt;&#xa;be &quot;rendered&quot; in unique ways. A list can be laid out horizontally or vertically and its content&lt;br&gt;&#xa;can be easily generated programmatically or via the model in the properties table.&lt;br&gt;&#xa;To customize the way the list shows its elements you need to set up a renderer for the list.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;List&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;One of the most elaborate components in Codename One, the list contains arbitrary items which can&lt;br&gt;&#xa;be &quot;rendered&quot; in unique ways. A list can be laid out horizontally or vertically and its content&lt;br&gt;&#xa;can be easily generated programmatically or via the model in the properties table.&lt;br&gt;&#xa;To customize the way the list shows its elements you need to set up a renderer for the list.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -426,7 +426,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="ContainerList"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ContainerList&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A container that acts like a List, providing a model and renderer approach but doesn&apos;t&lt;br&gt;&#xa;enable component addition. This allows mapping list functionality and model to a Container&lt;br&gt;&#xa;and using standard LWUIT layout managers to arrange the content of the container.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ContainerList&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A container that acts like a List, providing a model and renderer approach but doesn&apos;t&lt;br&gt;&#xa;enable component addition. This allows mapping list functionality and model to a Container&lt;br&gt;&#xa;and using standard Codename One layout managers to arrange the content of the container.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>

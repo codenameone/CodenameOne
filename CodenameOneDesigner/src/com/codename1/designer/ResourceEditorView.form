@@ -1273,54 +1273,6 @@
             <Property name="name" type="java.lang.String" value="helpMenu" noResource="true"/>
           </Properties>
           <SubComponents>
-            <MenuItem class="javax.swing.JMenuItem" name="introductionAndWalkthroughTutorial">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Introduction &amp; Walkthrough Video"/>
-                <Property name="name" type="java.lang.String" value="introductionAndWalkthroughTutorial" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="introductionAndWalkthroughTutorialActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <Menu class="javax.swing.JMenu" name="jMenu7">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="How Do I?"/>
-                <Property name="name" type="java.lang.String" value="jMenu7" noResource="true"/>
-              </Properties>
-              <SubComponents>
-                <MenuItem class="javax.swing.JMenuItem" name="howDoIChangeTheLookOfAComponent">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Change The Look Of A Component"/>
-                    <Property name="name" type="java.lang.String" value="howDoIChangeTheLookOfAComponent" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="howDoIChangeTheLookOfAComponentActionPerformed"/>
-                  </Events>
-                </MenuItem>
-                <MenuItem class="javax.swing.JMenuItem" name="howDoIGenerateNetbeansProject">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Connect To IDE/Source Code"/>
-                    <Property name="name" type="java.lang.String" value="howDoIGenerateNetbeansProject" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="howDoIGenerateNetbeansProjectActionPerformed"/>
-                  </Events>
-                </MenuItem>
-              </SubComponents>
-            </Menu>
-            <MenuItem class="javax.swing.JMenuItem" name="showSources">
-              <Properties>
-                <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
-                  <KeyStroke key="Shift+Ctrl+S"/>
-                </Property>
-                <Property name="mnemonic" type="int" value="83"/>
-                <Property name="text" type="java.lang.String" value="Show Source For Using"/>
-                <Property name="name" type="java.lang.String" value="showSources" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showSourcesActionPerformed"/>
-              </Events>
-            </MenuItem>
             <MenuItem class="javax.swing.JSeparator" name="jSeparator8">
               <Properties>
                 <Property name="name" type="java.lang.String" value="jSeparator8" noResource="true"/>

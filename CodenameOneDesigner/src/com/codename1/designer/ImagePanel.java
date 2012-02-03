@@ -29,7 +29,7 @@ import java.awt.Graphics;
 import javax.swing.JPanel;
 
 /**
- * Panel containing a LWUIT image that provides a photoshop-like square background
+ * Panel containing a CodenameOne image that provides a photoshop-like square background
  * effect. 
  *
  * @author Shai Almog

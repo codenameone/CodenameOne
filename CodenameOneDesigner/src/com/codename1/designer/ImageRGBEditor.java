@@ -43,7 +43,7 @@ import javax.swing.JOptionPane;
 import javax.swing.SpinnerNumberModel;
 
 /**
- * Editor for the standard LWUIT RGB images allowing us to pick images 
+ * Editor for the standard CodenameOne RGB images allowing us to pick images 
  *
  * @author Shai Almog
  */

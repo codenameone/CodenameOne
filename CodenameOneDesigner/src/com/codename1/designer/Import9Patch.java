@@ -304,15 +304,15 @@ private void okButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRS
 
 
 private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
-    List<com.codename1.ui.EncodedImage> topLeftLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> topRightLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> bottomLeftLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> bottomRightLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> centerLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> topImageLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> bottomImageLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> leftImageLwuit = new ArrayList<EncodedImage>();
-    List<com.codename1.ui.EncodedImage> rightImageLwuit = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> topLeftCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> topRightCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> bottomLeftCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> bottomRightCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> centerCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> topImageCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> bottomImageCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> leftImageCodenameOne = new ArrayList<EncodedImage>();
+    List<com.codename1.ui.EncodedImage> rightImageCodenameOne = new ArrayList<EncodedImage>();
     for(BufferedImage bi : biList) {
         int left = 0;
         for(int x = 0 ; x < bi.getWidth() ; x++) {
@@ -366,15 +366,15 @@ private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
         BufferedImage leftImage = bi.getSubimage(0, top, left, bi.getHeight() - top - bottom);
         BufferedImage rightImage = bi.getSubimage(bi.getWidth() - right, top, right, bi.getHeight() - top - bottom);
 
-        topLeftLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topLeft)));
-        topRightLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topRight)));
-        bottomLeftLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomLeft)));
-        bottomRightLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomRight)));
-        centerLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(center)));
-        topImageLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topImage)));
-        bottomImageLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomImage)));
-        leftImageLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(leftImage)));
-        rightImageLwuit.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(rightImage)));
+        topLeftCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topLeft)));
+        topRightCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topRight)));
+        bottomLeftCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomLeft)));
+        bottomRightCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomRight)));
+        centerCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(center)));
+        topImageCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(topImage)));
+        bottomImageCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(bottomImage)));
+        leftImageCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(leftImage)));
+        rightImageCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(rightImage)));
     }
 
     String prefix = (String)uiidCombo.getSelectedItem();
@@ -387,21 +387,21 @@ private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
             prefix += "#dis";
     }
     
-    com.codename1.ui.EncodedImage topLeftLwuitE = storeImage(topLeftLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage topRightLwuitE = storeImage(topRightLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage bottomLeftLwuitE = storeImage(bottomLeftLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage bottomRightLwuitE = storeImage(bottomRightLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage centerLwuitE = storeImage(centerLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage topImageLwuitE = storeImage(topImageLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage bottomImageLwuitE = storeImage(bottomImageLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage leftImageLwuitE = storeImage(leftImageLwuit, densities, prefix + " ");
-    com.codename1.ui.EncodedImage rightImageLwuitE = storeImage(rightImageLwuit, densities, prefix + " ");
+    com.codename1.ui.EncodedImage topLeftCodenameOneE = storeImage(topLeftCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage topRightCodenameOneE = storeImage(topRightCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage bottomLeftCodenameOneE = storeImage(bottomLeftCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage bottomRightCodenameOneE = storeImage(bottomRightCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage centerCodenameOneE = storeImage(centerCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage topImageCodenameOneE = storeImage(topImageCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage bottomImageCodenameOneE = storeImage(bottomImageCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage leftImageCodenameOneE = storeImage(leftImageCodenameOne, densities, prefix + " ");
+    com.codename1.ui.EncodedImage rightImageCodenameOneE = storeImage(rightImageCodenameOne, densities, prefix + " ");
     
     
-    com.codename1.ui.plaf.Border b = com.codename1.ui.plaf.Border.createImageScaledBorder(topImageLwuitE, 
-            bottomImageLwuitE, leftImageLwuitE,
-            rightImageLwuitE, topLeftLwuitE, topRightLwuitE,
-            bottomLeftLwuitE, bottomRightLwuitE, centerLwuitE);
+    com.codename1.ui.plaf.Border b = com.codename1.ui.plaf.Border.createImageScaledBorder(topImageCodenameOneE, 
+            bottomImageCodenameOneE, leftImageCodenameOneE,
+            rightImageCodenameOneE, topLeftCodenameOneE, topRightCodenameOneE,
+            bottomLeftCodenameOneE, bottomRightCodenameOneE, centerCodenameOneE);
     
     Hashtable newTheme = new Hashtable(res.getTheme(theme));
     newTheme.put(prefix + ".border", b);

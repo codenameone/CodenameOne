@@ -465,28 +465,28 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
             bottomImage = ImageTools.getScaledInstance(bottomImage, Math.max(20, bottomImage.getWidth()), bottomImage.getHeight());
         }
         
-        com.codename1.ui.EncodedImage topLeftLwuit = com.codename1.ui.EncodedImage.create(toPng(topLeft));
-        com.codename1.ui.EncodedImage topRightLwuit = com.codename1.ui.EncodedImage.create(toPng(topRight));
-        com.codename1.ui.EncodedImage bottomLeftLwuit = com.codename1.ui.EncodedImage.create(toPng(bottomLeft));
-        com.codename1.ui.EncodedImage bottomRightLwuit = com.codename1.ui.EncodedImage.create(toPng(bottomRight));
-        com.codename1.ui.EncodedImage centerLwuit = com.codename1.ui.EncodedImage.create(toPng(center));
-        com.codename1.ui.EncodedImage topImageLwuit = com.codename1.ui.EncodedImage.create(toPng(topImage));
-        com.codename1.ui.EncodedImage bottomImageLwuit = com.codename1.ui.EncodedImage.create(toPng(bottomImage));
-        com.codename1.ui.EncodedImage leftImageLwuit = com.codename1.ui.EncodedImage.create(toPng(leftImage));
-        com.codename1.ui.EncodedImage rightImageLwuit = com.codename1.ui.EncodedImage.create(toPng(rightImage));
+        com.codename1.ui.EncodedImage topLeftCodenameOne = com.codename1.ui.EncodedImage.create(toPng(topLeft));
+        com.codename1.ui.EncodedImage topRightCodenameOne = com.codename1.ui.EncodedImage.create(toPng(topRight));
+        com.codename1.ui.EncodedImage bottomLeftCodenameOne = com.codename1.ui.EncodedImage.create(toPng(bottomLeft));
+        com.codename1.ui.EncodedImage bottomRightCodenameOne = com.codename1.ui.EncodedImage.create(toPng(bottomRight));
+        com.codename1.ui.EncodedImage centerCodenameOne = com.codename1.ui.EncodedImage.create(toPng(center));
+        com.codename1.ui.EncodedImage topImageCodenameOne = com.codename1.ui.EncodedImage.create(toPng(topImage));
+        com.codename1.ui.EncodedImage bottomImageCodenameOne = com.codename1.ui.EncodedImage.create(toPng(bottomImage));
+        com.codename1.ui.EncodedImage leftImageCodenameOne = com.codename1.ui.EncodedImage.create(toPng(leftImage));
+        com.codename1.ui.EncodedImage rightImageCodenameOne = com.codename1.ui.EncodedImage.create(toPng(rightImage));
         String prefix = (String)applies.getAppliesTo().getModel().getElementAt(0);
-        topLeftLwuit = storeImage(topLeftLwuit, prefix +"TopL");
-        topRightLwuit = storeImage(topRightLwuit, prefix +"TopR");
-        bottomLeftLwuit = storeImage(bottomLeftLwuit, prefix +"BottomL");
-        bottomRightLwuit = storeImage(bottomRightLwuit, prefix +"BottomR");
-        centerLwuit = storeImage(centerLwuit, prefix + "Center");
-        topImageLwuit = storeImage(topImageLwuit, prefix + "Top");
-        bottomImageLwuit = storeImage(bottomImageLwuit, prefix + "Bottom");
-        leftImageLwuit = storeImage(leftImageLwuit, prefix + "Left");
-        rightImageLwuit = storeImage(rightImageLwuit, prefix + "Right");
-        com.codename1.ui.plaf.Border b = com.codename1.ui.plaf.Border.createImageBorder(topImageLwuit, bottomImageLwuit, leftImageLwuit,
-                rightImageLwuit, topLeftLwuit, topRightLwuit,
-                bottomLeftLwuit, bottomRightLwuit, centerLwuit);
+        topLeftCodenameOne = storeImage(topLeftCodenameOne, prefix +"TopL");
+        topRightCodenameOne = storeImage(topRightCodenameOne, prefix +"TopR");
+        bottomLeftCodenameOne = storeImage(bottomLeftCodenameOne, prefix +"BottomL");
+        bottomRightCodenameOne = storeImage(bottomRightCodenameOne, prefix +"BottomR");
+        centerCodenameOne = storeImage(centerCodenameOne, prefix + "Center");
+        topImageCodenameOne = storeImage(topImageCodenameOne, prefix + "Top");
+        bottomImageCodenameOne = storeImage(bottomImageCodenameOne, prefix + "Bottom");
+        leftImageCodenameOne = storeImage(leftImageCodenameOne, prefix + "Left");
+        rightImageCodenameOne = storeImage(rightImageCodenameOne, prefix + "Right");
+        com.codename1.ui.plaf.Border b = com.codename1.ui.plaf.Border.createImageBorder(topImageCodenameOne, bottomImageCodenameOne, leftImageCodenameOne,
+                rightImageCodenameOne, topLeftCodenameOne, topRightCodenameOne,
+                bottomLeftCodenameOne, bottomRightCodenameOne, centerCodenameOne);
         Hashtable newTheme = new Hashtable(res.getTheme(theme));
         for(int i = 0 ; i < applies.getAppliesTo().getModel().getSize() ; i++) {
             newTheme.put(applies.getAppliesTo().getModel().getElementAt(i), b);

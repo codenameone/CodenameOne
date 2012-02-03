@@ -254,7 +254,7 @@ public class ThemeEditor extends BaseForm {
         refreshTheme(themeHash);
         previewScroll.revalidate();
 
-        // a race condition causes LWUIT to sometimes paint a blank screen
+        // a race condition causes CodenameOne to sometimes paint a blank screen
         new Thread() {
             public void run() {
                 try {
@@ -784,7 +784,6 @@ public class ThemeEditor extends BaseForm {
         help = new javax.swing.JEditorPane();
         manageStyles = new javax.swing.JButton();
         borderWizard = new javax.swing.JButton();
-        helpVideo = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -1008,10 +1007,6 @@ public class ThemeEditor extends BaseForm {
         borderWizard.setName("borderWizard"); // NOI18N
         borderWizard.addActionListener(formListener);
 
-        helpVideo.setText("Help Video");
-        helpVideo.setName("helpVideo"); // NOI18N
-        helpVideo.addActionListener(formListener);
-
         org.jdesktop.layout.GroupLayout jPanel1Layout = new org.jdesktop.layout.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -1032,14 +1027,12 @@ public class ThemeEditor extends BaseForm {
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                         .add(removeThemeEntry)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(manageStyles)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(helpVideo))
+                        .add(manageStyles))
                     .add(stylesTabbedPane, 0, 0, Short.MAX_VALUE))
                 .addContainerGap())
         );
 
-        jPanel1Layout.linkSize(new java.awt.Component[] {addThemeEntry, editEntry, helpVideo, manageStyles, removeThemeEntry}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
+        jPanel1Layout.linkSize(new java.awt.Component[] {addThemeEntry, editEntry, manageStyles, removeThemeEntry}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -1056,8 +1049,7 @@ public class ThemeEditor extends BaseForm {
                     .add(addThemeEntry)
                     .add(editEntry)
                     .add(removeThemeEntry)
-                    .add(manageStyles)
-                    .add(helpVideo))
+                    .add(manageStyles))
                 .addContainerGap())
         );
 
@@ -1115,9 +1107,6 @@ public class ThemeEditor extends BaseForm {
             }
             else if (evt.getSource() == manageStyles) {
                 ThemeEditor.this.manageStylesActionPerformed(evt);
-            }
-            else if (evt.getSource() == helpVideo) {
-                ThemeEditor.this.helpVideoActionPerformed(evt);
             }
             else if (evt.getSource() == borderWizard) {
                 ThemeEditor.this.borderWizardActionPerformed(evt);
@@ -1647,10 +1636,6 @@ private  static final class MemoryCounter {
   }
 }
 
-private void helpVideoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_helpVideoActionPerformed
-    ResourceEditorView.helpVideo("http://lwuit.blogspot.com/2011/04/mini-tutorial-on-editing-theme.html");
-}//GEN-LAST:event_helpVideoActionPerformed
-
 private void simulatorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_simulatorActionPerformed
     if(resources.getUIResourceNames().length > 0) { 
         String ui = (String)uiPreviewContent.getSelectedItem();
@@ -2047,7 +2032,6 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     private javax.swing.JButton editEntry;
     private javax.swing.JSpinner heightResolution;
     private javax.swing.JEditorPane help;
-    private javax.swing.JButton helpVideo;
     private javax.swing.JButton hideConfig;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JPanel jPanel1;

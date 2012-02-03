@@ -28,7 +28,7 @@ import com.codename1.designer.ActionCommand;
 import com.codename1.designer.UserInterfaceEditor;
 
 /**
- * Extends the UIBuilder from LWUIT to provide a callback on loading
+ * Extends the UIBuilder from CodenameOne to provide a callback on loading
  *
  * @author Shai Almog
  */

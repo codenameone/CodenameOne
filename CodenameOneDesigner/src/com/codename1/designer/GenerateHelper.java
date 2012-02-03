@@ -209,7 +209,7 @@ public class GenerateHelper {
 
     private RunOnDevice generatePreviewActivity(JComponent mainPanel, EditableResources loadedResources, RunOnDevice rd, File selection, String androidDir) {
         try {
-            final Process p = new ProcessBuilder(androidDir + "/tools/android.bat", "create", "project", "--target", "2", "--name", "LWUITPreview",
+            final Process p = new ProcessBuilder(androidDir + "/tools/android.bat", "create", "project", "--target", "2", "--name", "CodenameOnePreview",
                     "--path", selection.getAbsolutePath(), "--activity", "PreviewActivity", "--package", "com.codenameone.preview").
                     redirectErrorStream(true).start();
             rd.waitForProcess(p, false, "Building Activity");
@@ -355,7 +355,7 @@ public class GenerateHelper {
             Process p = builder.start();
             rd.waitForProcess(p, false, "Compiling And Installing Activity");
             new ProcessBuilder(sdkDir + "\\platform-tools\\adb.exe", "-d", "shell",
-                    "am start -n com.codenameone.preview/com.codenameone.preview.LWUITPreview").
+                    "am start -n com.codenameone.preview/com.codenameone.preview.CodenameOnePreview").
                 redirectErrorStream(true).start();
             rd.waitForProcess(p, true, "Running App");
         } catch (Exception ex) {
