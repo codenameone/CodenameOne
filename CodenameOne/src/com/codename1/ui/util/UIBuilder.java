@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.analytics.AnalyticsService;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -102,6 +103,7 @@ public class UIBuilder {
     private static Hashtable componentRegistry;
 
     public static final int BACK_COMMAND_ID = 99999999;
+    private static boolean blockAnalytics;
 
     private static final String COMMAND_ACTION = "$COMMAND_ACTION$";
     private static final String COMMAND_ARGUMENTS = "$COMMAND_ARGUMENTS$";
@@ -192,6 +194,22 @@ public class UIBuilder {
     static final int LAYOUT_FLOW_LEGACY = 5004;
     static final int LAYOUT_FLOW = 5009;
     static final int LAYOUT_LAYERED = 5011;
+
+    /**
+     * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+     * @return the blockAnalytics
+     */
+    public static boolean isBlockAnalytics() {
+        return blockAnalytics;
+    }
+
+    /**
+     * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+     * @param aBlockAnalytics the blockAnalytics to set
+     */
+    public static void setBlockAnalytics(boolean aBlockAnalytics) {
+        blockAnalytics = aBlockAnalytics;
+    }
 
     private String resourceFilePath;
     private Resources resourceFile;
@@ -290,6 +308,17 @@ public class UIBuilder {
         getComponentRegistry().put(name, cmp);
     }
 
+    /**
+     * Invokes the analytics service if it is enabled and if 
+     * @param page the page visited
+     * @param referrer  the source page
+     */
+    protected void analyticsCallback(String page, String referrer) {
+        if(!isBlockAnalytics() && AnalyticsService.isEnabled()) {
+            AnalyticsService.visit(page, referrer);
+        }
+    }
+    
     /**
      * Creates the container defined under the given name in the res file
      *
@@ -1759,13 +1788,22 @@ public class UIBuilder {
                 initBackForm(f);
                 beforeShow(f);
                 f.showBack();
-                postShow(f);
+                postShowImpl(f);
             } else {
                 showContainerImpl(formName, null, sourceComponent, true);
             }
         }
     }
 
+    private String previousFormName(Form f) {
+        Vector formNavigationStack = getFormNavigationStackForComponent(f);
+        if(formNavigationStack != null && formNavigationStack.size() > 0) {
+            Hashtable h = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
+            return (String)h.get(FORM_STATE_KEY_NAME);
+        }
+        return null;
+    }
+    
     /**
      * Returns the text for the back command string. This can be controlled in the theme by the "backUsesTitleBool" constant
      * 
@@ -1875,7 +1913,7 @@ public class UIBuilder {
         newForm.setTransitionInAnimator(CommonTransitions.createEmpty());
         newForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
         newForm.show();
-        postShow(newForm);
+        postShowImpl(newForm);
         newForm.setTransitionInAnimator(tin);
         newForm.setTransitionOutAnimator(tout);
     }
@@ -1990,7 +2028,7 @@ public class UIBuilder {
             }
             beforeShow(f);
             f.showBack();
-            postShow(f);
+            postShowImpl(f);
         } else {
             if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
                 Form currentForm = Display.getInstance().getCurrent();
@@ -2028,18 +2066,18 @@ public class UIBuilder {
                     // dialog to prevent the "double clicking button" problem by using
                     // a modal dialog
                     sourceComponent.setEnabled(false);
-                    postShow(f);
+                    postShowImpl(f);
                     f.show();
                     sourceComponent.setEnabled(true);
                     exitForm(f);
                 } else {
                     ((Dialog)f).showModeless();
-                    postShow(f);
+                    postShowImpl(f);
                 }
             } else {
                 beforeShow(f);
                 f.show();
-                postShow(f);
+                postShowImpl(f);
             }
         }
     }
@@ -2103,6 +2141,17 @@ public class UIBuilder {
      * @param f the form about to be shown
      */
     protected void beforeShow(Form f) {
+    }
+
+    /**
+     * This method allows binding an action that should occur immediately after showing the given
+     * form
+     *
+     * @param f the form that was just shown
+     */
+    private void postShowImpl(Form f) {
+        postShow(f);
+        analyticsCallback(f.getName(), previousFormName(f));
     }
 
     /**
@@ -2231,7 +2280,7 @@ public class UIBuilder {
                     Form f = (Form)createContainer(fetchResourceFile(), nextForm);
                     beforeShow(f);
                     f.show();
-                    postShow(f);
+                    postShowImpl(f);
                 } else {
                     if(processBackground(destForm)) {
                         waitForForm(destForm);
@@ -2294,7 +2343,7 @@ public class UIBuilder {
                     } else {
                         f.show();
                     }
-                    postShow(f);
+                    postShowImpl(f);
                     new Thread(new FormListener(f, nextScreen)).start();
                     return;
                 }
@@ -2312,7 +2361,7 @@ public class UIBuilder {
                     } else {
                         f.show();
                     }
-                    postShow(f);
+                    postShowImpl(f);
                     new Thread(new FormListener(cmd, evt, f)).start();
                     return;
                 }

@@ -3159,14 +3159,10 @@ public abstract class CodenameOneImplementation {
         }
         
         if(Cookie.isAutoStored()){
-            if(Storage.isInitialized()){
-                if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
-                    Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
-                }
-                Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
-            }else{
-               System.out.println("Warning: Storage is not initialized");
+            if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
+                Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
             }
+            Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
         }
     }
 
@@ -3186,14 +3182,10 @@ public abstract class CodenameOneImplementation {
         }
         h.put(c.getName(), c);
         if(Cookie.isAutoStored()){
-            if(Storage.isInitialized()){
-                if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
-                    Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
-                }
-                Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
-            }else{
-               System.out.println("Warning: Storage is not initialized");
+            if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
+                Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
             }
+            Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
         }
     }
 
@@ -3221,11 +3213,7 @@ public abstract class CodenameOneImplementation {
     public Vector getCookiesForURL(String url) {
         Vector response = null;
         if (Cookie.isAutoStored()) {
-            if (Storage.isInitialized()) {
-                cookies = (Hashtable) Storage.getInstance().readObject(Cookie.STORAGE_NAME);
-            } else {
-                System.out.println("Warning: Storage is not initialized");
-            }
+            cookies = (Hashtable) Storage.getInstance().readObject(Cookie.STORAGE_NAME);
         }
 
         if(cookies != null && cookies.size() > 0) {

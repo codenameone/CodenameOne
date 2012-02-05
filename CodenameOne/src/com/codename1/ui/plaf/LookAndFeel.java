@@ -983,9 +983,7 @@ public abstract class LookAndFeel {
             if(c.equalsIgnoreCase("Native")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
             }
-        } else {
-            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
-        }
+        } 
     }
 
     private Transition getTransitionConstant(Transition t, String constant, String slideDir, int speed, boolean forward) {

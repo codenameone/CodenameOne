@@ -117,9 +117,18 @@ public class ConnectionRequest implements IOProgressListener {
     private Hashtable userHeaders;
     private Dialog showOnInit;
     private Dialog disposeOnCompletion;
+    private byte[] data;
 
     private int silentRetryCount = 0;
 
+    /**
+     * This method will return a valid value for only some of the responses and only after the response was processed
+     * @return null or the actual data returned
+     */
+    public byte[] getResponseData() {
+        return data;
+    }
+    
     /**
      * Adds the given header to the request that will be sent
      * 
@@ -504,8 +513,8 @@ public class ConnectionRequest implements IOProgressListener {
      * @throws IOException when a read input occurs
      */
     protected void readResponse(InputStream input) throws IOException  {
+        data = Util.readInputStream(input);
         if(hasResponseListeners()) {
-            byte[] data = Util.readInputStream(input);
             fireResponseListener(new NetworkEvent(this, data));
         }
     }
