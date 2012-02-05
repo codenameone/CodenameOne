@@ -4605,7 +4605,7 @@ public class UserInterfaceEditor extends BaseForm {
     private void codenameOneButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneButtonActionPerformed
         if(lockForDragging) {
             lockForDragging = false;
-            return;
+            return; 
         }
         addComponentToContainer(new com.codename1.ui.Button("Button"), "Button");
     }//GEN-LAST:event_codenameOneButtonActionPerformed

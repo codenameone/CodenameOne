@@ -24,6 +24,7 @@
 
 package com.codename1.designer;
 
+import com.codename1.analytics.AnalyticsService;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.l2fprod.common.swing.JOutlookBar;
 import com.codename1.ui.resource.util.BlockingAction;
@@ -202,6 +203,9 @@ public class ResourceEditorView extends FrameView {
         super(app);
         ToolTipManager.sharedInstance().setInitialDelay(0);
         ToolTipManager.sharedInstance().setDismissDelay(10000);
+        UIBuilder.setBlockAnalytics(true);
+        AnalyticsService.init("MO-27921432-2", "designer.codenameone.com");
+        AnalyticsService.visit("Startup", "");
         QuitAction.INSTANCE.setResource(loadedResources);
         initComponents();
         initNativeTheme();
@@ -548,6 +552,7 @@ public class ResourceEditorView extends FrameView {
         if(selectedResource == null || loadedResources.getResourceObject(selectedResource) == null) {
             return;
         }
+        AnalyticsService.visit(loadedResources.getResourceTypeAsString(selectedResource), loadedResources.getResourceTypeAsString(this.selectedResource));
         this.selectedResource = selectedResource;
         resourceEditor.removeAll();
         if(selectedResource != null) {

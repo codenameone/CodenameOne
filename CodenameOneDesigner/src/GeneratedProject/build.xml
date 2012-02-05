@@ -52,7 +52,8 @@
     <target name="-pre-compile">
         <echo>Compile is forcing CLDC 1.1 level API compliance for maximum device compatibility. This allows smaller
         code size and wider device support</echo>
-        <javac destdir="${build.classes.dir}"
+        <mkdir dir="build/tmp"/>
+        <javac destdir="build/tmp"
             source="1.1"
             target="1.1"
             bootclasspath="CLDC11.jar"
@@ -91,6 +92,7 @@
             vendor="${codename1.vendor}"
             subtitle="${codename1.secondaryTitle}"
             
+            appStoreBuild="true"
             targetType="iphone"
             certificate="${codename1.ios.release.certificate}"
             certPassword="${codename1.ios.release.certificatePassword}"
@@ -109,6 +111,9 @@
             <fileset dir="override" includes="**/*_phone.ovr"/>
             <fileset dir="override" includes="**/*_tablet.ovr"/>
         </copy>
+        <copy todir="${build.classes.dir}">
+            <fileset dir="native/android" includes="**/*"/>
+        </copy>
     </target>
     
     <target name="copy-ios-override">
@@ -121,6 +126,9 @@
             <fileset dir="override" includes="**/*_phone.ovr"/>
             <fileset dir="override" includes="**/*_tablet.ovr"/>
         </copy>
+        <copy todir="${build.classes.dir}">
+            <fileset dir="native/ios" includes="**/*"/>
+        </copy>
     </target>
         
     <target name="copy-rim-override">
@@ -129,6 +137,9 @@
         <copy todir="${build.classes.dir}">
             <fileset dir="override" includes="**/*_rim.ovr"/>
             <fileset dir="override" includes="**/*_phone.ovr"/>
+        </copy>
+        <copy todir="${build.classes.dir}">
+            <fileset dir="native/rim" includes="**/*"/>
         </copy>
     </target>
 
@@ -139,11 +150,17 @@
             <fileset dir="override" includes="**/*_me.ovr"/>
             <fileset dir="override" includes="**/*_phone.ovr"/>
         </copy>
+        <copy todir="${build.classes.dir}">
+            <fileset dir="native/j2me" includes="**/*"/>
+        </copy>
     </target>
 
     <target name="clean-override">
         <delete>
             <fileset dir="build/classes" includes="**/*.ovr"/>
+            <fileset dir="build/classes" includes="**/*.java"/>
+            <fileset dir="build/classes" includes="**/*.m"/>
+            <fileset dir="build/classes" includes="**/*.h"/>
         </delete>
     </target>
     
@@ -183,8 +200,19 @@
             />
     </target>
 
+    <target name="j2me-native-theme-init">
+        <available file="${codename1.j2me.nativeTheme}" property="j2me-native-theme.available" />
+    </target>
+    
+    <target name="copy-j2me-native" if="j2me-native-theme.available">
+        <copy file="${codename1.j2me.nativeTheme}" tofile="src/nativeJ2METheme.res" />
+    </target>
 
-    <target name="build-for-j2me-device" depends="clean,copy-j2me-override,jar,clean-override">
+    <target name="clean-j2me-native" if="j2me-native-theme.available">
+        <delete file="src/nativeJ2METheme.res" />
+    </target>
+
+    <target name="build-for-j2me-device" depends="clean,j2me-native-theme-init,copy-j2me-native,copy-j2me-override,jar,clean-j2me-native,clean-override">
         <codeNameOne
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -194,8 +222,10 @@
             icon="${codename1.icon}"
             vendor="${codename1.vendor}"
             subtitle="${codename1.secondaryTitle}"
-            
             targetType="me"            
             />
+    </target>
+    <target name="-pre-init">
+        <property name="application.args" value="${codename1.packageName}.${codename1.mainName}"/>
     </target>
 </project>

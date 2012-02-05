@@ -1952,6 +1952,24 @@ public class EditableResources extends Resources implements TreeModel {
         });
     }
 
+    public String getResourceTypeAsString(String name) {
+        if(name == null) {
+            return "";
+        }
+        byte t = getResourceType(name);
+        switch(t) {
+            case MAGIC_SVG: return "SVG";
+            case MAGIC_TIMELINE: return "Timeline";
+            case MAGIC_THEME: return "Theme";
+            case MAGIC_FONT: return "Font";
+            case MAGIC_IMAGE: return "Image";
+            case MAGIC_L10N: return "L10n";
+            case MAGIC_DATA: return "Data";
+            case MAGIC_UI: return "GUI";
+        }
+        return "Unknown: " + Integer.toHexString(t & 0xff);
+    }
+    
     byte getResourceType(String name) {
         if(overrideResource != null && isOverridenResource(name)) {
             return overrideResource.getResourceType(name);

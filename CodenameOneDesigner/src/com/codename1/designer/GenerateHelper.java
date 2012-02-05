@@ -54,6 +54,12 @@ public class GenerateHelper {
         "/GeneratedProject/src",
         "/GeneratedProject/src/generated",
         "/GeneratedProject/src/userclasses",
+        "/GeneratedProject/override",
+        "/GeneratedProject/native",
+        "/GeneratedProject/native/android",
+        "/GeneratedProject/native/ios",
+        "/GeneratedProject/native/j2me",
+        "/GeneratedProject/native/rim",
     };
     static final String[] GENERATED_PROJECT_FILE_NAMES = {
         "/GeneratedProject/build.xml",
