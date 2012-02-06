@@ -4772,6 +4772,9 @@ public class UserInterfaceEditor extends BaseForm {
             return false;
         }
         validateLoadedStateMachineCode();
+        if(containerInstance.getName() == null || c.getName() == null) {
+            return false;
+        }
         String methodName = "on" + ResourceEditorView.normalizeFormName(containerInstance.getName()) +
                             "_" + ResourceEditorView.normalizeFormName(c.getName()) + "Action";
         return userStateMachineCode.indexOf(methodName) > -1;

@@ -476,16 +476,21 @@ public class ResourceEditorView extends FrameView {
         });
         
         refreshRecentMenu();
+        loadedResources.clear();
+        loadedFile = null;
+        getFrame().setTitle("Untitled - Codename One Designer");
         if(fileToLoad != null) {
-            this.fileToLoad = fileToLoad;
-            loadResourceFileAction.actionPerformed(null);
-            getFrame().setTitle(fileToLoad.getName() + " - Codename One Designer");
-        } else {
-            loadedResources.clear();
-            loadedFile = null;
-            updateLoadedFile();
-            getFrame().setTitle("Untitled - Codename One Designer");
+            final File f = fileToLoad;
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    ResourceEditorView.this.fileToLoad = f;
+                    loadResourceFileAction.actionPerformed(null);
+                    getFrame().setTitle(f.getName() + " - Codename One Designer");
+                }
+            });
         }
+        updateLoadedFile();
         //animationScroll.getViewport().setOpaque(false);
         dataScroll.getViewport().setOpaque(false);
         fontsScroll.getViewport().setOpaque(false);
@@ -2194,7 +2199,12 @@ private void uiBuilderSourceActionPerformed(java.awt.event.ActionEvent evt) {//G
             w.write("        if(loadTheme) {\n");
             w.write("            if(res == null) {\n");
             w.write("                try {\n");
-            w.write("                    res = Resources.openLayered(resPath);\n");
+            w.write("                    if(resPath.endsWith(\".res\")) {\n");
+            w.write("                        res = Resources.open(resPath);\n");
+            w.write("                        System.out.println(\"Warning: you should construct the state machine without the .res extension to allow theme overlays\");\n");
+            w.write("                    } else {\n");
+            w.write("                        res = Resources.openLayered(resPath);\n");
+            w.write("                    }\n");
             w.write("                } catch(java.io.IOException err) { err.printStackTrace(); }\n");
             w.write("            }\n");
             w.write("            initTheme(res);\n");
@@ -3928,7 +3938,7 @@ public static void openInIDE(File f, int lineNumber) {
                 StringBuilder buildXML = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<project name=\"Export\" default=\"generateResource\" basedir=\".\">\n" +
                     "<target name=\"generateResource\">\n<taskdef classpath=\"editor.jar\" " +
-                    "classname=\"com.codename1.ui.tools.resourcebuilder.CodenameOneTask\" name=\"build\" />\n    <build dest=\"output.res\">\n"
+                    "classname=\"com.codename1.tools.resourcebuilder.CodenameOneTask\" name=\"build\" />\n    <build dest=\"output.res\">\n"
                 );
 
                 if(loadedResources.getFontResourceNames().length > 0) {

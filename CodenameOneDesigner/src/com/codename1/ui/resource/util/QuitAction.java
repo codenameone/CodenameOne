@@ -36,6 +36,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.util.EventObject;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.prefs.Preferences;
 import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
@@ -51,7 +53,7 @@ import org.jdesktop.application.Application;
  */
 public class QuitAction extends AbstractAction implements WindowListener {
     public static QuitAction INSTANCE = new QuitAction();
-    
+    private boolean exitPrompted;
     private EditableResources res;
     private QuitAction() {
         putValue(NAME, "Exit");
@@ -62,6 +64,7 @@ public class QuitAction extends AbstractAction implements WindowListener {
 
             @Override
             public boolean canExit(EventObject event) {
+                exitPrompted = true;
                 if(res != null && res.isModified()) {
                     if(JOptionPane.showConfirmDialog(ResourceEditorApp.getApplication().getMainFrame(), "File was modified, do you want to exit without saving?", 
                         "Exit", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION) {
@@ -81,50 +84,6 @@ public class QuitAction extends AbstractAction implements WindowListener {
         this.res = res;
     }
 
-    public void bindFrame(JFrame frm) {
-        frm.addWindowListener(this);
-        frm.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        Preferences pref = Preferences.userNodeForPackage(getClass());
-        int width = pref.getInt("width", 600);
-        int height = pref.getInt("height", 500);
-        int xLocation = pref.getInt("xLocation", -1);
-        int yLocation = pref.getInt("yLocation", -1);
-        Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
-        if(xLocation < 0 || yLocation < 0 || width < 10 || height < 10 ||
-                width > d.width || height > d.height) {
-            frm.setLocationByPlatform(true);
-            frm.setSize(600, 500);
-        } else {
-            frm.setBounds(xLocation, yLocation, width, height);
-        }
-        
-        frm.addComponentListener(new ComponentListener() {
-            public void componentResized(ComponentEvent e) {
-                if (e.getComponent() instanceof JFrame) {
-                    JFrame f = (JFrame)e.getComponent();
-                    if ((f.getExtendedState() & JFrame.MAXIMIZED_BOTH) == 0) {
-                        Preferences pref = Preferences.userNodeForPackage(getClass());
-                        Rectangle r = f.getBounds();
-                        pref.putInt("width", r.width);
-                        pref.putInt("height", r.height);
-                        pref.putInt("xLocation", r.x);
-                        pref.putInt("yLocation", r.y);
-                    }
-                }
-            }
-
-            public void componentMoved(ComponentEvent e) {
-            }
-
-            public void componentShown(ComponentEvent e) {
-            }
-
-            public void componentHidden(ComponentEvent e) {
-            }
-        });
-        
-        frm.validate();
-    }
     
     public boolean quit() {
         Application.getInstance().exit();
@@ -139,7 +98,16 @@ public class QuitAction extends AbstractAction implements WindowListener {
     }
 
     public void windowClosing(WindowEvent e) {
-        actionPerformed(null);
+        // workaround for a Swing Application Framework bug http://code.google.com/p/codenameone/issues/detail?id=6
+        exitPrompted = false;
+        new Timer().schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if(!exitPrompted) {
+                    System.exit(0);
+                }
+            }
+        }, 500);
     }
 
     public void windowClosed(WindowEvent e) {
