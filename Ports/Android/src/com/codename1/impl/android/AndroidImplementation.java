@@ -68,6 +68,7 @@ import android.database.Cursor;
 import android.media.MediaPlayer;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.widget.MediaController;
 import android.widget.VideoView;
@@ -1470,6 +1471,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.v = vv;
             clear.setColor(0xAA000000);
             clear.setStyle(Style.FILL);
+            v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), 
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
         }
 
         @Override
