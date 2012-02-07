@@ -96,6 +96,8 @@ import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.device.api.system.CodeModuleGroup;
 import net.rim.device.api.system.CodeModuleGroupManager;
 import net.rim.blackberry.api.phone.Phone;
+import net.rim.device.api.applicationcontrol.ApplicationPermissions;
+import net.rim.device.api.applicationcontrol.ApplicationPermissionsManager;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
@@ -157,6 +159,23 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void init(Object m) {
+        
+        ApplicationPermissions permRequest = new ApplicationPermissions();
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_LOCATION_DATA);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_ORGANIZER_DATA);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_EMAIL);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_FILE_API);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_INTERNET);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_RECORDING);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_WIFI);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_CROSS_APPLICATION_COMMUNICATION);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_MEDIA);
+        permRequest.addPermission(ApplicationPermissions.PERMISSION_INPUT_SIMULATION);
+ 
+        ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
+        apm.invokePermissionsRequest(permRequest);
+
+        
         if (m instanceof UiApplication) {
             app = (UiApplication) m;
         } else {
@@ -412,7 +431,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         out.close();
         i.close();
         byte[] b = out.toByteArray();
-        return Bitmap.createBitmapFromBytes(b, 0, b.length, 1);
+        return Bitmap.createBitmapFromBytes(b, 0, b.length, 1);                   
     }
 
     public boolean isAlphaMutableImageSupported() {
@@ -459,7 +478,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if (srcWidth == width && srcHeight == height) {
             return image;
         }
-
+        
         int[] currentArray = new int[srcWidth];
         int[] destinationArray = new int[width * height];
         scaleArray(image, srcWidth, srcHeight, height, width, currentArray, destinationArray);
@@ -1076,7 +1095,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     static EventDispatcher getVolumeListener() {
         return volumeListener;
     }
-
+    
     /**
      * @inheritDoc
      */
@@ -2520,11 +2539,16 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                                 String path = entry.getPath();
                                 //close the camera
                                 UiApplication.getUiApplication().removeFileSystemJournalListener(this);
-                                EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
-                                inject.post();
-                                inject.post();
+
+                                try {
+                                    EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
+                                    inject.post();
+                                    inject.post();                                    
+                                } catch (Exception e) {
+                                    //try to close the camera
+                                }
                                 
-                                camResponse.actionPerformed(new ActionEvent(path));
+                                camResponse.actionPerformed(new ActionEvent("file://"+path));
                             }
                         }
                     }
