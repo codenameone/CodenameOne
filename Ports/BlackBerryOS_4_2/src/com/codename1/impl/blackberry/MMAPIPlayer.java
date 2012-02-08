@@ -273,15 +273,14 @@ class MMAPIPlayer implements PlayerListener, Media{
     }
 
     public boolean isPlaying() {
-        return nativePlayer.getState() == Player.STARTED;
+        return nativePlayer != null && nativePlayer.getState() == Player.STARTED;
     }
 
     public void setNativePlayerMode(boolean nativePlayer) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     public boolean isNativePlayerMode() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return false;
     }
     
     

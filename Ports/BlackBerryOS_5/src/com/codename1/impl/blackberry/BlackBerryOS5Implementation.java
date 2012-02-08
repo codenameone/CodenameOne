@@ -29,20 +29,25 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import net.rim.blackberry.api.invoke.CameraArguments;
+import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.device.api.system.Branding;
 import org.w3c.dom.Document;
 
 // requires signing
-import net.rim.device.api.system.CodeModuleGroup;
-import net.rim.device.api.system.CodeModuleGroupManager;
-import net.rim.blackberry.api.phone.Phone;
 import net.rim.device.api.browser.field2.BrowserField;
 import net.rim.device.api.browser.field2.BrowserFieldListener;
+import net.rim.device.api.io.file.FileSystemJournal;
+import net.rim.device.api.io.file.FileSystemJournalEntry;
+import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.script.Scriptable;
+import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.DeviceInfo;
+import net.rim.device.api.system.EventInjector;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.UiApplication;
 
@@ -256,6 +261,59 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
+        }
+    }
+
+    public void captureVideo(ActionListener response) {
+        this.camResponse = response;
+
+        UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
+
+            private long lastUSN;
+            private String videoPath;
+
+            public void fileJournalChanged() {
+                // next sequence number file system will use
+                long USN = FileSystemJournal.getNextUSN();
+
+                for (long i = USN - 1; i >= lastUSN && i < USN; --i) {
+                    FileSystemJournalEntry entry = FileSystemJournal.getEntry(i);
+                    if (entry == null) {
+                        break;
+                    }
+
+                    String path = entry.getPath();
+                    if (entry.getEvent() == FileSystemJournalEntry.FILE_ADDED
+                            && videoPath == null) {
+                        int index = path.indexOf(".3GP");
+                        if (index != -1) {
+                            videoPath = path;
+                        }
+                    } else if (entry.getEvent() == FileSystemJournalEntry.FILE_RENAMED) {
+                        if (path != null && path.equals(videoPath)) {
+                            //close the camera
+                            UiApplication.getUiApplication().removeFileSystemJournalListener(this);
+
+                            try {
+                                EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
+                                inject.post();
+                                inject.post();
+                            } catch (Exception e) {
+                                //try to close the camera
+                            }
+
+                            camResponse.actionPerformed(new ActionEvent("file://" + path));
+                            camResponse = null;
+                            videoPath = null;
+                            break;
+                        }
+                    }
+                }
+                lastUSN = USN;
+            }
+        });
+        synchronized (UiApplication.getEventLock()) {
+            Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments(CameraArguments.ARG_VIDEO_RECORDER));
         }
     }
 }

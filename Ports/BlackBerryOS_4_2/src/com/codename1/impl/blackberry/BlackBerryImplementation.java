@@ -102,7 +102,10 @@ import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.system.ApplicationDescriptor;
+import net.rim.device.api.system.ApplicationManager;
+import net.rim.device.api.system.ApplicationManagerException;
 import net.rim.device.api.system.Characters;
+import net.rim.device.api.system.CodeModuleManager;
 import net.rim.device.api.system.EventInjector;
 
 /**
@@ -149,6 +152,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     private Hashtable fat = new Hashtable();
     private short currentKey = 1;
+    protected ActionListener camResponse;
 
     BlackBerryCanvas createCanvas() {
         return new BlackBerryCanvas(this);
@@ -197,7 +201,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
-        if(!apm.invokePermissionsRequest(permRequest)){
+        if (!apm.invokePermissionsRequest(permRequest)) {
             exitApplication();
             return;
         }
@@ -739,10 +743,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
 
+        EventLog.getInstance().logInformationEvent(uri);
+
         MMAPIPlayer player = MMAPIPlayer.createPlayer(uri, onCompletion);
         if (isVideo) {
             VideoMainScreen video = new VideoMainScreen(player, this);
-            showNativeScreen(video);
             return video;
         }
         return player;
@@ -762,7 +767,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         MMAPIPlayer player = MMAPIPlayer.createPlayer(stream, mimeType, onCompletion);
         if (mimeType.indexOf("video") > -1) {
             VideoMainScreen video = new VideoMainScreen(player, this);
-            showNativeScreen(video);
             return video;
         }
         return player;
@@ -1592,7 +1596,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     break;
 
                 case INVOKE_LATER_showNativeScreen:
-                    app.pushScreen((Screen) fld);
+                    if (app.getActiveScreen() != fld) {
+                        app.pushScreen((Screen) fld);
+                    }
                     break;
 
                 case INVOKE_AND_WAIT_calcPreferredSize:
@@ -2550,7 +2556,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             cleanup(fc);
         }
     }
-    private ActionListener camResponse;
 
     public void capturePhoto(ActionListener response) {
         this.camResponse = response;
@@ -2579,6 +2584,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                                 }
 
                                 camResponse.actionPerformed(new ActionEvent("file://" + path));
+                                camResponse = null;
                             }
                         }
                     }
@@ -2586,15 +2592,65 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 lastUSN = USN;
             }
         });
-        Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments());
+        synchronized (UiApplication.getEventLock()) {
+            Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments());
+        }
     }
 
     public void captureVideo(ActionListener response) {
-        throw new RuntimeException("not implemented yet");
+        throw new RuntimeException("capture video is supported on RIM OS 5.0 and up");
     }
 
     public void captureAudio(ActionListener response) {
-        throw new RuntimeException("not implemented yet");
+        int h = CodeModuleManager.getModuleHandle("net_rim_bb_voicenotesrecorder");
+        
+        if(h == 0){
+            throw new RuntimeException("capture audio works only if Voice Notes is installed");        
+        }
+        
+        this.camResponse = response;
+        
+        UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
+
+            private long lastUSN;
+
+            public void fileJournalChanged() {
+                long USN = FileSystemJournal.getNextUSN();
+                for (long i = USN - 1; i >= lastUSN; --i) {
+                    FileSystemJournalEntry entry = FileSystemJournal.getEntry(i);
+                    if (entry != null) {
+                        String path = entry.getPath();
+                        if (entry.getEvent() == FileSystemJournalEntry.FILE_ADDED
+                                && path.endsWith(".amr")) {
+
+                            UiApplication.getUiApplication().removeFileSystemJournalListener(this);
+
+                            try {
+                                EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
+//                                    inject.post();
+                                inject.post();
+                            } catch (Exception e) {
+                                //try to close the voicenotesrecorder
+                            }
+                            EventLog.getInstance().logInformationEvent(path);
+
+                            camResponse.actionPerformed(new ActionEvent("file://" + path));
+                            camResponse = null;
+                            break;
+                        }
+                        
+                    }
+                }
+                lastUSN = USN;
+            }
+        });
+
+        ApplicationDescriptor desc = new ApplicationDescriptor(CodeModuleManager.getApplicationDescriptors(h)[0], null);
+        try {
+            ApplicationManager.getApplicationManager().runApplication(desc, true);
+        } catch (ApplicationManagerException e) {
+            e.printStackTrace();
+        }
     }
 
     /**

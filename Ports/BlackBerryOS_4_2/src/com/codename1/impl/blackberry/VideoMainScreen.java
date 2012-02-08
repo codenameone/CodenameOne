@@ -26,14 +26,12 @@ import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import com.codename1.ui.Label;
 import javax.microedition.media.MediaException;
-import javax.microedition.media.Player;
 import javax.microedition.media.control.VideoControl;
 import net.rim.device.api.ui.Field;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.Manager;
-import net.rim.device.api.ui.component.LabelField;
+import net.rim.device.api.ui.MenuItem;
 import net.rim.device.api.ui.container.MainScreen;
-import net.rim.device.api.ui.container.VerticalFieldManager;
 
 /**
  *
@@ -45,9 +43,9 @@ public class VideoMainScreen extends MainScreen implements Media {
     private final MMAPIPlayer player;
     private BlackBerryImplementation impl;
     
-    public VideoMainScreen(MMAPIPlayer player, BlackBerryImplementation impl) {
+    public VideoMainScreen(MMAPIPlayer p, BlackBerryImplementation impl) {
         super(Manager.NO_VERTICAL_SCROLL);
-        this.player = player;
+        this.player = p;
         this.impl = impl;
         this.videoControl = (VideoControl) player.nativePlayer.getControl("VideoControl");
 
@@ -56,6 +54,19 @@ public class VideoMainScreen extends MainScreen implements Media {
                 // Initialize the field where the content of the camera shall be displayed.
                 Field videoField = (Field) this.videoControl.initDisplayMode(VideoControl.USE_GUI_PRIMITIVE, "net.rim.device.api.ui.Field");
                 add(videoField);
+                addMenuItem(new MenuItem("Pause", 0, 100) {
+
+                    public void run() {
+                        player.pause();
+                    }
+                });
+                addMenuItem(new MenuItem("Play", 0, 100) {
+
+                    public void run() {
+                        player.play();
+                    }
+                });
+                
                 // Display the video control.
                 this.videoControl.setDisplayFullScreen(true);
                 this.videoControl.setVisible(true);
@@ -67,6 +78,7 @@ public class VideoMainScreen extends MainScreen implements Media {
     }
 
     public void play() {
+        impl.showNativeScreen(this);
         player.play();
     }
 
@@ -118,7 +130,6 @@ public class VideoMainScreen extends MainScreen implements Media {
     }
 
     public void setNativePlayerMode(boolean nativePlayer) {
-        
     }
 
     public boolean isNativePlayerMode() {
@@ -127,6 +138,7 @@ public class VideoMainScreen extends MainScreen implements Media {
 
     protected boolean keyDown(int keycode, int time) {
         if (Keypad.key(keycode) == Keypad.KEY_ESCAPE) {
+            cleanup();
             impl.confirmControlView();
             return true;
         }
