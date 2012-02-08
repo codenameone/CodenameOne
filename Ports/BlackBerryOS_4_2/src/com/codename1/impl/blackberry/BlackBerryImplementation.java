@@ -105,7 +105,6 @@ import net.rim.device.api.system.ApplicationDescriptor;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.EventInjector;
 
-
 /**
  * The implementation of the blackberry platform delegates the work to the underlying UI
  * application to allow for deep BB integration
@@ -113,6 +112,7 @@ import net.rim.device.api.system.EventInjector;
  * @author Shai Almog, Thorsten Schemm
  */
 public class BlackBerryImplementation extends CodenameOneImplementation {
+
     private static CodeModuleGroup group;
     static Hashtable fieldComponentMap = new Hashtable();
     static final int INVOKE_LATER_confirmControlView = 1;
@@ -125,7 +125,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     static final int INVOKE_LATER_dirty = 8;
     static final int INVOKE_LATER_startMedia = 9;
     private static boolean minimizeOnEnd = true;
-
     // blackberry sometimes "breaks" the drawing color... No idea why this might happen...
     private int color;
     static final int MENU_SOFT_KEY = Keypad.KEY_MENU;
@@ -143,45 +142,73 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     private boolean initGetProperty = true;
     private static EventDispatcher volumeListener;
     private NullField nullFld;
-
     private String currentAccessPoint;
     private boolean deviceSide;
-
     /**
      * The File Allocation Table assigns user based file names to RMS storage
      */
     private Hashtable fat = new Hashtable();
-
     private short currentKey = 1;
-    
+
     BlackBerryCanvas createCanvas() {
         return new BlackBerryCanvas(this);
     }
 
     public void init(Object m) {
-        
+
         ApplicationPermissions permRequest = new ApplicationPermissions();
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_LOCATION_DATA);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_ORGANIZER_DATA);
         permRequest.addPermission(ApplicationPermissions.PERMISSION_EMAIL);
         permRequest.addPermission(ApplicationPermissions.PERMISSION_FILE_API);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_INTERNET);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_RECORDING);
         permRequest.addPermission(ApplicationPermissions.PERMISSION_WIFI);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_CROSS_APPLICATION_COMMUNICATION);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_MEDIA);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_INPUT_SIMULATION);
- 
-        ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
-        apm.invokePermissionsRequest(permRequest);
+        try {
+            //ApplicationPermissions.PERMISSION_CROSS_APPLICATION_COMMUNICATION
+            permRequest.addPermission(11);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_MEDIA
+            permRequest.addPermission(21);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_INPUT_SIMULATION
+            permRequest.addPermission(6);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_LOCATION_DATA
+            permRequest.addPermission(14);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_ORGANIZER_DATA
+            permRequest.addPermission(16);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_INTERNET
+            permRequest.addPermission(7);
+        } catch (Exception e) {
+        }
+        try {
+            //ApplicationPermissions.PERMISSION_RECORDING
+            permRequest.addPermission(17);
+        } catch (Exception e) {
+        }
 
-        
+        ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
+        if(!apm.invokePermissionsRequest(permRequest)){
+            exitApplication();
+            return;
+        }
+
+
         if (m instanceof UiApplication) {
             app = (UiApplication) m;
         } else {
-            if(m instanceof MIDlet) {
+            if (m instanceof MIDlet) {
                 midlet = true;
-                midletInstance = (MIDlet)m;
+                midletInstance = (MIDlet) m;
             } else {
                 midlet = false;
             }
@@ -207,7 +234,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
         });
 
-        
+
         RecordEnumeration e = null;
         RecordStore r = null;
         try {
@@ -223,7 +250,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     di.close();
                     bi.close();
                     fat.put(name, new Short(key));
-                    if(key >= currentKey) {
+                    if (key >= currentKey) {
                         currentKey += key;
                     }
                 }
@@ -236,7 +263,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             ex.printStackTrace();
             cleanup(r);
             cleanup(e);
-        }        
+        }
     }
 
     public void confirmControlView() {
@@ -267,46 +294,47 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int keyCode) {
         TextArea txtCmp = (TextArea) cmp;
-        if((txtCmp.getConstraint() & TextArea.NON_PREDICTIVE) == 0){
+        if ((txtCmp.getConstraint() & TextArea.NON_PREDICTIVE) == 0) {
             nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), keyCode);
         }
     }
 
     public void nativeEdit(final Component cmp, final int maxSize, final int constraint, String text, int keyCode) {
-        if(nativeEdit != null){
+        if (nativeEdit != null) {
             finishEdit(true);
         }
 
         lightweightEdit = (TextArea) cmp;
-        if(keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
-            text += ((char)keyCode);
+        if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
+            text += ((char) keyCode);
             lightweightEdit.setText(text);
         }
         class LightweightEdit implements Runnable, Animation {
+
             public void run() {
                 long type = 0;
                 TextArea lightweightEditTmp = lightweightEdit;
-                if(lightweightEditTmp == null) {
+                if (lightweightEditTmp == null) {
                     return;
                 }
                 int constraint = lightweightEditTmp.getConstraint();
-                if((constraint & TextArea.DECIMAL) == TextArea.DECIMAL) {
-                        type = BasicEditField.FILTER_REAL_NUMERIC;
+                if ((constraint & TextArea.DECIMAL) == TextArea.DECIMAL) {
+                    type = BasicEditField.FILTER_REAL_NUMERIC;
                 } else {
-                    if((constraint & TextArea.EMAILADDR) == TextArea.EMAILADDR) {
-                            type = BasicEditField.FILTER_EMAIL;
+                    if ((constraint & TextArea.EMAILADDR) == TextArea.EMAILADDR) {
+                        type = BasicEditField.FILTER_EMAIL;
                     } else {
-                        if((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
+                        if ((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
                             type = BasicEditField.FILTER_NUMERIC;
                         } else {
-                            if((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
+                            if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
                                 type = BasicEditField.FILTER_PHONE;
                             }
                         }
                     }
                 }
 
-                if(lightweightEditTmp.isSingleLineTextArea()) {
+                if (lightweightEditTmp.isSingleLineTextArea()) {
                     type |= BasicEditField.NO_NEWLINE;
                 }
 
@@ -331,7 +359,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 }
             }
 
-            public boolean animate() { 
+            public boolean animate() {
                 BasicEditField ef = nativeEdit;
                 Component lw = lightweightEdit;
                 if (lw == null || lw.getComponentForm() != Display.getInstance().getCurrent()) {
@@ -359,13 +387,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         super.setCurrentForm(f);
 
         nullFld = null;
-        synchronized(UiApplication.getEventLock()) {
-            while(canvas.getFieldCount() > 0) {
+        synchronized (UiApplication.getEventLock()) {
+            while (canvas.getFieldCount() > 0) {
                 canvas.delete(canvas.getField(0));
             }
         }
     }
-    
+
     protected void disableBlockFolding() {
     }
 
@@ -431,7 +459,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         out.close();
         i.close();
         byte[] b = out.toByteArray();
-        return Bitmap.createBitmapFromBytes(b, 0, b.length, 1);                   
+        return Bitmap.createBitmapFromBytes(b, 0, b.length, 1);
     }
 
     public boolean isAlphaMutableImageSupported() {
@@ -478,7 +506,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if (srcWidth == width && srcHeight == height) {
             return image;
         }
-        
+
         int[] currentArray = new int[srcWidth];
         int[] destinationArray = new int[width * height];
         scaleArray(image, srcWidth, srcHeight, height, width, currentArray, destinationArray);
@@ -640,7 +668,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
          * reset some information that we need to keep track of
          * manually (it seems).
          */
-        g.setFont(oldFont == null ? (net.rim.device.api.ui.Font)getDefaultFont() : oldFont);
+        g.setFont(oldFont == null ? (net.rim.device.api.ui.Font) getDefaultFont() : oldFont);
         g.setColor(oldColor);
         g.setGlobalAlpha(oldAlpha);
     }
@@ -701,7 +729,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 //            throw new IOException(ex.toString());
 //        }
 //    }
-
     /**
      * Plays the sound in the given URI which is partially platform specific.
      *
@@ -711,9 +738,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
-        
+
         MMAPIPlayer player = MMAPIPlayer.createPlayer(uri, onCompletion);
-        if(isVideo){
+        if (isVideo) {
             VideoMainScreen video = new VideoMainScreen(player, this);
             showNativeScreen(video);
             return video;
@@ -731,9 +758,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
-        
+
         MMAPIPlayer player = MMAPIPlayer.createPlayer(stream, mimeType, onCompletion);
-        if(mimeType.indexOf("video") > -1){
+        if (mimeType.indexOf("video") > -1) {
             VideoMainScreen video = new VideoMainScreen(player, this);
             showNativeScreen(video);
             return video;
@@ -748,7 +775,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public LocationManager getLocationManager() {
         return new RIMLocationManager();
     }
-    
+
     public void drawImage(Object graphics, Object img, int x, int y) {
         Bitmap b = (Bitmap) img;
         ((Graphics) graphics).drawBitmap(x, y, b.getWidth(), b.getHeight(), b, 0, 0);
@@ -1095,7 +1122,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     static EventDispatcher getVolumeListener() {
         return volumeListener;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -1104,13 +1131,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             if (nullFld == null) {
                 nullFld = new NullField();
                 nullFld.setFocusListener(new FocusChangeListener() {
+
                     public void focusChanged(Field field, int eventType) {
-                        if(lightweightEdit != null) {
+                        if (lightweightEdit != null) {
                             finishEdit(false);
                         }
                     }
                 });
-                synchronized(UiApplication.getEventLock()) {
+                synchronized (UiApplication.getEventLock()) {
                     canvas.add(nullFld);
                 }
             }
@@ -1232,7 +1260,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         protected EditPopup(TextArea lightweightEdit, boolean password, int maxSize) {
             super(new VerticalFieldManager(), Field.FOCUSABLE | Field.EDITABLE | Screen.DEFAULT_MENU);
-            
+
             UIManager m = UIManager.getInstance();
             okString = m.localize("ok", "OK");
             cancelString = m.localize("cancel", "Cancel");
@@ -1352,14 +1380,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
             if (isTouchDevice()) {
                 UiApplication.getUiApplication().invokeLater(new Runnable() {
+
                     public void run() {
                         Display.getInstance().setShowVirtualKeyboard(false);
                     }
                 });
             }
             UiApplication.getUiApplication().popScreen(this);
-        }        
-        
+        }
     }
 
     /**
@@ -1371,9 +1399,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     private class BBEditField extends ActiveAutoTextEditField {
 
         private TextArea lightweightEdit = null;
-        
         private NativeEditCallback callback = new NativeEditCallback();
-        
+
         public BBEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | Field.SPELLCHECKABLE | type);
             this.lightweightEdit = lightweightEdit;
@@ -1431,9 +1458,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     private class BBPasswordEditField extends PasswordEditField {
 
         private TextArea lightweightEdit = null;
-
         private NativeEditCallback callback = new NativeEditCallback();
-        
+
         public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | type);
             this.lightweightEdit = lightweightEdit;
@@ -1513,9 +1539,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 while (numOfChars <= cursorLocation && currentY < t.getLines()) {
                     String currentLine = t.getTextAt(currentY);
                     currentLineLength = currentLine.length();
-                    if (numOfChars + currentLineLength < text.length() &&
-                            (text.charAt(numOfChars + currentLineLength) == '\n' ||
-                            text.charAt(numOfChars + currentLineLength) == ' ')) {
+                    if (numOfChars + currentLineLength < text.length()
+                            && (text.charAt(numOfChars + currentLineLength) == '\n'
+                            || text.charAt(numOfChars + currentLineLength) == ' ')) {
                         currentLineLength++;
                     }
                     numOfChars += currentLineLength;
@@ -1604,7 +1630,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void execute(String url) {
-        if(midlet) {
+        if (midlet) {
             try {
                 midletInstance.platformRequest(url);
             } catch (ConnectionNotFoundException ex) {
@@ -1617,7 +1643,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void exitApplication() {
-        if(midlet) {
+        if (midlet) {
             midletInstance.notifyDestroyed();
         } else {
             System.exit(0);
@@ -1626,30 +1652,30 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     public String getProperty(String key, String defaultValue) {
         String val = null;
-        if("OS".equals(key)) {
+        if ("OS".equals(key)) {
             return "RIM";
         }
-        if("IMEI".equals(key)) {
+        if ("IMEI".equals(key)) {
             return GPRSInfo.imeiToString(GPRSInfo.getIMEI());
         }
 
-        if(midletInstance != null) {
+        if (midletInstance != null) {
             val = midletInstance.getAppProperty(key);
         } else {
             //requires signing
-            if("MSISDN".equals(key)) {
+            if ("MSISDN".equals(key)) {
                 return Phone.getDevicePhoneNumber(true);
             }
 
-            if(initGetProperty) {
+            if (initGetProperty) {
                 initGetProperty = false;
                 ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
-                if(ad != null) {
+                if (ad != null) {
                     String moduleName = ad.getModuleName();
 
-                    if(moduleName != null) {
+                    if (moduleName != null) {
                         CodeModuleGroup[] allGroups = CodeModuleGroupManager.loadAll();
-                        if(allGroups != null) {
+                        if (allGroups != null) {
                             for (int i = 0; i < allGroups.length; i++) {
                                 if (allGroups[i].containsModule(moduleName)) {
                                     group = allGroups[i];
@@ -1660,11 +1686,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     }
                 }
             }
-            if(group != null) {
+            if (group != null) {
                 val = group.getProperty(key);
             }
         }
-        if(val == null) {
+        if (val == null) {
             return defaultValue;
         }
         return val;
@@ -1674,7 +1700,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void playBuiltinSound(String soundIdentifier) {
-        if(!playUserSound(soundIdentifier)) {
+        if (!playUserSound(soundIdentifier)) {
             // todo...
         }
     }
@@ -1687,7 +1713,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             try {
                 Media m = createMedia(new ByteArrayInputStream((byte[]) data), "audio/mpeg", null);
                 m.play();
-            } catch(Exception err) {
+            } catch (Exception err) {
                 // some simulators take issue with the audio/mpeg string but the mp3 string
                 // works fine
                 Media m = createMedia(new ByteArrayInputStream((byte[]) data), "audio/mp3", null);
@@ -1703,35 +1729,33 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
-        if(soundIdentifier.equals(Display.SOUND_TYPE_ALARM)) {
+        if (soundIdentifier.equals(Display.SOUND_TYPE_ALARM)) {
             return true;
         }
-        if(soundIdentifier.equals(Display.SOUND_TYPE_CONFIRMATION)) {
+        if (soundIdentifier.equals(Display.SOUND_TYPE_CONFIRMATION)) {
             return true;
         }
-        if(soundIdentifier.equals(Display.SOUND_TYPE_ERROR)) {
+        if (soundIdentifier.equals(Display.SOUND_TYPE_ERROR)) {
             return true;
         }
-        if(soundIdentifier.equals(Display.SOUND_TYPE_INFO)) {
+        if (soundIdentifier.equals(Display.SOUND_TYPE_INFO)) {
             return true;
         }
-        if(soundIdentifier.equals(Display.SOUND_TYPE_WARNING)) {
+        if (soundIdentifier.equals(Display.SOUND_TYPE_WARNING)) {
             return true;
         }
         return super.isBuiltinSoundAvailable(soundIdentifier);
     }
-
-
     private boolean testedNativeTheme;
     private boolean nativeThemeAvailable;
 
     public boolean hasNativeTheme() {
-        if(!testedNativeTheme) {
+        if (!testedNativeTheme) {
             testedNativeTheme = true;
             try {
                 InputStream is = getResourceAsStream(getClass(), "/blackberry_theme.res");
                 nativeThemeAvailable = is != null;
-                if(is != null) {
+                if (is != null) {
                     is.close();
                 }
             } catch (IOException ex) {
@@ -1746,7 +1770,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * might replace the DefaultLookAndFeel instance and the default transitions.
      */
     public void installNativeTheme() {
-        if(nativeThemeAvailable) {
+        if (nativeThemeAvailable) {
             try {
                 InputStream is = getResourceAsStream(getClass(), "/blackberry_theme.res");
                 Resources r = Resources.open(is);
@@ -1769,10 +1793,10 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         Vector v = new Vector();
         ServiceBook bk = ServiceBook.getSB();
         ServiceRecord[] recs = bk.getRecords();
-        for(int iter = 0 ; iter < recs.length ; iter++) {
+        for (int iter = 0; iter < recs.length; iter++) {
             ServiceRecord sr = recs[iter];
             if (sr.isValid() && !sr.isDisabled() && sr.getUid() != null
-                        && sr.getUid().length() != 0) {
+                    && sr.getUid().length() != 0) {
                 v.addElement(sr);
             }
         }
@@ -1785,8 +1809,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public String[] getAPIds() {
         Vector v = getValidSBEntries();
         String[] s = new String[v.size()];
-        for (int iter = 0; iter < s.length ; iter++) {
-            s[iter] = "" + ((ServiceRecord)v.elementAt(iter)).getUid();
+        for (int iter = 0; iter < s.length; iter++) {
+            s[iter] = "" + ((ServiceRecord) v.elementAt(iter)).getUid();
         }
         return s;
     }
@@ -1797,13 +1821,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public int getAPType(String id) {
         Vector v = getValidSBEntries();
         for (int iter = 0; iter < v.size(); iter++) {
-            ServiceRecord r = (ServiceRecord)v.elementAt(iter);
-            if(("" + r.getUid()).equals(id)) {
-                if(r.getUid().toLowerCase().indexOf("wifi") > -1) {
+            ServiceRecord r = (ServiceRecord) v.elementAt(iter);
+            if (("" + r.getUid()).equals(id)) {
+                if (r.getUid().toLowerCase().indexOf("wifi") > -1) {
                     return NetworkManager.ACCESS_POINT_TYPE_WLAN;
                 }
                 // wap2
-                if(r.getCid().toLowerCase().indexOf("wptcp") > -1) {
+                if (r.getCid().toLowerCase().indexOf("wptcp") > -1) {
                     return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
                 }
                 return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
@@ -1817,9 +1841,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public String getAPName(String id) {
         Vector v = getValidSBEntries();
-        for (int iter = 0; iter < v.size() ; iter++) {
-            ServiceRecord r = (ServiceRecord)v.elementAt(iter);
-            if(("" + r.getUid()).equals(id)) {
+        for (int iter = 0; iter < v.size(); iter++) {
+            ServiceRecord r = (ServiceRecord) v.elementAt(iter);
+            if (("" + r.getUid()).equals(id)) {
                 return r.getName();
             }
         }
@@ -1830,7 +1854,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getCurrentAccessPoint() {
-        if(currentAccessPoint != null) {
+        if (currentAccessPoint != null) {
             return currentAccessPoint;
         }
         return null;
@@ -1849,9 +1873,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
-        if(currentAccessPoint != null) {
+        if (currentAccessPoint != null) {
             url += ";ConnectionUID=" + currentAccessPoint;
-            if(deviceSide) {
+            if (deviceSide) {
                 url += ";deviceside=true";
             }
         }
@@ -1860,10 +1884,10 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     private Object connectImpl(String url, boolean read, boolean write) throws IOException {
         int mode;
-        if(read && write) {
+        if (read && write) {
             mode = Connector.READ_WRITE;
         } else {
-            if(write) {
+            if (write) {
                 mode = Connector.WRITE;
             } else {
                 mode = Connector.READ;
@@ -1877,8 +1901,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public void setHeader(Object connection, String key, String val) {
         try {
-            ((HttpConnection)connection).setRequestProperty(key, val);
-        } catch(IOException err) {
+            ((HttpConnection) connection).setRequestProperty(key, val);
+        } catch (IOException err) {
             // this exception doesn't make sense since at this point no connection is in place
             err.printStackTrace();
         }
@@ -1888,7 +1912,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getContentLength(Object connection) {
-        return (int)((HttpConnection)connection).getLength();
+        return (int) ((HttpConnection) connection).getLength();
     }
 
     /**
@@ -1896,16 +1920,16 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public void cleanup(Object o) {
         try {
-            if(o != null) {
-                if(o instanceof Connection) {
+            if (o != null) {
+                if (o instanceof Connection) {
                     ((Connection) o).close();
                     return;
-                } 
-                if(o instanceof RecordEnumeration) {
+                }
+                if (o instanceof RecordEnumeration) {
                     ((RecordEnumeration) o).destroy();
                     return;
                 }
-                if(o instanceof RecordStore) {
+                if (o instanceof RecordStore) {
                     ((RecordStore) o).closeRecordStore();
                     return;
                 }
@@ -1920,27 +1944,27 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openOutputStream(Object connection) throws IOException {
-        if(connection instanceof String) {
-            FileConnection fc = (FileConnection)Connector.open((String)connection, Connector.READ_WRITE);
-            if(!fc.exists()) {
+        if (connection instanceof String) {
+            FileConnection fc = (FileConnection) Connector.open((String) connection, Connector.READ_WRITE);
+            if (!fc.exists()) {
                 fc.create();
             }
-            BufferedOutputStream o = new BufferedOutputStream(fc.openOutputStream(), (String)connection);
+            BufferedOutputStream o = new BufferedOutputStream(fc.openOutputStream(), (String) connection);
             o.setConnection(fc);
             return o;
         }
-        return new BufferedOutputStream(((HttpConnection)connection).openOutputStream(), ((HttpConnection)connection).getURL());
+        return new BufferedOutputStream(((HttpConnection) connection).openOutputStream(), ((HttpConnection) connection).getURL());
     }
 
     /**
      * @inheritDoc
      */
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
-        FileConnection fc = (FileConnection)Connector.open((String)connection, Connector.READ_WRITE);
-        if(!fc.exists()) {
+        FileConnection fc = (FileConnection) Connector.open((String) connection, Connector.READ_WRITE);
+        if (!fc.exists()) {
             fc.create();
         }
-        BufferedOutputStream o = new BufferedOutputStream(fc.openOutputStream(offset), (String)connection);
+        BufferedOutputStream o = new BufferedOutputStream(fc.openOutputStream(offset), (String) connection);
         o.setConnection(fc);
         return o;
     }
@@ -1949,13 +1973,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream openInputStream(Object connection) throws IOException {
-        if(connection instanceof String) {
-            FileConnection fc = (FileConnection)Connector.open((String)connection, Connector.READ);
-            BufferedInputStream o = new BufferedInputStream(fc.openInputStream(), (String)connection);
+        if (connection instanceof String) {
+            FileConnection fc = (FileConnection) Connector.open((String) connection, Connector.READ);
+            BufferedInputStream o = new BufferedInputStream(fc.openInputStream(), (String) connection);
             o.setConnection(fc);
             return o;
         }
-        return new BufferedInputStream(((HttpConnection)connection).openInputStream(), ((HttpConnection)connection).getURL());
+        return new BufferedInputStream(((HttpConnection) connection).openInputStream(), ((HttpConnection) connection).getURL());
     }
 
     /**
@@ -1963,12 +1987,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public void setPostRequest(Object connection, boolean p) {
         try {
-            if(p) {
-                ((HttpConnection)connection).setRequestMethod(HttpConnection.POST);
+            if (p) {
+                ((HttpConnection) connection).setRequestMethod(HttpConnection.POST);
             } else {
-                ((HttpConnection)connection).setRequestMethod(HttpConnection.GET);
+                ((HttpConnection) connection).setRequestMethod(HttpConnection.GET);
             }
-        } catch(IOException err) {
+        } catch (IOException err) {
             // an exception here doesn't make sense
             err.printStackTrace();
         }
@@ -1978,28 +2002,28 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getResponseCode(Object connection) throws IOException {
-        return ((HttpConnection)connection).getResponseCode();
+        return ((HttpConnection) connection).getResponseCode();
     }
 
     /**
      * @inheritDoc
      */
     public String getResponseMessage(Object connection) throws IOException {
-        return ((HttpConnection)connection).getResponseMessage();
+        return ((HttpConnection) connection).getResponseMessage();
     }
 
     /**
      * @inheritDoc
      */
     public String getHeaderField(String name, Object connection) throws IOException {
-        return ((HttpConnection)connection).getHeaderField(name);
+        return ((HttpConnection) connection).getHeaderField(name);
     }
 
     /**
      * @inheritDoc
      */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
-        HttpConnection c = (HttpConnection)connection;
+        HttpConnection c = (HttpConnection) connection;
         Vector r = new Vector();
         int i = 0;
         while (c.getHeaderFieldKey(i) != null) {
@@ -2009,13 +2033,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
             i++;
         }
-        
-        if(r.size() == 0) {
+
+        if (r.size() == 0) {
             return null;
         }
         String[] response = new String[r.size()];
-        for(int iter = 0 ; iter < response.length ; iter++) {
-            response[iter] = (String)r.elementAt(iter);
+        for (int iter = 0; iter < response.length; iter++) {
+            response[iter] = (String) r.elementAt(iter);
         }
         return response;
     }
@@ -2024,15 +2048,16 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
-        Short key = (Short)fat.get(name);
+        Short key = (Short) fat.get(name);
         fat.remove(name);
         resaveFat();
-        if(key != null) {
+        if (key != null) {
             try {
-                for(char c = 'A' ; c < 'Z' ; c++) {
+                for (char c = 'A'; c < 'Z'; c++) {
                     RecordStore.deleteRecordStore("" + c + key);
                 }
-            } catch(RecordStoreException e) {}
+            } catch (RecordStoreException e) {
+            }
         }
     }
 
@@ -2043,7 +2068,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             r = RecordStore.openRecordStore("FAT", true);
             Vector keys = new Vector();
             Enumeration fatKeys = fat.keys();
-            while(fatKeys.hasMoreElements()) {
+            while (fatKeys.hasMoreElements()) {
                 keys.addElement(fatKeys.nextElement());
             }
             e = r.enumerateRecords(null, null, false);
@@ -2056,13 +2081,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 short key = di.readShort();
                 di.close();
                 bi.close();
-                Short fatKey = (Short)fat.get(name);
-                if(fatKey == null) {
+                Short fatKey = (Short) fat.get(name);
+                if (fatKey == null) {
                     // we need to remove this record...
                     r.deleteRecord(recordId);
                 } else {
                     // we need to update the record
-                    if(fatKey.shortValue() != key) {
+                    if (fatKey.shortValue() != key) {
                         byte[] bd = toRecord(name, fatKey.shortValue());
                         r.setRecord(recordId, bd, 0, bd.length);
                     }
@@ -2073,14 +2098,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             e = null;
 
             Enumeration remainingKeys = keys.elements();
-            while(remainingKeys.hasMoreElements()) {
-                String name = (String)remainingKeys.nextElement();
-                Short key = (Short)fat.get(name);
+            while (remainingKeys.hasMoreElements()) {
+                String name = (String) remainingKeys.nextElement();
+                Short key = (Short) fat.get(name);
                 byte[] bd = toRecord(name, key.shortValue());
                 r.addRecord(bd, 0, bd.length);
             }
             r.closeRecordStore();
-        } catch(Exception err) {
+        } catch (Exception err) {
             // This might be a valid exception and some platforms (e..g. RIM) don't respond well to PST
             //err.printStackTrace();
             cleanup(e);
@@ -2113,19 +2138,22 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     private class RMSOutputStream extends OutputStream {
+
         private short key;
         private char letter = 'A';
         private ByteArrayOutputStream cache;
         private int offset;
+
         public RMSOutputStream(short key) {
-            this.key =  key;
+            this.key = key;
 
             // first we need to cleanup existing files
             try {
-                for(char c = 'A' ; c < 'Z' ; c++) {
+                for (char c = 'A'; c < 'Z'; c++) {
                     RecordStore.deleteRecordStore("" + c + key);
                 }
-            } catch(RecordStoreException e) {}
+            } catch (RecordStoreException e) {
+            }
 
             cache = new ByteArrayOutputStream();
         }
@@ -2136,15 +2164,15 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         public void flush() throws IOException {
-            if(cache != null) {
+            if (cache != null) {
                 byte[] data = cache.toByteArray();
-                if(data.length > 0) {
+                if (data.length > 0) {
                     RecordStore r = null;
                     try {
                         r = RecordStore.openRecordStore("" + letter + key, true);
                         r.addRecord(data, 0, data.length);
                         r.closeRecordStore();
-                        if(letter == 'Z') {
+                        if (letter == 'Z') {
                             letter = 'a';
                         } else {
                             letter++;
@@ -2161,30 +2189,32 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         public void write(byte[] arg0) throws IOException {
             cache.write(arg0);
-            if(cache.size() > 32536) {
+            if (cache.size() > 32536) {
                 flush();
             }
         }
 
         public void write(byte[] arg0, int arg1, int arg2) throws IOException {
             cache.write(arg0, arg1, arg2);
-            if(cache.size() > 32536) {
+            if (cache.size() > 32536) {
                 flush();
             }
         }
 
         public void write(int arg0) throws IOException {
             cache.write(arg0);
-            if(cache.size() > 32536) {
+            if (cache.size() > 32536) {
                 flush();
             }
         }
     }
 
     private class RMSInputStream extends InputStream {
+
         private InputStream current;
         private int offset;
         private short key;
+
         public RMSInputStream(short key) throws IOException {
             this.key = key;
             RecordStore r = null;
@@ -2193,9 +2223,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             try {
                 ByteArrayOutputStream os = new ByteArrayOutputStream();
                 r = open("" + letter + key);
-                while(r != null) {
+                while (r != null) {
                     e = r.enumerateRecords(null, null, false);
-                    while(e.hasNextElement()) {
+                    while (e.hasNextElement()) {
                         byte[] data = e.nextRecord();
                         os.write(data);
                     }
@@ -2203,8 +2233,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     r.closeRecordStore();
                     letter++;
                     r = open("" + letter + key);
-                    if(letter == 'Z') {
-                        letter = 'a' - ((char)1);
+                    if (letter == 'Z') {
+                        letter = 'a' - ((char) 1);
                     }
                 }
                 os.close();
@@ -2216,6 +2246,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 throw new IOException(ex.toString());
             }
         }
+
         private RecordStore open(String s) {
             try {
                 return RecordStore.openRecordStore(s, false);
@@ -2233,7 +2264,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         public int read(byte[] arg0) throws IOException {
-            int r  = current.read(arg0);
+            int r = current.read(arg0);
             offset += r;
             return r;
         }
@@ -2248,7 +2279,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             offset++;
             return current.read();
         }
-
     }
 
     /**
@@ -2259,8 +2289,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         RMSOutputStream os = null;
         DataOutputStream out = null;
         try {
-            Short key = (Short)fat.get(name);
-            if(key == null) {
+            Short key = (Short) fat.get(name);
+            if (key == null) {
                 // need to add a key to the FAT
                 key = new Short(currentKey);
                 fat.put(name, key);
@@ -2273,7 +2303,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
             os = new RMSOutputStream(key.shortValue());
             return os;
-        } catch(Exception err) {
+        } catch (Exception err) {
             cleanup(r);
             cleanup(os);
             cleanup(out);
@@ -2285,14 +2315,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream createStorageInputStream(String name) throws IOException {
-        Short key = (Short)fat.get(name);
-        if(key == null) {
+        Short key = (Short) fat.get(name);
+        if (key == null) {
             return null;
         }
 
         try {
             return new RMSInputStream(key.shortValue());
-        } catch(Exception err) {
+        } catch (Exception err) {
             err.printStackTrace();
         }
         return null;
@@ -2302,7 +2332,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
-        if(name == null) {
+        if (name == null) {
             return false;
         }
         return fat.containsKey(name);
@@ -2315,8 +2345,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         String[] a = new String[fat.size()];
         Enumeration e = fat.keys();
         int i = 0;
-        while(e.hasMoreElements()) {
-            a[i] = (String)e.nextElement();
+        while (e.hasMoreElements()) {
+            a[i] = (String) e.nextElement();
             i++;
         }
         return a;
@@ -2327,7 +2357,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public String[] listFilesystemRoots() {
         String[] res = enumToStringArr(FileSystemRegistry.listRoots());
-        for(int iter = 0 ; iter < res.length ; iter++) {
+        for (int iter = 0; iter < res.length; iter++) {
             res[iter] = "file:///" + res[iter];
         }
         return res;
@@ -2335,12 +2365,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     private String[] enumToStringArr(Enumeration e) {
         Vector v = new Vector();
-        while(e.hasMoreElements()) {
+        while (e.hasMoreElements()) {
             v.addElement(e.nextElement());
         }
         String[] response = new String[v.size()];
-        for(int iter = 0 ; iter < response.length ; iter++) {
-            response[iter] = (String)v.elementAt(iter);
+        for (int iter = 0; iter < response.length; iter++) {
+            response[iter] = (String) v.elementAt(iter);
         }
         return response;
     }
@@ -2351,7 +2381,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public String[] listFiles(String directory) throws IOException {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(directory, Connector.READ);
+            fc = (FileConnection) Connector.open(directory, Connector.READ);
             return enumToStringArr(fc.list());
         } finally {
             cleanup(fc);
@@ -2364,9 +2394,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public long getRootSizeBytes(String root) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(root, Connector.READ);
+            fc = (FileConnection) Connector.open(root, Connector.READ);
             return fc.totalSize();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return -1;
         } finally {
@@ -2380,9 +2410,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public long getRootAvailableSpace(String root) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(root, Connector.READ);
+            fc = (FileConnection) Connector.open(root, Connector.READ);
             return fc.availableSize();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return -1;
         } finally {
@@ -2396,9 +2426,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void mkdir(String directory) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(directory, Connector.READ_WRITE);
+            fc = (FileConnection) Connector.open(directory, Connector.READ_WRITE);
             fc.mkdir();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
         } finally {
             cleanup(fc);
@@ -2411,9 +2441,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void deleteFile(String file) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.WRITE);
+            fc = (FileConnection) Connector.open(file, Connector.WRITE);
             fc.delete();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
         } finally {
             cleanup(fc);
@@ -2426,9 +2456,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public boolean isHidden(String file) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ);
+            fc = (FileConnection) Connector.open(file, Connector.READ);
             return fc.isHidden();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return false;
         } finally {
@@ -2442,9 +2472,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void setHidden(String file, boolean h) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ_WRITE);
+            fc = (FileConnection) Connector.open(file, Connector.READ_WRITE);
             fc.setHidden(h);
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
         } finally {
             cleanup(fc);
@@ -2457,9 +2487,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public long getFileLength(String file) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ);
+            fc = (FileConnection) Connector.open(file, Connector.READ);
             return fc.fileSize();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return -1;
         } finally {
@@ -2473,9 +2503,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public boolean isDirectory(String file) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ);
+            fc = (FileConnection) Connector.open(file, Connector.READ);
             return fc.isDirectory();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return false;
         } finally {
@@ -2496,9 +2526,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public boolean exists(String file) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ);
+            fc = (FileConnection) Connector.open(file, Connector.READ);
             return fc.exists();
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
             return false;
         } finally {
@@ -2512,20 +2542,20 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void rename(String file, String newName) {
         FileConnection fc = null;
         try {
-            fc = (FileConnection)Connector.open(file, Connector.READ_WRITE);
+            fc = (FileConnection) Connector.open(file, Connector.READ_WRITE);
             fc.rename(newName);
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
         } finally {
             cleanup(fc);
         }
     }
-
     private ActionListener camResponse;
-    
+
     public void capturePhoto(ActionListener response) {
         this.camResponse = response;
         UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
+
             private long lastUSN;
 
             public void fileJournalChanged() {
@@ -2543,12 +2573,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                                 try {
                                     EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
                                     inject.post();
-                                    inject.post();                                    
+                                    inject.post();
                                 } catch (Exception e) {
                                     //try to close the camera
                                 }
-                                
-                                camResponse.actionPerformed(new ActionEvent("file://"+path));
+
+                                camResponse.actionPerformed(new ActionEvent("file://" + path));
                             }
                         }
                     }
@@ -2562,13 +2592,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void captureVideo(ActionListener response) {
         throw new RuntimeException("not implemented yet");
     }
-    
+
     public void captureAudio(ActionListener response) {
         throw new RuntimeException("not implemented yet");
     }
-    
-    
-    
+
     /**
      * @inheritDoc
      */
@@ -2580,6 +2608,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
-        return new String[] {"phone", "rim"};
+        return new String[]{"phone", "rim"};
     }
 }
