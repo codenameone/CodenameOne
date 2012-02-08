@@ -743,8 +743,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
 
-        EventLog.getInstance().logInformationEvent(uri);
-
         MMAPIPlayer player = MMAPIPlayer.createPlayer(uri, onCompletion);
         if (isVideo) {
             VideoMainScreen video = new VideoMainScreen(player, this);
@@ -2632,8 +2630,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                             } catch (Exception e) {
                                 //try to close the voicenotesrecorder
                             }
-                            EventLog.getInstance().logInformationEvent(path);
-
                             camResponse.actionPerformed(new ActionEvent("file://" + path));
                             camResponse = null;
                             break;
