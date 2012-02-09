@@ -87,6 +87,7 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.Storage;
+import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
@@ -2608,6 +2609,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String[] getPlatformOverrides() {
         return platformOverrides;
     }
+    
+    public LocationManager getLocationManager() {
+        return StubLocationManager.getLocationManager();
+    }
+
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {
 
