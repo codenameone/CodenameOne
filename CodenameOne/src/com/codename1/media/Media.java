@@ -139,6 +139,8 @@ public interface Media {
      * Returns true if this Video Media is in Native player mode.
      * Some platforms such as BlackBerry is able to play video only on the native
      * player on those platforms isNativePlayerMode() will always return true
+     * If Media supports native playing by calling to play() the video will start
+     * playing in the native player in full screen.
      * @return 
      */
     public boolean isNativePlayerMode();

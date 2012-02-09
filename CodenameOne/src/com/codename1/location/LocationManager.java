@@ -74,12 +74,15 @@ public abstract class LocationManager {
      * updated on the device Locations rather then calling getCurrentLocation.
      * @param listener a LocationListener
      */
-    public void setLocationListener(final LocationListener listener) {
+    public void setLocationListener(final LocationListener l) {
         if(this.listener != null){
             clearListener();
         }
+        this.listener = l;
+        if(l == null){
+            return;
+        }
         bindListener();
-        this.listener = listener;
     }
 
     protected LocationListener getLocationListener() {

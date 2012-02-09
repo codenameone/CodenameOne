@@ -195,25 +195,29 @@ public class MediaPlayer extends Container {
 
     private void initUI() {
         setLayout(new BorderLayout());        
+        
         addComponent(BorderLayout.CENTER, video.getVideoComponent());        
+        
         Container buttonsBar = new Container(new FlowLayout(Container.CENTER));
         addComponent(BorderLayout.SOUTH, buttonsBar);
         
-        Button back = new Button();
-        back.setUIID("MediaPlayerBack");
-        if(backIcon != null){
-            back.setIcon(backIcon);
-        }else{
-            back.setText("Back");
-        }
-        buttonsBar.addComponent(back);
-        back.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                int t = video.getTime();
-                video.setTime(t - 2);
+        if(!video.isNativePlayerMode()){
+            Button back = new Button();
+            back.setUIID("MediaPlayerBack");
+            if(backIcon != null){
+                back.setIcon(backIcon);
+            }else{
+                back.setText("Back");
             }
-        });
+            buttonsBar.addComponent(back);
+            back.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    int t = video.getTime();
+                    video.setTime(t - 2);
+                }
+            });        
+        }
         
         final Button play = new Button("play");
         play.setUIID("MediaPlayerPlay");
@@ -247,22 +251,24 @@ public class MediaPlayer extends Container {
             }
         });
         buttonsBar.addComponent(play);
-        
-        Button fwd = new Button(" ");
-        fwd.addActionListener(new ActionListener() {
 
-            public void actionPerformed(ActionEvent evt) {
-                int t = video.getTime();
-                video.setTime(t + 1);
+        if(!video.isNativePlayerMode()){        
+            Button fwd = new Button();
+            fwd.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    int t = video.getTime();
+                    video.setTime(t + 1);
+                }
+            });
+            fwd.setUIID("MediaPlayerFwd");
+            if(fwdIcon != null){
+                fwd.setIcon(fwdIcon);
+            }else{
+                fwd.setText("fwd");
             }
-        });
-        fwd.setUIID("MediaPlayerFwd");
-        if(fwdIcon != null){
-            fwd.setIcon(fwdIcon);
-        }else{
-            fwd.setText("fwd");
+            buttonsBar.addComponent(fwd);           
         }
-        buttonsBar.addComponent(fwd);           
     }
 
     
