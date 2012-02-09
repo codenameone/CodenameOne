@@ -9,6 +9,8 @@ import android.location.Criteria;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import com.codename1.location.Location;
 import java.io.IOException;
 
@@ -38,11 +40,21 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     }
 
     public void bindListener() {
-        locationManager.requestLocationUpdates(bestProvider, 0, 0, this);
+        Handler mHandler = new Handler(Looper.getMainLooper());
+        mHandler.post(new Runnable() {
+          public void run() {
+              locationManager.requestLocationUpdates(bestProvider, 0, 0, AndroidLocationManager.this);
+          }
+       });        
     }
 
     public void clearListener() {
-        locationManager.removeUpdates(this);
+        Handler mHandler = new Handler(Looper.getMainLooper());
+        mHandler.post(new Runnable() {
+          public void run() {
+              locationManager.removeUpdates(AndroidLocationManager.this);
+          }
+       });
     }
 
     private Location convert(android.location.Location loc) {
