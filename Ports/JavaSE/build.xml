@@ -72,6 +72,7 @@
 
     -->
     <target name="-pre-compile">
+        <copy file="../../Skins/torch.skin" todir="src" />
         <copy file="../../Skins/android.skin" todir="src" />
         <copy file="../../Skins/feature_phone.skin" todir="src" />
         <copy file="../../Skins/ipad.skin" todir="src" />

@@ -122,7 +122,7 @@ import jmapps.ui.VideoPanel;
  */
 public class JavaSEPort extends CodenameOneImplementation {
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin";
+    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/torch.skin";
     private boolean touchDevice = true;
     private boolean rotateTouchKeysOnLandscape;
     private int keyboardType = Display.KEYBOARD_TYPE_UNKNOWN;
@@ -838,6 +838,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
+                if(skinNames.indexOf("torch.skin") < 0) {
+                    skinNames += ";/torch.skin";
+                }
                 StringTokenizer tkn = new StringTokenizer(skinNames, ";");
                 while (tkn.hasMoreTokens()) {
                     final String current = tkn.nextToken();
@@ -2419,22 +2422,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
         List r = new ArrayList();
-        String ck = c.getHeaderFieldKey(0);
-        for (int iter = 0; ck != null; iter++) {
-            if (ck.equalsIgnoreCase(name)) {
-                r.add(c.getHeaderField(iter));
-            }
-            ck = c.getHeaderFieldKey(iter);
+        List<String> headers = c.getHeaderFields().get(name);
+        if(headers != null && headers.size() > 0) {
+            String[] s = new String[headers.size()];
+            headers.toArray(s);
+            return s;
         }
-
-        if (r.size() == 0) {
-            return null;
-        }
-        String[] response = new String[r.size()];
-        for (int iter = 0; iter < response.length; iter++) {
-            response[iter] = (String) r.get(iter);
-        }
-        return response;
+        return null;
     }
 
     /**
