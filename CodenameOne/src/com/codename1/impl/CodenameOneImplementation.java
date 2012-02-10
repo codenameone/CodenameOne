@@ -3819,4 +3819,11 @@ public abstract class CodenameOneImplementation {
     public String[] getPlatformOverrides() {
         return new String[0];
     }
+    
+    /**
+     * This callback allows highly broken devices like the blackberry to automatically detect the network
+     * type
+     */
+    public void autoDetectAccessPoint() {
+    }
 }

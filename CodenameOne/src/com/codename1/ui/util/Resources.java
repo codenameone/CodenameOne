@@ -439,7 +439,11 @@ public class Resources {
      * For internal use only
      */
     byte getResourceType(String name) {
-        return ((Byte)resourceTypes.get(name)).byteValue();
+        Byte b = (Byte)resourceTypes.get(name);
+        if(b == null) {
+            return (byte)0;
+        }
+        return b.byteValue();
     }
     
     private String[] getResourceTypeNames(byte b) {

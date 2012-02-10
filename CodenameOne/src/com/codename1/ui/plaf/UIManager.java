@@ -227,6 +227,7 @@ public class UIManager {
             return new Style(style);
         } catch(Throwable err) {
             // fail gracefully for an illegal style, this is useful for the resource editor
+            System.out.println("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
             err.printStackTrace();
             return new Style(defaultStyle);
         }

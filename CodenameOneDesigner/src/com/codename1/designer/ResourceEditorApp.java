@@ -30,10 +30,12 @@ import com.codename1.ui.resource.util.QuitAction;
 import java.awt.Image;
 import java.awt.Toolkit;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
+import java.util.Properties;
 import javax.swing.JPanel;
 import org.jdesktop.application.Application;
 import org.jdesktop.application.SingleFrameApplication;
@@ -147,6 +149,19 @@ public class ResourceEditorApp extends SingleFrameApplication {
      * Main method launching the application.
      */
     public static void main(String[] args) {
+        if(args.length > 0) {
+            if(args[0].equalsIgnoreCase("-buildVersion")) {
+                Properties p = new Properties();
+                try {
+                    p.load(ResourceEditorApp.class.getResourceAsStream("/version.properties"));
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+                System.out.println(p.getProperty("build", "1"));
+                System.exit(0);
+                return;
+            }
+        }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
         launch(ResourceEditorApp.class, args);

@@ -633,4 +633,60 @@ public class NetworkManager {
     public boolean isQueueIdle() {
         return pending.size() == 0 && networkThreads[0].getCurrentRequest() == null;
     }
+    
+    /**
+     * Indicates whether looking up an access point is supported by this device
+     * 
+     * @return true if access point lookup is supported
+     */
+    public boolean isAPSupported() {
+        return Util.getImplementation().isAPSupported();
+    }
+
+    /**
+     * Returns the ids of the access points available if supported
+     *
+     * @return ids of access points
+     */
+    public String[] getAPIds() {
+       return Util.getImplementation().getAPIds();
+    }
+
+    /**
+     * Returns the type of the access point
+     *
+     * @param id access point id
+     * @return one of the supported access point types from network manager
+     */
+    public int getAPType(String id) {
+        return Util.getImplementation().getAPType(id);
+    }
+
+    /**
+     * Returns the user displayable name for the given access point
+     *
+     * @param id the id of the access point
+     * @return the name of the access point
+     */
+    public String getAPName(String id) {
+        return Util.getImplementation().getAPName(id);
+    }
+
+    /**
+     * Returns the id of the current access point
+     *
+     * @return id of the current access point
+     */
+    public String getCurrentAccessPoint() {
+        return Util.getImplementation().getCurrentAccessPoint();
+    }
+
+    /**
+     * Returns the id of the current access point
+     *
+     * @param id id of the current access point
+     */
+    public void setCurrentAccessPoint(String id) {
+        Util.getImplementation().setCurrentAccessPoint(id);
+    }    
 }

@@ -132,7 +132,6 @@ import org.jdesktop.swingx.JXComboBox;
  * @author Shai Almog
  */
 public class ResourceEditorView extends FrameView {
-    public static final String VERSION="$Revision: 1595 $";
     //private final static Hashtable<String, String> TYPE_MAPPING;
     //private RemoveResourceAction removeResourceAction = new RemoveResourceAction();
     private NewResourceAction newResourceAction = new NewResourceAction();

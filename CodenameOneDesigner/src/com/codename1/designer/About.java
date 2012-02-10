@@ -25,6 +25,10 @@
 package com.codename1.designer;
 
 import java.awt.Frame;
+import java.io.IOException;
+import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.SwingUtilities;
 
 /**
@@ -38,7 +42,13 @@ public class About extends javax.swing.JDialog {
     public About(java.awt.Component parent) {
         super((Frame)SwingUtilities.windowForComponent(parent), true);
         initComponents();
-        buildNumber.setText(ResourceEditorView.VERSION.substring(10, ResourceEditorView.VERSION.length() - 1));
+        Properties p = new Properties();
+        try {
+            p.load(getClass().getResourceAsStream("/version.properties"));
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        buildNumber.setText(p.getProperty("build", "1"));
         pack();
         setLocationRelativeTo(parent);
         setVisible(true);

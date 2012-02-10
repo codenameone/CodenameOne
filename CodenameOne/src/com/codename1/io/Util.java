@@ -130,7 +130,7 @@ public class Util {
      */
     public static String readToString(InputStream i) throws IOException {
         byte[] b = readInputStream(i);
-        return new String(b, 0, b.length, "UTF8");
+        return new String(b, 0, b.length, "UTF-8");
     }
 
     /**
