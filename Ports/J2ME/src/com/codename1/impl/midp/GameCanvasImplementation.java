@@ -25,6 +25,7 @@ package com.codename1.impl.midp;
 
 import com.codename1.components.MediaPlayer;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -2848,6 +2849,12 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return FileSystemStorage.getInstance().getRoots()[0] + System.currentTimeMillis();
     }
 
+    public void sendMessage(String[] recieptents, String subject, Message msg) {
+        execute("mailto:" +recieptents[0] + "?body=" + msg.getContent() + "?subject=" + subject);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
