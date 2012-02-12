@@ -23,6 +23,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -2608,6 +2609,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         return StubLocationManager.getLocationManager();
     }
 
+    @Override
+    public void sendMessage(String[] recieptents, String subject, Message msg) {
+        System.out.println("sending message to " + recieptents[0]);
+    }
+
+    
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {
 
