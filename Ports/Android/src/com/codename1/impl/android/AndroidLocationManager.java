@@ -6,6 +6,7 @@ package com.codename1.impl.android;
 
 import android.content.Context;
 import android.location.Criteria;
+import android.location.GpsStatus;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.os.Bundle;
@@ -28,7 +29,18 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         Context context = (Context) ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         Criteria criteria = new Criteria();
-        bestProvider = locationManager.getBestProvider(criteria, false);
+        // If GPS provider, then create and start GPS listener
+        LocationProvider provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
+        if ( provider != null) {
+            bestProvider = provider.getName();
+	}else{
+            provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
+            if ( provider != null) {
+                bestProvider = provider.getName();
+            }else{
+                bestProvider = locationManager.getBestProvider(criteria, false);
+            }
+        }
     }
 
     public Location getCurrentLocation() throws IOException {
