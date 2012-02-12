@@ -76,6 +76,7 @@ import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.location.LocationManager;
+import com.codename1.messaging.Message;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -2469,6 +2470,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new AndroidLocationManager(activity);
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void sendMessage(String[] recipients, String subject, Message msg) {
+        Intent emailIntent = new Intent(android.content.Intent.ACTION_SEND);
+        emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+        emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+        emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
+        emailIntent.setType(msg.getMimeType());
+        if(msg.getAttachement() != null && msg.getAttachement().length() > 0){
+            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://"+ msg.getAttachement()));        
+        }
+        activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
+    }
+ 
+ 
     /**
      * @inheritDoc
      */

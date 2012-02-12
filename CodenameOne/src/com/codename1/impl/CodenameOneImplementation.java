@@ -29,6 +29,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.messaging.Message;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -3825,5 +3826,14 @@ public abstract class CodenameOneImplementation {
      * type
      */
     public void autoDetectAccessPoint() {
+    }
+
+    /**
+     * Send an email using the platform mail client
+     * @param recieptents array of e-mail addresses
+     * @param subject e-mail subject
+     * @param msg the Message to send
+     */
+    public void sendMessage(String[] recieptents, String subject, Message msg) {
     }
 }

@@ -91,13 +91,22 @@ import com.codename1.io.NetworkManager;
 // requires signing
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.messaging.Message;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
+import net.rim.blackberry.api.invoke.MessageArguments;
+import net.rim.blackberry.api.mail.Address;
+import net.rim.blackberry.api.mail.Folder;
+import net.rim.blackberry.api.mail.Multipart;
+import net.rim.blackberry.api.mail.Session;
+import net.rim.blackberry.api.mail.SupportedAttachmentPart;
+import net.rim.blackberry.api.mail.TextBodyPart;
 import net.rim.device.api.system.CodeModuleGroup;
 import net.rim.device.api.system.CodeModuleGroupManager;
 import net.rim.blackberry.api.phone.Phone;
 import net.rim.device.api.applicationcontrol.ApplicationPermissions;
 import net.rim.device.api.applicationcontrol.ApplicationPermissionsManager;
+import net.rim.device.api.io.IOUtilities;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
@@ -2601,13 +2610,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     public void captureAudio(ActionListener response) {
         int h = CodeModuleManager.getModuleHandle("net_rim_bb_voicenotesrecorder");
-        
-        if(h == 0){
-            throw new RuntimeException("capture audio works only if Voice Notes is installed");        
+
+        if (h == 0) {
+            throw new RuntimeException("capture audio works only if Voice Notes is installed");
         }
-        
+
         this.camResponse = response;
-        
+
         UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
 
             private long lastUSN;
@@ -2634,7 +2643,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                             camResponse = null;
                             break;
                         }
-                        
+
                     }
                 }
                 lastUSN = USN;
@@ -2646,6 +2655,45 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             ApplicationManager.getApplicationManager().runApplication(desc, true);
         } catch (ApplicationManagerException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void sendMessage(String[] recipients, String subject, Message msg) {
+        Folder folders[] = Session.getDefaultInstance().getStore().list(Folder.SENT);
+        net.rim.blackberry.api.mail.Message message = new net.rim.blackberry.api.mail.Message(folders[0]);
+        try {
+            Address toAdds[] = new Address[recipients.length];
+            for (int i = 0; i < recipients.length; i++) {
+                Address address = new Address(recipients[i], "");
+                toAdds[i] = address;
+            }
+            message.addRecipients(net.rim.blackberry.api.mail.Message.RecipientType.TO, toAdds);
+            message.setSubject(subject);
+        } catch (Exception e) {
+            EventLog.getInstance().logInformationEvent("err " + e.getMessage());            
+        }
+
+        try {
+
+            if (msg.getAttachement() != null && msg.getAttachement().length() > 0) {
+                Multipart content = new Multipart();
+                TextBodyPart tbp = new TextBodyPart(content,msg.getContent());                
+                content.addBodyPart(tbp);
+                
+                InputStream stream = com.codename1.io.FileSystemStorage.getInstance().openInputStream(msg.getAttachement());
+                byte[] buf;
+                buf = IOUtilities.streamToBytes(stream);
+                stream.close();
+                SupportedAttachmentPart sap = new SupportedAttachmentPart(content, message.getContentType(), "image.png", buf);
+                content.addBodyPart(sap);                
+                message.setContent(content);
+            } else {
+                message.setContent(msg.getContent());
+            }
+
+            Invoke.invokeApplication(Invoke.APP_TYPE_MESSAGES, new MessageArguments(message));
+        } catch (Exception ex) {
+            EventLog.getInstance().logInformationEvent("err " + ex.getMessage());
         }
     }
 
