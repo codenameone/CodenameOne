@@ -29,6 +29,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -114,7 +115,10 @@ public class NetworkManager {
      * @param threadCount the threadCount to set
      */
     public void setThreadCount(int threadCount) {
-        this.threadCount = threadCount;
+        // in auto detect mode multiple threads can break the detections
+        if(!Util.getImplementation().shouldAutoDetectAccessPoint()) {
+            this.threadCount = threadCount;
+        }
     }
 
     class NetworkThread implements Runnable {
@@ -291,7 +295,73 @@ public class NetworkManager {
     private NetworkThread createNetworkThread() {
         return new NetworkThread();
     }
+    
+    class AutoDetectAPN extends ConnectionRequest {
+        private Vector aps = null;
+        private int currentAP;
+        protected void handleErrorResponseCode(int code, String message) {
+            retryWithDifferentAPN();
+        }
 
+        protected void handleException(Exception err) {
+            retryWithDifferentAPN();
+        }
+
+        protected void readResponse(InputStream input) throws IOException  {
+            String s = Util.readToString(input);
+            if(!s.equals("hi")) {
+                retryWithDifferentAPN();
+            }
+        }
+                
+        private String nextAP() {
+            if(aps == null) {
+                String[] ids = getAPIds();
+                for(int iter = 0 ; iter < ids.length ; iter++) {
+                    int t = getAPType(ids[iter]);
+                    if(t == ACCESS_POINT_TYPE_WLAN) {
+                        aps.insertElementAt(ids[iter ], 0);
+                    } else {
+                        if(t == ACCESS_POINT_TYPE_CORPORATE || t == ACCESS_POINT_TYPE_NETWORK3G) {
+                            aps.addElement(ids[iter]);
+                        }
+                    }
+                }
+            }
+            if(currentAP >= aps.size()) {
+                return null;
+            }
+            String s = (String)aps.elementAt(currentAP);
+            currentAP++;
+            return s;
+        }
+        
+        private void retryWithDifferentAPN() {
+            String n = nextAP();
+            if(n == null) {
+                return;
+            }
+            setCurrentAccessPoint(n);
+            AutoDetectAPN r = new AutoDetectAPN();
+            r.setPost(false);
+            r.currentAP = currentAP;
+            r.aps = aps;
+            r.setUrl("http://codename-one.appspot.com/t.html");
+            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
+            addToQueue(r);
+        }
+    }
+
+    private void autoDetectAPN() {
+        if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
+            ConnectionRequest r = new AutoDetectAPN();
+            r.setPost(false);
+            r.setUrl("http://codename-one.appspot.com/t.html");
+            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
+            addToQueue(r);
+        }
+    }
+    
     /**
      * Invoked to initialize the network thread and start executing elements on the queue
      */
@@ -305,7 +375,7 @@ public class NetworkManager {
         for(int iter = 0 ; iter < getThreadCount() ; iter++) {
             networkThreads[iter] = createNetworkThread();
             networkThreads[iter].start();
-        }
+        }        
         // we need to implement a timeout thread of our own for this case...
         if(!Util.getImplementation().isTimeoutSupported()) {
             Util.getImplementation().startThread("Timeout Thread", new Runnable() {

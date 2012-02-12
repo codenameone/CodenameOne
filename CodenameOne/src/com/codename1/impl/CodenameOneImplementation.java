@@ -3825,7 +3825,8 @@ public abstract class CodenameOneImplementation {
      * This callback allows highly broken devices like the blackberry to automatically detect the network
      * type
      */
-    public void autoDetectAccessPoint() {
+    public boolean shouldAutoDetectAccessPoint() {
+        return false;
     }
 
     /**

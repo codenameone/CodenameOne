@@ -1170,7 +1170,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     if (b) {
                         canvas.eventTarget = fld;
                         fld.setFocusListener(new FocusChangeListener() {
-
                             public void focusChanged(Field field, int eventType) {
                                 if (getNativePeer() == fld && eventType == FocusChangeListener.FOCUS_LOST) {
                                     fld.setFocusListener(null);
@@ -1609,8 +1608,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     break;
 
                 case INVOKE_AND_WAIT_calcPreferredSize:
-                    dim.setWidth(Math.max(fld.getWidth(), fld.getPreferredWidth()));
-                    dim.setHeight(Math.max(fld.getHeight(), fld.getPreferredHeight()));
+                    dim.setWidth(Math.max(fld.getWidth(), fld.getPreferredWidth()) + fld.getPaddingLeft() + fld.getPaddingRight());
+                    dim.setHeight(Math.max(fld.getHeight(), fld.getPreferredHeight()) + fld.getPaddingBottom() + fld.getPaddingTop());
                     break;
 
                 case INVOKE_AND_WAIT_setFocus:
@@ -1882,6 +1881,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         deviceSide = t == NetworkManager.ACCESS_POINT_TYPE_NETWORK3G || t == NetworkManager.ACCESS_POINT_TYPE_WLAN;
     }
 
+    /**
+     * @inheritDoc
+     */
+    public boolean shouldAutoDetectAccessPoint() {
+        return true;
+    }
+    
     /**
      * @inheritDoc
      */

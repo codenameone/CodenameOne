@@ -109,21 +109,26 @@ public class CodenameOneActivity extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
         super.onOptionsItemSelected(item);
 
-        Form currentForm = Display.getInstance().getCurrent();
+        final Form currentForm = Display.getInstance().getCurrent();
         if (currentForm == null) {
             return false;
         }
 
         int commandIndex = item.getItemId();
-        Command command = currentForm.getCommand(commandIndex);
-        ActionEvent actionEvent = new ActionEvent(command);
+        final Command command = currentForm.getCommand(commandIndex);
+        final ActionEvent actionEvent = new ActionEvent(command);
 
         // Protect ourselves from commands that misbehave. A crash here will crash the entire application
-        try {
-            currentForm.dispatchCommand(command, actionEvent);
-        } catch (Throwable e) {
-            Log.e("CodenameOneActivity.onOptionsItemSelected", e.toString() + Log.getStackTraceString(e));
-        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    currentForm.dispatchCommand(command, actionEvent);
+                } catch (Throwable e) {
+                    Log.e("CodenameOneActivity.onOptionsItemSelected", e.toString() + Log.getStackTraceString(e));
+                }
+            }
+        });
 
         return true;
     }

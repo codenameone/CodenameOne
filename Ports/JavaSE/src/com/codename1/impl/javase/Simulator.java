@@ -23,10 +23,8 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.ui.Display;
 import java.io.File;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.StringTokenizer;

@@ -819,6 +819,23 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             if (nativeThemeData != null) {
                 nativeThemeRes = Resources.open(new ByteArrayInputStream(nativeThemeData));
+            } else {
+                try {
+                    String t = props.getProperty("nativeThemeAttribute", null);
+                    if(t != null) {
+                        Properties cnop = new Properties();
+                        File cnopFile = new File("codenameone_settings.properties");
+                        if(cnopFile.exists()) {
+                            cnop.load(new FileInputStream(cnopFile));
+                            t = cnop.getProperty(t, null);
+                            if(t != null) {
+                                nativeThemeRes = Resources.open(new FileInputStream(t));
+                            }
+                        }
+                    }
+                } catch(IOException ioErr) {
+                    ioErr.printStackTrace();
+                }
             }
 
             MenuBar bar = new MenuBar();

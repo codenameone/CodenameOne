@@ -2180,6 +2180,10 @@ public final class Display {
      * @param commandBehavior the commandBehavior to set
      */
     public void setCommandBehavior(int commandBehavior) {
+        if(!isTouchScreenDevice())
+            if(commandBehavior == COMMAND_BEHAVIOR_BUTTON_BAR) {
+                commandBehavior = COMMAND_BEHAVIOR_SOFTKEY;
+            }
         this.commandBehavior = commandBehavior;
         impl.notifyCommandBehavior(commandBehavior);
     }
