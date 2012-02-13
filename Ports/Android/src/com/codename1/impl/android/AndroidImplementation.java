@@ -2479,8 +2479,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
         emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
         emailIntent.setType(msg.getMimeType());
-        if(msg.getAttachement() != null && msg.getAttachement().length() > 0){
-            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://"+ msg.getAttachement()));        
+        if(msg.getAttachment() != null && msg.getAttachment().length() > 0){
+            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://"+ msg.getAttachment()));        
         }
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }

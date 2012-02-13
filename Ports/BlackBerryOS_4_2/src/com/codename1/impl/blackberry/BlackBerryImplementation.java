@@ -2640,7 +2640,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
                             try {
                                 EventInjector.KeyEvent inject = new EventInjector.KeyEvent(EventInjector.KeyEvent.KEY_DOWN, Characters.ESCAPE, 0, 200);
-//                                    inject.post();
                                 inject.post();
                             } catch (Exception e) {
                                 //try to close the voicenotesrecorder
@@ -2681,12 +2680,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         try {
 
-            if (msg.getAttachement() != null && msg.getAttachement().length() > 0) {
+            if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
                 Multipart content = new Multipart();
                 TextBodyPart tbp = new TextBodyPart(content,msg.getContent());                
                 content.addBodyPart(tbp);
                 
-                InputStream stream = com.codename1.io.FileSystemStorage.getInstance().openInputStream(msg.getAttachement());
+                InputStream stream = com.codename1.io.FileSystemStorage.getInstance().openInputStream(msg.getAttachment());
                 byte[] buf;
                 buf = IOUtilities.streamToBytes(stream);
                 stream.close();

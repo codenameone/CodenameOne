@@ -22,8 +22,11 @@
  */
 package com.codename1.messaging;
 
+import com.codename1.ui.Display;
+
 /**
- *
+ * Represents a message to be sent using underlying platform e-mail client.
+ * 
  * @author Chen
  */
 public class Message {
@@ -42,29 +45,62 @@ public class Message {
     
     public static final String MIME_IMAGE_PNG = "image/png";
     
+    /**
+     * Constructor with the message body content
+     * @param content the message content
+     */
     public Message(String content){
         this.content = content;
     }
     
+    /**
+     * Gets the message content
+     * @return content
+     */
     public String getContent(){
         return content;
     }
     
-    public void setAttachement(String fileUri){
+    /**
+     * Sets the message attachment if exists
+     * @param fileUri the file to attach to the message
+     */
+    public void setAttachment(String fileUri){
         this.fileUri = fileUri;
     }
 
+    /**
+     * Sets the attachment mime type
+     * @param mimeType 
+     */
     public void setMimeType(String mimeType) {
         this.mimeType = mimeType;
     }
     
-    public String getAttachement() {
+    /**
+     * Gets the message attachment file path
+     * @return the file path of the attachment
+     */
+    public String getAttachment() {
         return fileUri;
     }
 
+    /**
+     * Gets the attachment mime type
+     * @return 
+     */
     public String getMimeType() {
         return mimeType;
     }
     
+    /**
+     * Send an email using the platform mail client
+     * @param recieptents array of e-mail addresses
+     * @param subject e-mail subject
+     * @param msg the Message to send
+     */
+    public static void sendMessage(String [] recieptents, String subject, Message msg){
+        Display.getInstance().sendMessage(recieptents, subject, msg);
+    }
     
 }
