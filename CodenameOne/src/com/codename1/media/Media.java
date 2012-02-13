@@ -47,15 +47,12 @@ public interface Media {
 
     /**
      * Stops the audio playback and cleans up the resources related to it immediately.
-     *
-     * @param handle the playback handle
      */
     public void cleanup();
 
     /**
      * Returns the time in seconds in the audio file
      *
-     * @param handle the handle object returned by create audio
      * @return time in milli seconds
      */
     public int getTime();
@@ -63,7 +60,6 @@ public interface Media {
     /**
      * Sets the position in the audio file
      *
-     * @param handle the handle object returned by create audio
      * @param time in milli seconds
      */
     public void setTime(int time);
@@ -71,7 +67,6 @@ public interface Media {
     /**
      * Returns the length in seconds of the audio file
      *
-     * @param handle the handle object returned by create audio
      * @return time in milli seconds
      */
     public int getDuration();
@@ -92,7 +87,7 @@ public interface Media {
     
     /**
      * Returns true if the media is currently playing
-     * @return 
+     * @return true if playing
      */
     public boolean isPlaying();
     
@@ -141,7 +136,7 @@ public interface Media {
      * player on those platforms isNativePlayerMode() will always return true
      * If Media supports native playing by calling to play() the video will start
      * playing in the native player in full screen.
-     * @return 
+     * @return  true if the player is in native mode
      */
     public boolean isNativePlayerMode();
     
