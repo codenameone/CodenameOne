@@ -2490,4 +2490,12 @@ public final class Display {
     public void sendMessage(String[] recieptents, String subject, Message msg) {
         impl.sendMessage(recieptents, subject, msg);
     }
+    
+    /**
+     * Opens the device Dialer application with the given phone number
+     * @param phoneNumber 
+     */
+    public void dial(String phoneNumber) {
+        impl.dial(phoneNumber);
+    }    
 }

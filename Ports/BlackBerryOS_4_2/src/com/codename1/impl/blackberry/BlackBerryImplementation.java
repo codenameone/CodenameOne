@@ -95,6 +95,7 @@ import com.codename1.messaging.Message;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.blackberry.api.invoke.MessageArguments;
+import net.rim.blackberry.api.invoke.PhoneArguments;
 import net.rim.blackberry.api.mail.Address;
 import net.rim.blackberry.api.mail.Folder;
 import net.rim.blackberry.api.mail.Multipart;
@@ -2659,6 +2660,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         try {
             ApplicationManager.getApplicationManager().runApplication(desc, true);
         } catch (ApplicationManagerException e) {
+            EventLog.getInstance().logErrorEvent("err " + e.getMessage());            
             e.printStackTrace();
         }
     }
@@ -2675,7 +2677,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             message.addRecipients(net.rim.blackberry.api.mail.Message.RecipientType.TO, toAdds);
             message.setSubject(subject);
         } catch (Exception e) {
-            EventLog.getInstance().logInformationEvent("err " + e.getMessage());            
+            EventLog.getInstance().logErrorEvent("err " + e.getMessage());            
         }
 
         try {
@@ -2698,10 +2700,19 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
             Invoke.invokeApplication(Invoke.APP_TYPE_MESSAGES, new MessageArguments(message));
         } catch (Exception ex) {
-            EventLog.getInstance().logInformationEvent("err " + ex.getMessage());
+            EventLog.getInstance().logErrorEvent("err " + ex.getMessage());
         }
     }
 
+    public void dial(String phoneNumber) {   
+        try {
+            PhoneArguments call = new PhoneArguments(PhoneArguments.ARG_CALL, phoneNumber);
+            Invoke.invokeApplication(Invoke.APP_TYPE_PHONE, call);            
+        } catch (Exception e) {
+            EventLog.getInstance().logErrorEvent("unable to open dialer " + e.getMessage());
+        }
+    }
+    
     /**
      * @inheritDoc
      */

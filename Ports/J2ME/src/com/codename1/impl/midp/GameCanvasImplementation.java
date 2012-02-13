@@ -2853,6 +2853,12 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         execute("mailto:" +recieptents[0] + "?body=" + msg.getContent() + "?subject=" + subject);
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void dial(String phoneNumber) {   
+        execute("tel:" + phoneNumber);
+    }
     
     
     /**

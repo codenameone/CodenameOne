@@ -3837,4 +3837,11 @@ public abstract class CodenameOneImplementation {
      */
     public void sendMessage(String[] recieptents, String subject, Message msg) {
     }
+    
+    /**
+     * Opens the device Dialer application with the given phone number
+     * @param phoneNumber 
+     */
+    public void dial(String phoneNumber) {        
+    }
 }

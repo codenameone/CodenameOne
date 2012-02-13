@@ -2485,7 +2485,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }
  
- 
+    /**
+     * @inheritDoc
+     */
+    public void dial(String phoneNumber) {        
+        Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:"+ phoneNumber));
+        activity.startActivity(dialer);
+    }
+
     /**
      * @inheritDoc
      */
