@@ -881,12 +881,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 pref.put("skin", current);
                                 Display.deinitialize();
                                 frm.dispose();
-                                try {
-                                    Class sim = ClassLoader.getSystemClassLoader().loadClass("com.codename1.impl.javase.Simulator");
-                                    sim.getDeclaredMethod("main", String[].class).invoke(null, new Object[]{new String[]{mainClass}});
-                                } catch (Exception ex) {
-                                    ex.printStackTrace();
-                                }
+                                System.setProperty("reload.simulator", "true");
                             } else {
                                 loadSkinFile(current, frm);
                                 refreshSkin(frm);
@@ -920,12 +915,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             pref.put("skin", picker.getDirectory() + File.separator + file);
                             Display.deinitialize();
                             frm.dispose();
-                            try {
-                                Class sim = ClassLoader.getSystemClassLoader().loadClass("com.codename1.impl.javase.Simulator");
-                                sim.getDeclaredMethod("main", String[].class).invoke(null, new Object[]{new String[]{mainClass}});
-                            } catch (Exception ex) {
-                                ex.printStackTrace();
-                            }
+                            System.setProperty("reload.simulator", "true");
                         } else {
                             loadSkinFile(picker.getDirectory() + File.separator + file, frm);
                             refreshSkin(frm);

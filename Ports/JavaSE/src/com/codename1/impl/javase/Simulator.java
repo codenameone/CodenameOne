@@ -28,6 +28,8 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A simple class that can invoke a lifecycle object to allow it to run a Codename One application.
@@ -41,10 +43,7 @@ public class Simulator {
     /**
      * Accepts the classname to launch
      */
-    public static void main(String[] argv) throws Exception {
-        FixedJavaSoundRenderer r = new FixedJavaSoundRenderer();
-        r.usurpControlFromJavaSoundRenderer();
-        
+    public static void main(final String[] argv) throws Exception {
         String skin = System.getProperty("dskin");
         if (skin == null) {
             System.setProperty("dskin", "/iphone3gs.skin");
@@ -60,33 +59,26 @@ public class Simulator {
         Class c = ldr.loadClass("com.codename1.impl.javase.Executor");
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});        
-    }
-
-    public static class FixedJavaSoundRenderer extends com.sun.media.renderer.audio.JavaSoundRenderer {
-
-        public void usurpControlFromJavaSoundRenderer() {
-            final String OFFENDING_RENDERER_PLUGIN_NAME = com.sun.media.renderer.audio.JavaSoundRenderer.class.getName();
-            javax.media.Format[] rendererInputFormats = javax.media.PlugInManager.getSupportedInputFormats(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-            javax.media.Format[] rendererOutputFormats = javax.media.PlugInManager.getSupportedOutputFormats(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-            //should be only rendererInputFormats
-            if (rendererInputFormats != null || rendererOutputFormats != null) {
-                final String REPLACEMENT_RENDERER_PLUGIN_NAME = FixedJavaSoundRenderer.class.getName();
-                javax.media.PlugInManager.removePlugIn(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-                javax.media.PlugInManager.addPlugIn(REPLACEMENT_RENDERER_PLUGIN_NAME, rendererInputFormats, rendererOutputFormats, javax.media.PlugInManager.RENDERER);
-            }
-        }
-
-        @Override
-        protected com.sun.media.renderer.audio.device.AudioOutput createDevice(javax.media.format.AudioFormat format) {
-            return new com.sun.media.renderer.audio.device.JavaSoundOutput() {
-
-                @Override
-                public void setGain(double g) {
-                    g = Math.max(g, this.gc.getMinimum());
-                    g = Math.min(g, this.gc.getMaximum());
-                    super.setGain(g);
+        
+        new Thread() {
+            public void run() {
+                while(true) {
+                    try {
+                        sleep(500);
+                    } catch (InterruptedException ex) {
+                    }
+                    String r = System.getProperty("reload.simulator");
+                    if(r != null && r.equals("true")) {
+                        System.setProperty("reload.simulator", "");
+                        try {
+                            main(argv);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                        return;
+                    }
                 }
-            };
-        }
+            }
+        }.start();
     }
 }

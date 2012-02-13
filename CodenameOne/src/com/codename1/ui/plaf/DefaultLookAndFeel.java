@@ -1496,13 +1496,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * @inheritDoc
      */
-    public void refreshTheme() {
+    public void refreshTheme(boolean b) {
         chkBoxImages = null;
         comboImage = null;
         rButtonImages = null;
         chkBoxImagesFocus = null;
         rButtonImagesFocus = null;
-        super.refreshTheme();
+        super.refreshTheme(b);
         UIManager m = getUIManager();
         Image combo = m.getThemeImageConstant("comboImage");
         if(combo != null) {
@@ -1511,9 +1511,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         updateCheckBoxConstants(m, false, "");
         updateCheckBoxConstants(m, true, "Focus");
         updateRadioButtonConstants(m, false, "");
-        updateRadioButtonConstants(m, true, "Focus");
+        updateRadioButtonConstants(m, true, "Focus");        
     }
-
+    
     private void updateCheckBoxConstants(UIManager m, boolean focus, String append) {
         Image checkSel = m.getThemeImageConstant("checkBoxChecked" + append + "Image");
         if(checkSel != null) {

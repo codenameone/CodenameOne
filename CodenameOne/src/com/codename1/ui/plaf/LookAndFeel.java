@@ -886,8 +886,9 @@ public abstract class LookAndFeel {
     /**
      * This method is a callback to the LookAndFeel when a theme is being 
      * changed in the UIManager
+     * @param completeClear indicates that the theme is set and not added
      */
-    public void refreshTheme() {
+    public void refreshTheme(boolean completeClear) {
         fadeScrollTop = null;
         fadeScrollBottom = null;
         fadeScrollRight = null;
@@ -941,7 +942,7 @@ public abstract class LookAndFeel {
         defaultMenuTransitionOut = getTransitionConstant(defaultMenuTransitionOut, "menuTransitionOut", menuSlideDir, defaultTransitionSpeed, menuOutdir);
         defaultDialogTransitionIn = getTransitionConstant(defaultDialogTransitionIn, "dialogTransitionIn", dialogSlideDir, defaultTransitionSpeed, dialogIndir);
         defaultDialogTransitionOut = getTransitionConstant(defaultDialogTransitionOut, "dialogTransitionOut", dialogSlideDir, defaultTransitionSpeed, dialogOutdir);
-        initCommandBehaviorConstant(manager.getThemeConstant("commandBehavior", null));
+        initCommandBehaviorConstant(manager.getThemeConstant("commandBehavior", null), completeClear);
         reverseSoftButtons = manager.isThemeConstant("reverseSoftButtonsBool", reverseSoftButtons);
         textFieldCursorColor = manager.getThemeConstant("textFieldCursorColorInt", 0);
         TextArea.setDefaultValign(manager.getThemeConstant("textCmpVAlignInt", TextArea.getDefaultValign()));
@@ -963,7 +964,7 @@ public abstract class LookAndFeel {
         }
     }
 
-    private void initCommandBehaviorConstant(String c) {
+    private void initCommandBehaviorConstant(String c, boolean complete) {
         if(c != null) {
             if(c.equalsIgnoreCase("SoftKey")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);
@@ -983,7 +984,11 @@ public abstract class LookAndFeel {
             if(c.equalsIgnoreCase("Native")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
             }
-        } 
+        } else {
+            if(complete) {
+                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
+            }
+        }
     }
 
     private Transition getTransitionConstant(Transition t, String constant, String slideDir, int speed, boolean forward) {

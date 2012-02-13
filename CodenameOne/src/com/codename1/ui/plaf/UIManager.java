@@ -687,7 +687,7 @@ public class UIManager {
     public void addThemeProps(Hashtable themeProps) {
         if (accessible) {
             buildTheme(themeProps);
-            current.refreshTheme();
+            current.refreshTheme(false);
         }
     }
 
@@ -777,7 +777,7 @@ public class UIManager {
             themelisteners.fireActionEvent(new ActionEvent(themeProps));
         }
         buildTheme(themeProps);
-        current.refreshTheme();
+        current.refreshTheme(true);
     }
 
     private void buildTheme(Hashtable themeProps) {
@@ -1096,7 +1096,7 @@ public class UIManager {
                     getLookAndFeel().setRTL(v.equalsIgnoreCase("true"));
                     
                     // update some "bidi sensitive" variables in the LaF
-                    current.refreshTheme();
+                    current.refreshTheme(false);
                 }
                 String vkbInputMode = (String)resourceBundle.get("@vkb");
                 if(vkbInputMode != null && vkbInputMode.length() > 0) {
