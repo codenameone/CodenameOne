@@ -739,8 +739,14 @@ public final class CommonTransitions extends Transition {
      */
     public void cleanup() {
         if(transitionType == TYPE_SLIDE_AND_FADE) {
-            removeConstant((Container)getSource());
-            removeConstant((Container)getDestination());
+            Component c = getSource();
+            if(c instanceof Container){
+                removeConstant((Container)c);
+            }
+            c = getDestination();
+            if(c instanceof Container){
+                removeConstant((Container)c);
+            }
         }
         super.cleanup();
         buffer = null;
