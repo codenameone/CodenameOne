@@ -67,6 +67,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.media.MediaPlayer;
 import android.os.Environment;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.View.MeasureSpec;
 import android.view.WindowManager;
@@ -74,6 +75,7 @@ import android.widget.MediaController;
 import android.widget.VideoView;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -91,6 +93,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
+import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
@@ -203,6 +206,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peers[i].release();
             }
         }
+        
+        ConnectionRequest.setDefaultUserAgent(getUserAgent());
+
     }
 
     public int translatePixelForDPI(int pixel) {
@@ -1229,11 +1235,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return System.getProperty("platform");
         }
         if ("User-Agent".equals(key)) {
-            String userAgent;
-            WebView wv = new WebView(activity);
-            userAgent = wv.getSettings().getUserAgentString();
-            wv.destroy();
-            return userAgent;
+            String ua = getUserAgent();
+            return getUserAgent();
         }
         if ("IMEI".equals(key)) {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
@@ -1255,20 +1258,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return System.getProperty(key, defaultValue);
     }
 
+    private String getUserAgent() {
+    try {
+        Constructor<WebSettings> constructor = WebSettings.class.getDeclaredConstructor(Context.class, WebView.class);
+        constructor.setAccessible(true);
+        try {
+            WebSettings settings = constructor.newInstance(activity, null);
+            return settings.getUserAgentString();
+        } finally {
+            constructor.setAccessible(false);
+        }
+    } catch (Exception e) {
+        final StringBuffer ua = new StringBuffer();
+        if(Thread.currentThread().getName().equalsIgnoreCase("main")){
+            WebView m_webview = new WebView(activity);
+            ua.append(m_webview.getSettings().getUserAgentString());
+        }else{
+            Thread thread = new Thread(){
+                public void run(){
+                    Looper.prepare();
+                    WebView m_webview = new WebView(activity);
+                    ua.append(m_webview.getSettings().getUserAgentString());
+                    Looper.loop();
+                }
+            };
+            thread.start();
+        }
+        return ua.toString();
+    }
+}
     /**
      * @inheritDoc
      */
     public void execute(String url) {
         try {
-            Intent i = new Intent();
-
-            ComponentName comp = new ComponentName("com.google.android.browser",
-                    "com.google.android.browser.BrowserActivity");
-            i.setComponent(comp);
-            i.setAction("android.intent.action.VIEW");
-            i.addCategory("android.intent.category.BROWSABLE");
-            i.setData(Uri.parse(url));
-            activity.startActivity(i);
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); 
         } catch (Exception e) {
             e.printStackTrace();
         }
