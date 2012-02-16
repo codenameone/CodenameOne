@@ -223,6 +223,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Display.DENSITY_LOW;
             case DisplayMetrics.DENSITY_HIGH:
                 return Display.DENSITY_HIGH;
+            case DisplayMetrics.DENSITY_XHIGH:
+                return Display.DENSITY_VERY_HIGH;
             default:
                 return Display.DENSITY_MEDIUM;
         }
@@ -780,6 +782,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
         ((AndroidGraphics) graphics).getCanvas().drawBitmap((Bitmap) img, x, y, ((AndroidGraphics) graphics).getPaint());
+    }
+    
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        Bitmap b = (Bitmap) img;
+        Rect src = new Rect();
+        src.top = 0;
+        src.bottom = b.getHeight();
+        src.left = 0;
+        src.right = b.getWidth();
+        Rect dest = new Rect();
+        dest.top = y;
+        dest.bottom = y + h;
+        dest.left = x;
+        dest.right = x + w;
+        
+        ((AndroidGraphics) graphics).getCanvas().drawBitmap(b, src, dest, ((AndroidGraphics) graphics).getPaint());
     }
 
     @Override
