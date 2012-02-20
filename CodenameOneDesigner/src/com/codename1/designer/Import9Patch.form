@@ -27,17 +27,18 @@
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
                   <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
-                  <Group type="102" alignment="0" attributes="0">
+                  <Group type="102" alignment="1" attributes="0">
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="styleState" pref="390" max="32767" attributes="0"/>
-                          <Component id="uiidCombo" pref="390" max="32767" attributes="0"/>
+                      <Group type="103" groupAlignment="1" attributes="0">
+                          <Component id="imagesCombo" alignment="0" pref="390" max="32767" attributes="0"/>
                           <Component id="imageDirectory" alignment="0" pref="390" max="32767" attributes="0"/>
+                          <Component id="styleState" alignment="0" pref="390" max="32767" attributes="0"/>
+                          <Component id="uiidCombo" alignment="0" pref="390" max="32767" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="pickDirectory" min="-2" max="-2" attributes="0"/>
@@ -47,7 +48,12 @@
           <Group type="102" alignment="0" attributes="0">
               <EmptySpace min="-2" pref="224" max="-2" attributes="0"/>
               <Component id="jPanel1" min="-2" max="-2" attributes="0"/>
-              <EmptySpace pref="198" max="32767" attributes="0"/>
+              <EmptySpace pref="210" max="32767" attributes="0"/>
+          </Group>
+          <Group type="102" alignment="0" attributes="0">
+              <EmptySpace max="-2" attributes="0"/>
+              <Component id="jLabel5" min="-2" max="-2" attributes="0"/>
+              <EmptySpace pref="546" max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -64,13 +70,18 @@
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="jLabel3" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="uiidCombo" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel5" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="imagesCombo" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="jLabel4" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="uiidCombo" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel3" alignment="3" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="3" attributes="0">
                   <Component id="styleState" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel4" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace pref="8" max="32767" attributes="0"/>
               <Component id="jPanel1" min="-2" max="-2" attributes="0"/>
@@ -156,7 +167,7 @@
           <SubComponents>
             <Component class="javax.swing.JButton" name="okButton">
               <Properties>
-                <Property name="text" type="java.lang.String" value="OK"/>
+                <Property name="text" type="java.lang.String" value="Apply"/>
                 <Property name="name" type="java.lang.String" value="okButton" noResource="true"/>
               </Properties>
               <Events>
@@ -165,7 +176,7 @@
             </Component>
             <Component class="javax.swing.JButton" name="cancelButton">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Cancel"/>
+                <Property name="text" type="java.lang.String" value="Close"/>
                 <Property name="name" type="java.lang.String" value="cancelButton" noResource="true"/>
               </Properties>
               <Events>
@@ -176,5 +187,16 @@
         </Container>
       </SubComponents>
     </Container>
+    <Component class="javax.swing.JLabel" name="jLabel5">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Image"/>
+        <Property name="name" type="java.lang.String" value="jLabel5" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JComboBox" name="imagesCombo">
+      <Properties>
+        <Property name="name" type="java.lang.String" value="imagesCombo" noResource="true"/>
+      </Properties>
+    </Component>
   </SubComponents>
 </Form>

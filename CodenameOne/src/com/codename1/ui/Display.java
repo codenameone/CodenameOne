@@ -374,6 +374,13 @@ public final class Display {
     public static final int COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT = 6;
 
     /**
+     * Commands are placed in the same was as they are in the ice cream sandwich Android
+     * OS update where the back button has a theme icon the application icon appears next
+     * to the 
+     */
+    public static final int COMMAND_BEHAVIOR_ICS = 7;
+
+    /**
      * Indicates that commands should try to add themselves to the native menus
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;

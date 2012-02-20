@@ -45,6 +45,14 @@ public class Accessor {
     public static final int TYPE_COMPOUND = 9;
     public static final int TYPE_IMAGE_HORIZONTAL = 10;
     public static final int TYPE_IMAGE_VERTICAL = 11;
+    public static final int TYPE_DASHED = 12;
+    public static final int TYPE_DOTTED = 13;
+    public static final int TYPE_DOUBLE = 14;
+    public static final int TYPE_GROOVE = 15;
+    public static final int TYPE_RIDGE = 16;
+    public static final int TYPE_INSET = 17;
+    public static final int TYPE_OUTSET = 18;
+    public static final int TYPE_IMAGE_SCALED = 19;
 
     static {
         UIManager.accessible = false;
@@ -83,6 +91,8 @@ public class Accessor {
                 return "Image Horizontal";
             case TYPE_IMAGE_VERTICAL:
                 return "Image Vertical";
+            case TYPE_IMAGE_SCALED:
+                return "Image Scaled";
         }
         throw new IllegalArgumentException(b.toString());
     }

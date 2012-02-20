@@ -293,6 +293,10 @@ public class Dialog extends Form {
         dialogContentPane.setLayout(layout);
     }
 
+    void updateIcsIconCommandBehavior() {
+        // don't set the app icon to the dialog title
+    }
+    
     /**
      * @inheritDoc
      */

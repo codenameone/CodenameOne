@@ -770,13 +770,15 @@ public class ResourceEditorView extends FrameView {
         addMultiImages = new javax.swing.JMenuItem();
         addImages = new javax.swing.JMenuItem();
         addSVGImages = new javax.swing.JMenuItem();
-        findMultiImages = new javax.swing.JMenuItem();
         deleteUnusedImages = new javax.swing.JMenuItem();
         imageSizes = new javax.swing.JMenuItem();
-        launchOptiPng = new javax.swing.JMenuItem();
         imageBorderWizardMenuItem = new javax.swing.JMenuItem();
         jMenu5 = new javax.swing.JMenu();
         pulsateEffect = new javax.swing.JMenuItem();
+        jMenu2 = new javax.swing.JMenu();
+        findMultiImages = new javax.swing.JMenuItem();
+        launchOptiPng = new javax.swing.JMenuItem();
+        import9Patch = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
         jSeparator8 = new javax.swing.JSeparator();
         about = new javax.swing.JMenuItem();
@@ -1413,11 +1415,6 @@ public class ResourceEditorView extends FrameView {
         addSVGImages.addActionListener(formListener);
         jMenu4.add(addSVGImages);
 
-        findMultiImages.setText("Find Multi Images");
-        findMultiImages.setName("findMultiImages"); // NOI18N
-        findMultiImages.addActionListener(formListener);
-        jMenu4.add(findMultiImages);
-
         deleteUnusedImages.setText("Delete Unused Images");
         deleteUnusedImages.setName("deleteUnusedImages"); // NOI18N
         deleteUnusedImages.addActionListener(formListener);
@@ -1427,11 +1424,6 @@ public class ResourceEditorView extends FrameView {
         imageSizes.setName("imageSizes"); // NOI18N
         imageSizes.addActionListener(formListener);
         jMenu4.add(imageSizes);
-
-        launchOptiPng.setText("Launch OptiPng");
-        launchOptiPng.setName("launchOptiPng"); // NOI18N
-        launchOptiPng.addActionListener(formListener);
-        jMenu4.add(launchOptiPng);
 
         imageBorderWizardMenuItem.setText("Image Border Wizard");
         imageBorderWizardMenuItem.setName("imageBorderWizardMenuItem"); // NOI18N
@@ -1447,6 +1439,26 @@ public class ResourceEditorView extends FrameView {
         jMenu5.add(pulsateEffect);
 
         jMenu4.add(jMenu5);
+
+        jMenu2.setText("Advanced");
+        jMenu2.setName("jMenu2"); // NOI18N
+
+        findMultiImages.setText("Find Multi Images");
+        findMultiImages.setName("findMultiImages"); // NOI18N
+        findMultiImages.addActionListener(formListener);
+        jMenu2.add(findMultiImages);
+
+        launchOptiPng.setText("Launch OptiPng");
+        launchOptiPng.setName("launchOptiPng"); // NOI18N
+        launchOptiPng.addActionListener(formListener);
+        jMenu2.add(launchOptiPng);
+
+        import9Patch.setText("Import 9-Patch");
+        import9Patch.setName("import9Patch"); // NOI18N
+        import9Patch.addActionListener(formListener);
+        jMenu2.add(import9Patch);
+
+        jMenu4.add(jMenu2);
 
         menuBar.add(jMenu4);
 
@@ -1599,6 +1611,9 @@ public class ResourceEditorView extends FrameView {
             }
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
+            }
+            else if (evt.getSource() == import9Patch) {
+                ResourceEditorView.this.import9PatchActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -2830,7 +2845,7 @@ private void resPasswordActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
 private boolean configureOptiPNG() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("optiPng", null);
     if(node == null) {
-        JOptionPane.showMessageDialog(mainPanel, "Please select the OptiPng executable in the following dialog\nOptiPng can be downloaded from http://http://optipng.sourceforge.net/", "Select OptiPNG", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(mainPanel, "Please select the OptiPng executable in the following dialog\nOptiPng can be downloaded from http://optipng.sourceforge.net/", "Select OptiPNG", JOptionPane.INFORMATION_MESSAGE);
         File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app");
         if(result != null) {
             Preferences.userNodeForPackage(ResourceEditorView.class).put("optiPng", result[0].getAbsolutePath());
@@ -3065,6 +3080,13 @@ private void addNewTimelineActionPerformed(java.awt.event.ActionEvent evt) {//GE
     setSelectedResource(timelineName + index);
 }//GEN-LAST:event_addNewTimelineActionPerformed
 
+private void import9PatchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_import9PatchActionPerformed
+    if(selectedResource != null && loadedResources.getResourceObject(selectedResource) instanceof Hashtable) {
+        new Import9Patch(mainPanel, loadedResources, selectedResource);
+        setSelectedResource(selectedResource);
+    }
+}//GEN-LAST:event_import9PatchActionPerformed
+
     private void buildFilenameMap(File baseDir, Map<String, List<File>> map) {
         File[] f = baseDir.listFiles();
         for(File current : f) {
@@ -3279,7 +3301,7 @@ public static void openInIDE(File f, int lineNumber) {
                     Border b = (Border)v;
                     // BORDER_TYPE_IMAGE
                     if(Accessor.getType(b) == Accessor.TYPE_IMAGE || Accessor.getType(b) == Accessor.TYPE_IMAGE_HORIZONTAL ||
-                            Accessor.getType(b) == Accessor.TYPE_IMAGE_VERTICAL) {
+                            Accessor.getType(b) == Accessor.TYPE_IMAGE_VERTICAL || Accessor.getType(b) == Accessor.TYPE_IMAGE_SCALED) {
                         com.codename1.ui.Image[] images = Accessor.getImages(b);
                         for(int i = 0 ; i < images.length ; i++) {
                             if(images[i] == resourceValue) {
@@ -3305,7 +3327,7 @@ public static void openInIDE(File f, int lineNumber) {
                     Border b = (Border)v;
                     // BORDER_TYPE_IMAGE
                     if(Accessor.getType(b) == Accessor.TYPE_IMAGE || Accessor.getType(b) == Accessor.TYPE_IMAGE_HORIZONTAL ||
-                            Accessor.getType(b) == Accessor.TYPE_IMAGE_VERTICAL) {
+                            Accessor.getType(b) == Accessor.TYPE_IMAGE_VERTICAL || Accessor.getType(b) == Accessor.TYPE_IMAGE_SCALED) {
                         com.codename1.ui.Image[] images = Accessor.getImages(b);
                         for(int i = 0 ; i < images.length ; i++) {
                             if(images[i] == resourceValue) {
@@ -4435,9 +4457,11 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem imageBorderWizardMenuItem;
     private javax.swing.JScrollPane imageScroll;
     private javax.swing.JMenuItem imageSizes;
+    private javax.swing.JMenuItem import9Patch;
     private javax.swing.JMenuItem importRes;
     private javax.swing.JRadioButtonMenuItem iosNativeTheme;
     private javax.swing.JMenu jMenu1;
+    private javax.swing.JMenu jMenu2;
     private javax.swing.JMenu jMenu4;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenu jMenu6;

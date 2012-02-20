@@ -74,6 +74,8 @@ public class ImageTools {
                 if (w < targetWidth) {
                     w = targetWidth;
                 }
+            } else {
+                w = targetWidth;
             }
 
             if (h > targetHeight) {
@@ -81,7 +83,10 @@ public class ImageTools {
                 if (h < targetHeight) {
                     h = targetHeight;
                 }
+            } else {
+                h = targetHeight;
             }
+
 
             BufferedImage tmp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2 = tmp.createGraphics();

@@ -91,6 +91,14 @@ public class Resources {
     static final int BORDER_TYPE_IMAGE = 8;
     static final int BORDER_TYPE_IMAGE_HORIZONTAL = 10;
     static final int BORDER_TYPE_IMAGE_VERTICAL = 11;
+    static final int BORDER_TYPE_DASHED = 12;
+    static final int BORDER_TYPE_DOTTED = 13;
+    static final int BORDER_TYPE_DOUBLE = 14;
+    static final int BORDER_TYPE_GROOVE = 15;
+    static final int BORDER_TYPE_RIDGE = 16;
+    static final int BORDER_TYPE_INSET = 17;
+    static final int BORDER_TYPE_OUTSET = 18;
+    static final int BORDER_TYPE_IMAGE_SCALED = 19;
 
     // for use by the resource editor
     private static Class classLoader = Resources.class;
@@ -771,6 +779,14 @@ public class Resources {
                return Border.createVerticalImageBorder(getImage(value[1]),
                        getImage(value[2]), getImage(value[3]));
         }
+        if(value[0].equals("s")) {
+            Image[] images = new Image[value.length - 1];
+            for(int iter = 0 ; iter < images.length ; iter++) {
+                images[iter] = getImage(value[iter + 1]);
+            }
+           return Border.createImageScaledBorder(images[0], images[1], images[2],
+               images[3], images[4], images[5], images[6], images[7], images[8]); 
+        }
         Image[] images = new Image[value.length];
         for(int iter = 0 ; iter < value.length ; iter++) {
             images[iter] = getImage(value[iter]);
@@ -1372,6 +1388,10 @@ public class Resources {
             // vertical Image border
             case 0xff10:
                 return readImageBorder(input, "v");
+
+            // scaled Image border
+            case 0xff11:
+                return readScaledImageBorder(input);
         }
         return null;
     }
@@ -1424,6 +1444,7 @@ public class Resources {
                     return Border.createBevelLowered(input.readInt(), input.readInt(), input.readInt(), input.readInt());
                 }
             case BORDER_TYPE_IMAGE:
+            case BORDER_TYPE_IMAGE_SCALED:
                 Object[] imageBorder = readImageBorder(input);
                 
                 if(!newerVersion) {
@@ -1443,6 +1464,14 @@ public class Resources {
             imageBorder[iter] = input.readUTF();
         }
         return imageBorder;
+    }
+
+    private String[] readScaledImageBorder(DataInputStream input) throws IOException {
+        String[] a = readImageBorder(input);
+        String[] b = new String[a.length + 1];
+        System.arraycopy(a, 0, b, 1, a.length);
+        b[0] = "s";
+        return b;
     }
     
     private String[] readImageBorder(DataInputStream input) throws IOException {

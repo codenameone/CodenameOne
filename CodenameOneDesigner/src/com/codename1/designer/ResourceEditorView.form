@@ -1202,15 +1202,6 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="addSVGImagesActionPerformed"/>
               </Events>
             </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="findMultiImages">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Find Multi Images"/>
-                <Property name="name" type="java.lang.String" value="findMultiImages" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="findMultiImagesActionPerformed"/>
-              </Events>
-            </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="deleteUnusedImages">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Delete Unused Images"/>
@@ -1227,15 +1218,6 @@
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="imageSizesActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="launchOptiPng">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Launch OptiPng"/>
-                <Property name="name" type="java.lang.String" value="launchOptiPng" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="launchOptiPngActionPerformed"/>
               </Events>
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="imageBorderWizardMenuItem">
@@ -1260,6 +1242,41 @@
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="pulsateEffectActionPerformed"/>
+                  </Events>
+                </MenuItem>
+              </SubComponents>
+            </Menu>
+            <Menu class="javax.swing.JMenu" name="jMenu2">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Advanced"/>
+                <Property name="name" type="java.lang.String" value="jMenu2" noResource="true"/>
+              </Properties>
+              <SubComponents>
+                <MenuItem class="javax.swing.JMenuItem" name="findMultiImages">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Find Multi Images"/>
+                    <Property name="name" type="java.lang.String" value="findMultiImages" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="findMultiImagesActionPerformed"/>
+                  </Events>
+                </MenuItem>
+                <MenuItem class="javax.swing.JMenuItem" name="launchOptiPng">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Launch OptiPng"/>
+                    <Property name="name" type="java.lang.String" value="launchOptiPng" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="launchOptiPngActionPerformed"/>
+                  </Events>
+                </MenuItem>
+                <MenuItem class="javax.swing.JMenuItem" name="import9Patch">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Import 9-Patch"/>
+                    <Property name="name" type="java.lang.String" value="import9Patch" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="import9PatchActionPerformed"/>
                   </Events>
                 </MenuItem>
               </SubComponents>

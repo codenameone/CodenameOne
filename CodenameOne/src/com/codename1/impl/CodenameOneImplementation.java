@@ -3844,4 +3844,20 @@ public abstract class CodenameOneImplementation {
      */
     public void dial(String phoneNumber) {        
     }
+    
+    /**
+     * Returns an image representing the application icon, or null if not supported. This is used on
+     * Android to support the title bar icon
+     */
+    public Image getApplicationIconImage() {
+        InputStream i = getResourceAsStream(getClass(), "/icon.png");
+        if(i != null) {
+            try {
+                return EncodedImage.create(i);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+        return null;
+    }
 }

@@ -132,6 +132,14 @@ public class NetworkManager {
             return currentRequest;
         }
 
+        public void join() {
+            try {
+                threadInstance.join();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+        }
+        
         public void start() {
             Util.getImplementation().startThread("Network Thread", this);
         }
@@ -174,6 +182,10 @@ public class NetworkManager {
                     if(threadAssignements.size() > 0) {
                         String n = currentRequest.getClass().getName();
                         Integer threadOffset = (Integer)threadAssignements.get(n);
+                        NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
+                        if(networkThreads == null) {
+                            return;
+                        }
                         if(threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
                             synchronized(LOCK) {
                                 if(pending.size() > 0) {
@@ -351,16 +363,6 @@ public class NetworkManager {
             addToQueue(r);
         }
     }
-
-    private void autoDetectAPN() {
-        if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
-            ConnectionRequest r = new AutoDetectAPN();
-            r.setPost(false);
-            r.setUrl("http://codename-one.appspot.com/t.html");
-            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
-            addToQueue(r);
-        }
-    }
     
     /**
      * Invoked to initialize the network thread and start executing elements on the queue
@@ -387,7 +389,10 @@ public class NetworkManager {
                         } catch (InterruptedException ex) {
                             ex.printStackTrace();
                         }
-
+                        NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
+                        if(networkThreads == null) {
+                            return;
+                        }
                         // check for timeout violations on the currently executing threads
                         for(int iter = 0 ; iter < networkThreads.length ; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
@@ -427,6 +432,21 @@ public class NetworkManager {
      */
     public void shutdown() {
         running = false;
+        networkThreads = null;
+    }
+
+    /**
+     * Shuts down the network thread and waits for shutdown to complete
+     */
+    public void shutdownSync() {
+        NetworkThread[] n = this.networkThreads;
+        if(n != null) {
+            NetworkThread t = n[0];
+            if(t != null) {
+                shutdown();
+                t.join();
+            }
+        }
     }
 
     /**

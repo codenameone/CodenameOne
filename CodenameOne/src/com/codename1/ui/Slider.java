@@ -92,6 +92,9 @@ public class Slider extends Label {
     public void initComponent() {
         if(infinite) {
             getComponentForm().registerAnimatedInternal(this);
+            if(thumbImage == null) {
+                thumbImage = UIManager.getInstance().getThemeImageConstant("sliderThumbImage");
+            }
         }
     }
 

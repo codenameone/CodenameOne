@@ -2453,6 +2453,9 @@ public class UserInterfaceEditor extends BaseForm {
             out.writeInt(cmd.getId());
             if(cmd.getAction() != null) {
                 out.writeUTF(cmd.getAction());
+                if(cmd.getAction().equals("$Execute")) {
+                    out.writeUTF(cmd.getArgument());
+                }
             } else {
                 out.writeUTF("");
             }

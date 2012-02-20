@@ -1201,10 +1201,10 @@ public class Border {
                 height -= (topLeft.getHeight() + bottomLeft.getHeight());
                 width -= (topLeft.getWidth() + topRight.getWidth());
                 g.clipRect(x, y, width, height);
-                if(center != null){
+                if(center != null && width > 0 && height > 0){
                     int centerWidth = center.getWidth();
                     int centerHeight = center.getHeight();
-                    g.drawImage(center, x, y, centerWidth, centerHeight);
+                    g.drawImage(center, x, y, width, height);
                 }
                 Image top = images[0];  Image bottom = images[1];
                 Image left = images[2]; Image right = images[3];
@@ -1645,7 +1645,7 @@ public class Border {
     }
 
     private void drawImageBorderLineScale(Graphics g, Image left, Image right, Image center, int x, int y, int width) {
-        int currentWidth = width - right.getWidth();
+        int currentWidth = width - right.getWidth() - left.getWidth();
         if(currentWidth > 0) {
             x += left.getWidth();
             g.drawImage(center, x, y, currentWidth, center.getHeight());
@@ -1653,11 +1653,10 @@ public class Border {
     }
 
     private void drawImageBorderColumnScale(Graphics g, Image top, Image bottom, Image center, int x, int y, int height) {
-        int currentHeight = height - bottom.getHeight();
+        int currentHeight = height - bottom.getHeight() - top.getHeight();
         if(currentHeight > 0) {
             y += top.getHeight();
-            int centerHeight = center.getHeight();
-            g.drawImage(center, x, y, center.getWidth(), centerHeight);
+            g.drawImage(center, x, y, center.getWidth(), currentHeight);
         }
     }
     

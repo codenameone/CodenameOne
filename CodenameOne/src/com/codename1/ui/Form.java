@@ -736,6 +736,20 @@ public class Form extends Container {
         contentPane.setLayout(layout);
     }
 
+    void updateIcsIconCommandBehavior() {
+        int b = Display.getInstance().getCommandBehavior();
+        if(b == Display.COMMAND_BEHAVIOR_ICS) {
+            if(getTitleComponent().getIcon() == null) {
+                Image i = Display.getInstance().getImplementation().getApplicationIconImage();
+                if(i != null) {
+                    int h = getTitleComponent().getStyle().getFont().getHeight();
+                    i = i.scaled(h, h);
+                    getTitleComponent().setIcon(i);
+                }
+            }
+        }
+    }
+    
     /**
      * Sets the Form title to the given text
      * 
@@ -743,9 +757,11 @@ public class Form extends Container {
      */
     public void setTitle(String title) {
         this.title.setText(title);
+        updateIcsIconCommandBehavior();
         if(isInitialized() && this.title.isTickerEnabled()) {
-            int b =Display.getInstance().getCommandBehavior();
-            if(b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT) {
+            int b = Display.getInstance().getCommandBehavior();
+            if(b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT || 
+                    b == Display.COMMAND_BEHAVIOR_ICS) {
                 titleArea.revalidate();
             }
             if(this.title.shouldTickerStart()) {

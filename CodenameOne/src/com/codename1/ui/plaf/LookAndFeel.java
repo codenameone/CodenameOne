@@ -102,7 +102,7 @@ public abstract class LookAndFeel {
 
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
-    private int fadeScrollBarSpeed;
+    private int fadeScrollBarSpeed = 5;
     private int fadeScrollEdgeLength = 15;
     private Image fadeScrollTop;
     private Image fadeScrollBottom;
@@ -968,21 +968,31 @@ public abstract class LookAndFeel {
         if(c != null) {
             if(c.equalsIgnoreCase("SoftKey")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);
+                return;
             }
             if(c.equalsIgnoreCase("Touch")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);
+                return;
             }
             if(c.equalsIgnoreCase("Bar")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR);
+                return;
             }
             if(c.equalsIgnoreCase("Title")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK);
+                return;
             }
             if(c.equalsIgnoreCase("Right")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT);
+                return;
             }
             if(c.equalsIgnoreCase("Native")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+                return;
+            }
+            if(c.equalsIgnoreCase("ICS")) {
+                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_ICS);
+                return;
             }
         } else {
             if(complete) {
@@ -1274,14 +1284,14 @@ public abstract class LookAndFeel {
      * @param top destination of the tensile highlight image
      * @param opacity the opacity of the image
      */
-    public void paintTensileHighlight(Graphics  g, boolean top, int opacity) {
+    public void paintTensileHighlight(Component t, Graphics  g, boolean top, int opacity) {
         if(opacity > 0 && tensileHighlightTopImage != null && tensileHighlightBottomImage != null) {
             int a = g.getAlpha();
             g.setAlpha(opacity);
             if(top) {
-                g.drawImage(tensileHighlightTopImage, 0, 0, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
+                g.drawImage(tensileHighlightTopImage, t.getX(), t.getY(), Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
             } else {
-                g.drawImage(tensileHighlightBottomImage, 0, Display.getInstance().getDisplayHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                g.drawImage(tensileHighlightBottomImage, t.getX(), Display.getInstance().getDisplayHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
             }
             g.setAlpha(a);
         }

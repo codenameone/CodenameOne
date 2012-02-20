@@ -1149,10 +1149,10 @@ public class Component implements Animation, StyleListener {
         if(tensileHighlightIntensity > 0) {
             int i = getScrollDimension().getHeight() - getHeight();
             if(scrollY >= i - 1) {
-                getUIManager().getLookAndFeel().paintTensileHighlight(g, false , tensileHighlightIntensity);
+                getUIManager().getLookAndFeel().paintTensileHighlight(this, g, false , tensileHighlightIntensity);
             } else {
                 if(scrollY < 1) {
-                    getUIManager().getLookAndFeel().paintTensileHighlight(g, true, tensileHighlightIntensity);
+                    getUIManager().getLookAndFeel().paintTensileHighlight(this, g, true, tensileHighlightIntensity);
                 } else {
                     tensileHighlightIntensity = 0;
                 }
@@ -3729,6 +3729,8 @@ public class Component implements Animation, StyleListener {
                     int iW = bgImage.getWidth();
                     int iH = bgImage.getHeight();
                     switch (s.getBackgroundType()) {
+                        case Style.BACKGROUND_NONE:
+                            return;
                         case Style.BACKGROUND_IMAGE_SCALED:
                             if (iW != width || iH != height) {
                                 bgImage = bgImage.scaled(width, height);

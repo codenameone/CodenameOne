@@ -36,10 +36,12 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JComboBox;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
+import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 
 /**
@@ -84,6 +86,8 @@ public class Import9Patch extends javax.swing.JDialog {
         jPanel2 = new javax.swing.JPanel();
         okButton = new javax.swing.JButton();
         cancelButton = new javax.swing.JButton();
+        jLabel5 = new javax.swing.JLabel();
+        imagesCombo = new javax.swing.JComboBox();
 
         FormListener formListener = new FormListener();
 
@@ -119,17 +123,22 @@ public class Import9Patch extends javax.swing.JDialog {
         jPanel2.setName("jPanel2"); // NOI18N
         jPanel2.setLayout(new java.awt.GridLayout(1, 2));
 
-        okButton.setText("OK");
+        okButton.setText("Apply");
         okButton.setName("okButton"); // NOI18N
         okButton.addActionListener(formListener);
         jPanel2.add(okButton);
 
-        cancelButton.setText("Cancel");
+        cancelButton.setText("Close");
         cancelButton.setName("cancelButton"); // NOI18N
         cancelButton.addActionListener(formListener);
         jPanel2.add(cancelButton);
 
         jPanel1.add(jPanel2);
+
+        jLabel5.setText("Image");
+        jLabel5.setName("jLabel5"); // NOI18N
+
+        imagesCombo.setName("imagesCombo"); // NOI18N
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -139,22 +148,27 @@ public class Import9Patch extends javax.swing.JDialog {
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jLabel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(layout.createSequentialGroup()
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel2)
                             .add(jLabel3)
                             .add(jLabel4))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(styleState, 0, 390, Short.MAX_VALUE)
-                            .add(uiidCombo, 0, 390, Short.MAX_VALUE)
-                            .add(imageDirectory, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 390, Short.MAX_VALUE))
+                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, imagesCombo, 0, 390, Short.MAX_VALUE)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, imageDirectory, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 390, Short.MAX_VALUE)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, styleState, 0, 390, Short.MAX_VALUE)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, uiidCombo, 0, 390, Short.MAX_VALUE))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(pickDirectory))))
             .add(layout.createSequentialGroup()
                 .add(224, 224, 224)
                 .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(198, Short.MAX_VALUE))
+                .addContainerGap(210, Short.MAX_VALUE))
+            .add(layout.createSequentialGroup()
+                .addContainerGap()
+                .add(jLabel5)
+                .addContainerGap(546, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -168,12 +182,16 @@ public class Import9Patch extends javax.swing.JDialog {
                     .add(pickDirectory))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel3)
-                    .add(uiidCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jLabel5)
+                    .add(imagesCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel4)
-                    .add(styleState, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(uiidCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel3))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(styleState, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel4))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 8, Short.MAX_VALUE)
                 .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(9, 9, 9))
@@ -190,11 +208,11 @@ public class Import9Patch extends javax.swing.JDialog {
             if (evt.getSource() == pickDirectory) {
                 Import9Patch.this.pickDirectoryActionPerformed(evt);
             }
-            else if (evt.getSource() == cancelButton) {
-                Import9Patch.this.cancelButtonActionPerformed(evt);
-            }
             else if (evt.getSource() == okButton) {
                 Import9Patch.this.okButtonActionPerformed(evt);
+            }
+            else if (evt.getSource() == cancelButton) {
+                Import9Patch.this.cancelButtonActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -204,6 +222,31 @@ private void pickDirectoryActionPerformed(java.awt.event.ActionEvent evt) {//GEN
         if(result != null && result.length == 1) {
             imageDirectory.setText(result[0].getAbsolutePath());
         }
+        
+        File drawableHdpi = new File(imageDirectory.getText() + File.separator + "drawable-hdpi");
+        File[] potentials = drawableHdpi.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File file) {
+                    return file.getName().endsWith(".9.png");
+                }
+            });
+
+        if(potentials == null || potentials.length == 0) {
+            JOptionPane.showMessageDialog(this, "Can't find 9-patch files in the hdpi directory", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        imagesCombo.setRenderer(new DefaultListCellRenderer() {
+
+            @Override
+            public Component getListCellRendererComponent(JList jlist, Object o, int i, boolean bln, boolean bln1) {
+                if(o instanceof File) {
+                    o = ((File)o).getName();
+                }
+                return super.getListCellRendererComponent(jlist, o, i, bln, bln1);
+            }
+        });
+        imagesCombo.setModel(new DefaultComboBoxModel(potentials));        
 }//GEN-LAST:event_pickDirectoryActionPerformed
 
 private void cancelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelButtonActionPerformed
@@ -232,38 +275,7 @@ private void okButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRS
                 return;
             }
             
-            File[] potentials = drawableHdpi.listFiles(new FileFilter() {
-                    @Override
-                    public boolean accept(File file) {
-                        return file.getName().endsWith(".9.png");
-                    }
-                });
-            
-            if(potentials.length == 0) {
-                JOptionPane.showMessageDialog(this, "Can't find 9-patch files in the hdpi directory", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            if(potentials.length > 1) {
-                JComboBox options = new JComboBox(potentials);
-                options.setSelectedIndex(0);
-                options.setRenderer(new DefaultListCellRenderer() {
-                    @Override
-                    public Component getListCellRendererComponent(JList jlist, Object o, int i, boolean bln, boolean bln1) {
-                        File f = (File)o;
-                        if(f != null) {
-                            o = f.getName();
-                        }
-                        return super.getListCellRendererComponent(jlist, o, i, bln, bln1);
-                    }
-                });
-                int o = JOptionPane.showConfirmDialog(this, options, "Pick File", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                if(o != JOptionPane.OK_OPTION) {
-                    return;
-                }
-                potentials = new File[] {(File)options.getSelectedItem()};
-            }
-            drawableHdpi = potentials[0];
+            drawableHdpi = (File)imagesCombo.getSelectedItem();
             drawableLdpi = new File(drawableLdpi, drawableHdpi.getName());
             drawableMdpi = new File(drawableMdpi, drawableHdpi.getName());
             drawableXHdpi = new File(drawableXHdpi, drawableHdpi.getName());
@@ -299,7 +311,6 @@ private void okButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRS
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "IO Error reading file", "Error", JOptionPane.ERROR_MESSAGE);
         }
-        dispose();        
 }//GEN-LAST:event_okButtonActionPerformed
 
 
@@ -377,14 +388,17 @@ private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
         rightImageCodenameOne.add(com.codename1.ui.EncodedImage.create(ImageBorderCuttingWizard.toPng(rightImage)));
     }
 
-    String prefix = (String)uiidCombo.getSelectedItem();
+    String prefix = (String)uiidCombo.getSelectedItem() + ".";
     switch(styleState.getSelectedIndex()) {
         case 1:
-            prefix += "#sel";
+            prefix += "sel#";
+            break;
         case 2:
-            prefix += "#press";
+            prefix += "press#";
+            break;
         case 3:
-            prefix += "#dis";
+            prefix += "dis#";
+            break;
     }
     
     com.codename1.ui.EncodedImage topLeftCodenameOneE = storeImage(topLeftCodenameOne, densities, prefix + " ");
@@ -404,7 +418,7 @@ private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
             bottomLeftCodenameOneE, bottomRightCodenameOneE, centerCodenameOneE);
     
     Hashtable newTheme = new Hashtable(res.getTheme(theme));
-    newTheme.put(prefix + ".border", b);
+    newTheme.put(prefix + "border", b);
     res.setTheme(theme, newTheme);
 }
 
@@ -430,10 +444,12 @@ private void create9Patch(List<BufferedImage> biList, List<Integer> densities) {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton cancelButton;
     private javax.swing.JTextField imageDirectory;
+    private javax.swing.JComboBox imagesCombo;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JButton okButton;

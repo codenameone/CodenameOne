@@ -928,6 +928,10 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeShort(0xff10);
                 writeImageHVBorder(output, border);
                 return;
+            case BORDER_TYPE_IMAGE_SCALED:
+                output.writeShort(0xff11);
+                writeImageBorder(output, border);
+                return;
         }
     }
 
