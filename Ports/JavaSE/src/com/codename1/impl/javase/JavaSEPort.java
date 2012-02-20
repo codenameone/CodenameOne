@@ -88,6 +88,7 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -896,7 +897,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             if (mainClass != null) {
                                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                                 pref.put("skin", current);
-                                Display.deinitialize();
+                                deinitializeSync();
                                 frm.dispose();
                                 System.setProperty("reload.simulator", "true");
                             } else {
@@ -930,7 +931,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if (mainClass != null) {
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             pref.put("skin", picker.getDirectory() + File.separator + file);
-                            Display.deinitialize();
+                            deinitializeSync();
                             frm.dispose();
                             System.setProperty("reload.simulator", "true");
                         } else {
@@ -1072,6 +1073,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 frm.pack();
             }
         });
+    }
+    
+    public void deinitializeSync() {
+        final Thread[] t = new Thread[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                t[0] = Thread.currentThread();
+            }
+        });
+        Display.deinitialize();
+        NetworkManager.getInstance().shutdownSync();
+        try {
+            t[0].join();
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+        }
     }
 
     private void loadSkinFile(String f, Frame frm) {
@@ -1482,6 +1500,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object scale(Object nativeImage, int width, int height) {
         BufferedImage image = (BufferedImage) nativeImage;
         int srcWidth = image.getWidth();
@@ -1863,6 +1888,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void drawImage(Object graphics, Object img, int x, int y) {
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, null);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        nativeGraphics.drawImage((BufferedImage) img, x, y, w, h, null);
     }
 
     /**
