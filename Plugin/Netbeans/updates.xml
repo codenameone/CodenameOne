@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE module_updates PUBLIC "-//NetBeans//DTD Autoupdate Catalog 2.6//EN" "http://www.netbeans.org/dtds/autoupdate-catalog-2_6.dtd">
+<module_updates timestamp="23/34/12/18/02/2012">
+
+
+<module codenamebase="com.codename1" distribution="com-codename1.nbm" downloadsize="42551987" homepage="http://codenameone.com" license="D3A4AB17" moduleauthor="Codename One" needsrestart="false" releasedate="2012/02/18">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="com.codename1" OpenIDE-Module-Implementation-Version="120218" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.apache.tools.ant.module/3 &gt; 3.47.1.2, org.netbeans.modules.options.api/1 &gt; 1.22.1, org.netbeans.modules.projectapi/1 &gt; 1.36.1, org.netbeans.modules.projectuiapi/1 &gt; 1.51.1.8, org.openide.awt &gt; 7.31.1, org.openide.dialogs &gt; 7.20.1, org.openide.execution &gt; 1.22.1, org.openide.filesystems &gt; 7.47.1, org.openide.loaders &gt; 7.21.1, org.openide.nodes &gt; 7.21.1, org.openide.util &gt; 8.15.1, org.openide.util.lookup &gt; 8.8.1" OpenIDE-Module-Name="CodenameOnePlugin" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+<license name="D3A4AB17" url="licenses/D3A4AB17.license"/>
+</module_updates>
+
