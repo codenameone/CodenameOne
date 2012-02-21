@@ -39,6 +39,7 @@ import java.util.Hashtable;
  */
 public class DefaultListCellRenderer extends Label implements ListCellRenderer, CellRenderer {
     private boolean showNumbers;
+    private boolean showNumbersForce;
     private static boolean showNumbersDefault = true;
     private Label focusComponent = new Label();
     
@@ -59,7 +60,9 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
-        showNumbers = uim.isThemeConstant("rendererShowsNumbersBool", showNumbersDefault);
+        if(!showNumbersForce) {
+            showNumbers = uim.isThemeConstant("rendererShowsNumbersBool", showNumbersDefault);
+        }
     }
     
     
@@ -80,6 +83,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      */
     public DefaultListCellRenderer(boolean showNumbers) {
         this();
+        showNumbersForce = true;
         this.showNumbers = showNumbers;
     }
 
@@ -156,6 +160,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      */
     public void setShowNumbers(boolean showNumbers) {
         this.showNumbers = showNumbers;
+        showNumbersForce = true;
     }
 
     /**

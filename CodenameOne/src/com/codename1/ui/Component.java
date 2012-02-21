@@ -1254,6 +1254,20 @@ public class Component implements Animation, StyleListener {
         paintBackgroundImpl(g);
     }
 
+    /**
+     * Returns the scrollable parent of this component
+     */
+    protected Component getScrollable() {
+        if(isScrollable()) {
+            return this;
+        }
+        Component p = getParent();
+        if(p == null) {
+            return null;
+        }
+        return p.getScrollable();
+    }
+    
     private void paintBackgroundImpl(Graphics g) {
         if (isBorderPainted()) {
             Border b = getBorder();

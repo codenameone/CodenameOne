@@ -81,6 +81,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.EventObject;
 import java.util.Hashtable;
@@ -105,6 +106,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JOptionPane;
@@ -1038,6 +1040,12 @@ public class UserInterfaceEditor extends BaseForm {
                     return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
                 }
 
+                if(rowClass == Date.class) {
+                    currentEditor = new DateEditor();
+                    registerListeners();
+                    return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
+                }
+
                 if(rowClass == String[].class) {
                     currentEditor = new CommandArrayEditor(false, false);
                     registerListeners();
@@ -1708,6 +1716,10 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(rssReader, com.codename1.components.RSSReader.class, "RSSReader", null);
         makeDraggable(fileTree, com.codename1.components.FileTree.class, "FileTree", null);
         makeDraggable(embedContainer, EmbeddedContainer.class, "EmbeddedContainer", null);
+        makeDraggable(codenameOneNumericSpinner, com.codename1.ui.spinner.NumericSpinner.class, "NumericSpinner", null);
+        makeDraggable(codenameOneDateSpinner, com.codename1.ui.spinner.DateSpinner.class, "DateSpinner", null);
+        makeDraggable(codenameOneTimeSpinner, com.codename1.ui.spinner.TimeSpinner.class, "TimeSpinner", null);
+        makeDraggable(codenameOneDateTimeSpinner, com.codename1.ui.spinner.DateTimeSpinner.class, "DateTimeSpinner", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -2196,6 +2208,71 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
+    class DateEditor extends AbstractCellEditor implements TableCellEditor, ActionListener {
+        private JButton button;
+        private Object currentValue;
+
+        public DateEditor() {
+            button = new JButton("...");
+            button.addActionListener(this);
+            button.setBorderPainted(false);
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            javax.swing.JPanel grid = new javax.swing.JPanel(new java.awt.GridLayout(3, 2));
+            grid.add(new JLabel("Day"));
+            Object[] days = new Object[31];
+            for(int iter = 0 ; iter < 31 ; iter++) {
+                days[iter] = new Integer(iter + 1);
+            }
+            JComboBox day = new JComboBox(days);
+            grid.add(day);
+            grid.add(new JLabel("Month"));
+            Object[] months = new Object[31];
+            for(int iter = 0 ; iter < 12 ; iter++) {
+                months[iter] = new Integer(iter + 1);
+            }
+            JComboBox month = new JComboBox(months);
+            grid.add(month);
+            grid.add(new JLabel("Year"));
+            Object[] years = new Object[5000];
+            for(int iter = 0 ; iter < 5000 ; iter++) {
+                years[iter] = new Integer(iter + 1);
+            }
+            JComboBox year = new JComboBox(years);
+            grid.add(year);
+            
+            Date currentDate = (Date)currentValue;
+            if(currentDate == null) {
+                currentDate = new Date();
+            }
+            day.setSelectedItem(new Integer(currentDate.getDate()));
+            month.setSelectedItem(new Integer(currentDate.getMonth() + 1));
+            year.setSelectedItem(new Integer(currentDate.getYear() + 1900));
+            
+            if(JOptionPane.showConfirmDialog(UserInterfaceEditor.this, grid, "Edit", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
+                    != JOptionPane.OK_OPTION) {
+                fireEditingCanceled();
+                return;
+            }
+            currentValue = new Date(((Number)year.getSelectedItem()).intValue(), ((Number)month.getSelectedItem()).intValue(),
+                    ((Number)day.getSelectedItem()).intValue());
+            fireEditingStopped();
+        }
+
+        public Object getCellEditorValue() {
+            return currentValue;
+        }
+
+        public Component getTableCellEditorComponent(JTable table,
+                                                     Object value,
+                                                     boolean isSelected,
+                                                     int row,
+                                                     int column) {
+            currentValue = value;
+            return button;
+        }
+    }
 
     class CommandTableEditor extends AbstractCellEditor implements TableCellEditor, ActionListener {
         private JButton button;
@@ -3028,6 +3105,16 @@ public class UserInterfaceEditor extends BaseForm {
                         continue;
                     }
 
+                    if(type == Date.class) {
+                        if(value == null) {
+                            out.writeBoolean(false);
+                            continue;
+                        }
+                        out.writeBoolean(true);
+                        out.writeLong(((Date)value).getTime());
+                        continue;
+                    }
+                    
                     if(type == Float.class) {
                         out.writeFloat(((Number)value).floatValue());
                         continue;
@@ -3950,6 +4037,10 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneContainerList = new javax.swing.JButton();
         codenameOneComponentGroup = new javax.swing.JButton();
         codenameOneMediaPlayer = new javax.swing.JButton();
+        codenameOneNumericSpinner = new javax.swing.JButton();
+        codenameOneDateSpinner = new javax.swing.JButton();
+        codenameOneTimeSpinner = new javax.swing.JButton();
+        codenameOneDateTimeSpinner = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4193,6 +4284,42 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMediaPlayer.setName("codenameOneMediaPlayer"); // NOI18N
         codenameOneMediaPlayer.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneMediaPlayer);
+
+        codenameOneNumericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneNumericSpinner.setText("Numeric Spinner");
+        codenameOneNumericSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneNumericSpinner.setBorder(null);
+        codenameOneNumericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneNumericSpinner.setName("codenameOneNumericSpinner"); // NOI18N
+        codenameOneNumericSpinner.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneNumericSpinner);
+
+        codenameOneDateSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneDateSpinner.setText("Date Spinner");
+        codenameOneDateSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateSpinner.setBorder(null);
+        codenameOneDateSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneDateSpinner.setName("codenameOneDateSpinner"); // NOI18N
+        codenameOneDateSpinner.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneDateSpinner);
+
+        codenameOneTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTimeSpinner.setText("Time Spinner");
+        codenameOneTimeSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneTimeSpinner.setBorder(null);
+        codenameOneTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneTimeSpinner.setName("codenameOneTimeSpinner"); // NOI18N
+        codenameOneTimeSpinner.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneTimeSpinner);
+
+        codenameOneDateTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneDateTimeSpinner.setText("Date & Time Spinner");
+        codenameOneDateTimeSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateTimeSpinner.setBorder(null);
+        codenameOneDateTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneDateTimeSpinner.setName("codenameOneDateTimeSpinner"); // NOI18N
+        codenameOneDateTimeSpinner.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneDateTimeSpinner);
 
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
@@ -4572,6 +4699,18 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneNumericSpinner) {
+                UserInterfaceEditor.this.codenameOneNumericSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneDateSpinner) {
+                UserInterfaceEditor.this.codenameOneDateSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneTimeSpinner) {
+                UserInterfaceEditor.this.codenameOneTimeSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneDateTimeSpinner) {
+                UserInterfaceEditor.this.codenameOneDateTimeSpinnerActionPerformed(evt);
             }
         }
 
@@ -5181,6 +5320,39 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     }
 }//GEN-LAST:event_initialFormActionPerformed
 
+private void codenameOneNumericSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneNumericSpinnerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.spinner.NumericSpinner(), "NumericSpinner");
+}//GEN-LAST:event_codenameOneNumericSpinnerActionPerformed
+
+private void codenameOneDateSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneDateSpinnerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.spinner.DateSpinner(), "DateSpinner");
+}//GEN-LAST:event_codenameOneDateSpinnerActionPerformed
+
+private void codenameOneTimeSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneTimeSpinnerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.spinner.TimeSpinner(), "TimeSpinner");
+}//GEN-LAST:event_codenameOneTimeSpinnerActionPerformed
+
+private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneDateTimeSpinnerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.spinner.DateTimeSpinner(), "DateTimeSpinner");
+
+}//GEN-LAST:event_codenameOneDateTimeSpinnerActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5300,18 +5472,22 @@ private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JButton codenameOneComponentGroup;
     private javax.swing.JButton codenameOneContainer;
     private javax.swing.JButton codenameOneContainerList;
+    private javax.swing.JButton codenameOneDateSpinner;
+    private javax.swing.JButton codenameOneDateTimeSpinner;
     private javax.swing.JPanel codenameOneExtraComponents;
     private javax.swing.JButton codenameOneHTMLComponent;
     private javax.swing.JPanel codenameOneIOComponents;
     private javax.swing.JButton codenameOneLabel;
     private javax.swing.JButton codenameOneList;
     private javax.swing.JButton codenameOneMediaPlayer;
+    private javax.swing.JButton codenameOneNumericSpinner;
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneSlider;
     private javax.swing.JButton codenameOneTable;
     private javax.swing.JButton codenameOneTabs;
     private javax.swing.JButton codenameOneTextArea;
     private javax.swing.JButton codenameOneTextField;
+    private javax.swing.JButton codenameOneTimeSpinner;
     private javax.swing.JButton codenameOneTree;
     private org.jdesktop.swingx.JXTree componentHierarchy;
     private javax.swing.JPanel componentPalette;

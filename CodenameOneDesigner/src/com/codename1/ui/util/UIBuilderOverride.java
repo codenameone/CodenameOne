@@ -50,6 +50,10 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("RSSReader", com.codename1.components.RSSReader.class);
         registerCustomComponent("FileTree", com.codename1.components.FileTree.class);
         registerCustomComponent("WebBrowser", com.codename1.components.WebBrowser.class);
+        registerCustomComponent("NumericSpinner", com.codename1.ui.spinner.NumericSpinner.class);
+        registerCustomComponent("DateSpinner", com.codename1.ui.spinner.DateSpinner.class);
+        registerCustomComponent("TimeSpinner", com.codename1.ui.spinner.TimeSpinner.class);
+        registerCustomComponent("DateTimeSpinner", com.codename1.ui.spinner.DateTimeSpinner.class);
     }
 
     void modifyingProperty(com.codename1.ui.Component c, int p) {

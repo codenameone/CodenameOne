@@ -37,18 +37,37 @@ import java.util.Date;
  * @author Shai Almog
  */
 class DateTimeRenderer extends DefaultListCellRenderer {
+    static final String[] MONTHS = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    static final String[] DAYS = {
+        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+    };
+    
+    private boolean markToday;
+    private long today;
+    private String originalUIID;
     private boolean date;
     private int type;
     private char separatorChar;
     private boolean twentyFourHours;
     private boolean showSeconds;
 
+    void setType(int type) {
+        this.type = type;
+    }
+    
     private DateTimeRenderer() {
         super(false);
     }
 
     boolean isShowSeconds() {
         return showSeconds;
+    }
+    
+    void setMarkToday(boolean markToday, long today) {
+        this.markToday = markToday;
+        this.today = today;
     }
 
     /**
@@ -89,9 +108,31 @@ class DateTimeRenderer extends DefaultListCellRenderer {
      * @inheritDoc
      */
     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+        if(value instanceof String) {
+            // rendering prototype
+            return super.getListCellRendererComponent(list, value, index, isSelected);
+        }
         if(date) {
+            Date d = (Date)value;
+            if(markToday) {
+                long l = d.getTime();
+                long day = 24 * 60 * 60000;
+                if(l / day == today / day) {
+                    if(originalUIID == null) {
+                        originalUIID = getUIID();
+                        setUIID("TODAY");
+                        return super.getListCellRendererComponent(list, "Today", index, isSelected);
+                    }
+                } else {
+                    if(originalUIID != null) {
+                        setUIID(originalUIID);
+                        originalUIID = null;
+                    }
+                }
+            } 
+            
             Calendar c = Calendar.getInstance();
-            c.setTime((Date)value);
+            c.setTime(d);
             int day = c.get(Calendar.DAY_OF_MONTH);
             int month = c.get(Calendar.MONTH) + 1;
             int year = c.get(Calendar.YEAR);
@@ -107,6 +148,12 @@ class DateTimeRenderer extends DefaultListCellRenderer {
                     break;
                 case Spinner.DATE_FORMAT_MM_DD_YY:
                     value = twoDigits(month) + separatorChar + twoDigits(day) + separatorChar + (year % 100);
+                    break;
+                case Spinner.DATE_FORMAT_DOW_MON_DD:
+                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + MONTHS[month - 1] + separatorChar + twoDigits(day);
+                    break;
+                case Spinner.DATE_FORMAT_DOW_MON_DD_YY:
+                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + MONTHS[month - 1] + separatorChar + twoDigits(day) + separatorChar + year;
                     break;
             }
         } else {

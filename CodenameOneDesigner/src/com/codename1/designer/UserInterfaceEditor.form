@@ -471,6 +471,74 @@
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneMediaPlayerActionPerformed"/>
                                       </Events>
                                     </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneNumericSpinner">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Numeric Spinner"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneNumericSpinner" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneNumericSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneDateSpinner">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Date Spinner"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneDateSpinner" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneDateSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneTimeSpinner">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Time Spinner"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneTimeSpinner" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneTimeSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneDateTimeSpinner">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Date &amp; Time Spinner"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneDateTimeSpinner" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneDateTimeSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
                                   </SubComponents>
                                 </Container>
                               </SubComponents>

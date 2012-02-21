@@ -62,6 +62,7 @@ import com.codename1.ui.table.TableLayout;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -780,6 +781,13 @@ public class UIBuilder {
 
         if(type == Object[].class) {
             return readObjectArrayForListModel(in, res);
+        }
+        
+        if(type == Date.class) {
+            boolean b = in.readBoolean();
+            if(b) {
+                return new Date(in.readInt());
+            }
         }
         
         return new Character(in.readChar());

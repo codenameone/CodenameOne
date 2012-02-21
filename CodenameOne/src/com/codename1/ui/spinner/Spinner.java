@@ -44,8 +44,9 @@ import java.util.Date;
  * in a similar way to a list or a combo box.
  *
  * @author Shai Almog
+ * @deprecated use the Numeric/Date/Time spinners instead
  */
-public class Spinner extends List {
+class Spinner extends List {
     /**
      * Value for create date renderer represnting Day-Month-4 Digit Year
      */
@@ -67,6 +68,16 @@ public class Spinner extends List {
     public static final int DATE_FORMAT_MM_DD_YY = 12;
 
     /**
+     * Value for create date renderer represnting Day Of Week, Month, Day
+     */
+    public static final int DATE_FORMAT_DOW_MON_DD = 13;
+
+    /**
+     * Value for create date renderer represnting Day Of Week, Month, Day, Year
+     */
+    public static final int DATE_FORMAT_DOW_MON_DD_YY = 14;
+
+    /**
      * The image appearing on the side of the spinner widget to indicate its "spinnability"
      */
     private static Image spinnerHandle;
@@ -76,7 +87,6 @@ public class Spinner extends List {
     private boolean monthFirst;
     private int currentInputAlign = LEFT;
     private static int inputSkipDelay = 2000;
-    private Style overlayStyle;
 
     /**
      * Creates a new time spinner instance, time is an integer represented in seconds
@@ -89,6 +99,7 @@ public class Spinner extends List {
      * @param twentyFourHours show the value as 24 hour values or AM/PM
      * @param showSeconds show the value of the seconds as well or hide it
      * @return new spinner instance
+     * @deprecated use TimeSpinner
      */
     public static Spinner createTime(int min, int max, int currentValue, int step, boolean twentyFourHours, boolean showSeconds) {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step),
@@ -106,6 +117,7 @@ public class Spinner extends List {
      * @param separatorChar character to separate the entries during rendering
      * @param format formatting type for the field
      * @return new spinner instance
+     * @deprecated use DateSpinner
      */
     public static Spinner createDate(long min, long max, long currentValue, char separatorChar, int format) {
         Spinner s = new Spinner(new SpinnerDateModel(min, max, currentValue), DateTimeRenderer.createDateRenderer(separatorChar, format));
@@ -121,9 +133,12 @@ public class Spinner extends List {
      * @param currentValue the starting value for the mode
      * @param step the value by which we increment the entries in the model
      * @return new spinner instance
+     * @deprecated use NumericSpinner
      */
     public static Spinner create(int min, int max, int currentValue, int step) {
-        return new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false));
+        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false));
+        s.setRenderingPrototype(new Integer(max * 10));
+        return s;
     }
 
 
@@ -135,9 +150,10 @@ public class Spinner extends List {
      * @param currentValue the starting value for the mode
      * @param step the value by which we increment the entries in the model
      * @return new spinner instance
+     * @deprecated use NumericSpinner
      */
     public static Spinner create(double min, double max, double currentValue, double step) {
-        return new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false) {
+        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false) {
             public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                 if(value != null && value instanceof Double) {
                     // round the number in the spinner to two digits
@@ -145,11 +161,17 @@ public class Spinner extends List {
                     long l = (long)d;
                     long r = (long)(d * 100);
                     r %= 100;
-                    value = "" + l + "." + r;
+                    if(r == 0) {
+                        value = "" + l;
+                    } else {
+                        value = "" + l + "." + r;
+                    }
                 }
                 return super.getListCellRendererComponent(list, value, index, isSelected);
             }
         });
+        s.setRenderingPrototype(new Double(max * 10));
+        return s;
     }
 
     /**
@@ -157,7 +179,7 @@ public class Spinner extends List {
      *
      * @param spinner model such as SpinnerDateModel or SpinnerNumberModel
      */
-    private Spinner(ListModel model, ListCellRenderer rendererInstance) {
+    Spinner(ListModel model, ListCellRenderer rendererInstance) {
         super(model);
         setRenderer(rendererInstance);
         setUIID("Spinner");
@@ -186,8 +208,6 @@ public class Spinner extends List {
         if (getRenderer() instanceof DateTimeRenderer) {
             quickType.setColumns(2);
         }
-        overlayStyle = getUIManager().getComponentStyle("SpinnerOverlay");
-        installDefaultPainter(overlayStyle);
     }
 
     /**
@@ -252,10 +272,6 @@ public class Spinner extends List {
         if(style.getBorder() != null) {
             d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
-        }
-        if(overlayStyle.getBorder() != null) {
-            d.setWidth(Math.max(overlayStyle.getBorder().getMinimumWidth(), d.getWidth()));
-            d.setHeight(Math.max(overlayStyle.getBorder().getMinimumHeight(), d.getHeight()));
         }
         return d;
     }
@@ -468,37 +484,12 @@ public class Spinner extends List {
     public void setRTL(boolean rtl) {
         // Since spinner is numeric it shouldn't be affected by RTL and should naturally be right aligned
     }
-
-    /**
-     * @inheritDoc
-     */
-    public void setUIID(String id) {
-        super.setUIID(id);
-        overlayStyle = getUIManager().getComponentStyle(id + "Overlay");
-        installDefaultPainter(overlayStyle);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public void refreshTheme(boolean merge) {
-        super.refreshTheme(merge);
-        overlayStyle = getUIManager().getComponentStyle(getUIID() + "Overlay");
-        installDefaultPainter(overlayStyle);
-    }
     
     /**
      * @inheritDoc
      */
     public void paint(Graphics g) {
         super.paint(g);
-        if(overlayStyle.getBorder() != null) {
-            overlayStyle.getBorder().paintBorderBackground(g, this);
-            overlayStyle.getBorder().paint(g, this);
-        } else {
-            overlayStyle.getBgPainter().paint(g, getBounds());
-        }
-
         if(spinnerHandle != null) {
             Style s = getStyle();
             g.drawImage(spinnerHandle, getX() + getWidth() - spinnerHandle.getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT),
