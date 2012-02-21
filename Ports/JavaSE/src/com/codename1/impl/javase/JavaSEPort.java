@@ -160,7 +160,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
     private java.awt.Rectangle landscapeScreenCoordinates;
     private static Class clsInstance;
-
+    
+    private BufferedImage header;
+    private BufferedImage headerLandscape;
+    
     private String platformName;
     private String[] platformOverrides = new String[0];
     
@@ -737,6 +740,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     e = z.getNextEntry();
                     continue;
                 }
+                if (name.equals("header.png")) {
+                    header = ImageIO.read(z);
+                    e = z.getNextEntry();
+                    continue;
+                }
+                if (name.equals("header_l.png")) {
+                    headerLandscape = ImageIO.read(z);
+                    e = z.getNextEntry();
+                    continue;
+                }
                 if (name.equals("skin.properties")) {
                     props.load(z);
                     e = z.getNextEntry();
@@ -869,6 +882,65 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoomMenu.add(zoom100);
             MenuItem zoom200 = new MenuItem("200%");
             zoomMenu.add(zoom200);
+            MenuItem screenshot = new MenuItem("Screenshot");
+            simulatorMenu.add(screenshot);
+            screenshot.addActionListener(new ActionListener() {
+                private File findScreenshotFile() {
+                    int counter = 1;
+                    File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
+                    while(f.exists()) {
+                        counter++;
+                        f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
+                    }
+                    return f;
+                }
+                
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    float zoom = zoomLevel;
+                    zoomLevel = 1;
+                    OutputStream out = null;
+                    Form frm = Display.getInstance().getCurrent();
+                    try {
+                        BufferedImage headerImage;
+                        if(isPortrait()) {
+                            headerImage = header;
+                        } else {
+                            headerImage = headerLandscape;                            
+                        }
+                        int headerHeight = 0;
+                        if(headerImage != null) {
+                            headerHeight = headerImage.getHeight();
+                        }
+                        com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                        com.codename1.ui.Graphics gr = img.getGraphics();
+                        //gr.translate(0, statusBarHeight);
+                        frm.paint(gr);
+                        BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                        bi.setRGB(0, headerHeight, img.getWidth(), img.getHeight(), img.getRGB(), 0, img.getWidth());
+                        if(headerImage != null) {
+                            Graphics2D g2d = bi.createGraphics();
+                            g2d.drawImage(headerImage, 0, 0, null);
+                            g2d.dispose();
+                        }
+                        
+                        out = new FileOutputStream(findScreenshotFile());
+                        ImageIO.write(bi, "png", out);
+                        out.close();
+                    } catch (Throwable ex) {
+                        ex.printStackTrace();
+                        System.exit(1);
+                    } finally {
+                        zoomLevel = zoom;
+                        try {
+                            out.close();
+                        } catch (Throwable ex) {
+                        }
+                        frm.repaint();
+                        canvas.repaint();
+                    }                    
+                }
+            });
 
             Menu skinMenu = new Menu("Skins");
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
