@@ -329,6 +329,7 @@ public class NetworkManager {
                 
         private String nextAP() {
             if(aps == null) {
+                aps = new Vector();
                 String[] ids = getAPIds();
                 for(int iter = 0 ; iter < ids.length ; iter++) {
                     int t = getAPType(ids[iter]);
@@ -363,6 +364,11 @@ public class NetworkManager {
             r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
             addToQueue(r);
         }
+
+        public boolean equals(Object o) {
+            return false;
+        }
+        
     }
     
     /**

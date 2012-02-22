@@ -870,6 +870,32 @@ public class Util {
     }
 
     /**
+     * Provides a utility method breaks a given String to array of String according 
+     * to the given separator
+     * @param original the String to break
+     * @param separator the pattern to look in the original String
+     * @return array of Strings from the original String
+     */
+    public static String[] split(String original, String separator) {
+        
+        Vector nodes = new Vector();
+
+        int index = original.indexOf(separator);
+        while (index >= 0) {
+            nodes.addElement(original.substring(0, index));
+            original = original.substring(index + separator.length());
+            index = original.indexOf(separator);
+        }
+        nodes.addElement(original);
+        
+        String [] ret = new String[nodes.size()];
+         for (int i = 0; i < nodes.size(); i++) {
+             ret[i] = (String) nodes.elementAt(i);             
+         }
+        return ret;
+    }
+     
+    /**
      * Invoked internally from Display, this method is for internal use only
      * 
      * @param impl implementation instance

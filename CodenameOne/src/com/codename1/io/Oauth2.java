@@ -23,7 +23,11 @@
  */
 package com.codename1.io;
 
+import com.codename1.components.WebBrowser;
+import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
@@ -31,8 +35,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLComponent;
-import com.codename1.io.ConnectionRequest;
-import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +42,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Vector;
 
 /**
  * This is a utility class that allows Oauth2 authentication
@@ -56,39 +59,56 @@ public class Oauth2 {
     private String clientId;
     private String redirectURI;
     private String scope;
-    private String OauthURL;
-
+    private String clientSecret;
+    private String oauth2URL;
+    private String tokenRequestURL;
     private Hashtable additionalParams;
-
-    private IOException error;
+    private Dialog login;
 
     /**
      * Simple constructor
      *
-     * @param OauthURL the authentication url of the service
+     * @param oauth2URL the authentication url of the service
      * @param clientId the client id that would like to use the service
      * @param redirectURI the redirect uri
      * @param scope the authentication scope
      */
-    public Oauth2(String OauthURL, String clientId, String redirectURI, String scope) {
-        this(OauthURL, clientId, redirectURI, scope, null);
+    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope) {
+        this(oauth2URL, clientId, redirectURI, scope, null, null);
     }
 
     /**
      * Simple constructor
      *
-     * @param OauthURL the authentication url of the service
+     * @param oauth2URL the authentication url of the service
      * @param clientId the client id that would like to use the service
      * @param redirectURI the redirect uri
      * @param scope the authentication scope
+     * @param clientSecret the client secret
+     */
+    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope,
+            String tokenRequestURL, String clientSecret) {
+        this(oauth2URL, clientId, redirectURI, scope, tokenRequestURL, clientSecret, null);
+    }
+
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL the authentication url of the service
+     * @param clientId the client id that would like to use the service
+     * @param redirectURI the redirect uri
+     * @param scope the authentication scope
+     * @param clientSecret the client secret
      * @param additionalParams hashtable of additional parameters to the
      * authentication request
      */
-    public Oauth2(String OauthURL, String clientId, String redirectURI, String scope, Hashtable additionalParams) {
-        this.OauthURL = OauthURL;
+    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope, String tokenRequestURL, String clientSecret, Hashtable additionalParams) {
+        this.oauth2URL = oauth2URL;
         this.redirectURI = redirectURI;
         this.clientId = clientId;
         this.scope = scope;
+        this.clientSecret = clientSecret;
+        this.tokenRequestURL = tokenRequestURL;
         this.additionalParams = additionalParams;
     }
 
@@ -102,125 +122,113 @@ public class Oauth2 {
      * @throws IOException the method will throw an IOException if something went
      * wrong in the communication.
      */
-    public String authenticate() throws IOException{
+    public String authenticate() throws IOException {
 
         if (token == null) {
-            final Form current = Display.getInstance().getCurrent();
-            final boolean[] loginFlag = new boolean[1];
-            error = null;
-
-            Form login = new Form();
+            login = new Dialog();
+            login.setAutoAdjustDialogSize(false);
             login.setLayout(new BorderLayout());
             login.setScrollable(false);
-            Component html = createLoginComponent(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    loginFlag[0] = true;
-                }
-            });
-            login.addComponent(BorderLayout.CENTER, html);
-            login.show();
-            Display.getInstance().invokeAndBlock(new Runnable() {
 
-                public void run() {
-                    while (!loginFlag[0]) {
-                        try {
-                            Thread.sleep(50);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                    if (current != null) {
-                        current.show();
-                    }
-                }
-            });
-            if(error != null){
-                throw error;
-            }
+            Component html = createLoginComponent();
+            login.addComponent(BorderLayout.CENTER, html);
+            login.show(0, 0, 0, 0, false, true);
+            login.setAutoAdjustDialogSize(true);
         }
 
         return token;
     }
 
-    private Component createLoginComponent(final ActionListener loginCallback) {
+    private Component createLoginComponent() {
 
-        String URL = OauthURL + "?client_id=" + clientId
-                + "&redirect_uri=" + Util.encodeUrl(redirectURI) + "&scope=" + scope + "&response_type=token";
+        String URL = oauth2URL + "?client_id=" + clientId
+                + "&redirect_uri=" + Util.encodeUrl(redirectURI) + "&scope=" + scope;
+
+        if(clientSecret != null){
+            URL += "&response_type=code";        
+        }else{
+            URL += "&response_type=token";
+        }
+
 
         if (additionalParams != null) {
             Enumeration e = additionalParams.keys();
-            while(e.hasMoreElements()){
+            while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
                 String val = additionalParams.get(key).toString();
                 URL += "&" + key + "=" + val;
             }
         }
+        
+        WebBrowser web = new WebBrowser(){
 
-        HTMLComponent c = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
+            public void onStart(String url) {
+                System.out.println("url " + url);
+                if ((url.startsWith(redirectURI))) {
+                    //remove the browser component.
+                    login.removeAll();
+                    login.revalidate();
+                    
+                    if (url.indexOf("code=") > -1) {
+                        Hashtable params = getParamsFromURL(url);
+                        ConnectionRequest req = new ConnectionRequest() {
 
-            protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo, final IOCallback callback, final Object[] response) {
-                return new ConnectionRequest() {
-
-                    protected void buildRequestBody(OutputStream os) throws IOException {
-                        if (isPost()) {
-                            if (docInfo.getParams() != null) {
-                                OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
-                                w.write(docInfo.getParams());
+                            protected void readResponse(InputStream input) throws IOException {
+                                byte[] tok = Util.readInputStream(input);
+                                token = new String(tok);
+                                token = token.substring(token.indexOf("=") + 1, token.indexOf("&"));
+                                login.dispose();
                             }
-                        }
-                    }
+                        };
 
-                    protected void handleIOException(IOException err) {
-                        if (callback == null) {
-                            response[0] = err;
-                        }
-                        error = err;
-                        loginCallback.actionPerformed(null);
-                    }
+                        String URL = tokenRequestURL
+                                + "?client_id=" + clientId
+                                + "&redirect_uri=" + Util.encodeUrl(redirectURI)
+                                + "&client_secret=" + clientSecret
+                                + "&code=" + params.get("code");
 
-                    protected boolean shouldAutoCloseResponse() {
-                        return callback != null;
-                    }
+                        req.setUrl(URL);
+                        req.setPost(false);
 
-                    protected void readResponse(InputStream input) throws IOException {
-                        BufferedInputStream i;
-                        if (input instanceof BufferedInputStream) {
-                            i = (BufferedInputStream) input;
-                        } else {
-                            i = new BufferedInputStream(input);
-                        }
-                        i.setYield(-1);
-                        if (callback != null) {
-                            callback.streamReady(input, docInfo);
-                        } else {
-                            response[0] = input;
-                            synchronized (LOCK) {
-                                LOCK.notify();
-                            }
+                        NetworkManager.getInstance().addToQueue(req);
+                    } else if (url.indexOf("error_reason=") > -1) {
+                        Hashtable table = getParamsFromURL(url);
+                        
+                        String error = (String) table.get("error_reason");
+                        String description = (String) table.get("error_description");
+                        Dialog.show(error, description, "OK", "");
+                        login.dispose();
+                        
+                    } else {
+                        boolean success = url.indexOf("#") > -1;
+                        if (success) {
+                            String accessToken = url.substring(url.indexOf("#") + 1);
+                            token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
+                            login.dispose();
                         }
                     }
-
-                    public boolean onRedirect(String url) {
-                        if ((url.startsWith(redirectURI))){
-                            boolean success = url.indexOf("#") > -1;
-                            if(success){
-                                String accessToken = url.substring(url.indexOf("#") + 1);
-                                token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
-                            }
-                            loginCallback.actionPerformed(null);
-                            return true;
-                        }
-                        return false;
-                    }
-                };
+                }
             }
-        });
-
-        c.setPage(URL);
-        c.getDocumentInfo().setPostRequest(true);
-        c.setIgnoreCSS(true);
-        c.getDocumentInfo().setEncoding("UTF-8");
-        return c;
+        };
+        web.setURL(URL);
+        
+        return web;
     }
-    
+
+    private Hashtable getParamsFromURL(String url) {
+        int paramsStarts = url.indexOf('?');
+        if (paramsStarts > -1) {
+            url = url.substring(paramsStarts + 1);
+        }
+        Hashtable retVal = new Hashtable();
+
+        String[] params = Util.split(url, "&");
+        for (int i = 0; i < params.length; i++) {
+            if (params[i].indexOf("=") > 0) {
+                String[] keyVal = Util.split(params[i], "=");
+                retVal.put(keyVal[0], keyVal[1]);
+            }
+        }
+        return retVal;
+    }
 }

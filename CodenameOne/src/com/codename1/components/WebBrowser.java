@@ -21,14 +21,24 @@
  * CA 94065 USA or visit www.oracle.com if you need additional information or
  * have any questions.
  */
-
 package com.codename1.components;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
+import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLComponent;
 import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.html.DefaultHTMLCallback;
 import com.codename1.ui.layouts.BorderLayout;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 
 /**
  * A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
@@ -38,23 +48,138 @@ import com.codename1.ui.layouts.BorderLayout;
  * @author Shai Almog
  */
 public class WebBrowser extends Container {
+
     private Component internal;
     private boolean isNative;
     private String page;
-    
+
     /**
      * Default constructor
      */
     public WebBrowser() {
         super(new BorderLayout());
-        if(BrowserComponent.isNativeBrowserSupported()) {
+        if (BrowserComponent.isNativeBrowserSupported()) {
             isNative = true;
-            internal = new BrowserComponent();
+            BrowserComponent b = new BrowserComponent();
+            b.addWebEventListener("onStart", new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    onStart((String) evt.getSource());
+                }
+            });
+
+            b.addWebEventListener("onLoad", new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    onLoad((String) evt.getSource());
+                }
+            });
+            b.addWebEventListener("onError", new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    onError((String) evt.getSource(), evt.getKeyEvent());
+                }
+            });
+            internal = b;
         } else {
             isNative = false;
-            internal = new HTMLComponent(new AsyncDocumentRequestHandlerImpl());
+            HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
+
+                protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
+                        final IOCallback callback, final Object[] response) {
+                    return new ConnectionRequest() {
+
+                        protected void buildRequestBody(OutputStream os) throws IOException {
+                            if (isPost()) {
+                                if (docInfo.getParams() != null) {
+                                    OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
+                                    w.write(docInfo.getParams());
+                                }
+                            }
+                        }
+
+                        protected void handleIOException(IOException err) {
+                            if (callback == null) {
+                                response[0] = err;
+                            }
+                            super.handleIOException(err);
+                        }
+
+                        protected boolean shouldAutoCloseResponse() {
+                            return callback != null;
+                        }
+
+                        protected void readResponse(InputStream input) throws IOException {
+                            if (callback != null) {
+                                callback.streamReady(input, docInfo);
+                            } else {
+                                response[0] = input;
+                                synchronized (LOCK) {
+                                    LOCK.notify();
+                                }
+                            }
+                        }
+
+                        protected void handleErrorResponseCode(int code, String message) {
+                            onError(message, code);
+                        }
+
+                        protected void handleException(Exception err) {
+                            System.out.println("Error occured");
+                            err.printStackTrace();
+                        }
+
+                        public boolean onRedirect(String url) {
+                            onStart(url);
+                            return super.onRedirect(url);                            
+                        }
+                        
+                        
+                    };
+
+                }
+            });
+            h.setIgnoreCSS(true);
+            h.setHTMLCallback(new DefaultHTMLCallback() {
+
+                public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
+                    if (status == STATUS_REQUESTED && url != null) {
+                        onStart(url);
+                    } else if (status == STATUS_DISPLAYED && url != null) {
+                        onLoad(url);
+                    } else if (status == STATUS_ERROR) {
+                        onError("error on page", -1);
+                    }
+                }
+            });
+
+            internal = h;
         }
         addComponent(BorderLayout.CENTER, internal);
+    }
+
+    /**
+     * This is a callback method, this method is called before the url has been
+     * loaded
+     * @param url 
+     */
+    public void onStart(String url) {
+    }
+
+    /**
+     * This is a callback method, this method is called after the url has been
+     * loaded
+     * @param url 
+     */
+    public void onLoad(String url) {
+    }
+
+    /**
+     * This is a callback method to inform on an error.
+     * @param message 
+     * @param errorCode 
+     */
+    public void onError(String message, int errorCode) {
     }
 
     /**
@@ -66,16 +191,16 @@ public class WebBrowser extends Container {
     public Component getInternal() {
         return internal;
     }
-    
+
     /**
      * Returns the title for the browser page
      * @return the title
      */
     public String getTitle() {
-        if(isNative) {
-            return ((BrowserComponent)internal).getTitle();
+        if (isNative) {
+            return ((BrowserComponent) internal).getTitle();
         } else {
-            return ((HTMLComponent)internal).getTitle();
+            return ((HTMLComponent) internal).getTitle();
         }
     }
 
@@ -84,10 +209,10 @@ public class WebBrowser extends Container {
      * @return the URL
      */
     public String getURL() {
-        if(isNative) {
-            return ((BrowserComponent)internal).getURL();
+        if (isNative) {
+            return ((BrowserComponent) internal).getURL();
         } else {
-            return ((HTMLComponent)internal).getPageURL();
+            return ((HTMLComponent) internal).getPageURL();
         }
     }
 
@@ -96,10 +221,10 @@ public class WebBrowser extends Container {
      * @param url  the URL
      */
     public void setURL(String url) {
-        if(isNative) {
-            ((BrowserComponent)internal).setURL(url);
+        if (isNative) {
+            ((BrowserComponent) internal).setURL(url);
         } else {
-            ((HTMLComponent)internal).setPage(url);
+            ((HTMLComponent) internal).setPage(url);
         }
     }
 
@@ -107,10 +232,10 @@ public class WebBrowser extends Container {
      * Reload the current page
      */
     public void reload() {
-        if(isNative) {
-            ((BrowserComponent)internal).reload();
+        if (isNative) {
+            ((BrowserComponent) internal).reload();
         } else {
-            ((HTMLComponent)internal).refreshDOM();
+            ((HTMLComponent) internal).refreshDOM();
         }
     }
 
@@ -122,13 +247,13 @@ public class WebBrowser extends Container {
      */
     public void setPage(String html, String baseUrl) {
         page = html;
-        if(isNative) {
-            ((BrowserComponent)internal).setPage(html, baseUrl);
+        if (isNative) {
+            ((BrowserComponent) internal).setPage(html, baseUrl);
         } else {
-            ((HTMLComponent)internal).setHTML(html, "UTF-8", null, true);
+            ((HTMLComponent) internal).setHTML(html, "UTF-8", null, true);
         }
-    }    
-    
+    }
+
     /**
      * Returns the page set by getPage for the GUI builder
      * 
@@ -138,29 +263,28 @@ public class WebBrowser extends Container {
         return page;
     }
 
-
     /**
      * @inheritDoc
      */
     public String[] getPropertyNames() {
-        return new String[] {"url", "html"};
+        return new String[]{"url", "html"};
     }
 
     /**
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {String.class, String.class};
+        return new Class[]{String.class, String.class};
     }
 
     /**
      * @inheritDoc
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("url")) {
+        if (name.equals("url")) {
             return getURL();
         }
-        if(name.equals("html")) {
+        if (name.equals("html")) {
             return getPage();
         }
         return null;
@@ -170,12 +294,12 @@ public class WebBrowser extends Container {
      * @inheritDoc
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("url")) {
-            setURL((String)value);
+        if (name.equals("url")) {
+            setURL((String) value);
             return null;
         }
-        if(name.equals("page")) {
-            setURL((String)value);
+        if (name.equals("page")) {
+            setURL((String) value);
             return null;
         }
         return super.setPropertyValue(name, value);

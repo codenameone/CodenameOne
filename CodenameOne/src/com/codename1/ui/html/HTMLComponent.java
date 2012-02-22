@@ -1299,18 +1299,6 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
     void setPageStatus(final int status) {
         if ((!pageError) || (status==HTMLCallback.STATUS_REQUESTED)) { //Once the page error flag has been raised the page status doesn't change until a new page is requested
             pageStatus=status;
-            // Performance measurement debug code
-            /*if (status==HTMLCallback.STATUS_COMPLETED) {
-                System.out.println("Completed: "+(System.currentTimeMillis()-startTime));
-                if (!pageURL.startsWith("file:///")) {
-                    clickTimer("Comp");
-                    msg+="Text:"+textTime+"\n";
-                    Dialog.show("Time", msg, "OK", "Cancel");
-                }
-            } else if (status==HTMLCallback.STATUS_DISPLAYED) {
-                System.out.println("Displayed: "+(System.currentTimeMillis()-startTime));
-                clickTimer("Disp");
-            }*/
             if (htmlCallback!=null) {
                 if (Display.getInstance().isEdt()) {
                     htmlCallback.pageStatusChanged(this, status, pageURL);

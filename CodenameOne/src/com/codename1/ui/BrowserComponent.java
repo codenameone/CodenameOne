@@ -179,7 +179,7 @@ public class BrowserComponent extends Container {
      * Adds a listener to the given event type name, event type names are platform specific but some 
      * must be fired for all platforms and will invoke the action listener when the appropriate event loads
      * 
-     * @param type platform specific but must support: onLoad, onError
+     * @param type platform specific but must support: onStart, onLoad, onError
      * @param listener callback for the event
      */
     public void addWebEventListener(String type, ActionListener listener) {
