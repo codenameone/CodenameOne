@@ -104,6 +104,8 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
+import java.net.CookieHandler;
+import java.net.CookieManager;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
@@ -111,11 +113,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.imageio.IIOException;
 import javax.media.ControllerEvent;
 import javax.media.ControllerListener;
 import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
+import javax.net.ssl.HttpsURLConnection;
 import jmapps.ui.VideoPanel;
 
 /**
@@ -124,6 +128,7 @@ import jmapps.ui.VideoPanel;
  * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
+
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/torch.skin";
     private boolean touchDevice = true;
@@ -160,17 +165,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
     private java.awt.Rectangle landscapeScreenCoordinates;
     private static Class clsInstance;
-    
     private BufferedImage header;
     private BufferedImage headerLandscape;
-    
     private String platformName;
     private String[] platformOverrides = new String[0];
-    
+
     public static void setBaseResourceDir(File f) {
         baseResourceDir = f;
     }
-    
+
     public static void setClassLoader(Class cls) {
         clsInstance = cls;
     }
@@ -248,11 +251,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static void setNativeTheme(Resources resFile) {
         nativeThemeRes = resFile;
     }
-    
+
     public static Resources getNativeTheme() {
         return nativeThemeRes;
     }
-    
+
     public boolean hasNativeTheme() {
         return nativeTheme != null || nativeThemeRes != null;
     }
@@ -606,7 +609,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void ancestorResized(HierarchyEvent e) {
-            
+
             if (getSkin() != null) {
                 float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
                 float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
@@ -801,21 +804,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
-            if(platformName.equals("and")){
+            if (platformName.equals("and")) {
                 ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
-            }else if(platformName.equals("rim")){
+            } else if (platformName.equals("rim")) {
                 ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (BlackBerry; U; BlackBerry 9860; en-GB) AppleWebKit/534.11+ (KHTML, like Gecko) Version/7.0.0.296 Mobile Safari/534.11+");
-            }else if(platformName.equals("ios")){
-                if(isTablet()){
-                    ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (iPad; U; CPU OS 4_3_1 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8G4 Safari/6533.18.5");                
-                }else{
+            } else if (platformName.equals("ios")) {
+                if (isTablet()) {
+                    ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (iPad; U; CPU OS 4_3_1 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8G4 Safari/6533.18.5");
+                } else {
                     ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2 Safari/6533.18.5");
                 }
-            }else if(platformName.equals("me")){
+            } else if (platformName.equals("me")) {
                 ConnectionRequest.setDefaultUserAgent("Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124");
             }
 
-            
+
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
@@ -848,23 +851,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             if (nativeThemeData != null) {
                 nativeThemeRes = Resources.open(new ByteArrayInputStream(nativeThemeData));
-            } 
-            
-            else {
+            } else {
                 try {
                     String t = props.getProperty("nativeThemeAttribute", null);
-                    if(t != null) {
+                    if (t != null) {
                         Properties cnop = new Properties();
                         File cnopFile = new File("codenameone_settings.properties");
-                        if(cnopFile.exists()) {
+                        if (cnopFile.exists()) {
                             cnop.load(new FileInputStream(cnopFile));
                             t = cnop.getProperty(t, null);
-                            if(t != null && new File(t).exists()) {
+                            if (t != null && new File(t).exists()) {
                                 nativeThemeRes = Resources.open(new FileInputStream(t));
                             }
                         }
                     }
-                } catch(IOException ioErr) {
+                } catch (IOException ioErr) {
                     ioErr.printStackTrace();
                 }
             }
@@ -885,16 +886,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             MenuItem screenshot = new MenuItem("Screenshot");
             simulatorMenu.add(screenshot);
             screenshot.addActionListener(new ActionListener() {
+
                 private File findScreenshotFile() {
                     int counter = 1;
                     File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
-                    while(f.exists()) {
+                    while (f.exists()) {
                         counter++;
                         f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
                     }
                     return f;
                 }
-                
+
                 @Override
                 public void actionPerformed(ActionEvent ae) {
                     float zoom = zoomLevel;
@@ -903,13 +905,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Form frm = Display.getInstance().getCurrent();
                     try {
                         BufferedImage headerImage;
-                        if(isPortrait()) {
+                        if (isPortrait()) {
                             headerImage = header;
                         } else {
-                            headerImage = headerLandscape;                            
+                            headerImage = headerLandscape;
                         }
                         int headerHeight = 0;
-                        if(headerImage != null) {
+                        if (headerImage != null) {
                             headerHeight = headerImage.getHeight();
                         }
                         com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
@@ -918,12 +920,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         frm.paint(gr);
                         BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
                         bi.setRGB(0, headerHeight, img.getWidth(), img.getHeight(), img.getRGB(), 0, img.getWidth());
-                        if(headerImage != null) {
+                        if (headerImage != null) {
                             Graphics2D g2d = bi.createGraphics();
                             g2d.drawImage(headerImage, 0, 0, null);
                             g2d.dispose();
                         }
-                        
+
                         out = new FileOutputStream(findScreenshotFile());
                         ImageIO.write(bi, "png", out);
                         out.close();
@@ -938,7 +940,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         frm.repaint();
                         canvas.repaint();
-                    }                    
+                    }
                 }
             });
 
@@ -946,7 +948,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
-                if(skinNames.indexOf("torch.skin") < 0) {
+                if (skinNames.indexOf("torch.skin") < 0) {
                     skinNames += ";/torch.skin";
                 }
                 StringTokenizer tkn = new StringTokenizer(skinNames, ";");
@@ -1034,7 +1036,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
                     frm.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
                     frm.repaint();
-                    
+
                     zoomLevel = 1;
                     JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 }
@@ -1132,7 +1134,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 zoomLevel = Math.min(h1, w1);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
                 deepRevaliate(Display.getInstance().getCurrent());
-                
+
                 if (hasNativeTheme()) {
                     Display.getInstance().installNativeTheme();
                 }
@@ -1146,10 +1148,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
     }
-    
+
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
+
             @Override
             public void run() {
                 t[0] = Thread.currentThread();
@@ -1227,7 +1230,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void windowDeactivated(WindowEvent e) {
                 }
             });
-            frm.setLocationByPlatform(true);           
+            frm.setLocationByPlatform(true);
             frm.setLayout(new java.awt.BorderLayout());
             frm.add(java.awt.BorderLayout.CENTER, canvas);
             frm.add(canvas);
@@ -2328,16 +2331,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof Frame)) {
             cnt = cnt.getParent();
-            if(cnt == null) {
+            if (cnt == null) {
                 return null;
             }
         }
-        
-        if(uri.indexOf(':') < 0) {
+
+        if (uri.indexOf(':') < 0) {
             String mimeType = "video/mp4";
             return new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (Frame) cnt, onCompletion);
         }
-        
+
         return new CodenameOneMediaPlayer(uri, isVideo, (Frame) cnt, onCompletion);
     }
 
@@ -2354,7 +2357,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof Frame)) {
             cnt = cnt.getParent();
-            if(cnt == null) {
+            if (cnt == null) {
                 return null;
             }
         }
@@ -2453,8 +2456,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
+        if(currentAp == null || !currentAp.equals("22")){
+            throw new IOException("apn error");
+        }
         URL u = new URL(url);
+
         URLConnection con = u.openConnection();
+
+        if (con instanceof HttpURLConnection) {
+            HttpURLConnection c = (HttpURLConnection) con;
+            c.setUseCaches(false);
+            c.setDefaultUseCaches(false);
+            c.setInstanceFollowRedirects(false);
+        }
+
         con.setDoInput(read);
         con.setDoOutput(write);
         return con;
@@ -2554,7 +2569,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         HttpURLConnection c = (HttpURLConnection) connection;
         List r = new ArrayList();
         List<String> headers = c.getHeaderFields().get(name);
-        if(headers != null && headers.size() > 0) {
+        if (headers != null && headers.size() > 0) {
             String[] s = new String[headers.size()];
             headers.toArray(s);
             return s;
@@ -2727,14 +2742,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String getPlatformName() {
         return platformName;
     }
-    
+
     /**
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
         return platformOverrides;
     }
-    
+
     public LocationManager getLocationManager() {
         return StubLocationManager.getLocationManager();
     }
@@ -2744,7 +2759,79 @@ public class JavaSEPort extends CodenameOneImplementation {
         System.out.println("sending message to " + recieptents[0]);
     }
 
+    @Override
+    public boolean shouldAutoDetectAccessPoint() {
+        return true;
+    }
+
     
+    /**
+     * Indicates whether looking up an access point is supported by this device
+     * 
+     * @return true if access point lookup is supported
+     */
+    public boolean isAPSupported() {
+        return true;
+    }
+
+    /**
+     * Returns the ids of the access points available if supported
+     *
+     * @return ids of access points
+     */
+    public String[] getAPIds() {
+        return new String[]{"11", "22"};
+    }
+
+    /**
+     * Returns the type of the access point
+     *
+     * @param id access point id
+     * @return one of the supported access point types from network manager
+     */
+    public int getAPType(String id) {
+        if (id.indexOf("11") > -1) {
+            return NetworkManager.ACCESS_POINT_TYPE_WLAN;
+        }else if (id.indexOf("22") > -1) {
+            return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
+        }
+        return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
+    }
+
+    /**
+     * Returns the user displayable name for the given access point
+     *
+     * @param id the id of the access point
+     * @return the name of the access point
+     */
+    public String getAPName(String id) {
+        if (id.indexOf("11") > -1) {
+            return "wifi";
+        }else if (id.indexOf("22") > -1) {
+            return "3g";
+        }
+        return null;
+    }
+    
+    private String currentAp;
+    
+    /**
+     * Returns the id of the current access point
+     *
+     * @return id of the current access point
+     */
+    public String getCurrentAccessPoint() {
+        return currentAp;
+    }
+
+    /**
+     * Returns the id of the current access point
+     *
+     * @param id id of the current access point
+     */
+    public void setCurrentAccessPoint(String id) {
+        this.currentAp = id;
+    }
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {
 
@@ -2856,7 +2943,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void cleanup() {
             player.close();
-            playing = false;            
+            playing = false;
         }
 
         public void play() {
@@ -2866,7 +2953,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void pause() {
             player.stop();
-            playing = false;            
+            playing = false;
         }
 
         public int getTime() {
@@ -2934,14 +3021,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         private VideoPanel vid;
         private Frame frm;
         private Container cnt = new Container();
-        
+
         public VideoComponent(Frame frm, VideoPanel vid) {
             super(vid);
             this.vid = vid;
             this.frm = frm;
             cnt.setLayout(null);
             cnt.add(vid);
-           
+
         }
 
         @Override
@@ -2958,7 +3045,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             frm.validate();
         }
 
-       
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
             return new com.codename1.ui.geom.Dimension(vid.getWidth(), vid.getHeight());
@@ -2968,31 +3054,29 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void paint(Graphics g) {
             onPositionSizeChange();
         }
-        
-        
+
         @Override
         protected void onPositionSizeChange() {
             int x = getAbsoluteX();
             int y = getAbsoluteY();
             int w = getWidth();
             int h = getHeight();
-            
-            vid.setBounds((int) ((x + getScreenCoordinates().x) * zoomLevel), 
+
+            vid.setBounds((int) ((x + getScreenCoordinates().x) * zoomLevel),
                     (int) ((y + getScreenCoordinates().y) * zoomLevel),
                     (int) (w * zoomLevel),
-                    (int) (h * zoomLevel)
-                    );
+                    (int) (h * zoomLevel));
         }
     }
 
     public InputStream getResourceAsStream(Class cls, String resource) {
-        if(baseResourceDir != null) {
+        if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);
-                if(f.exists()) {
+                if (f.exists()) {
                     return new FileInputStream(f);
                 }
-            } catch(IOException err) {
+            } catch (IOException err) {
                 return null;
             }
         }

@@ -1,6 +1,7 @@
 package com.codename1.impl.android;
 
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.os.Bundle;
 import android.view.MotionEvent;
 import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
@@ -8,7 +9,6 @@ import com.codename1.ui.geom.Dimension;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -60,8 +60,10 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import java.io.FileNotFoundException;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
+import java.net.MalformedURLException;
 import java.util.Vector;
 import android.content.Context;
 import android.database.Cursor;
@@ -76,7 +78,6 @@ import android.widget.VideoView;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Form;
@@ -100,7 +101,16 @@ import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Hashtable;
 import java.util.List;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.X509HostnameVerifier;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.SingleClientConnManager;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
@@ -208,7 +218,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         ConnectionRequest.setDefaultUserAgent(getUserAgent());
-
+        
+        
     }
 
     public int translatePixelForDPI(int pixel) {
@@ -430,7 +441,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             return activity.getAssets().open(resource);
         } catch (IOException ex) {
-            Log.e("Codename One", "Failed to load resource: " + resource, ex);
+            Log.i("Codename One", "Failed to load resource: " + resource);
             return null;
         }
     }
@@ -1964,6 +1975,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidBrowserComponent) browserPeer).setURL(url);
     }
 
+    public void browserStop(PeerComponent browserPeer) {
+        ((AndroidBrowserComponent) browserPeer).stop();
+    }
+
+    
     /**
      * Reload the current page
      * @param browserPeer browser instance
@@ -2073,18 +2089,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.setWebViewClient(new WebViewClient() {
 
                 public void onLoadResource(WebView view, String url) {
-                    super.onLoadResource(view, url);
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
+                    super.onLoadResource(view, url);
                 }
 
+                @Override
+                public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                    parent.fireWebEvent("onStart", new ActionEvent(url));
+                    super.onPageStarted(view, url, favicon);
+                }
+                
+                
                 public void onPageFinished(WebView view, String url) {
-                    super.onPageFinished(view, url);
                     parent.fireWebEvent("onLoad", new ActionEvent(url));
+                    super.onPageFinished(view, url);
                 }
 
                 public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                    super.onReceivedError(view, errorCode, description, failingUrl);
                     parent.fireWebEvent("onError", new ActionEvent(description, errorCode));
+                    super.onReceivedError(view, errorCode, description, failingUrl);
                     super.shouldOverrideKeyEvent(view, null);
                 }
 
@@ -2163,6 +2186,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.clearHistory();
         }
 
+        public void stop() {
+            web.stopLoading();
+        }
+        
         public void setPage(String html, String baseUrl) {
             web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
         }
@@ -2182,6 +2209,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object connect(String url, boolean read, boolean write) throws IOException {
         URL u = new URL(url);
         URLConnection con = u.openConnection();
+        if(con instanceof HttpURLConnection){
+            HttpURLConnection c = (HttpURLConnection) con;
+            c.setUseCaches(false);
+            c.setDefaultUseCaches(false);
+        }
         con.setDoInput(read);
         con.setDoOutput(write);
         return con;
@@ -2556,7 +2588,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return new String[] {"phone", "android", "android-phone"};
         }
     }
-
+        
     public class Video extends AndroidImplementation.AndroidPeer implements Media {
 
         private VideoView nativeVideo;

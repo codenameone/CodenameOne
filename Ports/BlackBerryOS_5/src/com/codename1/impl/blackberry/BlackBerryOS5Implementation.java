@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
+import net.rim.device.api.script.ScriptEngine;
 import net.rim.device.api.system.Branding;
 import org.w3c.dom.Document;
 
@@ -137,13 +138,18 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             bff.addListener(new BrowserFieldListener() {
 
                 public void documentError(BrowserField browserField, Document document) throws Exception {
-                    super.documentError(browserField, document);
                     cmp.fireWebEvent("onError", new ActionEvent(document));
+                    super.documentError(browserField, document);
                 }
 
+                public void documentCreated(BrowserField browserField, ScriptEngine scriptEngine, Document document) throws Exception {
+                    cmp.fireWebEvent("onStart", new ActionEvent(document));
+                    super.documentCreated(browserField, scriptEngine, document);
+                }
+                
                 public void documentLoaded(BrowserField browserField, Document document) throws Exception {
-                    super.documentLoaded(browserField, document);
                     cmp.fireWebEvent("onLoad", new ActionEvent(document));
+                    super.documentLoaded(browserField, document);
                 }
             });
             return PeerComponent.create(bff);
