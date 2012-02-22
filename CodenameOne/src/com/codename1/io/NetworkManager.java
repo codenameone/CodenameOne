@@ -569,7 +569,11 @@ public class NetworkManager {
         if(!autoDetected) {
             autoDetected = true;
             if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
-                addToQueue(new AutoDetectAPN(), false);
+                AutoDetectAPN r = new AutoDetectAPN();
+                r.setPost(false);
+                r.setUrl("http://codename-one.appspot.com/t.html");
+                r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
+                addToQueue(r, false);
             }
         }
         request.validateImpl();
