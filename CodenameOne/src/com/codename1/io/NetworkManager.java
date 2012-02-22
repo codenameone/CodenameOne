@@ -84,6 +84,7 @@ public class NetworkManager {
     private int timeout = 300000;
     private Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
+    private boolean autoDetected;
 
     private NetworkManager() {
     }
@@ -564,6 +565,12 @@ public class NetworkManager {
     void addToQueue(ConnectionRequest request, boolean retry) {
         if(!running) {
             start();
+        }
+        if(!autoDetected) {
+            autoDetected = true;
+            if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
+                addToQueue(new AutoDetectAPN(), false);
+            }
         }
         request.validateImpl();
         synchronized(LOCK) {
