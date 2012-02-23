@@ -34,6 +34,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.media.Media;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -455,6 +456,11 @@ public final class Display {
                 INSTANCE.edt.start();
             }
             INSTANCE.impl.postInit();
+            //sets the default device user agent if available by the platform, by default
+            //we set Nokia, beacause if the user agent is empty it is most likely a J2ME device
+            ConnectionRequest.setDefaultUserAgent(INSTANCE.getProperty("User-Agent", 
+                    "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124"));
+
         }else{
             INSTANCE.impl.confirmControlView();
         }

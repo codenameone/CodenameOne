@@ -440,6 +440,10 @@ public class NetworkManager {
     public void shutdown() {
         running = false;
         networkThreads = null;
+        synchronized(LOCK) {
+            LOCK.notifyAll();
+        }
+
     }
 
     /**
