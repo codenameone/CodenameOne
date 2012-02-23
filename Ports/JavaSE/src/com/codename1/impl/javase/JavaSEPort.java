@@ -1157,12 +1157,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void run() {
                 t[0] = Thread.currentThread();
             }
-        });
+        }, 250);
         Display.deinitialize();
         NetworkManager.getInstance().shutdownSync();
         try {
-            t[0].join();
-        } catch (InterruptedException ex) {
+            if(t[0] != null){
+                t[0].join();
+            }
+        } catch (Throwable ex) {
             ex.printStackTrace();
         }
     }
