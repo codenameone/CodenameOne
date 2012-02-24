@@ -130,7 +130,7 @@ import jmapps.ui.VideoPanel;
 public class JavaSEPort extends CodenameOneImplementation {
 
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/torch.skin";
+    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin";
     private boolean touchDevice = true;
     private boolean rotateTouchKeysOnLandscape;
     private int keyboardType = Display.KEYBOARD_TYPE_UNKNOWN;
@@ -948,8 +948,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
-                if (skinNames.indexOf("torch.skin") < 0) {
-                    skinNames += ";/torch.skin";
+                if(skinNames.length() < DEFAULT_SKINS.length()){
+                    skinNames = DEFAULT_SKINS;
                 }
                 StringTokenizer tkn = new StringTokenizer(skinNames, ";");
                 while (tkn.hasMoreTokens()) {

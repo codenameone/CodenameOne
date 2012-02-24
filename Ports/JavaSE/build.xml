@@ -79,6 +79,7 @@
         <copy file="../../Skins/nexus.skin" todir="src" />
         <copy file="../../Skins/iphone3gs.skin" todir="src" />
         <copy file="../../Skins/iphone4.skin" todir="src" />
+        <copy file="../../Skins/xoom.skin" todir="src" />
     </target>
     
     <target name="-post-compile">
