@@ -2106,10 +2106,10 @@ public class UserInterfaceEditor extends BaseForm {
                 List result = ed.getResult();
                 currentValue = new com.codename1.ui.Image[result.size()];
                 result.toArray(currentValue);
-                fireEditingCanceled();
+                fireEditingStopped();
                 return;
             }
-            fireEditingStopped();
+            fireEditingCanceled();
         }
 
         public Object getCellEditorValue() {
@@ -4910,7 +4910,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasActionEventCode(com.codename1.ui.Component c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4923,7 +4923,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasFormBeforeCode(com.codename1.ui.Form c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4932,7 +4932,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasFormPostCode(com.codename1.ui.Form c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4941,7 +4941,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasFormExitCode(com.codename1.ui.Form c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4950,7 +4950,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasContainerPostCode(com.codename1.ui.Container c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4959,7 +4959,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasContainerBeforeCode(com.codename1.ui.Container c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4968,7 +4968,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasOnCreateCode(com.codename1.ui.Component c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();
@@ -4977,7 +4977,7 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     private boolean hasOnListModelCode(com.codename1.ui.Component c) {
-        if(projectGeneratorSettings == null) {
+        if(projectGeneratorSettings == null || c.getName() == null) {
             return false;
         }
         validateLoadedStateMachineCode();

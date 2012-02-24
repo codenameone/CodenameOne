@@ -2458,9 +2458,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
-        if(currentAp == null || !currentAp.equals("22")){
+        /*if(currentAp == null || !currentAp.equals("22")){
             throw new IOException("apn error");
-        }
+        }*/
         URL u = new URL(url);
 
         URLConnection con = u.openConnection();
@@ -2815,7 +2815,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
     
-    private String currentAp;
+    //private String currentAp;
     
     /**
      * Returns the id of the current access point
@@ -2823,7 +2823,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @return id of the current access point
      */
     public String getCurrentAccessPoint() {
-        return currentAp;
+        return super.getCurrentAccessPoint();
+        //return currentAp;
     }
 
     /**
@@ -2832,7 +2833,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param id id of the current access point
      */
     public void setCurrentAccessPoint(String id) {
-        this.currentAp = id;
+        //this.currentAp = id;
+        super.setCurrentAccessPoint(id);
     }
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {

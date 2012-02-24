@@ -80,6 +80,10 @@ public class Location {
         return longtitude;
     }
 
+    /**
+     * The status of the location one of: LocationManager.AVAILABLE, 
+     * LocationManager.OUT_OF_SERVICE or LocationManager.TEMPORARILY_UNAVAILABLE:
+     */
     public int getStatus() {
         return status;
     }
@@ -138,6 +142,10 @@ public class Location {
         this.longtitude = longtitude;
     }
 
+    /**
+     * The status of the location one of: LocationProvider.AVAILABLE, 
+     * LocationProvider.OUT_OF_SERVICE or LocationProvider.TEMPORARILY_UNAVAILABLE:
+     */
     public void setStatus(int status) {
         this.status = status;
     }

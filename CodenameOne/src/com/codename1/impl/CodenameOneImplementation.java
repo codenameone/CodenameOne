@@ -3793,15 +3793,31 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Allows buggy implementations (Android) to release image objects  
+     * @param image native image object
+     */
     public void releaseImage(Object image) {
     }
     
+    /**
+     * Captures a photo and notifies with the image data when available
+     * @param response callback for the resulting image
+     */
     public void capturePhoto(ActionListener response) {
     }
 
+    /**
+     * Captures a audio and notifies with the raw data when available
+     * @param response callback for the resulting data
+     */
     public void captureAudio(ActionListener response) {
     }
 
+    /**
+     * Captures a video and notifies with the data when available
+     * @param response callback for the resulting video
+     */
     public void captureVideo(ActionListener response) {
     }
 

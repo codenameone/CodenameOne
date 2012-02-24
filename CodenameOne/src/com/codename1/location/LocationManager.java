@@ -58,6 +58,10 @@ public abstract class LocationManager {
         return status;
     }
 
+    /**
+     * Allows the implentation to set the status of the location
+     * @param status the new status
+     */
     protected void setStatus(int status) {
         this.status = status;
     }
@@ -85,12 +89,22 @@ public abstract class LocationManager {
         bindListener();
     }
 
+    /**
+     * Allows the implementation to notify the location listener of changes to location
+     * @return location listener instance
+     */
     protected LocationListener getLocationListener() {
         return listener;
     }
     
+    /**
+     * Allows the implementation to track events
+     */
     protected abstract void bindListener();
     
+    /**
+     * Allows the implementation to track events
+     */
     protected abstract void clearListener();
     
 }

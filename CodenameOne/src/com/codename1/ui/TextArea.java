@@ -764,6 +764,18 @@ public class TextArea extends Component {
                 textAreaWidth = Math.min(Display.getInstance().getDisplayWidth() - tPadding, columns) * charWidth;
             }
         }*/
+        if(textAreaWidth <= charWidth) {
+            if(!isInitialized()) {
+                rowStrings.addElement(getText());
+            } else {
+                // special case for the edge case of "no room".
+                // Its important since sometimes this case occurs in the GUI builder by accident
+                for(int iter = 0 ; iter < text.length ; iter++) {
+                    rowStrings.addElement("" + text[iter]);
+                }
+            }
+            return;
+        }
         
         int minCharactersInRow = Math.max(1, textAreaWidth / charWidth);
         int rowIndex=0;
@@ -940,7 +952,7 @@ public class TextArea extends Component {
     }
 
     void paintHint(Graphics g) {
-        if(Display.getInstance().isTextEditing()) {
+        if(Display.getInstance().isTextEditing() && hasFocus()) {
             return;
         }
         super.paintHint(g);
