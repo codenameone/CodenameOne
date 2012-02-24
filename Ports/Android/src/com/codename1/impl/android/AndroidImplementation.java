@@ -216,10 +216,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peers[i].release();
             }
         }
-        
-        ConnectionRequest.setDefaultUserAgent(getUserAgent());
-        
-        
     }
 
     public int translatePixelForDPI(int pixel) {
@@ -1073,6 +1069,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public int getActualDisplayHeight() {
+        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
+        return dm.heightPixels;
+    }
+
+    @Override
     public int getGameAction(int keyCode) {
         switch (keyCode) {
             case DROID_IMPL_KEY_DOWN:
@@ -1872,7 +1874,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!testedNativeTheme) {
             testedNativeTheme = true;
             try {
-                InputStream is = getResourceAsStream(getClass(), "/androidTheme.res");
+                InputStream is;
+                if(android.os.Build.VERSION.SDK_INT < 14 && !isTablet()){
+                    is = getResourceAsStream(getClass(), "/androidTheme.res");
+                }else{
+                    is = getResourceAsStream(getClass(), "/android_holo_light.res");                
+                }
                 nativeThemeAvailable = is != null;
                 if (is != null) {
                     is.close();
