@@ -73,6 +73,7 @@
     -->
     <target name="-pre-compile">
         <copy file="../../Themes/androidTheme.res" todir="src" />
+        <copy file="../../Themes/android_holo_light.res" todir="src" />
     </target>
 
     <target name="-post-jar">
