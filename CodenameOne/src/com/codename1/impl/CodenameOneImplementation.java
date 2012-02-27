@@ -2633,7 +2633,7 @@ public abstract class CodenameOneImplementation {
      * reasonable valid values for the application:
      * <ol>
      * <li>AppName
-     * <li>UserAgent - ideally although not required
+     * <li>User-Agent - ideally although not required
      * <li>AppVersion
      * <li>Platform - Similar to microedition.platform
      * </ol>
@@ -2656,7 +2656,7 @@ public abstract class CodenameOneImplementation {
 
     /**
      * Returns one of the density variables appropriate for this device, notice that
-     * density doesn't alwyas correspond to resolution and an implementation might
+     * density doesn't always correspond to resolution and an implementation might
      * decide to change the density based on DPI constraints.
      *
      * @return one of the DENSITY constants of Display
