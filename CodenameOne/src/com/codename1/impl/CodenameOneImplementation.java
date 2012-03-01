@@ -2579,7 +2579,11 @@ public abstract class CodenameOneImplementation {
      * @return input stream for the resource or null if not found
      */
     public InputStream getResourceAsStream(Class cls, String resource) {
-        return cls.getResourceAsStream(resource);
+        if(cls != null){
+            return cls.getResourceAsStream(resource);
+        }else{
+            return getClass().getResourceAsStream(resource);
+        }
     }
 
     /**
