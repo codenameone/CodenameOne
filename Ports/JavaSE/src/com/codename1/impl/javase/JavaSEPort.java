@@ -2394,6 +2394,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         g.rotate(angle);
     }
 
+    public void rotate(Object nativeGraphics, float angle, int pX, int pY) {
+        Graphics2D g = getGraphics(nativeGraphics);
+        g.rotate(angle, pX, pY);
+    }
+
     public void shear(Object nativeGraphics, float x, float y) {
         Graphics2D g = getGraphics(nativeGraphics);
         g.shear(x, y);

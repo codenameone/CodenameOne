@@ -742,7 +742,10 @@ public class NetworkManager {
      * @return true if no network activity is in progress or pending
      */
     public boolean isQueueIdle() {
-        return pending.size() == 0 && networkThreads[0].getCurrentRequest() == null;
+        return pending == null || 
+                networkThreads == null || 
+                networkThreads[0] == null || 
+                (pending.size() == 0 && networkThreads[0].getCurrentRequest() == null);
     }
     
     /**

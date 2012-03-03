@@ -2144,6 +2144,18 @@ public abstract class CodenameOneImplementation {
      * @param nativeGraphics the native graphics object
      */
     public void rotate(Object nativeGraphics, float angle) {
+        rotate(nativeGraphics, angle, 0, 0);
+    }
+
+    /**
+     * Rotates the coordinate system around a radian angle using the affine transform
+     *
+     * @param angle the rotation angle in radians
+     * @param pivotX the pivot location
+     * @param pivotY the pivot location
+     * @param nativeGraphics the native graphics object
+     */
+    public void rotate(Object nativeGraphics, float angle, int pivotX, int pivotY) {
         System.out.println("Affine unsupported");
     }
 
@@ -2581,9 +2593,8 @@ public abstract class CodenameOneImplementation {
     public InputStream getResourceAsStream(Class cls, String resource) {
         if(cls != null){
             return cls.getResourceAsStream(resource);
-        }else{
-            return getClass().getResourceAsStream(resource);
         }
+        return getClass().getResourceAsStream(resource);
     }
 
     /**

@@ -26,6 +26,7 @@ package com.codename1.impl.javase;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -103,7 +104,7 @@ class ClassPathLoader extends ClassLoader {
     }
 
     public Class findClass(String className) throws ClassNotFoundException {
-        byte classByte[];
+        byte[] classByte;
         Class result = null;
 
         result = (Class) classes.get(className); //checks in cached classes

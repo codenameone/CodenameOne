@@ -823,6 +823,17 @@ public final class Graphics {
     }
 
     /**
+     * Rotates the coordinate system around a radian angle using the affine transform
+     *
+     * @param angle the rotation angle in radians
+     * @param pivotX the pivot point
+     * @param pivotY the pivot point
+     */
+    public void rotate(float angle, int pivotX, int pivotY) {
+        impl.rotate(nativeGraphics, angle, pivotX, pivotY);
+    }
+
+    /**
      * Shear the graphics coordinate system using the affine transform
      *
      * @param x shear factor for x

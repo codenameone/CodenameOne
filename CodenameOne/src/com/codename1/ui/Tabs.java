@@ -77,7 +77,7 @@ public class Tabs extends Container {
     private boolean dragStarted = false;
     private int activeComponent = 0;
     private EventDispatcher focusListeners;
-    private TabFocusListener focusListener = new TabFocusListener();
+    private TabFocusListener focusListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
     private int textPosition = -1;
@@ -103,6 +103,7 @@ public class Tabs extends Container {
      */
     public Tabs(int tabP) {
         super(new BorderLayout());
+        focusListener = new TabFocusListener();
         contentPane.setUIID("TabbedPane");
         super.addComponent(BorderLayout.CENTER, contentPane);
         tabsContainer = new Container();
@@ -820,7 +821,7 @@ public class Tabs extends Container {
             final int size = parent.getComponentCount();
             for (int i = 0; i < size; i++) {
                 int xOffset;
-                if(isRTL()) {
+                if(parent.isRTL()) {
                     xOffset = (size - i) * parent.getWidth();
                     xOffset -= ((size - activeComponent) * parent.getWidth());
                 } else {
@@ -906,7 +907,7 @@ public class Tabs extends Container {
         private boolean blockSwipe;
         private boolean riskySwipe;
 
-        SwipeListener(int type) {
+        public SwipeListener(int type) {
             this.type = type;
         }
 

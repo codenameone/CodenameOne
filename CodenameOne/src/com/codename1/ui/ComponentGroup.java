@@ -44,6 +44,7 @@ public class ComponentGroup extends Container {
     private String buttonUIID = "ButtonGroup";
     private String groupFlag = "ComponentGroupBool";
     private boolean uiidsDirty;
+    private boolean forceGroup;
  
     /**
      * Default constructor
@@ -69,7 +70,7 @@ public class ComponentGroup extends Container {
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if(!getUIManager().isThemeConstant(groupFlag, false)) {
+        if(!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
             if(uiidsDirty) {
                 uiidsDirty = false;
                 int count = getComponentCount();
@@ -102,7 +103,7 @@ public class ComponentGroup extends Container {
     }
 
     private void updateUIIDs() {
-        if(!getUIManager().isThemeConstant(groupFlag, false)) {
+        if(!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
             return;
         }
         int count = getComponentCount();
@@ -186,14 +187,14 @@ public class ComponentGroup extends Container {
      * @inheritDoc
      */
     public String[] getPropertyNames() {
-        return new String[] {"elementUIID", "displayName", "horizontal", "groupFlag"};
+        return new String[] {"elementUIID", "displayName", "horizontal", "groupFlag", "forceGroup"};
     }
 
     /**
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {String.class, String.class, Boolean.class, String.class};
+       return new Class[] {String.class, String.class, Boolean.class, String.class, Boolean.class};
     }
 
     /**
@@ -211,6 +212,12 @@ public class ComponentGroup extends Container {
         }
         if(name.equals("groupFlag")) {
             return groupFlag;
+        }
+        if(name.equals("forceGroup")) {
+            if(forceGroup) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
         }
         return null;
     }
@@ -230,6 +237,10 @@ public class ComponentGroup extends Container {
         }
         if(name.equals("groupFlag")) {
             setGroupFlag(groupFlag);
+            return null;
+        }
+        if(name.equals("forceGroup")) {
+            forceGroup = ((Boolean)value).booleanValue();
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -255,5 +266,25 @@ public class ComponentGroup extends Container {
      */
     public void setGroupFlag(String groupFlag) {
         this.groupFlag = groupFlag;
+    }
+
+    /**
+     * Component grouping can be an element from the theme but can be forced manually
+     * for a specific group
+     * 
+     * @return the forceGroup
+     */
+    public boolean isForceGroup() {
+        return forceGroup;
+    }
+
+    /**
+     * Component grouping can be an element from the theme but can be forced manually
+     * for a specific group
+     * 
+     * @param forceGroup the forceGroup to set
+     */
+    public void setForceGroup(boolean forceGroup) {
+        this.forceGroup = forceGroup;
     }
 }
