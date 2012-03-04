@@ -12,6 +12,7 @@ import android.os.ResultReceiver;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -222,10 +223,6 @@ public class InPlaceEditView extends FrameLayout {
         addView(mEditText, mEditLayoutParams);
 
         mTextArea = textArea;
-
-        mEditText.setInputType(getAndroidInputType(codenameOneInputType));
-
-
         Component nextDown = textArea.getComponentForm().findNextFocusVertical(true);
         if(nextDown != null && nextDown instanceof TextArea){
             mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
@@ -234,8 +231,6 @@ public class InPlaceEditView extends FrameLayout {
         }
 
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
-
-        mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
         invalidate();
         setVisibility(VISIBLE);
@@ -254,6 +249,8 @@ public class InPlaceEditView extends FrameLayout {
 
         int fgColor = taStyle.getFgColor();
         mEditText.setTextColor(Color.rgb(fgColor >> 16, (fgColor & 0x00ff00) >> 8, (fgColor & 0x0000ff)));
+        mEditText.setInputType(getAndroidInputType(codenameOneInputType));
+        
         showVirtualKeyboard(true);
     }
 
@@ -377,7 +374,7 @@ public class InPlaceEditView extends FrameLayout {
         if (!(component instanceof TextArea)) {
             throw new IllegalArgumentException("component must be instance of TextArea");
         }
-
+        
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
         Dimension prefSize = textArea.getPreferredSize();
@@ -515,5 +512,5 @@ public class InPlaceEditView extends FrameLayout {
 
             return super.onKeyDown(keyCode, event);
         }
-    }
+    }    
 }
