@@ -92,6 +92,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
 import java.awt.GridBagLayout;
@@ -120,6 +121,7 @@ import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
 import javax.net.ssl.HttpsURLConnection;
+import javax.swing.ImageIcon;
 import jmapps.ui.VideoPanel;
 
 /**
@@ -948,7 +950,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
-                if(skinNames.length() < DEFAULT_SKINS.length()){
+                if (skinNames.length() < DEFAULT_SKINS.length()) {
                     skinNames = DEFAULT_SKINS;
                 }
                 StringTokenizer tkn = new StringTokenizer(skinNames, ";");
@@ -1161,7 +1163,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.deinitialize();
         NetworkManager.getInstance().shutdownSync();
         try {
-            if(t[0] != null){
+            if (t[0] != null) {
                 t[0].join();
             }
         } catch (Throwable ex) {
@@ -2464,7 +2466,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
         /*if(currentAp == null || !currentAp.equals("22")){
-            throw new IOException("apn error");
+        throw new IOException("apn error");
         }*/
         URL u = new URL(url);
 
@@ -2771,7 +2773,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
-    
     /**
      * Indicates whether looking up an access point is supported by this device
      * 
@@ -2799,7 +2800,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public int getAPType(String id) {
         if (id.indexOf("11") > -1) {
             return NetworkManager.ACCESS_POINT_TYPE_WLAN;
-        }else if (id.indexOf("22") > -1) {
+        } else if (id.indexOf("22") > -1) {
             return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
         }
         return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
@@ -2814,14 +2815,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String getAPName(String id) {
         if (id.indexOf("11") > -1) {
             return "wifi";
-        }else if (id.indexOf("22") > -1) {
+        } else if (id.indexOf("22") > -1) {
             return "3g";
         }
         return null;
     }
-    
+
     //private String currentAp;
-    
     /**
      * Returns the id of the current access point
      *
@@ -2840,6 +2840,31 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setCurrentAccessPoint(String id) {
         //this.currentAp = id;
         super.setCurrentAccessPoint(id);
+    }
+
+    /**
+     * Captures a photo and notifies with the image data when available
+     * @param response callback for the resulting image
+     */
+    public void capturePhoto(com.codename1.ui.events.ActionListener response) {
+        try {
+            long t = System.currentTimeMillis();
+            int num = (int) (t % 5);
+            BufferedImage i = new BufferedImage(2048, 1280, BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics g = i.getGraphics();
+            g.setColor(Color.BLUE);
+            g.fillRect(0, 0, 2048, 1280);
+            g.setColor(Color.RED);
+            g.setFont(new java.awt.Font("Arial", Font.STYLE_PLAIN, 100));
+            g.drawString("Image number " + num + " created", 100, 640);
+            File temp = File.createTempFile("img", ".jpg");
+            ImageIO.write(i, "jpg", temp);
+            response.actionPerformed(new com.codename1.ui.events.ActionEvent(temp.getAbsolutePath()));
+        } catch (IOException ex) {
+            Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+
     }
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {
