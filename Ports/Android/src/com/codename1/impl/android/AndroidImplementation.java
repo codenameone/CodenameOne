@@ -161,11 +161,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.activity = (Activity) m;
 
         try {
-            System.out.println("android.os.Build.VERSION.SDK_INT " + android.os.Build.VERSION.SDK_INT);
-            if (android.os.Build.VERSION.SDK_INT < 11) {
-                activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
-            }
-            //activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
         } catch (Exception e) {
             Log.d("Codename One", "No idea why this throws a Runtime Error", e);
         }
