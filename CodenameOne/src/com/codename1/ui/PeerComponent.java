@@ -164,17 +164,30 @@ public class PeerComponent extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
-        int scrollX = getScrollX();
-        int scrollY = getScrollY();
-        int x = getAbsoluteX() + scrollX;
-        int y = getAbsoluteY() + scrollY;
-        if(x != lastPos.getX() || y != lastPos.getY() || getWidth() != lastPos.getSize().getWidth() || getHeight() != lastPos.getSize().getHeight()) {
-            lastPos.setX(x);
-            lastPos.setY(y);
-            lastPos.getSize().setWidth(getWidth());
-            lastPos.getSize().setHeight(getHeight());
-            onPositionSizeChange();
+        onPositionSizeChangeImpl();
+    }
+    
+    private void onPositionSizeChangeImpl() {
+        if(isInitialized() && getWidth() > 0 && getHeight() > 0) {
+            int scrollX = getScrollX();
+            int scrollY = getScrollY();
+            int x = getAbsoluteX() + scrollX;
+            int y = getAbsoluteY() + scrollY;
+            if(x != lastPos.getX() || y != lastPos.getY() || getWidth() != lastPos.getSize().getWidth() || getHeight() != lastPos.getSize().getHeight()) {
+                lastPos.setX(x);
+                lastPos.setY(y);
+                lastPos.getSize().setWidth(getWidth());
+                lastPos.getSize().setHeight(getHeight());
+                onPositionSizeChange();
+            }        
         }
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    void onParentPositionChange() {        
+        onPositionSizeChangeImpl();
     }
 
     /**

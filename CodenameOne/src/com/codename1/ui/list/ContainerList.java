@@ -223,7 +223,7 @@ public class ContainerList extends Container {
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Object[].class, CellRenderer.class};
+       return new Class[] {com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
     }
 
     /**

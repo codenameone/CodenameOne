@@ -2012,7 +2012,11 @@ public class List extends Component {
                     initListMotion();
                     fixedDraggedAnimationPosition = 0;
                 }
-                setSelectedIndex(fixedDraggedSelection);
+                
+                // this happens when dragging an empty list causing an exception on a negative selection
+                if(fixedDraggedSelection >= 0 && fixedDraggedSelection < getModel().getSize()) { 
+                    setSelectedIndex(fixedDraggedSelection);
+                }
                 setDragActivated(false);
                 fixedDraggedMotion = null;
             }

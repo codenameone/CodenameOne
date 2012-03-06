@@ -273,6 +273,7 @@ public class Util {
         
         if(!xmlVMInstanceofBugTested) {
             xmlVMInstanceofBug = Display.getInstance().getPlatformName().equals("ios");
+            xmlVMInstanceofBugTested = true;
         }
 
         if(instanceofObjArray(o)) {

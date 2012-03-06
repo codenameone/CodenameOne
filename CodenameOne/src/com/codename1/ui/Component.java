@@ -426,6 +426,7 @@ public class Component implements Animation, StyleListener {
      */
     public void setX(int x) {
         bounds.setX(x);
+        onParentPositionChange();
     }
 
     /**
@@ -437,8 +438,16 @@ public class Component implements Animation, StyleListener {
      */
     public void setY(int y) {
         bounds.setY(y);
+        onParentPositionChange();
     }
 
+    /**
+     * This callback allows subcomponents who are interested in following position change of their parents
+     * to receive such an event
+     */
+    void onParentPositionChange() {        
+    }
+    
     /**
      * The baseline for the component text according to which it should be aligned
      * with other components for best visual look.
@@ -1350,12 +1359,14 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollX(int scrollX) {
         // the setter must always update the value regardless...
+        int ox = this.scrollX;
         this.scrollX = scrollX;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             this.scrollX = Math.min(this.scrollX, getScrollDimension().getWidth() - getWidth());
             this.scrollX = Math.max(this.scrollX, 0);
         }
         if (isScrollableX()) {
+            onParentPositionChange();
             repaint();
         }
     }
@@ -1369,6 +1380,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollY(int scrollY) {
         // the setter must always update the value regardless... 
+        int oy = this.scrollY;
         this.scrollY = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             int h = getScrollDimension().getHeight() - getHeight();
@@ -1379,6 +1391,7 @@ public class Component implements Animation, StyleListener {
         }
         
         if (isScrollableY()) {
+            onParentPositionChange();            
             repaint();
         }
     }

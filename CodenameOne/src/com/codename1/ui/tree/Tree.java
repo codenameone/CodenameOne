@@ -117,7 +117,7 @@ public class Tree extends Container {
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {String[][].class};
+       return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()};
     }
 
     /**

@@ -3891,5 +3891,48 @@ public abstract class CodenameOneImplementation {
         }
         return null;
     }
-        
+    
+    /**
+     * This is a temporary workaround for an XMLVM Bug!
+     */
+    public static Class getStringArrayClass() {
+        try {
+            return String[].class;
+        } catch(Throwable t) {
+            return new String[0].getClass();
+        }
+    }
+
+    /**
+     * This is a temporary workaround for an XMLVM Bug!
+     */
+    public static Class getStringArray2DClass() {
+        try {
+            return String[][].class;
+        } catch(Throwable t) {
+            return new String[1][].getClass();
+        }
+    }
+
+    /**
+     * This is a temporary workaround for an XMLVM Bug!
+     */
+    public static Class getImageArrayClass() {
+        try {
+            return Image[].class;
+        } catch(Throwable t) {
+            return new Image[0].getClass();
+        }
+    }
+
+    /**
+     * This is a temporary workaround for an XMLVM Bug!
+     */
+    public static Class getObjectArrayClass() {
+        try {
+            return Object[].class;
+        } catch(Throwable t) {
+            return new Object[0].getClass();
+        }
+    }
 }

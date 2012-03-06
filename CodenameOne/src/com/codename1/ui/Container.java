@@ -549,8 +549,17 @@ public class Container extends Component {
         return (c == this) || isParentOf(c);
     }
 
+    void onParentPositionChange() {
+        int cmpCount = getComponentCount();
+        for (int iter = 0; iter < cmpCount ; iter++) {
+            Component c = getComponentAt(iter);
+            c.onParentPositionChange();
+        }
+    }
+
     private boolean requestFocusChild(boolean avoidRepaint) {
-        for (int iter = 0; iter < getComponentCount(); iter++) {
+        int cmpCount = getComponentCount();
+        for (int iter = 0; iter < cmpCount ; iter++) {
             Component c = getComponentAt(iter);
             if (c.isFocusable()) {
                 if(avoidRepaint) {
@@ -850,6 +859,7 @@ public class Container extends Component {
             }
         }
         laidOut();
+        onParentPositionChange();            
     }
 
     /**

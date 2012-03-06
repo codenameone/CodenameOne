@@ -706,13 +706,13 @@ public class UIBuilder {
             return g;
         }
     }
-
-    private Object readCustomPropertyValue(DataInputStream in, Class type, Resources res) throws IOException {
+    
+    private Object readCustomPropertyValue(DataInputStream in, Class type, Resources res, String name) throws IOException {
         if(type == String.class) {
             return in.readUTF();
         }
 
-        if(type == String[].class) {
+        if(type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {
             String[] result = new String[in.readInt()];
             for(int i = 0 ; i < result.length ; i++) {
                 result[i] = in.readUTF();
@@ -720,7 +720,7 @@ public class UIBuilder {
             return result;
         }
 
-        if(type == String[][].class) {
+        if(type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {
             String[][] result = new String[in.readInt()][];
             for(int i = 0 ; i < result.length ; i++) {
                 result[i] = new String[in.readInt()];
@@ -752,10 +752,13 @@ public class UIBuilder {
         }
 
         if(type == Boolean.class) {
-            return new Boolean(in.readBoolean());
+            if(in.readBoolean()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
         }
 
-        if(type == Image[].class) {
+        if(type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {
             Image[] result = new Image[in.readInt()];
             for(int i = 0 ; i < result.length ; i++) {
                 result[i] = res.getImage(in.readUTF());
@@ -779,7 +782,7 @@ public class UIBuilder {
             return readRendererer(res, in);
         }
 
-        if(type == Object[].class) {
+        if(type.isArray()) {
             return readObjectArrayForListModel(in, res);
         }
         
@@ -889,7 +892,7 @@ public class UIBuilder {
                     for(int iter = 0 ; iter < propertyNames.length ; iter++) {
                         if(propertyNames[iter].equals(customPropertyName)) {
                             Class type = cmp.getPropertyTypes()[iter];
-                            Object value = readCustomPropertyValue(in, type, res);
+                            Object value = readCustomPropertyValue(in, type, res, propertyNames[iter]);
                             cmp.setPropertyValue(customPropertyName, value);
                             break;
                         }
@@ -1920,6 +1923,7 @@ public class UIBuilder {
         currentForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
         newForm.setTransitionInAnimator(CommonTransitions.createEmpty());
         newForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        newForm.layoutContainer();
         newForm.show();
         postShowImpl(newForm);
         newForm.setTransitionInAnimator(tin);
