@@ -2209,7 +2209,7 @@ public final class Display {
      * reasonable valid values for the application:
      * <ol>
      * <li>AppName
-     * <li>UserAgent - ideally although not required
+     * <li>User-Agent
      * <li>AppVersion
      * <li>Platform - Similar to microedition.platform
      * <li>OS - returns what is the underlying platform e.g. - J2ME, RIM, SE...
