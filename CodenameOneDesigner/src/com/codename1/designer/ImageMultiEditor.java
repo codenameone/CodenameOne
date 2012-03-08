@@ -179,7 +179,7 @@ public class ImageMultiEditor extends BaseForm {
 
         FormListener formListener = new FormListener();
 
-        dpi.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low Density 176x220 And Smaller", "Low Density Up To 240x320", "Medium Density Up To 360x480", "Hi Density Up To 480x854", "Very Hi Density Up To 1440x720", "HD Up To 1920x1080" }));
+        dpi.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low Density 176x220 And Smaller", "Low Density Up To 240x320", "Medium Density Up To (360x480/3.5 inch)", "Hi Density Up To (480x854/3.5-4inch)", "Very Hi Density Up To (1440x720/3.5-4.5inch)", "HD Up To 1920x1080" }));
         dpi.setName("dpi"); // NOI18N
         dpi.addActionListener(formListener);
 
@@ -271,9 +271,9 @@ public class ImageMultiEditor extends BaseForm {
                     .add(layout.createSequentialGroup()
                         .add(preview, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 518, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 577, Short.MAX_VALUE)))
+                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 604, Short.MAX_VALUE)))
                 .addContainerGap())
-            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 1149, Short.MAX_VALUE)
+            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 1176, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)

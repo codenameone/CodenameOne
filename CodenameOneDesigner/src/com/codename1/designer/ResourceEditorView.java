@@ -207,6 +207,9 @@ public class ResourceEditorView extends FrameView {
         AnalyticsService.visit("Startup", "");
         QuitAction.INSTANCE.setResource(loadedResources);
         initComponents();
+        
+        livePreviewUI.setSelected(Preferences.userNodeForPackage(getClass()).getBoolean("LivePreview", false));
+        
         initNativeTheme();
         LocalServer.startServer(mainPanel);
         if(ResourceEditorApp.IS_MAC) {
@@ -749,21 +752,19 @@ public class ResourceEditorView extends FrameView {
         jSeparator2 = new javax.swing.JSeparator();
         undoItem = new javax.swing.JMenuItem();
         redoItem = new javax.swing.JMenuItem();
-        midletMenu = new javax.swing.JMenu();
-        jSeparator5 = new javax.swing.JSeparator();
-        generateNetbeansProject = new javax.swing.JMenuItem();
-        jMenu6 = new javax.swing.JMenu();
-        uiBuilderSource = new javax.swing.JMenuItem();
-        resetNetbeansSettings = new javax.swing.JMenuItem();
-        pickMIDlet = new javax.swing.JMenuItem();
-        resetToDefault = new javax.swing.JMenuItem();
         jMenu8 = new javax.swing.JMenu();
         signup = new javax.swing.JMenuItem();
         login = new javax.swing.JMenuItem();
-        livePreview = new javax.swing.JMenuItem();
+        livePreviewUI = new javax.swing.JCheckBoxMenuItem();
+        jMenu6 = new javax.swing.JMenu();
+        resetNetbeansSettings = new javax.swing.JMenuItem();
+        pickMIDlet = new javax.swing.JMenuItem();
+        resetToDefault = new javax.swing.JMenuItem();
         jMenu1 = new javax.swing.JMenu();
         iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
+        jMenu3 = new javax.swing.JMenu();
         android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
+        icsNativeTheme = new javax.swing.JMenuItem();
         blackberryNativeTheme = new javax.swing.JRadioButtonMenuItem();
         customNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu4 = new javax.swing.JMenu();
@@ -1303,25 +1304,26 @@ public class ResourceEditorView extends FrameView {
 
         menuBar.add(editMenu);
 
-        midletMenu.setMnemonic('M');
-        midletMenu.setText("Application");
-        midletMenu.setName("midletMenu"); // NOI18N
+        jMenu8.setText("Codename One");
+        jMenu8.setName("jMenu8"); // NOI18N
 
-        jSeparator5.setName("jSeparator5"); // NOI18N
-        midletMenu.add(jSeparator5);
+        signup.setText("Signup");
+        signup.setName("signup"); // NOI18N
+        signup.addActionListener(formListener);
+        jMenu8.add(signup);
 
-        generateNetbeansProject.setText("Generate Netbeans Project");
-        generateNetbeansProject.setName("generateNetbeansProject"); // NOI18N
-        generateNetbeansProject.addActionListener(formListener);
-        midletMenu.add(generateNetbeansProject);
+        login.setText("Login");
+        login.setName("login"); // NOI18N
+        login.addActionListener(formListener);
+        jMenu8.add(login);
+
+        livePreviewUI.setText("Live Preview");
+        livePreviewUI.setName("livePreviewUI"); // NOI18N
+        livePreviewUI.addActionListener(formListener);
+        jMenu8.add(livePreviewUI);
 
         jMenu6.setText("Advanced");
         jMenu6.setName("jMenu6"); // NOI18N
-
-        uiBuilderSource.setText("Generate UI State Machine");
-        uiBuilderSource.setName("uiBuilderSource"); // NOI18N
-        uiBuilderSource.addActionListener(formListener);
-        jMenu6.add(uiBuilderSource);
 
         resetNetbeansSettings.setText("Reset Netbeans Settings");
         resetNetbeansSettings.setName("resetNetbeansSettings"); // NOI18N
@@ -1341,27 +1343,7 @@ public class ResourceEditorView extends FrameView {
         resetToDefault.addActionListener(formListener);
         jMenu6.add(resetToDefault);
 
-        midletMenu.add(jMenu6);
-
-        menuBar.add(midletMenu);
-
-        jMenu8.setText("Codename One");
-        jMenu8.setName("jMenu8"); // NOI18N
-
-        signup.setText("Signup");
-        signup.setName("signup"); // NOI18N
-        signup.addActionListener(formListener);
-        jMenu8.add(signup);
-
-        login.setText("Login");
-        login.setName("login"); // NOI18N
-        login.addActionListener(formListener);
-        jMenu8.add(login);
-
-        livePreview.setText("Live Preview");
-        livePreview.setName("livePreview"); // NOI18N
-        livePreview.addActionListener(formListener);
-        jMenu8.add(livePreview);
+        jMenu8.add(jMenu6);
 
         menuBar.add(jMenu8);
 
@@ -1375,11 +1357,21 @@ public class ResourceEditorView extends FrameView {
         iosNativeTheme.addActionListener(formListener);
         jMenu1.add(iosNativeTheme);
 
+        jMenu3.setText("Android");
+        jMenu3.setName("jMenu3"); // NOI18N
+
         nativeThemeButtonGroup.add(android2NativeTheme);
-        android2NativeTheme.setText("Android (2.3) Theme");
+        android2NativeTheme.setText("Gingerbread (2.3.x)");
         android2NativeTheme.setName("android2NativeTheme"); // NOI18N
         android2NativeTheme.addActionListener(formListener);
-        jMenu1.add(android2NativeTheme);
+        jMenu3.add(android2NativeTheme);
+
+        icsNativeTheme.setText("ICS (3.x or newer/Tablets)");
+        icsNativeTheme.setName("icsNativeTheme"); // NOI18N
+        icsNativeTheme.addActionListener(formListener);
+        jMenu3.add(icsNativeTheme);
+
+        jMenu1.add(jMenu3);
 
         nativeThemeButtonGroup.add(blackberryNativeTheme);
         blackberryNativeTheme.setText("Blackberry Theme");
@@ -1546,12 +1538,6 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == duplicateItem) {
                 ResourceEditorView.this.duplicateItemActionPerformed(evt);
             }
-            else if (evt.getSource() == generateNetbeansProject) {
-                ResourceEditorView.this.generateNetbeansProjectActionPerformed(evt);
-            }
-            else if (evt.getSource() == uiBuilderSource) {
-                ResourceEditorView.this.uiBuilderSourceActionPerformed(evt);
-            }
             else if (evt.getSource() == resetNetbeansSettings) {
                 ResourceEditorView.this.resetNetbeansSettingsActionPerformed(evt);
             }
@@ -1567,14 +1553,14 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == login) {
                 ResourceEditorView.this.loginActionPerformed(evt);
             }
-            else if (evt.getSource() == livePreview) {
-                ResourceEditorView.this.livePreviewActionPerformed(evt);
-            }
             else if (evt.getSource() == iosNativeTheme) {
                 ResourceEditorView.this.iosNativeThemeActionPerformed(evt);
             }
             else if (evt.getSource() == android2NativeTheme) {
                 ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
+            }
+            else if (evt.getSource() == icsNativeTheme) {
+                ResourceEditorView.this.icsNativeThemeActionPerformed(evt);
             }
             else if (evt.getSource() == blackberryNativeTheme) {
                 ResourceEditorView.this.blackberryNativeThemeActionPerformed(evt);
@@ -1591,17 +1577,11 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == addSVGImages) {
                 ResourceEditorView.this.addSVGImagesActionPerformed(evt);
             }
-            else if (evt.getSource() == findMultiImages) {
-                ResourceEditorView.this.findMultiImagesActionPerformed(evt);
-            }
             else if (evt.getSource() == deleteUnusedImages) {
                 ResourceEditorView.this.deleteUnusedImagesActionPerformed(evt);
             }
             else if (evt.getSource() == imageSizes) {
                 ResourceEditorView.this.imageSizesActionPerformed(evt);
-            }
-            else if (evt.getSource() == launchOptiPng) {
-                ResourceEditorView.this.launchOptiPngActionPerformed(evt);
             }
             else if (evt.getSource() == imageBorderWizardMenuItem) {
                 ResourceEditorView.this.imageBorderWizardMenuItemActionPerformed(evt);
@@ -1609,11 +1589,20 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == pulsateEffect) {
                 ResourceEditorView.this.pulsateEffectActionPerformed(evt);
             }
-            else if (evt.getSource() == about) {
-                ResourceEditorView.this.aboutActionPerformed(evt);
+            else if (evt.getSource() == findMultiImages) {
+                ResourceEditorView.this.findMultiImagesActionPerformed(evt);
+            }
+            else if (evt.getSource() == launchOptiPng) {
+                ResourceEditorView.this.launchOptiPngActionPerformed(evt);
             }
             else if (evt.getSource() == import9Patch) {
                 ResourceEditorView.this.import9PatchActionPerformed(evt);
+            }
+            else if (evt.getSource() == about) {
+                ResourceEditorView.this.aboutActionPerformed(evt);
+            }
+            else if (evt.getSource() == livePreviewUI) {
+                ResourceEditorView.this.livePreviewUIActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -2101,24 +2090,6 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
         return (String)main.getSelectedItem();
     }
 
-private void uiBuilderSourceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_uiBuilderSourceActionPerformed
-    if(loadedFile != null && loadedResources != null) {
-        String uiResourceName = pickMainScreenForm();
-        if(uiResourceName == null) {
-            return;
-        }
-
-        File destFile = pickJavaSourceLocation();
-        if(destFile == null) {
-            return;
-        }
-        generateStateMachineCode(uiResourceName, destFile, true);
-    } else {
-        JOptionPane.showMessageDialog(mainPanel, "You must have a UI builder entry for this feature", "Error", JOptionPane.ERROR_MESSAGE);
-    }
-
-}//GEN-LAST:event_uiBuilderSourceActionPerformed
-
     String generateStateMachineCode(String uiResourceName, File destFile, boolean promptUserForPackageName) {
         String packageString = "";
         File currentFile = destFile;
@@ -2546,14 +2517,6 @@ private void duplicateItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN
 
 private GenerateHelper helper = new GenerateHelper();
 
-private void generateNetbeansProjectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_generateNetbeansProjectActionPerformed
-    Properties p = helper.generateNetbeansProject(this, mainPanel, loadedResources, loadedFile);
-    if(p != null) {
-        projectGeneratorSettings = p;
-        platformOverrides.setEnabled(true);
-    }
-}//GEN-LAST:event_generateNetbeansProjectActionPerformed
-
 private static boolean configureNetbeans() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("netbeansInstall", null);
     if(node == null) {
@@ -2946,13 +2909,9 @@ private boolean configureOptiPNG() {
         new About(mainPanel);
     }//GEN-LAST:event_aboutActionPerformed
 
-private void livePreviewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_livePreviewActionPerformed
-    new LivePreview(mainPanel, this);
-}//GEN-LAST:event_livePreviewActionPerformed
-
 private void signupActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_signupActionPerformed
         try {
-            Desktop.getDesktop().browse(new URI("http://www.codenameone.com/"));
+            Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -3086,6 +3045,15 @@ private void import9PatchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         setSelectedResource(selectedResource);
     }
 }//GEN-LAST:event_import9PatchActionPerformed
+
+private void icsNativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_icsNativeThemeActionPerformed
+        setNativeTheme("/android_holo_light.res", true);
+}//GEN-LAST:event_icsNativeThemeActionPerformed
+
+private void livePreviewUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_livePreviewUIActionPerformed
+    LivePreview.setLivePreviewEnabled(livePreviewUI.isSelected(), mainPanel, this);
+    Preferences.userNodeForPackage(getClass()).putBoolean("LivePreview", livePreviewUI.isSelected());
+}//GEN-LAST:event_livePreviewUIActionPerformed
 
     private void buildFilenameMap(File baseDir, Map<String, List<File>> map) {
         File[] f = baseDir.listFiles();
@@ -3711,6 +3679,7 @@ public static void openInIDE(File f, int lineNumber) {
 
             getFrame().setTitle(loadedFile.getName() + " - Codename One Designer");
             treeArea.revalidate();
+            livePreviewUIActionPerformed(null);
             LivePreview.updateServer(mainPanel);
             // expand the entire tree
             /*for (int i=0; i<resourceTree.getRowCount(); i++)
@@ -3822,6 +3791,7 @@ public static void openInIDE(File f, int lineNumber) {
                         }
                         platformOverrides.setEnabled(true);
                     }
+                    livePreviewUIActionPerformed(null);
                     LivePreview.updateServer(mainPanel);
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -3848,6 +3818,7 @@ public static void openInIDE(File f, int lineNumber) {
     }
     
     private class SaveResourceFileAsAction extends SaveResourceFileAction {
+        File oldLoadedFile;
         SaveResourceFileAsAction() {
             putValue(NAME, "Save As...");
             putValue(SHORT_DESCRIPTION, "Save As...");
@@ -3857,8 +3828,17 @@ public static void openInIDE(File f, int lineNumber) {
 
         @Override
         protected void checkFile() {
+            oldLoadedFile = loadedFile;
             loadedFile = null;
             super.checkFile();
+        }
+
+        @Override
+        public void exectute() {
+            super.exectute();
+            if(dialogCanceled) {
+                loadedFile = oldLoadedFile;
+            }
             updateLoadedFile();
         }
     }
@@ -3888,7 +3868,7 @@ public static void openInIDE(File f, int lineNumber) {
                 loadedResources.setIgnoreSVGMode(false);
                 loadedResources.setIgnorePNGMode(pngMode);
                 getFrame().setTitle(loadedFile.getName() + " - Codename One Designer");
-            }
+            } 
         }
     }
 
@@ -4452,8 +4432,8 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenu fileMenu;
     private javax.swing.JMenuItem findMultiImages;
     private javax.swing.JScrollPane fontsScroll;
-    private javax.swing.JMenuItem generateNetbeansProject;
     private javax.swing.JMenu helpMenu;
+    private javax.swing.JMenuItem icsNativeTheme;
     private javax.swing.JMenuItem imageBorderWizardMenuItem;
     private javax.swing.JScrollPane imageScroll;
     private javax.swing.JMenuItem imageSizes;
@@ -4462,6 +4442,7 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JRadioButtonMenuItem iosNativeTheme;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu2;
+    private javax.swing.JMenu jMenu3;
     private javax.swing.JMenu jMenu4;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenu jMenu6;
@@ -4480,7 +4461,6 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JSeparator jSeparator3;
     private javax.swing.JSeparator jSeparator4;
-    private javax.swing.JSeparator jSeparator5;
     private javax.swing.JSeparator jSeparator6;
     private javax.swing.JSeparator jSeparator8;
     private javax.swing.JSplitPane jSplitPane1;
@@ -4488,14 +4468,13 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JToolBar jToolBar1;
     private javax.swing.JMenuItem launchOptiPng;
     private javax.swing.JTextArea license;
-    private javax.swing.JMenuItem livePreview;
+    private javax.swing.JCheckBoxMenuItem livePreviewUI;
     private javax.swing.JScrollPane localizationScroll;
     private javax.swing.JMenuItem login;
     private javax.swing.JMenu lookAndFeelMenu;
     private javax.swing.JScrollPane mainImages;
     private javax.swing.JPanel mainPanel;
     private javax.swing.JMenuBar menuBar;
-    private javax.swing.JMenu midletMenu;
     private javax.swing.JScrollPane multiImages;
     private javax.swing.ButtonGroup nativeThemeButtonGroup;
     private javax.swing.JMenuItem newMenuItem;
@@ -4521,7 +4500,6 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JScrollPane timelineImages;
     private javax.swing.JToolBar toolbar;
     private javax.swing.JPanel treeArea;
-    private javax.swing.JMenuItem uiBuilderSource;
     private javax.swing.JMenuItem undoItem;
     private javax.swing.JScrollPane userInterfaceScroll;
     // End of variables declaration//GEN-END:variables

@@ -45,12 +45,12 @@
                   <Group type="102" alignment="0" attributes="0">
                       <Component id="preview" min="-2" pref="518" max="-2" attributes="0"/>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                      <Component id="jScrollPane1" pref="577" max="32767" attributes="2"/>
+                      <Component id="jScrollPane1" pref="604" max="32767" attributes="2"/>
                   </Group>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
           </Group>
-          <Component id="jScrollPane2" alignment="0" pref="1149" max="32767" attributes="0"/>
+          <Component id="jScrollPane2" alignment="0" pref="1176" max="32767" attributes="0"/>
       </Group>
     </DimensionLayout>
     <DimensionLayout dim="1">
@@ -88,9 +88,9 @@
           <StringArray count="6">
             <StringItem index="0" value="Very Low Density 176x220 And Smaller"/>
             <StringItem index="1" value="Low Density Up To 240x320"/>
-            <StringItem index="2" value="Medium Density Up To 360x480"/>
-            <StringItem index="3" value="Hi Density Up To 480x854"/>
-            <StringItem index="4" value="Very Hi Density Up To 1440x720"/>
+            <StringItem index="2" value="Medium Density Up To (360x480/3.5 inch)"/>
+            <StringItem index="3" value="Hi Density Up To (480x854/3.5-4inch)"/>
+            <StringItem index="4" value="Very Hi Density Up To (1440x720/3.5-4.5inch)"/>
             <StringItem index="5" value="HD Up To 1920x1080"/>
           </StringArray>
         </Property>

@@ -110,8 +110,7 @@ public class ScaleMultiImage extends javax.swing.JPanel {
         jLabel2.setText("To");
         jLabel2.setName("jLabel2"); // NOI18N
 
-        to.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low", "Low", "Medium", "High", "Very High", "HD" }));
-        to.setSelectedIndex(3);
+        to.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low Density 176x220 And Smaller", "Low Density Up To 240x320", "Medium Density Up To (360x480/3.5 inch)", "Hi Density Up To (480x854/3.5-4inch)", "Very Hi Density Up To (1440x720/3.5-4.5inch)", "HD Up To 1920x1080" }));
         to.setName("to"); // NOI18N
 
         jLabel3.setText("Width");
@@ -148,9 +147,9 @@ public class ScaleMultiImage extends javax.swing.JPanel {
                     .add(layout.createSequentialGroup()
                         .add(keepAspectRatio)
                         .add(271, 271, 271))
-                    .add(height, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 292, Short.MAX_VALUE)
-                    .add(width, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 292, Short.MAX_VALUE)
-                    .add(to, 0, 292, Short.MAX_VALUE))
+                    .add(height, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 299, Short.MAX_VALUE)
+                    .add(width, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 299, Short.MAX_VALUE)
+                    .add(to, 0, 299, Short.MAX_VALUE))
                 .addContainerGap())
         );
         layout.setVerticalGroup(

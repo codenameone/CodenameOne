@@ -344,6 +344,7 @@ public class EditableResources extends Resources implements TreeModel {
         updateModified();
         undoQueue.clear();
         redoQueue.clear();
+        ThemeEditor.resetThemeLoaded();
     }
 
     /**

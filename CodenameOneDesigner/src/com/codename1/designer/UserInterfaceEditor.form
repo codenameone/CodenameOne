@@ -539,6 +539,23 @@
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneDateTimeSpinnerActionPerformed"/>
                                       </Events>
                                     </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneGenericSpinner">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Generic Spinner"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneGenericSpinner" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneGenericSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
                                   </SubComponents>
                                 </Container>
                               </SubComponents>
@@ -856,105 +873,39 @@
                   <Layout>
                     <DimensionLayout dim="0">
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Group type="102" alignment="0" attributes="0">
+                          <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel5" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="initialForm" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="-2" pref="169" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Group type="103" alignment="0" groupAlignment="0" attributes="0">
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="addPreviewTheme" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace min="191" pref="191" max="191" attributes="0"/>
-                                      </Group>
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="previewTheme" pref="98" max="32767" attributes="0"/>
-                                          <EmptySpace min="-2" pref="187" max="-2" attributes="0"/>
-                                      </Group>
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="simulateDevice" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace min="191" pref="191" max="191" attributes="0"/>
-                                      </Group>
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="useNativeTheme" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace min="-2" pref="198" max="-2" attributes="0"/>
-                                      </Group>
-                                  </Group>
+                              <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="simulateDevice" max="32767" attributes="1"/>
+                                  <Component id="initialForm" alignment="0" max="32767" attributes="1"/>
                               </Group>
+                              <EmptySpace min="-2" pref="187" max="-2" attributes="0"/>
                           </Group>
                       </Group>
                     </DimensionLayout>
                     <DimensionLayout dim="1">
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" alignment="0" attributes="0">
-                              <Group type="103" groupAlignment="3" attributes="0">
-                                  <Component id="jLabel2" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  <Component id="previewTheme" alignment="3" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="3" attributes="0">
-                                  <Component id="jLabel1" alignment="3" min="-2" pref="29" max="-2" attributes="0"/>
-                                  <Component id="addPreviewTheme" alignment="3" min="-2" max="-2" attributes="0"/>
-                              </Group>
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="3" attributes="0">
                                   <Component id="jLabel3" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="simulateDevice" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="2" attributes="0">
-                                  <Component id="useNativeTheme" alignment="2" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel4" alignment="2" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="3" attributes="0">
                                   <Component id="jLabel5" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="initialForm" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace pref="153" max="32767" attributes="0"/>
+                              <EmptySpace pref="234" max="32767" attributes="0"/>
                           </Group>
                       </Group>
                     </DimensionLayout>
                   </Layout>
                   <SubComponents>
-                    <Component class="javax.swing.JComboBox" name="previewTheme">
-                      <Properties>
-                        <Property name="toolTipText" type="java.lang.String" value="Preview Theme"/>
-                        <Property name="name" type="java.lang.String" value="previewTheme" noResource="true"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="previewThemeActionPerformed"/>
-                      </Events>
-                    </Component>
-                    <Component class="javax.swing.JLabel" name="jLabel2">
-                      <Properties>
-                        <Property name="text" type="java.lang.String" value="Theme"/>
-                        <Property name="name" type="java.lang.String" value="jLabel2" noResource="true"/>
-                      </Properties>
-                    </Component>
-                    <Component class="javax.swing.JLabel" name="jLabel1">
-                      <Properties>
-                        <Property name="text" type="java.lang.String" value="Add Theme"/>
-                        <Property name="name" type="java.lang.String" value="jLabel1" noResource="true"/>
-                      </Properties>
-                    </Component>
-                    <Component class="javax.swing.JButton" name="addPreviewTheme">
-                      <Properties>
-                        <Property name="text" type="java.lang.String" value="..."/>
-                        <Property name="name" type="java.lang.String" value="addPreviewTheme" noResource="true"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="addPreviewThemeActionPerformed"/>
-                      </Events>
-                    </Component>
                     <Component class="javax.swing.JLabel" name="jLabel3">
                       <Properties>
                         <Property name="text" type="java.lang.String" value="Simulate Device"/>
@@ -969,19 +920,6 @@
                       <Events>
                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="simulateDeviceActionPerformed"/>
                       </Events>
-                    </Component>
-                    <Component class="javax.swing.JCheckBox" name="useNativeTheme">
-                      <Properties>
-                        <Property name="selected" type="boolean" value="true"/>
-                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;Use Native Theme On Simulator&lt;br&gt; When Applicable"/>
-                        <Property name="name" type="java.lang.String" value="useNativeTheme" noResource="true"/>
-                      </Properties>
-                    </Component>
-                    <Component class="javax.swing.JLabel" name="jLabel4">
-                      <Properties>
-                        <Property name="text" type="java.lang.String" value="Simulator Native Theme"/>
-                        <Property name="name" type="java.lang.String" value="jLabel4" noResource="true"/>
-                      </Properties>
                     </Component>
                     <Component class="javax.swing.JLabel" name="jLabel5">
                       <Properties>

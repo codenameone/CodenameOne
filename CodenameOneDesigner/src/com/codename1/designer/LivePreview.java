@@ -294,8 +294,12 @@ public static void updateServer(final java.awt.Component parent) {
                     out.writeUTF(user);
                     out.writeUTF(password);
                     out.writeUTF(getMainFormSelection());
-                    if( getThemeSelection() == null) {
-                        out.writeUTF("");
+                    if(getThemeSelection() == null) {
+                        if(view.getLoadedResources().getThemeResourceNames().length > 0) {
+                            out.writeUTF(view.getLoadedResources().getThemeResourceNames()[0]);
+                        } else {
+                            out.writeUTF("");
+                        }
                     } else {
                         out.writeUTF(getThemeSelection());                        
                     }
@@ -320,6 +324,18 @@ public static void updateServer(final java.awt.Component parent) {
         }
     }.start();
     
+}
+
+public static void setLivePreviewEnabled(boolean e, java.awt.Component parent, ResourceEditorView v) {
+    view = v;
+    if(e) {
+        if(previewKey == null) {
+            previewKey = "";
+            updateServer(parent);
+        }
+    } else {
+        previewKey = null;
+    }
 }
 
 private void enableLivePreviewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_enableLivePreviewActionPerformed

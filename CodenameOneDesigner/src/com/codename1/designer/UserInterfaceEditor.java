@@ -481,8 +481,9 @@ public class UserInterfaceEditor extends BaseForm {
         this.name = name;
         initComponents();
         simulateDevice.setEnabled(projectGeneratorSettings != null);
+
         
-        String themeList = Preferences.userNodeForPackage(getClass()).get("ThemeList", null);
+        /*String themeList = Preferences.userNodeForPackage(getClass()).get("ThemeList", null);
         String themeListSelection = Preferences.userNodeForPackage(getClass()).get("ThemeListSelection", null);
         if(themeList == null) {
             if(res.getThemeResourceNames().length > 0) {
@@ -518,7 +519,7 @@ public class UserInterfaceEditor extends BaseForm {
                 }
                 return super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
             }
-        });
+        });*/
 
         resourceBundle.setModel(new DefaultComboBoxModel(res.getL10NResourceNames()));
         resourceBundle.setEnabled(res.getL10NResourceNames().length > 1);
@@ -736,7 +737,10 @@ public class UserInterfaceEditor extends BaseForm {
                                     cnt = (com.codename1.ui.Container)cmp;
                                 }
                                 for(com.codename1.ui.Component clip : clipboard) {
-                                    clip = copyComponent(clip);
+                                    com.codename1.ui.Component copiedValue = copyComponent(clip);
+                                    if(copiedValue != null) {
+                                        clip = copiedValue;
+                                    }
                                     clip.setName(findUniqueName(clip.getName()));
                                     if(cnt.getLayout() instanceof com.codename1.ui.layouts.BorderLayout) {
                                         if(cnt.getComponentCount() < 5) {
@@ -1720,6 +1724,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneDateSpinner, com.codename1.ui.spinner.DateSpinner.class, "DateSpinner", null);
         makeDraggable(codenameOneTimeSpinner, com.codename1.ui.spinner.TimeSpinner.class, "TimeSpinner", null);
         makeDraggable(codenameOneDateTimeSpinner, com.codename1.ui.spinner.DateTimeSpinner.class, "DateTimeSpinner", null);
+        makeDraggable(codenameOneGenericSpinner, com.codename1.ui.spinner.GenericSpinner.class, "GenericSpinner", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -4041,6 +4046,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneDateSpinner = new javax.swing.JButton();
         codenameOneTimeSpinner = new javax.swing.JButton();
         codenameOneDateTimeSpinner = new javax.swing.JButton();
+        codenameOneGenericSpinner = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4062,14 +4068,8 @@ public class UserInterfaceEditor extends BaseForm {
         localizeTable = new javax.swing.JTable();
         resourceBundle = new javax.swing.JComboBox();
         jPanel9 = new javax.swing.JPanel();
-        previewTheme = new javax.swing.JComboBox();
-        jLabel2 = new javax.swing.JLabel();
-        jLabel1 = new javax.swing.JLabel();
-        addPreviewTheme = new javax.swing.JButton();
         jLabel3 = new javax.swing.JLabel();
         simulateDevice = new javax.swing.JButton();
-        useNativeTheme = new javax.swing.JCheckBox();
-        jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         initialForm = new javax.swing.JButton();
         jScrollPane5 = new javax.swing.JScrollPane();
@@ -4321,6 +4321,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneDateTimeSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneDateTimeSpinner);
 
+        codenameOneGenericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneGenericSpinner.setText("Generic Spinner");
+        codenameOneGenericSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneGenericSpinner.setBorder(null);
+        codenameOneGenericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneGenericSpinner.setName("codenameOneGenericSpinner"); // NOI18N
+        codenameOneGenericSpinner.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneGenericSpinner);
+
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
         jTabbedPane1.addTab("Additional Components", jPanel6);
@@ -4460,33 +4469,12 @@ public class UserInterfaceEditor extends BaseForm {
 
         jPanel9.setName("jPanel9"); // NOI18N
 
-        previewTheme.setToolTipText("Preview Theme");
-        previewTheme.setName("previewTheme"); // NOI18N
-        previewTheme.addActionListener(formListener);
-
-        jLabel2.setText("Theme");
-        jLabel2.setName("jLabel2"); // NOI18N
-
-        jLabel1.setText("Add Theme");
-        jLabel1.setName("jLabel1"); // NOI18N
-
-        addPreviewTheme.setText("...");
-        addPreviewTheme.setName("addPreviewTheme"); // NOI18N
-        addPreviewTheme.addActionListener(formListener);
-
         jLabel3.setText("Simulate Device");
         jLabel3.setName("jLabel3"); // NOI18N
 
         simulateDevice.setText("...");
         simulateDevice.setName("simulateDevice"); // NOI18N
         simulateDevice.addActionListener(formListener);
-
-        useNativeTheme.setSelected(true);
-        useNativeTheme.setToolTipText("<html><body>Use Native Theme On Simulator<br> When Applicable");
-        useNativeTheme.setName("useNativeTheme"); // NOI18N
-
-        jLabel4.setText("Simulator Native Theme");
-        jLabel4.setName("jLabel4"); // NOI18N
 
         jLabel5.setText("Set As Main Form");
         jLabel5.setName("jLabel5"); // NOI18N
@@ -4502,53 +4490,26 @@ public class UserInterfaceEditor extends BaseForm {
             jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel9Layout.createSequentialGroup()
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jLabel2)
-                    .add(jLabel1)
-                    .add(jLabel3)
-                    .add(jLabel4)
-                    .add(jLabel5))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel9Layout.createSequentialGroup()
-                        .add(initialForm)
-                        .add(169, 169, 169))
-                    .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                        .add(jPanel9Layout.createSequentialGroup()
-                            .add(addPreviewTheme)
-                            .add(191, 191, 191))
-                        .add(jPanel9Layout.createSequentialGroup()
-                            .add(previewTheme, 0, 98, Short.MAX_VALUE)
-                            .add(187, 187, 187))
-                        .add(jPanel9Layout.createSequentialGroup()
-                            .add(simulateDevice)
-                            .add(191, 191, 191))
-                        .add(jPanel9Layout.createSequentialGroup()
-                            .add(useNativeTheme)
-                            .add(198, 198, 198)))))
+                    .add(jLabel5)
+                    .add(jLabel3))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                    .add(simulateDevice, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(initialForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .add(187, 187, 187))
         );
         jPanel9Layout.setVerticalGroup(
             jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel9Layout.createSequentialGroup()
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel2)
-                    .add(previewTheme, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 29, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(addPreviewTheme))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .addContainerGap()
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel3)
                     .add(simulateDevice))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(useNativeTheme)
-                    .add(jLabel4))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel5)
                     .add(initialForm))
-                .addContainerGap(153, Short.MAX_VALUE))
+                .addContainerGap(234, Short.MAX_VALUE))
         );
 
         propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
@@ -4658,6 +4619,21 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneMediaPlayer) {
                 UserInterfaceEditor.this.codenameOneMediaPlayerActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneNumericSpinner) {
+                UserInterfaceEditor.this.codenameOneNumericSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneDateSpinner) {
+                UserInterfaceEditor.this.codenameOneDateSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneTimeSpinner) {
+                UserInterfaceEditor.this.codenameOneTimeSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneDateTimeSpinner) {
+                UserInterfaceEditor.this.codenameOneDateTimeSpinnerActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneGenericSpinner) {
+                UserInterfaceEditor.this.codenameOneGenericSpinnerActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
@@ -4688,29 +4664,11 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == resourceBundle) {
                 UserInterfaceEditor.this.resourceBundleActionPerformed(evt);
             }
-            else if (evt.getSource() == previewTheme) {
-                UserInterfaceEditor.this.previewThemeActionPerformed(evt);
-            }
-            else if (evt.getSource() == addPreviewTheme) {
-                UserInterfaceEditor.this.addPreviewThemeActionPerformed(evt);
-            }
             else if (evt.getSource() == simulateDevice) {
                 UserInterfaceEditor.this.simulateDeviceActionPerformed(evt);
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneNumericSpinner) {
-                UserInterfaceEditor.this.codenameOneNumericSpinnerActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneDateSpinner) {
-                UserInterfaceEditor.this.codenameOneDateSpinnerActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneTimeSpinner) {
-                UserInterfaceEditor.this.codenameOneTimeSpinnerActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneDateTimeSpinner) {
-                UserInterfaceEditor.this.codenameOneDateTimeSpinnerActionPerformed(evt);
             }
         }
 
@@ -5202,68 +5160,6 @@ public class UserInterfaceEditor extends BaseForm {
         addComponentToContainer(new com.codename1.ui.ComponentGroup(), "ComponentGroup");
 }//GEN-LAST:event_codenameOneComponentGroupActionPerformed
 
-    private void addPreviewThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addPreviewThemeActionPerformed
-        File[] file = ResourceEditorView.showOpenFileChooser("Resource File", "res");
-        if(file == null || file.length == 0) {
-            return;
-        }
-        FileInputStream f = null;
-        try {
-            String[] t = name.split("@");
-            f = new FileInputStream(file[0]);
-            Resources r = Resources.open(f);
-            if(r.getThemeResourceNames().length == 0) {
-                JOptionPane.showMessageDialog(this, "Theme Not Found In File", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            String themeName;
-            if(r.getThemeResourceNames().length > 1) {
-                JComboBox pick = new JComboBox(r.getThemeResourceNames());
-                int result = JOptionPane.showConfirmDialog(this, pick, "Pick Theme", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-                if(result != JOptionPane.OK_OPTION) {
-                    return;
-                }
-                themeName = (String)pick.getSelectedItem();
-            } else {
-                themeName = r.getThemeResourceNames()[0];
-            }
-            String themeListSelection = file[0].getAbsolutePath() + "@" + themeName;
-            String themeList = Preferences.userNodeForPackage(getClass()).get("ThemeList", null);
-            Preferences.userNodeForPackage(getClass()).put("ThemeListSelection", themeListSelection);
-            if(themeList != null) {
-                themeList += ";" + themeListSelection;
-            } else {
-                themeList = themeListSelection;
-            }
-            Preferences.userNodeForPackage(getClass()).put("ThemeList", themeList);
-            Accessor.setTheme(r.getTheme(themeName));
-            com.codename1.ui.Display.getInstance().getCurrent().refreshTheme();
-            com.codename1.ui.Display.getInstance().getCurrent().revalidate();
-            ((DefaultComboBoxModel)previewTheme.getModel()).addElement(themeListSelection);
-            previewTheme.setSelectedIndex(previewTheme.getItemCount() - 1);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error reading file", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        } finally {
-            try {
-                f.close();
-            } catch (Exception ex) {}
-        }
-    }//GEN-LAST:event_addPreviewThemeActionPerformed
-
-    private void previewThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_previewThemeActionPerformed
-        applyThemePreview((String)previewTheme.getSelectedItem());
-        Preferences.userNodeForPackage(getClass()).put("ThemeListSelection", (String)previewTheme.getSelectedItem());
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                com.codename1.ui.Display.getInstance().getCurrent().refreshTheme();
-                com.codename1.ui.Display.getInstance().getCurrent().revalidate();
-                uiPreview.repaint();
-            }
-        });
-    }//GEN-LAST:event_previewThemeActionPerformed
-
 private void whyAreEventsDisabledActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_whyAreEventsDisabledActionPerformed
     JOptionPane.showMessageDialog(this, 
             "Event buttons are only enabled when the Codename one creator tool\n"
@@ -5279,12 +5175,6 @@ private void whyAreEventsDisabledActionPerformed(java.awt.event.ActionEvent evt)
 
 private void simulateDeviceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_simulateDeviceActionPerformed
     String theme = null;
-    if(!useNativeTheme.isSelected()) {
-        theme = (String)previewTheme.getSelectedItem();
-        if(theme == null && previewTheme.getModel().getSize() > 0) {
-            theme = (String)previewTheme.getModel().getElementAt(0);
-        }
-    }
     PreviewInSimulator.execute(this, theme, ResourceEditorView.getLoadedFile(), name);
 }//GEN-LAST:event_simulateDeviceActionPerformed
 
@@ -5353,6 +5243,14 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
 
 }//GEN-LAST:event_codenameOneDateTimeSpinnerActionPerformed
 
+private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneGenericSpinnerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.spinner.GenericSpinner(), "GenericSpinner");
+}//GEN-LAST:event_codenameOneGenericSpinnerActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5402,23 +5300,7 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
             ((com.codename1.ui.Tabs)destContainer).addTab("Tab", c);
         } else {
             if(destContainer.getLayout() instanceof com.codename1.ui.layouts.BorderLayout) {
-                try {
-                    destContainer.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, c);
-                } catch(Exception e) {
-                    try {
-                        destContainer.addComponent(com.codename1.ui.layouts.BorderLayout.NORTH, c);
-                    } catch(Exception e2) {
-                        try {
-                            destContainer.addComponent(com.codename1.ui.layouts.BorderLayout.SOUTH, c);
-                        } catch(Exception e3) {
-                            try {
-                                destContainer.addComponent(com.codename1.ui.layouts.BorderLayout.EAST, c);
-                            } catch(Exception e4) {
-                                destContainer.addComponent(com.codename1.ui.layouts.BorderLayout.WEST, c);
-                            }
-                        }
-                    }
-                }
+                destContainer.addComponent(findAvailableSpotInBorderLayout(destContainer), c);
             } else {
                 destContainer.addComponent(c);
             }
@@ -5458,7 +5340,6 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton addPreviewTheme;
     private javax.swing.JSplitPane arrangeLeftRight;
     private javax.swing.JButton bindActionEvent;
     private javax.swing.JButton bindBeforeShow;
@@ -5475,6 +5356,7 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
     private javax.swing.JButton codenameOneDateSpinner;
     private javax.swing.JButton codenameOneDateTimeSpinner;
     private javax.swing.JPanel codenameOneExtraComponents;
+    private javax.swing.JButton codenameOneGenericSpinner;
     private javax.swing.JButton codenameOneHTMLComponent;
     private javax.swing.JPanel codenameOneIOComponents;
     private javax.swing.JButton codenameOneLabel;
@@ -5496,10 +5378,7 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
     private javax.swing.JButton fileTree;
     private javax.swing.JTextPane help;
     private javax.swing.JButton initialForm;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
-    private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
@@ -5519,14 +5398,12 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
     private javax.swing.JPanel leftSidePanel;
     private javax.swing.JTable localizeTable;
     private javax.swing.JScrollPane palettePanel;
-    private javax.swing.JComboBox previewTheme;
     private javax.swing.JTable properties;
     private javax.swing.JTabbedPane propertyAndEventTabs;
     private javax.swing.JComboBox resourceBundle;
     private javax.swing.JButton rssReader;
     private javax.swing.JButton simulateDevice;
     private javax.swing.JPanel uiPreview;
-    private javax.swing.JCheckBox useNativeTheme;
     private javax.swing.JPanel userComponents;
     private org.jdesktop.swingx.JXButton whyAreEventsDisabled;
     // End of variables declaration//GEN-END:variables
@@ -6104,6 +5981,7 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
                                 parent.removeComponent(cmps[iter]);
                                 cnt.addComponent(cmps[iter]);
                             }
+                            break;
                         }
 
                         case ENCLOSE_IN_COMPONENT_GROUP: {
@@ -6116,6 +5994,7 @@ private void codenameOneDateTimeSpinnerActionPerformed(java.awt.event.ActionEven
                                 parent.removeComponent(cmps[iter]);
                                 cnt.addComponent(cmps[iter]);
                             }
+                            break;
                         }
                 }
                 containerInstance.revalidate();

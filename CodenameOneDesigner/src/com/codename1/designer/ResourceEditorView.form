@@ -1003,25 +1003,37 @@
             </MenuItem>
           </SubComponents>
         </Menu>
-        <Menu class="javax.swing.JMenu" name="midletMenu">
+        <Menu class="javax.swing.JMenu" name="jMenu8">
           <Properties>
-            <Property name="mnemonic" type="int" value="77"/>
-            <Property name="text" type="java.lang.String" value="Application"/>
-            <Property name="name" type="java.lang.String" value="midletMenu" noResource="true"/>
+            <Property name="text" type="java.lang.String" value="Codename One"/>
+            <Property name="name" type="java.lang.String" value="jMenu8" noResource="true"/>
           </Properties>
           <SubComponents>
-            <MenuItem class="javax.swing.JSeparator" name="jSeparator5">
+            <MenuItem class="javax.swing.JMenuItem" name="signup">
               <Properties>
-                <Property name="name" type="java.lang.String" value="jSeparator5" noResource="true"/>
-              </Properties>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="generateNetbeansProject">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Generate Netbeans Project"/>
-                <Property name="name" type="java.lang.String" value="generateNetbeansProject" noResource="true"/>
+                <Property name="text" type="java.lang.String" value="Signup"/>
+                <Property name="name" type="java.lang.String" value="signup" noResource="true"/>
               </Properties>
               <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="generateNetbeansProjectActionPerformed"/>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="signupActionPerformed"/>
+              </Events>
+            </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="login">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Login"/>
+                <Property name="name" type="java.lang.String" value="login" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loginActionPerformed"/>
+              </Events>
+            </MenuItem>
+            <MenuItem class="javax.swing.JCheckBoxMenuItem" name="livePreviewUI">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Live Preview"/>
+                <Property name="name" type="java.lang.String" value="livePreviewUI" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="livePreviewUIActionPerformed"/>
               </Events>
             </MenuItem>
             <Menu class="javax.swing.JMenu" name="jMenu6">
@@ -1030,15 +1042,6 @@
                 <Property name="name" type="java.lang.String" value="jMenu6" noResource="true"/>
               </Properties>
               <SubComponents>
-                <MenuItem class="javax.swing.JMenuItem" name="uiBuilderSource">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Generate UI State Machine"/>
-                    <Property name="name" type="java.lang.String" value="uiBuilderSource" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="uiBuilderSourceActionPerformed"/>
-                  </Events>
-                </MenuItem>
                 <MenuItem class="javax.swing.JMenuItem" name="resetNetbeansSettings">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Reset Netbeans Settings"/>
@@ -1073,41 +1076,6 @@
             </Menu>
           </SubComponents>
         </Menu>
-        <Menu class="javax.swing.JMenu" name="jMenu8">
-          <Properties>
-            <Property name="text" type="java.lang.String" value="Codename One"/>
-            <Property name="name" type="java.lang.String" value="jMenu8" noResource="true"/>
-          </Properties>
-          <SubComponents>
-            <MenuItem class="javax.swing.JMenuItem" name="signup">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Signup"/>
-                <Property name="name" type="java.lang.String" value="signup" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="signupActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="login">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Login"/>
-                <Property name="name" type="java.lang.String" value="login" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loginActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="livePreview">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Live Preview"/>
-                <Property name="name" type="java.lang.String" value="livePreview" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="livePreviewActionPerformed"/>
-              </Events>
-            </MenuItem>
-          </SubComponents>
-        </Menu>
         <Menu class="javax.swing.JMenu" name="jMenu1">
           <Properties>
             <Property name="text" type="java.lang.String" value="Native Theme"/>
@@ -1127,18 +1095,35 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="iosNativeThemeActionPerformed"/>
               </Events>
             </MenuItem>
-            <MenuItem class="javax.swing.JRadioButtonMenuItem" name="android2NativeTheme">
+            <Menu class="javax.swing.JMenu" name="jMenu3">
               <Properties>
-                <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
-                  <ComponentRef name="nativeThemeButtonGroup"/>
-                </Property>
-                <Property name="text" type="java.lang.String" value="Android (2.3) Theme"/>
-                <Property name="name" type="java.lang.String" value="android2NativeTheme" noResource="true"/>
+                <Property name="text" type="java.lang.String" value="Android"/>
+                <Property name="name" type="java.lang.String" value="jMenu3" noResource="true"/>
               </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="android2NativeThemeActionPerformed"/>
-              </Events>
-            </MenuItem>
+              <SubComponents>
+                <MenuItem class="javax.swing.JRadioButtonMenuItem" name="android2NativeTheme">
+                  <Properties>
+                    <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+                      <ComponentRef name="nativeThemeButtonGroup"/>
+                    </Property>
+                    <Property name="text" type="java.lang.String" value="Gingerbread (2.3.x)"/>
+                    <Property name="name" type="java.lang.String" value="android2NativeTheme" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="android2NativeThemeActionPerformed"/>
+                  </Events>
+                </MenuItem>
+                <MenuItem class="javax.swing.JMenuItem" name="icsNativeTheme">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="ICS (3.x or newer/Tablets)"/>
+                    <Property name="name" type="java.lang.String" value="icsNativeTheme" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="icsNativeThemeActionPerformed"/>
+                  </Events>
+                </MenuItem>
+              </SubComponents>
+            </Menu>
             <MenuItem class="javax.swing.JRadioButtonMenuItem" name="blackberryNativeTheme">
               <Properties>
                 <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">

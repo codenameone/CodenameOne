@@ -30,9 +30,9 @@
                       <Component id="keepAspectRatio" min="-2" max="-2" attributes="0"/>
                       <EmptySpace min="271" pref="271" max="271" attributes="0"/>
                   </Group>
-                  <Component id="height" alignment="0" pref="292" max="32767" attributes="0"/>
-                  <Component id="width" alignment="0" pref="292" max="32767" attributes="0"/>
-                  <Component id="to" alignment="0" pref="292" max="32767" attributes="0"/>
+                  <Component id="height" alignment="0" pref="299" max="32767" attributes="0"/>
+                  <Component id="width" alignment="0" pref="299" max="32767" attributes="0"/>
+                  <Component id="to" alignment="0" pref="299" max="32767" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
           </Group>
@@ -77,15 +77,14 @@
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
           <StringArray count="6">
-            <StringItem index="0" value="Very Low"/>
-            <StringItem index="1" value="Low"/>
-            <StringItem index="2" value="Medium"/>
-            <StringItem index="3" value="High"/>
-            <StringItem index="4" value="Very High"/>
-            <StringItem index="5" value="HD"/>
+            <StringItem index="0" value="Very Low Density 176x220 And Smaller"/>
+            <StringItem index="1" value="Low Density Up To 240x320"/>
+            <StringItem index="2" value="Medium Density Up To (360x480/3.5 inch)"/>
+            <StringItem index="3" value="Hi Density Up To (480x854/3.5-4inch)"/>
+            <StringItem index="4" value="Very Hi Density Up To (1440x720/3.5-4.5inch)"/>
+            <StringItem index="5" value="HD Up To 1920x1080"/>
           </StringArray>
         </Property>
-        <Property name="selectedIndex" type="int" value="3"/>
         <Property name="name" type="java.lang.String" value="to" noResource="true"/>
       </Properties>
     </Component>

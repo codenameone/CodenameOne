@@ -121,6 +121,10 @@ public class ThemeEditor extends BaseForm {
         return themeWasLoaded;
     }
     
+    public static void resetThemeLoaded() {
+        themeWasLoaded = false;
+    }
+    
     /** Creates new form ThemeEditor */
     public ThemeEditor(EditableResources resources, String themeName, Hashtable themeHash, ResourceEditorView view) {
         if(resources.isOverrideMode() && !resources.isOverridenResource(themeName)) {
@@ -364,6 +368,7 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("DateSpinner", com.codename1.ui.spinner.DateSpinner.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("TimeSpinner", com.codename1.ui.spinner.TimeSpinner.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("DateTimeSpinner", com.codename1.ui.spinner.DateTimeSpinner.class);
+            com.codename1.ui.util.UIBuilder.registerCustomComponent("GenericSpinner", com.codename1.ui.spinner.GenericSpinner.class);
             com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
             com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
             if(c instanceof com.codename1.ui.Form) {
