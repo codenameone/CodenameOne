@@ -2378,6 +2378,7 @@ public class UIBuilder {
                     return;
                 }
 
+                evt.consume();
                 showContainer(action, cmd, evt.getComponent());
             }
         }
