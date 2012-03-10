@@ -673,7 +673,9 @@ public class UIBuilder {
                             String key = in.readUTF();
                             Object value = in.readUTF();
                             if(key.equals("$navigation")) {
-                                value = createCommandImpl((String)value, null, -1, "" + value, false, "");
+                                Command cmd = createCommandImpl((String)value, null, -1, (String)value, false, "");
+                                cmd.putClientProperty(COMMAND_ACTION, (String)value);
+                                value = cmd;
                             }
                             val.put(key, value);
                         } else {

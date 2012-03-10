@@ -544,7 +544,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     Hashtable h = (Hashtable)selection;
                     Command cmd = (Command)h.get("$navigation");
                     if(cmd != null) {
-                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(parentList));
+                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd));
                         return;
                     }
                     for(int iter = 0 ; iter < selectedEntries.length ; iter++) {
