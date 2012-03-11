@@ -34,6 +34,7 @@ import java.io.DataOutputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
@@ -305,9 +306,18 @@ public static void updateServer(final java.awt.Component parent) {
                     }
                     InetAddress addr = InetAddress.getLocalHost();
                     byte[] ipAddr = addr.getAddress();
-                    out.writeUTF("http://" + (ipAddr[0] & 0xff) + "." + (ipAddr[1] & 0xff) + 
-                            "." + (ipAddr[2] & 0xff) + "." + (ipAddr[3] & 0xff) + 
-                            ":" + LocalServer.getPort() + "/");
+                    if((ipAddr[0] & 0xff) == 127) {
+                        // workaround  for linux where loopback is returned
+                        Socket s = new Socket("192.168.1.1", 80);
+                        String p = s.getLocalAddress().getHostAddress();
+                        s.close();
+                        out.writeUTF("http://" + p +
+                                ":" + LocalServer.getPort() + "/");
+                    } else {
+                        out.writeUTF("http://" + (ipAddr[0] & 0xff) + "." + (ipAddr[1] & 0xff) + 
+                                "." + (ipAddr[2] & 0xff) + "." + (ipAddr[3] & 0xff) + 
+                                ":" + LocalServer.getPort() + "/");
+                    }
                     view.getLoadedResources().save(out);
                     out.close();
 

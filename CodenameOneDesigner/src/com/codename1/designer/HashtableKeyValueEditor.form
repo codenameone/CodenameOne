@@ -76,7 +76,7 @@
               <Component id="navigationCombo" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="booleanValue" min="-2" max="-2" attributes="0"/>
-              <EmptySpace pref="12" max="32767" attributes="0"/>
+              <EmptySpace max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -169,6 +169,9 @@
     </Component>
     <Component class="javax.swing.JRadioButton" name="isNavigation">
       <Properties>
+        <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+          <ComponentRef name="buttonGroup1"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Navigation"/>
         <Property name="name" type="java.lang.String" value="isNavigation" noResource="true"/>
       </Properties>

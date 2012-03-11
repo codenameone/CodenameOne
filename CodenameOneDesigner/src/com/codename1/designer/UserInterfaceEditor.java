@@ -25,7 +25,6 @@
 package com.codename1.designer;
 
 import com.l2fprod.common.swing.JOutlookBar;
-import com.codename1.ui.Display;
 import com.codename1.ui.resource.util.CodenameOneComponentWrapper;
 import com.codename1.ui.CodenameOneAccessor;
 import com.codename1.ui.layouts.BorderLayout;
@@ -69,11 +68,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -88,9 +84,6 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.prefs.Preferences;
 import javax.swing.AbstractAction;
 import javax.swing.AbstractCellEditor;
 import javax.swing.ComboBoxModel;
@@ -2971,7 +2964,11 @@ public class UserInterfaceEditor extends BaseForm {
                                     } else {
                                         out.writeInt(1);
                                         out.writeUTF((String)key);
-                                        out.writeUTF((String)val);
+                                        if(val instanceof ActionCommand) {
+                                            out.writeUTF(((ActionCommand)val).getAction());
+                                        } else {
+                                            out.writeUTF((String)val);
+                                        }
                                     }
                                 }
                             }
@@ -5187,27 +5184,7 @@ private void codenameOneMediaPlayerActionPerformed(java.awt.event.ActionEvent ev
 }//GEN-LAST:event_codenameOneMediaPlayerActionPerformed
 
 private void initialFormActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_initialFormActionPerformed
-    Properties p = view.getProjectGeneratorSettings();
-    if(p != null) {
-        p.setProperty("mainForm", name);
-        File codenameone_settings = new File(ResourceEditorView.getLoadedFile().getParentFile().getParentFile(), "codenameone_settings.properties");
-        if(codenameone_settings.exists()) {
-            OutputStream o = null;
-            try {
-                o = new FileOutputStream(codenameone_settings);
-                projectGeneratorSettings.store(o, "");
-                o.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Error In Saving Settings: " + ex, "Error", JOptionPane.ERROR_MESSAGE);
-            } finally {
-                try {
-                    o.close();
-                } catch (IOException ex) {
-                }
-            }
-        }
-    }
+    view.setNewMainForm(name);
 }//GEN-LAST:event_initialFormActionPerformed
 
 private void codenameOneNumericSpinnerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneNumericSpinnerActionPerformed

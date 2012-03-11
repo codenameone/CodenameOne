@@ -98,6 +98,10 @@ public class CommandEditor extends javax.swing.JPanel {
                     String[] arr = a.split(";");
                     action.setSelectedItem(arr[0]);
                     postAction.setSelectedItem(arr[1]);
+                } else {
+                    if(a.startsWith("$")) {
+                        a = a.substring(1);
+                    }
                 }
             }
         }

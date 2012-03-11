@@ -44,6 +44,7 @@ import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilder;
 import com.codename1.ui.util.UIBuilderOverride;
 import java.awt.Component;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -1717,6 +1718,13 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
             removeFont(element);
             return;
         }
+        if(Arrays.asList(loadedResources.getUIResourceNames()).contains(element)) {
+            String usedBy = getUiResourceInUse(element);
+            if(usedBy != null) {
+                JOptionPane.showMessageDialog(mainPanel, element + " is used by " + usedBy, "Resource In Use", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
         removeSelection(element);
         themeList.refresh();
         dataList.refresh();
@@ -1740,6 +1748,13 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
     
 private void renameItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_renameItemActionPerformed
     if(selectedResource != null && loadedResources.containsResource(selectedResource)) {
+        if(Arrays.asList(loadedResources.getUIResourceNames()).contains(selectedResource)) {
+            String usedBy = getUiResourceInUse(selectedResource);
+            if(usedBy != null) {
+                JOptionPane.showMessageDialog(mainPanel, selectedResource + " is used by " + usedBy, "Resource In Use", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
         Box rename = new Box(BoxLayout.X_AXIS);
         rename.add(new JLabel("New Name: "));
         JTextField field = new JTextField(selectedResource, 20);
@@ -3152,6 +3167,29 @@ private void showPasswordDialog(String password) {
  * less than 0
  */
 public static void openInIDE(File f, int lineNumber) {
+    // Check if this is a NetBeans project
+    File nbProject = new File(loadedFile.getParentFile().getParentFile(), "nbproject");
+    
+    // this is an eclipse project
+    if(!nbProject.exists()) {
+        FileOutputStream fs = null;
+        try {
+            String userDir = System.getProperty("user.home");
+            File resEditorLoc = new File(userDir,".codenameone");
+            fs = new FileOutputStream(new File(resEditorLoc, "open.txt"));
+            fs.write((f.getAbsolutePath() + ":" + lineNumber).getBytes());
+            fs.close();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        } finally {
+            try {
+                fs.close();
+            } catch (IOException ex) {
+            }
+        }
+        return;
+    }
+    
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("netbeansInstall", null);
     if(manualIDESettings != null) {
         node = manualIDESettings;
@@ -3223,6 +3261,29 @@ public static void openInIDE(File f, int lineNumber) {
 	}
 
 
+    private String getUiResourceInUse(final String element) {
+        for(String res : loadedResources.getUIResourceNames()) {
+            if(!res.equals(element)) {
+                if(isUiResourceInUse(element, res)) {
+                    return res;
+                }
+            }
+        }
+        return null;
+    }
+    
+    private boolean isUiResourceInUse(final String element, String resource) {
+        final boolean[] flag = new boolean[1];
+        UIBuilder uib = new UIBuilder() {
+            public com.codename1.ui.Container createContainer(Resources res, String resourceName) {
+                flag[0] = flag[0] || element.equals(resourceName);
+                return super.createContainer(res, resourceName);
+            }
+        };
+        uib.createContainer(loadedResources, resource);
+        return flag[0];
+    }
+    
     /**
      * Returns true if the given image is used by a theme or timeline animation,
      * false otherwise.
@@ -3687,6 +3748,30 @@ public static void openInIDE(File f, int lineNumber) {
         }
     }
 
+    public void setNewMainForm(String mainForm) {
+        Properties p = projectGeneratorSettings;
+        if(p != null) {
+            p.setProperty("mainForm", mainForm);
+            File codenameone_settings = new File(ResourceEditorView.getLoadedFile().getParentFile().getParentFile(), "codenameone_settings.properties");
+            if(codenameone_settings.exists()) {
+                OutputStream o = null;
+                try {
+                    o = new FileOutputStream(codenameone_settings);
+                    projectGeneratorSettings.store(o, "");
+                    o.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(mainPanel, "Error In Saving Settings: " + ex, "Error", JOptionPane.ERROR_MESSAGE);
+                } finally {
+                    try {
+                        o.close();
+                    } catch (IOException ex) {
+                    }
+                }
+            }
+        }
+    }
+    
     void setLoadedFile(File loadedFile) {
         this.loadedFile = loadedFile;
         updateLoadedFile();
@@ -3785,9 +3870,22 @@ public static void openInIDE(File f, int lineNumber) {
                     if(projectGeneratorSettings != null) {
                         File f = new File(loadedFile.getParentFile().getParentFile(), projectGeneratorSettings.getProperty("baseClass"));
                         if(f.exists()) {
-                            generateStateMachineCode(projectGeneratorSettings.getProperty("mainForm"),
-                                    f,
-                                    false);
+                            String formName = projectGeneratorSettings.getProperty("mainForm");
+                            if(loadedResources.getResourceObject(formName) == null) {
+                                String[] arr = loadedResources.getUIResourceNames();
+                                if(arr.length > 0) {
+                                    JPanel panel = new JPanel();
+                                    JComboBox combo = new JComboBox(loadedResources.getUIResourceNames());
+                                    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+                                    panel.add(new JLabel("<html><body>The main form is missing,<br>Please pick a new main form"));
+                                    panel.add(combo);
+                                    int result = JOptionPane.showConfirmDialog(mainPanel, panel, "Main Form Missing", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                                    if(result == JOptionPane.OK_OPTION) {
+                                        setNewMainForm((String)combo.getSelectedItem());
+                                    }
+                                }
+                            }
+                            generateStateMachineCode(formName, f, false);
                         }
                         platformOverrides.setEnabled(true);
                     }

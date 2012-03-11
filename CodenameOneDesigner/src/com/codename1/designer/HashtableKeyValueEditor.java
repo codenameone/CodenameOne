@@ -87,6 +87,9 @@ public class HashtableKeyValueEditor extends javax.swing.JPanel {
         if(isBoolean.isSelected()) {
             return "" + booleanValue.isSelected();
         }
+        if(isNavigation.isSelected()) {
+            return navigationCombo.getSelectedItem();
+        }
         return res.getImage((String)imageValue.getSelectedItem());
     }
 
@@ -151,6 +154,7 @@ public class HashtableKeyValueEditor extends javax.swing.JPanel {
         booleanValue.setEnabled(false);
         booleanValue.setName("booleanValue"); // NOI18N
 
+        buttonGroup1.add(isNavigation);
         isNavigation.setText("Navigation");
         isNavigation.setName("isNavigation"); // NOI18N
         isNavigation.addActionListener(formListener);
@@ -210,7 +214,7 @@ public class HashtableKeyValueEditor extends javax.swing.JPanel {
                 .add(navigationCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(booleanValue)
-                .addContainerGap(12, Short.MAX_VALUE))
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
     }
 
