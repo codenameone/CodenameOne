@@ -30,10 +30,10 @@ import java.lang.reflect.Method;
  * @author Shai Almog
  */
 public class Executor {
-    public static void main(String[] argv) throws Exception {
+    public static void main(final String[] argv) throws Exception {
         FixedJavaSoundRenderer r = new FixedJavaSoundRenderer();
         r.usurpControlFromJavaSoundRenderer();
-        Class c = Class.forName(argv[0]);
+        final Class c = Class.forName(argv[0]);
         try {
             Method m = c.getDeclaredMethod("main", String[].class);
             m.invoke(null, new Object[]{null});
@@ -42,19 +42,27 @@ public class Executor {
                 Method m = c.getDeclaredMethod("startApp");
                 m.invoke(c.newInstance());
             } catch (NoSuchMethodException noStartApp) {
-                try {
-                    if (Display.isInitialized()) {
-                        Display.deinitialize();
-                    }
-                    Display.init(null);
-                    Method m = c.getDeclaredMethod("init", Object.class);
-                    Object o = c.newInstance();
-                    m.invoke(o, new Object[]{null});
-                    m = c.getDeclaredMethod("start", new Class[0]);
-                    m.invoke(o, new Object[0]);
-                } catch (NoSuchMethodException err) {
-                    System.out.println("Couldn't find a main or a startup in " + argv[0]);
+                if (Display.isInitialized()) {
+                    Display.deinitialize();
                 }
+                Display.init(null);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Method m = c.getDeclaredMethod("init", Object.class);
+                            Object o = c.newInstance();
+                            m.invoke(o, new Object[]{null});
+                            m = c.getDeclaredMethod("start", new Class[0]);
+                            m.invoke(o, new Object[0]);
+                        } catch (NoSuchMethodException err) {
+                            System.out.println("Couldn't find a main or a startup in " + argv[0]);
+                        } catch (Exception err) {
+                            err.printStackTrace();
+                            System.exit(1);
+                        }
+                    }
+                });
             }
         }
     }
