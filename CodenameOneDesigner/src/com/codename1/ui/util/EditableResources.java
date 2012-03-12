@@ -130,10 +130,10 @@ public class EditableResources extends Resources implements TreeModel {
         ImageIO.write(buffer, "png", byteOut);
         byte[] data = byteOut.toByteArray();
         output.writeInt(data.length);
+        output.write(data);
         output.writeInt(buffer.getWidth());
         output.writeInt(buffer.getHeight());
         output.writeBoolean(EncodedImage.create(data).isOpaque());
-        output.write(data);
     }
 
     /**
