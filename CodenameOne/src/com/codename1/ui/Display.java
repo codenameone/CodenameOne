@@ -2511,4 +2511,14 @@ public final class Display {
     public void dial(String phoneNumber) {
         impl.dial(phoneNumber);
     }    
+    
+    /**
+     * Sends a SMS message to the given phone number
+     * @param phoneNumber to send the sms
+     * @param message the content of the sms
+     */
+    public void sendSMS(String phoneNumber, String message) throws IOException{
+        impl.sendSMS(phoneNumber, message);
+    }
+    
 }

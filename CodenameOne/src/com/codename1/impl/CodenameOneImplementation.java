@@ -3875,6 +3875,15 @@ public abstract class CodenameOneImplementation {
      */
     public void dial(String phoneNumber) {        
     }
+
+    /**
+     * Sends a SMS message to the given phone number
+     * @param phoneNumber to send the sms
+     * @param message the content of the sms
+     * @throws IOException if for some reason sending failed
+     */
+    public void sendSMS(String phoneNumber, String message) throws IOException{
+    }
     
     /**
      * Returns an image representing the application icon, or null if not supported. This is used on
@@ -3935,4 +3944,5 @@ public abstract class CodenameOneImplementation {
             return new Object[0].getClass();
         }
     }
+
 }

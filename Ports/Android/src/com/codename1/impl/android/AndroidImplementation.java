@@ -9,6 +9,7 @@ import com.codename1.ui.geom.Dimension;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -71,6 +72,7 @@ import android.media.MediaPlayer;
 import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.telephony.SmsManager;
 import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.widget.MediaController;
@@ -2577,6 +2579,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:"+ phoneNumber));
         activity.startActivity(dialer);
     }
+    
+    
+    /**
+     * @inheritDoc
+     */
+    public void sendSMS(final String phoneNumber, final String message) throws IOException{
+        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
+        new Intent("SMS_DELIVERED"), 0);
+        SmsManager sms = SmsManager.getDefault();
+        sms.sendTextMessage(phoneNumber, null, message, deliveredPI, null);     
+    }    
 
     /**
      * @inheritDoc

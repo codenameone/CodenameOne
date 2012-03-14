@@ -92,6 +92,10 @@ import com.codename1.io.NetworkManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import javax.microedition.io.Datagram;
+import javax.microedition.io.DatagramConnection;
+import javax.wireless.messaging.MessageConnection;
+import javax.wireless.messaging.TextMessage;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.blackberry.api.invoke.MessageArguments;
@@ -117,6 +121,7 @@ import net.rim.device.api.system.ApplicationManagerException;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.CodeModuleManager;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.system.RadioInfo;
 
 /**
  * The implementation of the blackberry platform delegates the work to the underlying UI
@@ -2712,7 +2717,65 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             EventLog.getInstance().logErrorEvent("unable to open dialer " + e.getMessage());
         }
     }
+
+    public void sendSMS(final String phoneNumber, final String message) throws IOException {
+        //why on hell?? RIM has 2 different API's one for CDMA and 
+        //one for GSM
+        if (!isCDMA()) {
+            String address = "sms://" + phoneNumber + ":5000";
+            MessageConnection con = null;
+
+            try {
+                con = (MessageConnection) Connector.open(address);
+                TextMessage txtmessage =
+                        (TextMessage) con.newMessage(MessageConnection.TEXT_MESSAGE);
+                txtmessage.setAddress(address);
+                txtmessage.setPayloadText(message);
+                con.send(txtmessage);
+            } catch (Exception e) {
+                throw new IOException("failed to send sms " + e.getMessage());
+            } finally {
+                if (con != null) {
+                    try {
+                        con.close();
+                    } catch (IOException ioe) {
+                        ioe.printStackTrace();
+                    }
+                }
+            }
+        } else {
+            DatagramConnection connection = null;
+            try {
+                byte[] data = (message).getBytes("UTF-8");
+                connection = (DatagramConnection) Connector.open(
+                        "sms://" + phoneNumber + ":5016");
+                Datagram dg = connection.newDatagram(
+                        connection.getMaximumLength());
+                dg.setData(data, 0, data.length);
+
+                connection.send(dg);
+            } catch (IOException e) {
+                throw new IOException("failed to send sms " + e.getMessage());
+            } finally {
+                try {
+                    connection.close();
+                    connection = null;
+                } catch (Exception e) {
+                }
+            }
+
+        }
+    }
+
     
+    private boolean isCDMA() {
+        if ((RadioInfo.getActiveWAFs() & RadioInfo.WAF_CDMA)
+                == RadioInfo.WAF_CDMA) {
+            return true;
+        } else {
+            return false;
+        }
+    }
     /**
      * @inheritDoc
      */

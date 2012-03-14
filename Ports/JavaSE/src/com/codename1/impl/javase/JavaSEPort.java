@@ -111,7 +111,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.IIOException;
@@ -2580,8 +2582,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         List r = new ArrayList();
         List<String> headers = c.getHeaderFields().get(name);
         if (headers != null && headers.size() > 0) {
-            String[] s = new String[headers.size()];
-            headers.toArray(s);
+            Vector v = new Vector<String>();
+            v.addAll(headers);
+            Collections.reverse(v);
+            String[] s = new String[v.size()];
+            v.toArray(s);
             return s;
         }
         return null;
@@ -2768,7 +2773,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void sendMessage(String[] recieptents, String subject, Message msg) {
         System.out.println("sending message to " + recieptents[0]);
     }
+    
+    @Override
+    public void sendSMS(final String phoneNumber, final String message) throws IOException{
+        System.out.println("sending sms to " + phoneNumber);
+    }
 
+    @Override
+    public void dial(String phoneNumber) {
+        System.out.println("dialing to " + phoneNumber);
+    }
+    
+    
     @Override
     public boolean shouldAutoDetectAccessPoint() {
         return true;

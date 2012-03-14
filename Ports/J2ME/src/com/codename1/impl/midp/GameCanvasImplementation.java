@@ -78,6 +78,8 @@ import javax.microedition.media.control.RecordControl;
 import javax.microedition.rms.RecordEnumeration;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
+import javax.wireless.messaging.MessageConnection;
+import javax.wireless.messaging.TextMessage;
 
 /**
  * An implementation of Codename One based on game canvas, this is the default implementation
@@ -2860,6 +2862,33 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         execute("tel:" + phoneNumber);
     }
     
+    /**
+     * @inheritDoc
+     */
+    public void sendSMS(final String phoneNumber, final String message) throws IOException{
+        String address = "sms://" + phoneNumber + ":5000";
+        MessageConnection con = null;
+
+        try {
+            con = (MessageConnection) Connector.open(address);
+            TextMessage txtmessage =
+                    (TextMessage) con.newMessage(MessageConnection.TEXT_MESSAGE);
+            txtmessage.setAddress(address);
+            txtmessage.setPayloadText(message);
+            con.send(txtmessage);
+        } catch (Exception e) {
+            throw new IOException("failed to send sms " + e.getMessage());
+        } finally {
+            if (con != null) {
+                try {
+                    con.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+            }
+        }
+
+    }
     
     /**
      * @inheritDoc
