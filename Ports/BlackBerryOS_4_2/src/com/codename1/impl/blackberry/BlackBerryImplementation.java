@@ -461,6 +461,16 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public Object createImage(String path) throws IOException {
+        if (exists(path)) {
+            InputStream is = null;
+            try {
+                is = openInputStream(path);
+                return createImage(is);
+            } finally {
+                is.close();
+            }
+        }
+
         try {
             return createImage(com.codename1.ui.Image.class.getResourceAsStream(path));
         } catch (RuntimeException err) {

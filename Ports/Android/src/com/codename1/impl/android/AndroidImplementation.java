@@ -105,6 +105,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import org.apache.http.conn.scheme.Scheme;
@@ -153,11 +155,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
-
     private Uri imageUri;
     private ActionListener intentResponse;
-    
-    
+
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
@@ -167,11 +167,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Exception e) {
             Log.d("Codename One", "No idea why this throws a Runtime Error", e);
         }
-        
+
         if (m instanceof CodenameOneActivity) {
             ((CodenameOneActivity) m).setIntentResultListener(this);
         }
-        
+
         int hardwareAcceleration = 16777216;
         activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
         /**
@@ -202,7 +202,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Display.getInstance().setDefaultVirtualKeyboard(vkb);
 
         saveTextEditingState();
-        
+
         activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
         if (nativePeers.size() > 0) {
@@ -686,18 +686,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createImage(String path) throws IOException {
-        InputStream in = this.getResourceAsStream(null, path);
-        if (in == null) {
-            throw new IOException("Resource not found. " + path);
-        }
-        try {
-            return this.createImage(in);
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (Exception ignored) {
-                    ;
+        int IMAGE_MAX_SIZE = getDisplayHeight()*2;
+        if (exists(path)) {
+            Bitmap b = null;
+            try {
+                //Decode image size
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+
+                FileInputStream fis = new FileInputStream(path);
+                BitmapFactory.decodeStream(fis, null, o);
+                fis.close();
+
+                int scale = 1;
+                if (o.outHeight > IMAGE_MAX_SIZE || o.outWidth > IMAGE_MAX_SIZE) {
+                    scale = (int) Math.pow(2, (int) Math.round(Math.log(IMAGE_MAX_SIZE / (double) Math.max(o.outHeight, o.outWidth)) / Math.log(0.5)));
+                }
+
+                //Decode with inSampleSize
+                BitmapFactory.Options o2 = new BitmapFactory.Options();
+                o2.inSampleSize = scale;
+                fis = new FileInputStream(path);
+                b = BitmapFactory.decodeStream(fis, null, o2);
+                fis.close();
+            } catch (IOException e) {
+            }
+            return b;
+        } else {
+            InputStream in = this.getResourceAsStream(getClass(), path);
+            if (in == null) {
+                throw new IOException("Resource not found. " + path);
+            }
+            try {
+                return this.createImage(in);
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (Exception ignored) {
+                        ;
+                    }
                 }
             }
         }
@@ -721,7 +749,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         i.recycle();
     }
 
-    
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
         BitmapFactory.Options opts = new BitmapFactory.Options();
@@ -794,7 +821,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void drawImage(Object graphics, Object img, int x, int y) {
         ((AndroidGraphics) graphics).getCanvas().drawBitmap((Bitmap) img, x, y, ((AndroidGraphics) graphics).getPaint());
     }
-    
+
     public boolean isScaledImageDrawingSupported() {
         return true;
     }
@@ -811,7 +838,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         dest.bottom = y + h;
         dest.left = x;
         dest.right = x + w;
-        
+
         ((AndroidGraphics) graphics).getCanvas().drawBitmap(b, src, dest, ((AndroidGraphics) graphics).getPaint());
     }
 
@@ -1270,40 +1297,55 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String getUserAgent() {
-    try {
-        Constructor<WebSettings> constructor = WebSettings.class.getDeclaredConstructor(Context.class, WebView.class);
-        constructor.setAccessible(true);
         try {
-            WebSettings settings = constructor.newInstance(activity, null);
-            return settings.getUserAgentString();
-        } finally {
-            constructor.setAccessible(false);
-        }
-    } catch (Exception e) {
-        final StringBuffer ua = new StringBuffer();
-        if(Thread.currentThread().getName().equalsIgnoreCase("main")){
-            WebView m_webview = new WebView(activity);
-            ua.append(m_webview.getSettings().getUserAgentString());
-        }else{
-            Thread thread = new Thread(){
-                public void run(){
-                    Looper.prepare();
-                    WebView m_webview = new WebView(activity);
-                    ua.append(m_webview.getSettings().getUserAgentString());
-                    Looper.loop();
+            Constructor<WebSettings> constructor = WebSettings.class.getDeclaredConstructor(Context.class, WebView.class);
+            constructor.setAccessible(true);
+            try {
+                WebSettings settings = constructor.newInstance(activity, null);
+                return settings.getUserAgentString();
+            } finally {
+                constructor.setAccessible(false);
+            }
+        } catch (Exception e) {
+            final StringBuffer ua = new StringBuffer();
+            if (Thread.currentThread().getName().equalsIgnoreCase("main")) {
+                WebView m_webview = new WebView(activity);
+                ua.append(m_webview.getSettings().getUserAgentString());
+            } else {
+                final boolean[] flag = new boolean[1];
+                Thread thread = new Thread() {
+
+                    public void run() {
+                        Looper.prepare();
+                        WebView m_webview = new WebView(activity);
+                        ua.append(m_webview.getSettings().getUserAgentString());
+                        Looper.loop();
+                        flag[0] = true;
+                        synchronized (flag) {
+                            flag.notify();
+                        }
+                    }
+                };
+                thread.start();
+                while (!flag[0]) {
+                    synchronized (flag) {
+                        try {
+                            flag.wait(100);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
                 }
-            };
-            thread.start();
+            }
+            return ua.toString();
         }
-        return ua.toString();
     }
-}
+
     /**
      * @inheritDoc
      */
     public void execute(String url) {
         try {
-            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); 
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1343,7 +1385,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     @Override
-    public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+    public Media createMedia(final String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
 
         if (uri.startsWith("file://")) {
             return createMedia(uri.substring(7), isVideo, onCompletion);
@@ -1358,14 +1400,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Media retVal;
 
         if (isVideo) {
-            VideoView video = new VideoView(activity);
-            video.setZOrderMediaOverlay(true);
-            if (file != null) {
-                video.setVideoURI(Uri.fromFile(file));
-            } else {
-                video.setVideoURI(Uri.parse(uri));
+            final Video[] video = new Video[1];
+            final boolean[] flag = new boolean[1];
+            final File f = file;
+            activity.runOnUiThread(new Runnable() {
+
+                @Override
+                public void run() {
+                    VideoView v = new VideoView(activity);
+                    v = new VideoView(activity);
+                    v.setZOrderMediaOverlay(true);
+                    if (f != null) {
+                        v.setVideoURI(Uri.fromFile(f));
+                    } else {
+                        v.setVideoURI(Uri.parse(uri));
+                    }
+                    video[0] = new Video(v, activity, onCompletion);                    
+                    flag[0] = true;
+                    synchronized (flag) {
+                        flag.notify();
+                    }
+                }
+            });
+            while (!flag[0]) {
+                synchronized (flag) {
+                    try {
+                        flag.wait(100);
+                    } catch (InterruptedException ex) {
+                    }
+                }
             }
-            retVal = new Video(video, activity, onCompletion);
+            return video[0];
         } else {
             MediaPlayer player;
             if (file != null) {
@@ -1385,7 +1450,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     @Override
-    public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+    public Media createMedia(InputStream stream, String mimeType, final Runnable onCompletion) throws IOException {
 
         boolean isVideo = mimeType.contains("video");
 
@@ -1396,7 +1461,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return new Audio(activity, player, stream, onCompletion);
         }
 
-        File temp = File.createTempFile("mtmp", "dat");
+        final File temp = File.createTempFile("mtmp", "dat");
         temp.deleteOnExit();
         FileOutputStream out = new FileOutputStream(temp);
         byte buf[] = new byte[256];
@@ -1408,10 +1473,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
         if (isVideo) {
-            VideoView video = new VideoView(activity);
-            video.setZOrderMediaOverlay(true);
-            video.setVideoURI(Uri.fromFile(temp));
-            return new Video(video, activity, onCompletion);
+            final Video[] retVal = new Video[1];
+            final boolean[] flag = new boolean[1];
+
+            activity.runOnUiThread(new Runnable() {
+
+                @Override
+                public void run() {
+                    VideoView v = new VideoView(activity);
+                    v.setZOrderMediaOverlay(true);
+                    v.setVideoURI(Uri.fromFile(temp));
+                    retVal[0] = new Video(v, activity, onCompletion);
+                    flag[0] = true;
+                    synchronized (flag) {
+                        flag.notify();
+                    }
+                }
+            });
+            while (!flag[0]) {
+                synchronized (flag) {
+                    try {
+                        flag.wait(100);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+
+            return retVal[0];
         } else {
             return createMedia(new FileInputStream(temp), mimeType, onCompletion);
         }
@@ -1529,7 +1617,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.v = vv;
             clear.setColor(0xAA000000);
             clear.setStyle(Style.FILL);
-            v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), 
+            v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                     MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
         }
 
@@ -1637,7 +1725,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
 
                             public boolean onTouch(View v, MotionEvent me) {
-                               return false;//myView.onTouchEvent(me);
+                                return false;//myView.onTouchEvent(me);
                             }
                         });
                     }
@@ -1873,10 +1961,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             testedNativeTheme = true;
             try {
                 InputStream is;
-                if(android.os.Build.VERSION.SDK_INT < 14 && !isTablet()){
+                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet()) {
                     is = getResourceAsStream(getClass(), "/androidTheme.res");
-                }else{
-                    is = getResourceAsStream(getClass(), "/android_holo_light.res");                
+                } else {
+                    is = getResourceAsStream(getClass(), "/android_holo_light.res");
                 }
                 nativeThemeAvailable = is != null;
                 if (is != null) {
@@ -1984,7 +2072,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidBrowserComponent) browserPeer).stop();
     }
 
-    
     /**
      * Reload the current page
      * @param browserPeer browser instance
@@ -2107,8 +2194,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     parent.fireWebEvent("onStart", new ActionEvent(url));
                     super.onPageStarted(view, url, favicon);
                 }
-                
-                
+
                 public void onPageFinished(WebView view, String url) {
                     parent.fireWebEvent("onLoad", new ActionEvent(url));
                     super.onPageFinished(view, url);
@@ -2198,7 +2284,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void stop() {
             web.stopLoading();
         }
-        
+
         public void setPage(String html, String baseUrl) {
             web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
         }
@@ -2218,7 +2304,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object connect(String url, boolean read, boolean write) throws IOException {
         URL u = new URL(url);
         URLConnection con = u.openConnection();
-        if(con instanceof HttpURLConnection){
+        if (con instanceof HttpURLConnection) {
             HttpURLConnection c = (HttpURLConnection) con;
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
@@ -2566,30 +2652,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
         emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
         emailIntent.setType(msg.getMimeType());
-        if(msg.getAttachment() != null && msg.getAttachment().length() > 0){
-            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://"+ msg.getAttachment()));        
+        if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
+            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
         }
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }
- 
+
     /**
      * @inheritDoc
      */
-    public void dial(String phoneNumber) {        
-        Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:"+ phoneNumber));
+    public void dial(String phoneNumber) {
+        Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber));
         activity.startActivity(dialer);
     }
-    
-    
+
     /**
      * @inheritDoc
      */
-    public void sendSMS(final String phoneNumber, final String message) throws IOException{
+    public void sendSMS(final String phoneNumber, final String message) throws IOException {
         PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
-        new Intent("SMS_DELIVERED"), 0);
+                new Intent("SMS_DELIVERED"), 0);
         SmsManager sms = SmsManager.getDefault();
-        sms.sendTextMessage(phoneNumber, null, message, deliveredPI, null);     
-    }    
+        sms.sendTextMessage(phoneNumber, null, message, deliveredPI, null);
+    }
 
     /**
      * @inheritDoc
@@ -2602,13 +2687,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
-        if(isTablet()) {
-            return new String[] {"tablet", "android", "android-tab"};
+        if (isTablet()) {
+            return new String[]{"tablet", "android", "android-tab"};
         } else {
-            return new String[] {"phone", "android", "android-phone"};
+            return new String[]{"phone", "android", "android-phone"};
         }
     }
-        
+
     public class Video extends AndroidImplementation.AndroidPeer implements Media {
 
         private VideoView nativeVideo;
@@ -2619,14 +2704,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean nativePlayer;
         private Form curentForm;
 
-        public Video(VideoView nativeVideo, Activity activity, final Runnable onCompletion) {
+        public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
             super(nativeVideo);
             this.nativeVideo = nativeVideo;
             this.activity = activity;
             if (nativeController) {
-                MediaController mc = new MediaController(activity);
+                MediaController mc = new CN1MediaController();
                 nativeVideo.setMediaController(mc);
             }
+
             nativeVideo.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
                 @Override
@@ -2763,7 +2849,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        
+        System.out.println("requestCode " + requestCode);
+        System.out.println("resultCode " + resultCode);
+        System.out.println("intent " + intent);
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
@@ -2776,29 +2864,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     picture.recycle();
                     picture = null;
                     new File(path).delete();
-
                     intentResponse.actionPerformed(new ActionEvent(f.getAbsolutePath()));
+                    return;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            } else if(requestCode == CAPTURE_VIDEO || requestCode == CAPTURE_AUDIO){
+            } else if (requestCode == CAPTURE_VIDEO || requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, activity);
-                intentResponse.actionPerformed(new ActionEvent(path));            
+                intentResponse.actionPerformed(new ActionEvent(path));
+                return;
             }
         }
+        intentResponse.actionPerformed(null);
+
     }
 
-    public void capturePhoto(int type, ActionListener response) {
+    @Override
+    public void capturePhoto(ActionListener response) {
         intentResponse = response;
-        
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-        
-        String fileName = "temp.jpg";  
-        ContentValues values = new ContentValues();  
-        values.put(MediaStore.Images.Media.TITLE, fileName);  
-        imageUri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);  
-                        
+
+        String fileName = "temp.jpg";
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.TITLE, fileName);
+        imageUri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
 
         this.activity.startActivityForResult(intent, CAPTURE_IMAGE);
@@ -2807,7 +2898,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void captureVideo(ActionListener response) {
         intentResponse = response;
-        Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);                                
+        Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
         this.activity.startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
@@ -2817,24 +2908,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
         this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
     }
-     
-    
-    
-    
+
     class NativeImage extends Image {
 
         public NativeImage(Bitmap nativeImage) {
             super(nativeImage);
         }
     }
-    
-    
+
     /** Create a File for saving an image or video */
     private File getOutputMediaFile(boolean isVideo) {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
         activity.getComponentName();
-        
+
         File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES), "" + activity.getTitle());
         // This location works best if you want the created images to be shared
@@ -2854,10 +2941,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!isVideo) {
             mediaFile = new File(mediaStorageDir.getPath() + File.separator
                     + "IMG_" + timeStamp + ".jpg");
-        } else{
+        } else {
             mediaFile = new File(mediaStorageDir.getPath() + File.separator
                     + "VID_" + timeStamp + ".mp4");
-        } 
+        }
 
         return mediaFile;
     }
@@ -2877,4 +2964,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
+    
+    class CN1MediaController extends MediaController{
+        
+        public CN1MediaController(){
+            super(activity);
+        }
+
+        @Override
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            int keycode = event.getKeyCode();
+            keycode = AndroidView.internalKeyCodeTranslate(keycode);
+            if(keycode == AndroidImplementation.DROID_IMPL_KEY_BACK){
+                Display.getInstance().keyPressed(keycode);
+                Display.getInstance().keyReleased(keycode);
+                return true;
+            }else{            
+                return super.dispatchKeyEvent(event);
+            }
+        }
+        
+        
+        
+    }
+    
 }

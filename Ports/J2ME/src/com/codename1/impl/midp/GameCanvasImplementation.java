@@ -733,16 +733,23 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-    public Object createImage(
-            String path) throws IOException {
+    public Object createImage(String path) throws IOException {
+        if(exists(path)){
+            InputStream is = null;
+            try {
+                is = openInputStream(path);
+                return createImage(is);
+            } finally {
+                is.close();
+            }
+        }
         return javax.microedition.lcdui.Image.createImage(path);
     }
 
     /**
      * @inheritDoc
      */
-    public Object createImage(
-            InputStream i) throws IOException {
+    public Object createImage(InputStream i) throws IOException {
         return javax.microedition.lcdui.Image.createImage(i);
     }
 
@@ -2546,7 +2553,6 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             fc = (FileConnection)Connector.open(file, Connector.READ);
             return fc.exists();
         } catch(IOException err) {
-            err.printStackTrace();
             return false;
         } finally {
             cleanup(fc);

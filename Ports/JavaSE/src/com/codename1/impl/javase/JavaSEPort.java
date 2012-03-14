@@ -1498,6 +1498,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(String path) throws IOException {
+        if (exists(path)) {
+            InputStream is = null;
+            try {
+                is = openInputStream(path);
+                return createImage(is);
+            } finally {
+                is.close();
+            }
+        }
+
         try {
             InputStream i = getResourceAsStream(clsInstance, path);
 
