@@ -1021,6 +1021,9 @@ public class Form extends Container {
         for(int iter = 0 ; iter < cmds.length ; iter++) {
             addCommand(cmds[iter], getCommandCount());
         }
+        if(getBackCommand() != null) {
+            setBackCommand(getBackCommand());
+        }
 
         revalidate();
     }

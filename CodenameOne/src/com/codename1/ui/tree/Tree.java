@@ -36,6 +36,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
@@ -60,6 +61,7 @@ public class Tree extends Container {
     private static Image openFolder;
     private static Image nodeImage;
     private int depthIndent = 15;
+    
     /**
      * Constructor for usage by GUI builder and automated tools, normally one
      * should use the version that accepts the model
@@ -149,6 +151,11 @@ public class Tree extends Container {
     public Tree(TreeModel model) {
         this.model = model;
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+        if(folder == null) {
+            folder = UIManager.getInstance().getThemeImageConstant("treeFolderImage");
+            openFolder = UIManager.getInstance().getThemeImageConstant("treeFolderOpenImage");
+            nodeImage = UIManager.getInstance().getThemeImageConstant("treeNodeImage");
+        }
         buildBranch(null, 0, this);
         setScrollableY(true);
         setUIID("Tree");

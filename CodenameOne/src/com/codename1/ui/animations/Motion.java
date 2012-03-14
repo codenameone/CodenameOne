@@ -45,6 +45,7 @@ public class Motion {
     private static final int FRICTION = 2;
 
     private static final int DECELERATION = 3;
+    private static final int CUBIC = 4;
     
     private int sourceValue;
     private int destinationValue;
@@ -54,6 +55,8 @@ public class Motion {
     private int lastReturnedValue;
     private long currentMotionTime = -1;
 
+    private float p0, p1, p2, p3;
+    
     /**
      * Construct a point/destination motion
      * 
@@ -82,7 +85,78 @@ public class Motion {
         duration = (int) ((Math.abs(initVelocity)) / friction);
     }
 
+    
+    /**
+     * Creates a standard Cubic Bezier motion to implement functions such as ease-in/out etc.
+     * 
+     * @param sourceValue starting value
+     * @param destinationValue destination value
+     * @param duration motion duration
+     * @param p0 argument to the bezier function
+     * @param p1 argument to the bezier function
+     * @param p2 argument to the bezier function
+     * @param p3 argument to the bezier function
+     * @return Motion instance 
+     */
+    public static Motion createCubicBezierMotion(int sourceValue, int destinationValue, int duration, 
+            float p0, float p1, float p2, float p3) {
+        Motion m = new Motion(sourceValue, destinationValue, duration);
+        m.motionType = CUBIC;
+        m.p0 = p0;
+        m.p1 = p1;
+        m.p2 = p2;
+        m.p3 = p3;
+        return m;
+    }
 
+    /**
+     * Equivalent to createCubicBezierMotion with 0, 0.42, 0.58, 1.0 as arguments.
+     * 
+     * @param sourceValue starting value
+     * @param destinationValue destination value
+     * @param duration motion duration
+     * @return Motion instance 
+     */
+    public static Motion createEaseInOutMotion(int sourceValue, int destinationValue, int duration) {
+        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0, 0.42f, 0.58f, 1);
+    }
+    
+    /**
+     * Equivalent to createCubicBezierMotion with 0f, 0.25f, 0.25f, 1 as arguments.
+     * 
+     * @param sourceValue starting value
+     * @param destinationValue destination value
+     * @param duration motion duration
+     * @return Motion instance 
+     */
+    public static Motion createEaseMotion(int sourceValue, int destinationValue, int duration) {
+        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.25f, 0.25f, 1.0f);
+    }
+    
+    /**
+     * Equivalent to createCubicBezierMotion with 0f, 0.42f, 1f, 1f as arguments.
+     * 
+     * @param sourceValue starting value
+     * @param destinationValue destination value
+     * @param duration motion duration
+     * @return Motion instance 
+     */
+    public static Motion createEaseInMotion(int sourceValue, int destinationValue, int duration) {
+        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.42f, 1f, 1f);
+    }
+    
+    /**
+     * Equivalent to createCubicBezierMotion with 0f, 0f, 0.58f, 1.0f as arguments.
+     * 
+     * @param sourceValue starting value
+     * @param destinationValue destination value
+     * @param duration motion duration
+     * @return Motion instance 
+     */
+    public static Motion createEaseOutMotion(int sourceValue, int destinationValue, int duration) {
+        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0f, 0.58f, 1.0f);
+    }
+    
     /**
      * Creates a linear motion starting from source value all the way to destination value
      * 
@@ -235,6 +309,38 @@ public class Motion {
         return x;
     }
 
+
+    private int getCubicValue() {
+        //make sure we reach the destination value.
+        if(isFinished()){
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if(currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        currentTime = Math.min(currentTime, totalTime);
+        if(currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        float dis = Math.abs(destinationValue - sourceValue);
+        float p = currentTime / totalTime;
+        float a = (1 - p) * (1 - p) * (1 - p) * p0;
+        float b = 3 * (1 - p) * (1 - p) * p * p1;
+        float c = 3 * (1 - p) * p * p * p2;
+        float d = p * p * p * p3;
+        int current;
+        if (destinationValue > sourceValue) {
+            current = sourceValue + (int)((a + b + c + d) * dis);
+        } else {
+            int currentDis = (int)((a + b + c + d) * dis);
+            current = sourceValue - currentDis;
+        }
+        return current;        
+    }
     
     /**
      * Returns the value for the motion for the current clock time. 
@@ -249,6 +355,9 @@ public class Motion {
         switch(motionType) {
             case SPLINE:
                 lastReturnedValue = getSplineValue();
+                break;
+            case CUBIC:
+                lastReturnedValue = getCubicValue();
                 break;
             case FRICTION:
                 lastReturnedValue = getFriction();

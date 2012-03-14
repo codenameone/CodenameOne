@@ -487,7 +487,7 @@ public final class CommonTransitions extends Transition {
             return Motion.createLinearMotion(startOffset, dest, speed);
         }
 
-        return Motion.createSplineMotion(startOffset, dest, speed);
+        return Motion.createEaseInOutMotion(startOffset, dest, speed);
     }
 
     /**
@@ -621,7 +621,7 @@ public final class CommonTransitions extends Transition {
             }
         } catch(Throwable t) {
             System.out.println("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
-            //t.printStackTrace();
+            t.printStackTrace();
         }
     }
 
@@ -653,15 +653,15 @@ public final class CommonTransitions extends Transition {
             }
             if(incoming) {
                 if(forward) {
-                    m = Motion.createSplineMotion(-travelDestination, 0, speed);
+                    m = Motion.createEaseInOutMotion(-travelDestination, 0, speed);
                 } else {
-                    m = Motion.createSplineMotion(travelDestination, 0, speed);
+                    m = Motion.createEaseInOutMotion(travelDestination, 0, speed);
                 }
             } else {
                 if(forward) {
-                    m = Motion.createSplineMotion(0, travelDestination, speed);
+                    m = Motion.createEaseInOutMotion(0, travelDestination, speed);
                 } else {
-                    m = Motion.createSplineMotion(0, -travelDestination, speed);
+                    m = Motion.createEaseInOutMotion(0, -travelDestination, speed);
                 }
             }
             m.start();

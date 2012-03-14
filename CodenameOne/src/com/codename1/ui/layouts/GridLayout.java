@@ -66,7 +66,8 @@ public class GridLayout extends Layout{
             int maxWidth = 0;
             for(int iter = 0 ; iter < numOfcomponents ; iter++) {
                 Component cmp = parent.getComponentAt(iter);
-                maxWidth = Math.max(cmp.getPreferredW(), maxWidth);
+                Style s = cmp.getStyle();
+                maxWidth = Math.max(cmp.getPreferredW() + s.getMargin(Component.LEFT) + s.getMargin(Component.RIGHT), maxWidth);
             }
             if(width < maxWidth) {
                 width = Display.getInstance().getDisplayWidth();
