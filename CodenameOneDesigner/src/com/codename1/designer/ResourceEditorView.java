@@ -3877,7 +3877,8 @@ public static void openInIDE(File f, int lineNumber) {
                                     JPanel panel = new JPanel();
                                     JComboBox combo = new JComboBox(loadedResources.getUIResourceNames());
                                     panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-                                    panel.add(new JLabel("<html><body>The main form is missing,<br>Please pick a new main form"));
+                                    panel.add(new JLabel("The main form is missing"));
+                                    panel.add(new JLabel("Please pick a new main form"));
                                     panel.add(combo);
                                     int result = JOptionPane.showConfirmDialog(mainPanel, panel, "Main Form Missing", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
                                     if(result == JOptionPane.OK_OPTION) {

@@ -284,6 +284,23 @@ public static void updateServer(final java.awt.Component parent) {
         public void run() {
             try {
                 if(view.getLoadedResources() != null) {
+                    String localServerURL = null;
+                    try {
+                        InetAddress addr = InetAddress.getLocalHost();
+                        byte[] ipAddr = addr.getAddress();
+                        if((ipAddr[0] & 0xff) == 127) {
+                            // workaround  for linux where loopback is returned
+                            Socket s = new Socket("codename-one.appspot.com", 80);
+                            String p = s.getLocalAddress().getHostAddress();
+                            s.close();
+                            localServerURL = p;
+                        } else {
+                            localServerURL = (ipAddr[0] & 0xff) + "." + (ipAddr[1] & 0xff) + 
+                                    "." + (ipAddr[2] & 0xff) + "." + (ipAddr[3] & 0xff);
+                        }
+                    } catch(Throwable t) {
+                    }
+                    
                     URL u = new URL("https://codename-one.appspot.com/liveeditpreview/preview");
                     HttpURLConnection con = (HttpURLConnection)u.openConnection();
                     con.setDoOutput(true);
@@ -304,19 +321,11 @@ public static void updateServer(final java.awt.Component parent) {
                     } else {
                         out.writeUTF(getThemeSelection());                        
                     }
-                    InetAddress addr = InetAddress.getLocalHost();
-                    byte[] ipAddr = addr.getAddress();
-                    if((ipAddr[0] & 0xff) == 127) {
-                        // workaround  for linux where loopback is returned
-                        Socket s = new Socket("192.168.1.1", 80);
-                        String p = s.getLocalAddress().getHostAddress();
-                        s.close();
-                        out.writeUTF("http://" + p +
+                    if(localServerURL != null) {
+                        out.writeUTF("http://" + localServerURL +
                                 ":" + LocalServer.getPort() + "/");
                     } else {
-                        out.writeUTF("http://" + (ipAddr[0] & 0xff) + "." + (ipAddr[1] & 0xff) + 
-                                "." + (ipAddr[2] & 0xff) + "." + (ipAddr[3] & 0xff) + 
-                                ":" + LocalServer.getPort() + "/");
+                        out.writeUTF("");
                     }
                     view.getLoadedResources().save(out);
                     out.close();
