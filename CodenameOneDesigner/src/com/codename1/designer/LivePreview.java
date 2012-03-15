@@ -338,7 +338,7 @@ public static void updateServer(final java.awt.Component parent) {
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(parent, "Error: \n" + ex.toString(), "Error Connecting To Server", JOptionPane.ERROR_MESSAGE);
+                //JOptionPane.showMessageDialog(parent, "Error: \n" + ex.toString(), "Error Connecting To Server", JOptionPane.ERROR_MESSAGE);
             }
         }
     }.start();
