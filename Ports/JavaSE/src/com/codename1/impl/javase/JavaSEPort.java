@@ -93,6 +93,7 @@ import com.codename1.io.Storage;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
 import java.awt.GridBagLayout;
@@ -2910,27 +2911,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = jmapps.util.JMFUtils.createMediaPlayer(uri, f, "", "");
-                player.setPlaybackLoop(false);
-                player.setPopupActive(false);
-                player.addControllerListener(this);
-                player.realize();
-                Display.getInstance().invokeAndBlock(new Runnable() {
+                if(player != null){
+                    player.setPlaybackLoop(false);
+                    player.setPopupActive(false);
+                    player.addControllerListener(this);
+                    player.realize();
+                    Display.getInstance().invokeAndBlock(new Runnable() {
 
-                    @Override
-                    public void run() {
-                        while (!realized) {
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
+                        @Override
+                        public void run() {
+                            while (!realized) {
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
+                                }
                             }
                         }
+                    });
+                    if (isVideo) {
+                        video = new VideoPanel(player);
                     }
-                });
-                if (isVideo) {
-                    video = new VideoPanel(player);
                 }
-
             } catch (Exception ex) {
                 ex.printStackTrace();
                 throw new RuntimeException(ex);
@@ -2975,25 +2977,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = jmapps.util.JMFUtils.createMediaPlayer(temp.toURI().toURL().toString(), f, null, null);
-                player.setPlaybackLoop(false);
-                player.setPopupActive(false);
-                player.addControllerListener(this);
-                player.realize();
-                Display.getInstance().invokeAndBlock(new Runnable() {
+                if(player != null){
+                    player.setPlaybackLoop(false);
+                    player.setPopupActive(false);
+                    player.addControllerListener(this);
+                    player.realize();
+                    Display.getInstance().invokeAndBlock(new Runnable() {
 
-                    @Override
-                    public void run() {
-                        while (!realized) {
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
+                        @Override
+                        public void run() {
+                            while (!realized) {
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
+                                }
                             }
                         }
+                    });
+                    if (isVideo) {
+                        video = new VideoPanel(player);
                     }
-                });
-                if (isVideo) {
-                    video = new VideoPanel(player);
                 }
 
             } catch (Exception ex) {
@@ -3003,45 +3007,76 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void cleanup() {
+            if(player == null){
+                return;
+            }
             player.close();
             playing = false;
+            
         }
 
         public void play() {
+            if(player == null){
+                return;
+            }
             player.start();
             playing = true;
         }
 
         public void pause() {
+            if(player == null){
+                return;
+            }
             player.stop();
             playing = false;
         }
 
         public int getTime() {
+            if(player == null){
+                return -1;
+            }
             return (int) player.getMediaTime().getSeconds();
         }
 
         public void setTime(int time) {
+            if(player == null){
+                return;
+            }
             player.setMediaTime(new Time(time));
         }
 
         public int getDuration() {
+            if(player == null){
+                return -1;
+            }
             return (int) player.getDuration().getSeconds();
         }
 
         public void setVolume(int vol) {
+            if(player == null){
+                return;
+            }
             int level = vol / 20;
             player.setVolumeLevel(level + "");
         }
 
         public int getVolume() {
+            if(player == null){
+                return -1;
+            }
             int level = Integer.parseInt(player.getVolumeLevel());
             return level * 20;
         }
 
         @Override
         public Component getVideoComponent() {
-            return new VideoComponent(frm, video);
+            if(video != null){
+                return new VideoComponent(frm, video);
+            }
+            System.out.println("Video Playing is not supported on this platform");
+            Label l = new Label("Video");
+            l.getStyle().setAlignment(Component.CENTER);
+            return l;
         }
 
         public boolean isVideo() {
