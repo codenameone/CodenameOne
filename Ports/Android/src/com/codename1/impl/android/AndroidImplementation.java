@@ -1,7 +1,6 @@
 package com.codename1.impl.android;
 
 import android.content.pm.PackageManager.NameNotFoundException;
-import android.os.Bundle;
 import android.view.MotionEvent;
 import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
@@ -61,10 +60,8 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
-import java.io.FileNotFoundException;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.util.Vector;
 import android.content.Context;
 import android.database.Cursor;
@@ -79,7 +76,6 @@ import android.widget.MediaController;
 import android.widget.VideoView;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.ConnectionRequest;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Form;
@@ -103,18 +99,7 @@ import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Hashtable;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.conn.ssl.X509HostnameVerifier;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.SingleClientConnManager;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
@@ -2733,6 +2718,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return false;
                 }
             });
+            
         }
 
         @Override
@@ -2983,8 +2969,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return super.dispatchKeyEvent(event);
             }
         }
-        
-        
+                
         
     }
     
