@@ -951,31 +951,43 @@ public class Component implements Animation, StyleListener {
         int oWidth = g.getClipWidth();
         int oHeight = g.getClipHeight();
         if (bounds.intersects(oX, oY, oWidth, oHeight)) {
-            g.clipRect(getX(), getY(), getWidth(), getHeight());
-            paintBackground(g);
-
-            if (isScrollable()) {
-                int scrollX = getScrollX();
-                int scrollY = getScrollY();
-                g.translate(-scrollX, -scrollY);
-                paint(g);
-                g.translate(scrollX, scrollY);
-                if (isScrollVisible) {
-                    paintScrollbars(g);
-                }
+            Style s = getStyle();
+            if(s.getOpacity() < 255 && g.isAlphaSupported()) {
+                int oldAlpha = g.getAlpha();
+                g.setAlpha(s.getOpacity());
+                internalPaintImpl(g, paintIntersects);
+                g.setAlpha(oldAlpha);
             } else {
-                paint(g);
-            }
-            if (isBorderPainted()) {
-                paintBorder(g);
-            }
-
-            //paint all the intersecting Components above the Component
-            if (paintIntersects && parent != null) {
-                paintIntersectingComponentsAbove(g);
+                internalPaintImpl(g, paintIntersects);
             }
 
             g.setClip(oX, oY, oWidth, oHeight);
+        }
+    }
+
+    private void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        g.clipRect(getX(), getY(), getWidth(), getHeight());
+        paintBackground(g);
+
+        if (isScrollable()) {
+            int scrollX = getScrollX();
+            int scrollY = getScrollY();
+            g.translate(-scrollX, -scrollY);
+            paint(g);
+            g.translate(scrollX, scrollY);
+            if (isScrollVisible) {
+                paintScrollbars(g);
+            }
+        } else {
+            paint(g);
+        }
+        if (isBorderPainted()) {
+            paintBorder(g);
+        }
+
+        //paint all the intersecting Components above the Component
+        if (paintIntersects && parent != null) {
+            paintIntersectingComponentsAbove(g);
         }
     }
 

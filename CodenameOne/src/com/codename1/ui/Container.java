@@ -56,6 +56,7 @@ public class Container extends Component {
     private java.util.Vector cmpTransitions;
     private int scrollIncrement = 20;
     private boolean blockFocus = false;
+    private boolean dontRecurseContainer;
 
     /**
      * Constructs a new Container with a new layout manager.
@@ -456,6 +457,7 @@ public class Container extends Component {
         if(layoutAnimationSpeed > 0) {
             animateLayoutAndWait(layoutAnimationSpeed);
         }
+        dontRecurseContainer = false;
         enableLayoutOnPaint = true;
     }
 
@@ -757,6 +759,30 @@ public class Container extends Component {
         }
     }
 
+    private void paintContainerChildrenForAnimation(Container cnt, Graphics g) {
+        int ourX = getAbsoluteX();
+        int ourY = getAbsoluteY();
+        int cc = cnt.getComponentCount();
+        for(int iter = 0 ; iter < cc ; iter++) {
+            Component cmp = cnt.getComponentAt(iter);
+            if(cmp.getClass() == Container.class) {
+                paintContainerChildrenForAnimation((Container)cmp, g);
+                continue;
+            }
+            int abx = cmp.getAbsoluteX();
+            int aby = cmp.getAbsoluteY();
+            int oldX = cmp.getX();
+            int oldY = cmp.getY();
+            cmp.setParent(this);
+            cmp.setX(abx - ourX);
+            cmp.setY(aby - ourY);
+            cmp.paintInternal(g, false);
+            cmp.setParent(cnt);
+            cmp.setX(oldX);
+            cmp.setY(oldY);
+        }
+    }
+    
     /**
      * @inheritDoc
      */
@@ -767,9 +793,20 @@ public class Container extends Component {
         g.translate(getX(), getY());
         int size = components.size();
         CodenameOneImplementation impl = Display.getInstance().getImplementation();
-        for (int i = 0; i < size; i++) {
-            Component cmp = (Component)components.elementAt(i);
-            cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+        if(dontRecurseContainer) {
+            for (int i = 0; i < size; i++) {
+                Component cmp = (Component)components.elementAt(i);
+                if(cmp.getClass() == Container.class) {
+                    paintContainerChildrenForAnimation((Container)cmp, g);
+                } else {
+                    cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+                }
+            }
+        } else {
+            for (int i = 0; i < size; i++) {
+                Component cmp = (Component)components.elementAt(i);
+                cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+            }
         }
         int tx = g.getTranslateX();
         int ty = g.getTranslateY();
@@ -1475,6 +1512,69 @@ public class Container extends Component {
     boolean isBlockFocus() {
         return blockFocus;
     }
+        
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation. This method waits until the operation is completed before returning
+     *
+     * @param duration the duration in milliseconds for the animation
+     */
+    public void animateHierarchyAndWait(final int duration) {
+        animateHierarchy(duration, true, 255);
+    }
+
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     */
+    public void animateHierarchy(final int duration) {
+        animateHierarchy(duration, false, 255);
+    }
+
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation. This method waits until the operation is completed before returning
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     */
+    public void animateHierarchyFadeAndWait(final int duration, int startingOpacity) {
+        animateHierarchy(duration, true, startingOpacity);
+    }
+
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     */
+    public void animateHierarchyFade(final int duration, int startingOpacity) {
+        animateHierarchy(duration, false, startingOpacity);
+    }
+
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
+     * waits until the operation is completed before returning
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     */
+    public void animateLayoutFadeAndWait(final int duration, int startingOpacity) {
+        animateLayout(duration, true, startingOpacity);
+    }
+
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     */
+    public void animateLayoutFade(final int duration, int startingOpacity) {
+        animateLayout(duration, false, startingOpacity);
+    }
 
     /**
      * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
@@ -1483,7 +1583,7 @@ public class Container extends Component {
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayoutAndWait(final int duration) {
-        animateLayout(duration, true);
+        animateLayout(duration, true, 255);
     }
 
     /**
@@ -1492,7 +1592,7 @@ public class Container extends Component {
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayout(final int duration) {
-        animateLayout(duration, false);
+        animateLayout(duration, false, 255);
     }
 
     /**
@@ -1519,11 +1619,91 @@ public class Container extends Component {
     }
 
     /**
+     * Creates a motion object for animation, allows subclasses to replace the motion type
+     * used in animations (currently defaults to ease-in).
+     * 
+     * @param start start value
+     * @param destination destination value
+     * @param duration duration of animation
+     * @return motion object
+     */
+    protected Motion createAnimateMotion(int start, int destination, int duration) {
+        return Motion.createEaseInMotion(start, destination, duration);
+    }
+    
+    private void findComponentsInHierachy(Vector vec) {
+        int cc = getComponentCount();
+        for(int iter = 0 ; iter < cc ; iter++) {
+            Component c = getComponentAt(iter);
+            vec.addElement(c);
+            if(c.getClass() == Container.class) {
+                ((Container)c).findComponentsInHierachy(vec);
+            }
+        }
+    }
+    
+    /**
      * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
      *
      * @param duration the duration in milliseconds for the animation
      */
-    private void animateLayout(final int duration, boolean wait) {
+    private void animateHierarchy(final int duration, boolean wait, int opacity) {
+        enableLayoutOnPaint = false;
+        dontRecurseContainer = true;
+        Vector comps = new Vector();
+        findComponentsInHierachy(comps);
+        final int componentCount = comps.size();
+        int[] beforeX = new int[componentCount];
+        int[] beforeY = new int[componentCount];
+        int[] beforeW = new int[componentCount];
+        int[] beforeH = new int[componentCount];
+        final Motion[] xMotions = new Motion[componentCount];
+        final Motion[] yMotions = new Motion[componentCount];
+        final Motion[] wMotions = new Motion[componentCount];
+        final Motion[] hMotions = new Motion[componentCount];
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component current = (Component)comps.elementAt(iter);
+            beforeX[iter] = current.getX();
+            beforeY[iter] = current.getY();
+            beforeW[iter] = current.getWidth();
+            beforeH[iter] = current.getHeight();
+        }
+        layoutContainer();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component current = (Component)comps.elementAt(iter);
+            xMotions[iter] = createAnimateMotion(beforeX[iter], current.getX(), duration);
+            yMotions[iter] = createAnimateMotion(beforeY[iter], current.getY(), duration);
+            wMotions[iter] = createAnimateMotion(beforeW[iter], current.getWidth(), duration);
+            hMotions[iter] = createAnimateMotion(beforeH[iter], current.getHeight(), duration);
+            xMotions[iter].start();
+            yMotions[iter].start();
+            wMotions[iter].start();
+            hMotions[iter].start();
+            current.setX(beforeX[iter]);
+            current.setY(beforeY[iter]);
+            current.setWidth(beforeW[iter]);
+            current.setHeight(beforeH[iter]);
+        }
+        Anim a = new Anim(this, duration, new Motion[][] {
+            xMotions, yMotions, wMotions, hMotions
+        });
+        if(opacity < 255) {
+            a.opacity = createAnimateMotion(opacity, 255, duration);
+            a.opacity.start();
+        }
+        a.animatedComponents = comps;
+        getComponentForm().registerAnimated(a);
+        if(wait) {
+            Display.getInstance().invokeAndBlock(a);
+        }
+    }
+    
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     */
+    private void animateLayout(final int duration, boolean wait, int opacity) {
         enableLayoutOnPaint = false;
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
@@ -1544,10 +1724,10 @@ public class Container extends Component {
         layoutContainer();
         for(int iter = 0 ; iter < componentCount ; iter++) {
             Component current = getComponentAt(iter);
-            xMotions[iter] = Motion.createSplineMotion(beforeX[iter], current.getX(), duration);
-            yMotions[iter] = Motion.createSplineMotion(beforeY[iter], current.getY(), duration);
-            wMotions[iter] = Motion.createSplineMotion(beforeW[iter], current.getWidth(), duration);
-            hMotions[iter] = Motion.createSplineMotion(beforeH[iter], current.getHeight(), duration);
+            xMotions[iter] = createAnimateMotion(beforeX[iter], current.getX(), duration);
+            yMotions[iter] = createAnimateMotion(beforeY[iter], current.getY(), duration);
+            wMotions[iter] = createAnimateMotion(beforeW[iter], current.getWidth(), duration);
+            hMotions[iter] = createAnimateMotion(beforeH[iter], current.getHeight(), duration);
             xMotions[iter].start();
             yMotions[iter].start();
             wMotions[iter].start();
@@ -1560,6 +1740,10 @@ public class Container extends Component {
         Anim a = new Anim(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
+        if(opacity < 255) {
+            a.opacity = createAnimateMotion(opacity, 255, duration);
+            a.opacity.start();
+        }
         getComponentForm().registerAnimated(a);
         if(wait) {
             Display.getInstance().invokeAndBlock(a);
@@ -1581,7 +1765,9 @@ public class Container extends Component {
         Runnable onFinish;
         int growSpeed;
         int layoutAnimationSpeed;
-
+        Vector animatedComponents;
+        Motion opacity;
+        
         public Anim(Container thisContainer, int duration, Motion[][] motions) {
             startTime = System.currentTimeMillis();
             animationType = 2;
@@ -1603,21 +1789,40 @@ public class Container extends Component {
             switch(animationType) {
                 case 2:
                     int componentCount = thisContainer.getComponentCount();
-                    for(int iter = 0 ; iter < componentCount ; iter++) {
-                        Component currentCmp = thisContainer.getComponentAt(iter);
+                    if(animatedComponents != null) {
+                        componentCount = animatedComponents.size();
+                        for(int iter = 0 ; iter < componentCount ; iter++) {
+                            Component currentCmp = (Component)animatedComponents.elementAt(iter);
 
-                        // this might happen if a container was replaced during animation
-                        if(currentCmp == null) {
-                            continue;
+                            currentCmp.setX(motions[0][iter].getValue());
+                            currentCmp.setY(motions[1][iter].getValue());
+                            currentCmp.setWidth(motions[2][iter].getValue());
+                            currentCmp.setHeight(motions[3][iter].getValue());
+                            if(opacity != null) {
+                                currentCmp.getStyle().setOpacity(opacity.getValue(), false);
+                            }
                         }
-                        currentCmp.setX(motions[0][iter].getValue());
-                        currentCmp.setY(motions[1][iter].getValue());
-                        currentCmp.setWidth(motions[2][iter].getValue());
-                        currentCmp.setHeight(motions[3][iter].getValue());
+                    } else {
+                        for(int iter = 0 ; iter < componentCount ; iter++) {
+                            Component currentCmp = thisContainer.getComponentAt(iter);
+
+                            // this might happen if a container was replaced during animation
+                            if(currentCmp == null) {
+                                continue;
+                            }
+                            currentCmp.setX(motions[0][iter].getValue());
+                            currentCmp.setY(motions[1][iter].getValue());
+                            currentCmp.setWidth(motions[2][iter].getValue());
+                            currentCmp.setHeight(motions[3][iter].getValue());
+                            if(opacity != null) {
+                                currentCmp.getStyle().setOpacity(opacity.getValue(), false);
+                            }
+                        }
                     }
                     thisContainer.repaint();
                     if(System.currentTimeMillis() - startTime >= duration) {
                         enableLayoutOnPaint = true;
+                        thisContainer.dontRecurseContainer = false;
                         Form f = thisContainer.getComponentForm();
                         f.deregisterAnimated(this);
                         f.revalidate();

@@ -102,6 +102,11 @@ public class Style {
     public static final String TRANSPARENCY = "transparency";
 
     /**
+     * Opacity attribute name for the theme hashtable 
+     */
+    public static final String OPACITY = "opacity";
+
+    /**
      * Margin attribute name for the theme hashtable 
      */
     public static final String MARGIN = "margin";
@@ -349,6 +354,7 @@ public class Style {
      */
     private byte[] marginUnit;
     private byte transparency = (byte) 0xFF; //no transparency
+    private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
 
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
@@ -408,6 +414,7 @@ public class Style {
     private static final int BACKGROUND_GRADIENT_MODIFIED = 8192;
 
     private static final int ALIGNMENT_MODIFIED = 16384;
+    private static final int OPACITY_MODIFIED = 32768;
     private static final int TEXT_DECORATION_MODIFIED = 64;
 
 
@@ -448,6 +455,7 @@ public class Style {
         setPaddingUnit(style.paddingUnit);
         setMarginUnit(style.marginUnit);
         setBorder(style.getBorder());
+        opacity = style.opacity;
         modifiedFlag = 0;
         align = style.align;
         backgroundType = style.backgroundType;
@@ -554,6 +562,10 @@ public class Style {
 
         if ((modifiedFlag & TRANSPARENCY_MODIFIED) == 0) {
             setBgTransparency(style.getBgTransparency());
+        }
+
+        if ((modifiedFlag & OPACITY_MODIFIED) == 0) {
+            setOpacity(style.getOpacity());
         }
 
         if ((modifiedFlag & PADDING_MODIFIED) == 0) {
@@ -1055,6 +1067,47 @@ public class Style {
         setBgTransparency(transparency & 0xFF, false);
     }
 
+    /**
+     * Returns the opacity value for the component
+     * 
+     * @return the opacity value
+     */
+    public int getOpacity() {
+        return opacity & 0xff;
+    }
+    
+    /**
+     * Set the opacity value
+     * 
+     * @param opacity the opacity value
+     */
+    public void setOpacity(int opacity) {
+        setOpacity(opacity, false);
+    }
+    
+    /**
+     * Sets the Component transparency level. Valid values should be a 
+     * number between 0-255
+     * 
+     * @param transparency int value between 0-255
+     * @param override If set to true allows the look and feel/theme to override 
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setOpacity(int opacity, boolean override) {
+        if (opacity < 0 || opacity > 255) {
+            throw new IllegalArgumentException("valid values are between 0-255");
+        }
+        if (this.opacity != (byte) opacity) {
+            this.opacity = (byte) opacity;
+
+            if (!override) {
+                modifiedFlag |= OPACITY_MODIFIED;
+            }
+            firePropertyChanged(OPACITY);
+        }
+    }
+    
+    
     /**
      * Sets the Component transparency level. Valid values should be a 
      * number between 0-255
