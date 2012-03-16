@@ -2044,10 +2044,12 @@ public class UIBuilder {
             f.showBack();
             postShowImpl(f);
         } else {
+            Form currentForm = Display.getInstance().getCurrent();
+            if(currentForm != null) {
+                exitForm(currentForm);
+            }
             if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
-                Form currentForm = Display.getInstance().getCurrent();
                 if(currentForm != null) {
-                    exitForm(currentForm);
                     String nextForm = (String)f.getClientProperty("%next_form%");
 
                     // don't add back commands to transitional forms
