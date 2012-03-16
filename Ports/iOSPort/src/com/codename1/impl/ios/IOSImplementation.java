@@ -1529,13 +1529,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String getProperty(String key, String defaultValue) {
+        if(key.equalsIgnoreCase("Platform")) {
+            return "iOS";
+        }
+        if(key.equalsIgnoreCase("OS")) {
+            return "iOS";
+        }
         if(key.equalsIgnoreCase("User-Agent")) {
             if(isTablet()) {
                 return "Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/531.21.10";
             } 
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";
         }
-        if(key.equalsIgnoreCase("UDID")) {
+        if(key.equalsIgnoreCase("UDID") || key.equalsIgnoreCase("MSISDN")) {
             return IOSNative.getUDID();
         }
         return super.getProperty(key, defaultValue);
