@@ -31,16 +31,20 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         Criteria criteria = new Criteria();
         // If GPS provider, then create and start GPS listener
         LocationProvider provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
-        if ( provider != null) {
+        boolean enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        if ( provider != null && enabled) {
             bestProvider = provider.getName();
+            
 	}else{
             provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
-            if ( provider != null) {
+            enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+            if ( provider != null && enabled) {
                 bestProvider = provider.getName();
             }else{
-                bestProvider = locationManager.getBestProvider(criteria, false);
+                bestProvider = locationManager.getBestProvider(criteria, true);
             }
         }
+        System.out.println("bestProvider " + bestProvider);
     }
 
     public Location getCurrentLocation() throws IOException {
@@ -48,7 +52,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         if (location != null) {
             return convert(location);
         }
-        return null;
+        throw new IOException("cannot retrieve location try later");
     }
 
     public void bindListener() {
