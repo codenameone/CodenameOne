@@ -353,84 +353,49 @@ public class Util {
 
     private static boolean instanceofObjArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (Object[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new Object[0].getClass();
         }
         return o instanceof Object[];
     }
     
     private static boolean instanceofByteArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (byte[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new byte[0].getClass();
         }
         return o instanceof byte[];
     }
     
     private static boolean instanceofShortArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (short[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new short[0].getClass();
         }
         return o instanceof short[];
     }
     
     private static boolean instanceofLongArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (long[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new long[0].getClass();
         }
         return o instanceof long[];
     }
     
     private static boolean instanceofIntArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (int[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new int[0].getClass();
         }
         return o instanceof int[];
     }
     
     private static boolean instanceofFloatArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (float[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new float[0].getClass();
         }
         return o instanceof float[];
     }
     
     private static boolean instanceofDoubleArray(Object o) {
         if(xmlVMInstanceofBug) {
-            try {
-                o = (double[])o;
-                return true;
-            } catch(ClassCastException e) {
-                return false;
-            }
+            return o.getClass() == new double[0].getClass();
         }
         return o instanceof double[];
     }
