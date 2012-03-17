@@ -913,7 +913,7 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(JAVA_LONG peer) {
     [impl release];
 }
 
-void com_codename1_impl_ios_IOSNative_x___java_lang_String(JAVA_OBJECT n1)
+void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_execute___java_lang_String]
     const char* chrs = xmlvm_java_string_to_const_char(n1);

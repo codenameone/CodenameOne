@@ -73,7 +73,7 @@
 }
 
 - (void)addHeader:(NSString*)key value:(NSString*)value {
-    [request addValue:key forHTTPHeaderField:value];
+    [request addValue:value forHTTPHeaderField:key];
 }
 
 - (void)setBody:(void*)body size:(int)size {
