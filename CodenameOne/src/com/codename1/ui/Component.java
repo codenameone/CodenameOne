@@ -1871,14 +1871,15 @@ public class Component implements Animation, StyleListener {
      * @return an image
      */
     protected Image getDragImage() {
-        Image draggedImage = Image.createImage(getWidth(), getHeight());
+        Image draggedImage = Image.createImage(getWidth(), getHeight(),0x00ff7777);
         Graphics g = draggedImage.getGraphics();
 
-        // choose a rare color
-        g.setColor(0xff7777);
-        g.fillRect(0, 0, getWidth(), getHeight());
         g.translate(-getX(), -getY());
+        paintBackground(g);
         paint(g);
+        if (isBorderPainted()) {
+            paintBorder(g);
+        }
         g.translate(getX(), getY());
 
         // remove all occurences of the rare color

@@ -913,7 +913,21 @@ public class TextArea extends Component {
                     from = spaceIndex;
                 }
             }
-
+            if(rowText.length() == 0) {
+                // This happens due to a race condition or something, no idea why???
+                if(textAreaWidth <= charWidth) {
+                    if(!isInitialized()) {
+                        rowStrings.addElement(getText());
+                    } else {
+                        // special case for the edge case of "no room".
+                        // Its important since sometimes this case occurs in the GUI builder by accident
+                        for(int iter = 0 ; iter < text.length ; iter++) {
+                            rowStrings.addElement("" + text[iter]);
+                        }
+                    }
+                    return;
+                }
+            }
             rowStrings.addElement(rowText);
             //adding minCharactersInRow doesn't work if what is left is less
             //then minCharactersInRow

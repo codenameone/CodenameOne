@@ -597,7 +597,9 @@ public final class CommonTransitions extends Transition {
                 case TYPE_PULSATE_DIALOG:
                     paint(g, getSource(), 0, 0);
                     int alpha = g.getAlpha();
-                    g.setAlpha(motion2.getValue());
+                    if(motion2 != null) {
+                        g.setAlpha(motion2.getValue());
+                    }
 
                     Component c = getDialogParent(getDestination());
                     float ratio = ((float)position) / 1000.0f;
@@ -621,7 +623,7 @@ public final class CommonTransitions extends Transition {
             }
         } catch(Throwable t) {
             System.out.println("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
-            t.printStackTrace();
+            //t.printStackTrace();
         }
     }
 

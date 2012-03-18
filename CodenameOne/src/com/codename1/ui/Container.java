@@ -970,7 +970,7 @@ public class Container extends Component {
      * 
      * @param c the component that will be scrolling for visibility
      */
-    protected void scrollComponentToVisible(Component c) {
+    public void scrollComponentToVisible(Component c) {
         if (isScrollable()) {
             if (c != null) {
                 Rectangle r = c.getVisibleBounds();
@@ -1630,6 +1630,12 @@ public class Container extends Component {
     protected Motion createAnimateMotion(int start, int destination, int duration) {
         return Motion.createEaseInMotion(start, destination, duration);
     }
+
+    private Motion createAndStartAnimateMotion(int start, int destination, int duration) {
+        Motion m = createAnimateMotion(start, destination, duration);
+        m.start();
+        return m;
+    }
     
     private void findComponentsInHierachy(Vector vec) {
         int cc = getComponentCount();
@@ -1643,11 +1649,96 @@ public class Container extends Component {
     }
     
     /**
+     * Morph is similar to the replace functionality where a component might be replaced with 
+     * a component that isn't within the container. However, unlike the replace functionality which
+     * uses a transition and assumes the position of the component (and is hence quite flexible) morph
+     * can move and resize the component. E.g. after entering text into a text field and pressing submit
+     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
+     * container when the animation completes.
+     * 
+     * @param source source component assumed to be within this container or one of its children
+     * @param destination the destination component
+     * @param duration the time the morph operation should take
+     * @param onCompletion invoked when the morphing completes
+     */
+    public void morph(Component source, Component destination, int duration, Runnable onCompletion) {
+        morph(source, destination, duration, false, onCompletion);
+    }
+
+    /**
+     * Morph is similar to the replace functionality where a component might be replaced with 
+     * a component that isn't within the container. However, unlike the replace functionality which
+     * uses a transition and assumes the position of the component (and is hence quite flexible) morph
+     * can move and resize the component. E.g. after entering text into a text field and pressing submit
+     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
+     * container when the animation completes.
+     * 
+     * @param source source component assumed to be within this container or one of its children
+     * @param destination the destination component
+     * @param duration the time the morph operation should take
+     */
+    public void morphAndWait(Component source, Component destination, int duration) {
+        morph(source, destination, duration, true, null);
+    }
+
+    private void morph(Component source, Component destination, int duration, boolean wait, Runnable onCompletion) {
+        setShouldCalcPreferredSize(true);
+        enableLayoutOnPaint = false;
+        dontRecurseContainer = true;
+        int deltaX = getAbsoluteX() - getScrollX();
+        int deltaY = getAbsoluteY() - getScrollY();
+        int sourceX = source.getAbsoluteX() - deltaX;
+        int destX = destination.getAbsoluteX() - deltaX;
+        int sourceY = source.getAbsoluteY() - deltaY;
+        int destY = destination.getAbsoluteY() - deltaY;
+        final Motion[] xMotions = new Motion[] {
+            createAndStartAnimateMotion(sourceX, destX, duration),
+            createAndStartAnimateMotion(sourceX, destX, duration)
+        };
+        final Motion[] yMotions = new Motion[] {
+            createAndStartAnimateMotion(sourceY, destY, duration),
+            createAndStartAnimateMotion(sourceY, destY, duration)
+        };
+        final Motion[] wMotions = new Motion[] {
+            createAndStartAnimateMotion(source.getWidth(), destination.getWidth(), duration),
+            createAndStartAnimateMotion(source.getWidth(), destination.getWidth(), duration)
+        };
+        final Motion[] hMotions = new Motion[] {
+            createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration),
+            createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration)
+        };
+        Anim a = new Anim(this, duration, new Motion[][] {
+            xMotions, yMotions, wMotions, hMotions
+        });
+        a.opacity = new Motion[] {
+            createAndStartAnimateMotion(255, 0, duration),
+            createAndStartAnimateMotion(0, 255, duration)
+        };
+        a.animatedComponents = new Vector();
+        a.animatedComponents.addElement(source);
+        a.animatedComponents.addElement(destination);
+        a.onFinish = onCompletion;
+        a.dontRevalidate = true;
+        a.scrollTo = destination;
+        
+        // animate once to prevent flickering from newly added components 
+        a.animate();
+        getComponentForm().registerAnimated(a);
+        if(wait) {
+            Display.getInstance().invokeAndBlock(a);
+        }
+        
+    }
+    
+    /**
      * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
      *
      * @param duration the duration in milliseconds for the animation
      */
     private void animateHierarchy(final int duration, boolean wait, int opacity) {
+        setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         dontRecurseContainer = true;
         Vector comps = new Vector();
@@ -1687,11 +1778,81 @@ public class Container extends Component {
         Anim a = new Anim(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
-        if(opacity < 255) {
-            a.opacity = createAnimateMotion(opacity, 255, duration);
-            a.opacity.start();
-        }
+        setAnimOpacity(opacity, 255, a, componentCount, duration);
         a.animatedComponents = comps;
+        getComponentForm().registerAnimated(a);
+        if(wait) {
+            Display.getInstance().invokeAndBlock(a);
+        }
+    }
+    
+    /**
+     * This method is the exact reverse of animateLayout, when completed it leaves the container in 
+     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
+     * different form or provide some other interaction.
+     * 
+     * @param duration the duration of the animation
+     * @param opacity the opacity to which the layout will reach, allows fading out the components
+     * @param callback if not null will be invoked when unlayouting is complete
+     */
+    public void animateUnlayout(final int duration, int opacity, Runnable callback) {
+        animateUnlayout(duration, false, opacity, callback);
+    }
+    
+    /**
+     * This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in 
+     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
+     * different form or provide some other interaction.
+     * 
+     * @param duration the duration of the animation
+     * @param opacity the opacity to which the layout will reach, allows fading out the components
+     */
+    public void animateUnlayoutAndWait(final int duration, int opacity) {
+        animateUnlayout(duration, true, opacity, null);
+    }
+
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     */
+    private void animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback) {
+        setShouldCalcPreferredSize(true);
+        enableLayoutOnPaint = false;
+        final int componentCount = getComponentCount();
+        int[] beforeX = new int[componentCount];
+        int[] beforeY = new int[componentCount];
+        int[] beforeW = new int[componentCount];
+        int[] beforeH = new int[componentCount];
+        final Motion[] xMotions = new Motion[componentCount];
+        final Motion[] yMotions = new Motion[componentCount];
+        final Motion[] wMotions = new Motion[componentCount];
+        final Motion[] hMotions = new Motion[componentCount];
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component current = getComponentAt(iter);
+            beforeX[iter] = current.getX();
+            beforeY[iter] = current.getY();
+            beforeW[iter] = current.getWidth();
+            beforeH[iter] = current.getHeight();
+        }
+        layoutContainer();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component current = getComponentAt(iter);
+            xMotions[iter] = createAnimateMotion(current.getX(), beforeX[iter], duration);
+            yMotions[iter] = createAnimateMotion(current.getY(), beforeY[iter], duration);
+            wMotions[iter] = createAnimateMotion(current.getWidth(), beforeW[iter], duration);
+            hMotions[iter] = createAnimateMotion(current.getHeight(), beforeH[iter], duration);
+            xMotions[iter].start();
+            yMotions[iter].start();
+            wMotions[iter].start();
+            hMotions[iter].start();
+        }
+        Anim a = new Anim(this, duration, new Motion[][] {
+            xMotions, yMotions, wMotions, hMotions
+        });
+        setAnimOpacity(255, opacity, a, componentCount, duration);
+        a.onFinish = callback;
+        a.dontRevalidate = true;
         getComponentForm().registerAnimated(a);
         if(wait) {
             Display.getInstance().invokeAndBlock(a);
@@ -1704,6 +1865,7 @@ public class Container extends Component {
      * @param duration the duration in milliseconds for the animation
      */
     private void animateLayout(final int duration, boolean wait, int opacity) {
+        setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
@@ -1740,16 +1902,22 @@ public class Container extends Component {
         Anim a = new Anim(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
-        if(opacity < 255) {
-            a.opacity = createAnimateMotion(opacity, 255, duration);
-            a.opacity.start();
-        }
+        setAnimOpacity(opacity, 255, a, componentCount, duration);
         getComponentForm().registerAnimated(a);
         if(wait) {
             Display.getInstance().invokeAndBlock(a);
         }
     }
 
+    private void setAnimOpacity(int source, int dest, Anim a, int componentCount, int duration) {
+        if(source != dest) {
+            a.opacity = new Motion[componentCount];
+            for(int iter = 0 ; iter < componentCount ; iter++) {
+                a.opacity[iter] = createAndStartAnimateMotion(source, dest, duration);
+            }
+        }        
+    }
+    
     static class Anim implements Animation, Runnable {
         private int animationType;
         private long startTime;
@@ -1766,7 +1934,9 @@ public class Container extends Component {
         int growSpeed;
         int layoutAnimationSpeed;
         Vector animatedComponents;
-        Motion opacity;
+        Motion[] opacity;
+        boolean dontRevalidate;
+        private Component scrollTo;
         
         public Anim(Container thisContainer, int duration, Motion[][] motions) {
             startTime = System.currentTimeMillis();
@@ -1799,7 +1969,7 @@ public class Container extends Component {
                             currentCmp.setWidth(motions[2][iter].getValue());
                             currentCmp.setHeight(motions[3][iter].getValue());
                             if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity.getValue(), false);
+                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
                             }
                         }
                     } else {
@@ -1815,9 +1985,15 @@ public class Container extends Component {
                             currentCmp.setWidth(motions[2][iter].getValue());
                             currentCmp.setHeight(motions[3][iter].getValue());
                             if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity.getValue(), false);
+                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
                             }
                         }
+                    }
+                    if(scrollTo != null) {
+                        boolean s = thisContainer.isSmoothScrolling();
+                        thisContainer.setSmoothScrolling(false);
+                        thisContainer.scrollComponentToVisible(scrollTo);
+                        thisContainer.setSmoothScrolling(s);
                     }
                     thisContainer.repaint();
                     if(System.currentTimeMillis() - startTime >= duration) {
@@ -1825,7 +2001,9 @@ public class Container extends Component {
                         thisContainer.dontRecurseContainer = false;
                         Form f = thisContainer.getComponentForm();
                         f.deregisterAnimated(this);
-                        f.revalidate();
+                        if(!dontRevalidate) {
+                            f.revalidate();
+                        }
                         synchronized(this) {
                             finished = true;
                             notify();
@@ -1868,7 +2046,7 @@ public class Container extends Component {
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {
-                    if(layoutAnimationSpeed <= 0) {
+                    if(layoutAnimationSpeed <= 0 && !dontRevalidate) {
                         parent.revalidate();
                     }
                 }

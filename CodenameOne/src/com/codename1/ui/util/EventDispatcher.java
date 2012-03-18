@@ -44,6 +44,9 @@ public class EventDispatcher {
 
     private static boolean fireStyleEventsOnNonEDT = false;
 
+    private static boolean xmlVMTested;
+    private static boolean xmlVMWorkaround;
+    
     /**
      * When set to true, style events will be dispatched even from non-EDT threads.
      * When set to false, when in non-EDT threads, style events will not be dispatched at all (And developer has to make sure changes will be reflected by calling revalidate after all the changes)
@@ -56,6 +59,57 @@ public class EventDispatcher {
         fireStyleEventsOnNonEDT = fire;
     }
 
+    private static boolean isXMLVMWorkaround() {
+        if(xmlVMTested) {
+            return xmlVMWorkaround;
+        }
+     
+        xmlVMTested = true;
+        try {
+            DataChangedListener[] d = new DataChangedListener[1];
+            if(d instanceof ActionListener[] || !(d instanceof DataChangedListener[])) {
+                xmlVMWorkaround = true;
+            }
+        } catch(Throwable t) {
+            xmlVMWorkaround = true;
+        }
+        return xmlVMWorkaround;
+    }
+    
+    boolean isActionListenerArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new ActionListener[1].getClass();
+        }
+        return o instanceof ActionListener[];
+    }
+
+    boolean isDataChangedListenerArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new DataChangedListener[1].getClass();
+        }
+        return o instanceof DataChangedListener[];
+    }
+
+    boolean isFocusListenerArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new FocusListener[1].getClass();
+        }
+        return o instanceof FocusListener[];
+    }
+    
+    boolean isSelectionListenerArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new SelectionListener[1].getClass();
+        }
+        return o instanceof SelectionListener[];
+    }
+    
+    boolean isStyleListenerArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new StyleListener[1].getClass();
+        }
+        return o instanceof StyleListener[];
+    }
 
     class CallbackClass implements Runnable {
         private Object[] iPending;
@@ -81,27 +135,27 @@ public class EventDispatcher {
                 iPending = pending;
             }
 
-            if(iPending instanceof ActionListener[]) {
+            if(isActionListenerArray(iPending)) {
                 fireActionSync((ActionListener[])iPending, (ActionEvent)iPendingEvent);
                 return;
             }
 
-            if(iPending instanceof FocusListener[]) {
+            if(isFocusListenerArray(iPending)) {
                 fireFocusSync((FocusListener[])iPending, (Component)iPendingEvent);
                 return;
             }
 
-            if(iPending instanceof DataChangedListener[]) {
+            if(isDataChangedListenerArray(iPending)) {
                 fireDataChangeSync((DataChangedListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1]);
                 return;
             }
 
-            if(iPending instanceof SelectionListener[]) {
+            if(isSelectionListenerArray(iPending)) {
                 fireSelectionSync((SelectionListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1]);
                 return;
             }
 
-            if(iPending instanceof StyleListener[]) {
+            if(isStyleListenerArray(iPending)) {
                 Object[] p = (Object[])iPendingEvent;
                 fireStyleChangeSync((StyleListener[])iPending, (String)p[0], (Style)p[1]);
                 pendingEvent = null;

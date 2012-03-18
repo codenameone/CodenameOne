@@ -698,6 +698,13 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Removes all arguments
+     */
+    public void removeAllArguments() {
+        requestArguments = null;
+    }
+    
+    /**
      * Add an argument to the request response without encoding it, this is useful for
      * arguments which are already encoded
      *
