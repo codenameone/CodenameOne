@@ -2521,4 +2521,13 @@ public final class Display {
         impl.sendSMS(phoneNumber, message);
     }
     
+    /**
+     * Indicates if the native video player includes its own play/pause etc. controls so the movie player
+     * component doesn't need to include them
+     * 
+     * @return true if the movie player component doesn't need to include such controls
+     */
+    public boolean isNativeVideoPlayerControlsIncluded() {
+        return impl.isNativeVideoPlayerControlsIncluded();
+    }
 }

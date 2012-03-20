@@ -1,36 +1,69 @@
+/*
+Copyright (c) 2007, Sun Microsystems, Inc.
+ 
+All rights reserved.
+ 
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+ 
+ * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+ * Neither the name of Sun Microsystems, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+ 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 package com.codename1.processing;
 
-import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * Converts a Codename One parsed JSON hashtable back to a readable JSON string
+ * Private class, do not use.
  * 
- * @author Eric Coolman
+ * An internal utility method used by toString() methods to produce a JSON document
+ * from a given hashtable or vector.
+ * 
+ * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
-public class PrettyPrinter {
+class PrettyPrinter {
     Hashtable myHashMap;
     
     private PrettyPrinter(Hashtable h) {
     	this.myHashMap = h;
     }
     
-    public static String print(Hashtable h) throws IOException {
+    public static String print(Hashtable h) {
     	return print(h, 2, 0);
     }
 
-    public static String print(Vector v) throws IOException {
+    public static String print(Vector v) {
     	return print(v, 2, 0);
     }
 
-    static String print(Hashtable h, int indentFactor, int indent) throws IOException {
+    static String print(Hashtable h, int indentFactor, int indent) {
     	PrettyPrinter printer = new PrettyPrinter(h);
     	return printer.toString(indentFactor, indent);
     }
     
-    static String print(Vector v, int indentFactor, int indent) throws IOException {
+    static String print(Vector v, int indentFactor, int indent) {
         int len = v.size();
         if (len == 0) {
             return "[]";
@@ -91,9 +124,8 @@ public class PrettyPrinter {
      *  representation of the object, beginning
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     * @throws IOException If the object contains an invalid number.
      */
-    public String toString(int indentFactor) throws IOException {
+    public String toString(int indentFactor) {
         return toString(indentFactor, 0);
     }
 
@@ -109,9 +141,8 @@ public class PrettyPrinter {
      *  representation of the object, beginning
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     * @throws IOException If the object contains an invalid number.
      */
-    String toString(int indentFactor, int indent) throws IOException {
+    String toString(int indentFactor, int indent) {
         int          i;
         int          n = length();
         if (n == 0) {
@@ -168,10 +199,8 @@ public class PrettyPrinter {
      *  representation of the object, beginning
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     * @throws IOException If the object contains an invalid number.
      */
-     static String valueToString(Object value, int indentFactor, int indent)
-            throws IOException {
+     static String valueToString(Object value, int indentFactor, int indent) {
         if (value == null || value.equals(null)) {
             return "null";
         }
@@ -277,9 +306,8 @@ public class PrettyPrinter {
       *  representation of the object, beginning
       *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
       *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-      * @throws IOException If the value is or contains an invalid number.
       */
-     static String valueToString(Object value) throws IOException {
+     static String valueToString(Object value) {
          if (value == null || value.equals(null)) {
              return "null";
          }
@@ -297,6 +325,7 @@ public class PrettyPrinter {
          }
          return quote(value.toString());
      }
+     
      static public String trimNumber(String s) {
          if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
              while (s.endsWith("0")) {
@@ -315,10 +344,9 @@ public class PrettyPrinter {
       * @return A String.
       * @throws JSONException If n is a non-finite number.
       */
-     static public String numberToString(Object n)
-             throws IOException {
+     static public String numberToString(Object n) {
          if (n == null) {
-             throw new IOException("Null pointer");
+             return null;
          }
          return trimNumber(n.toString());
      }

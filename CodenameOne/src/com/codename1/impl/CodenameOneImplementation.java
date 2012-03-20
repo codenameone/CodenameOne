@@ -1043,6 +1043,16 @@ public abstract class CodenameOneImplementation {
         }
         
     }
+
+    /**
+     * Indicates if the native video player includes its own play/pause etc. controls so the movie player
+     * component doesn't need to include them
+     * 
+     * @return true if the movie player component doesn't need to include such controls
+     */
+    public boolean isNativeVideoPlayerControlsIncluded() {
+        return false;
+    }
     
     /**
      * Indicates if image scaling on the fly is supported by the platform, if not Codename One will just scale the images on its own before drawing

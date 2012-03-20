@@ -27,6 +27,7 @@ import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -199,7 +200,9 @@ public class MediaPlayer extends Container {
         addComponent(BorderLayout.CENTER, video.getVideoComponent());        
         
         Container buttonsBar = new Container(new FlowLayout(Container.CENTER));
-        addComponent(BorderLayout.SOUTH, buttonsBar);
+        if(!Display.getInstance().isNativeVideoPlayerControlsIncluded()) {
+            addComponent(BorderLayout.SOUTH, buttonsBar);
+        }
         
         if(!video.isNativePlayerMode()){
             Button back = new Button();

@@ -35,8 +35,12 @@ package com.codename1.processing;
 import java.util.Vector;
 
 /**
+ * Internal class, do not use.
+ * 
  * Used internally by Result class apply() methods, this converts a path expression into a Vector of string tokens.
  *
+ * @author Eric Coolman (2012-03 - derivative work from original Sun source).
+ * 
  */
 class ResultTokenizer {
     
