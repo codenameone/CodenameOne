@@ -23,6 +23,8 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.contacts.Address;
+import com.codename1.contacts.Contact;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -87,16 +89,12 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
-import com.codename1.io.Storage;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
-import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
-import java.awt.GridBagLayout;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -106,26 +104,22 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
-import java.net.CookieHandler;
-import java.net.CookieManager;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.imageio.IIOException;
 import javax.media.ControllerEvent;
 import javax.media.ControllerListener;
 import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
-import javax.net.ssl.HttpsURLConnection;
-import javax.swing.ImageIcon;
 import jmapps.ui.VideoPanel;
 
 /**
@@ -2806,6 +2800,101 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void dial(String phoneNumber) {
         System.out.println("dialing to " + phoneNumber);
     }
+    
+    @Override
+    public String [] getAllContacts(boolean withNumbers) {
+        return new String [] {"1", "2", "3", "4", "5"};
+    }
+    
+    @Override
+    public Contact getContactById(String id){
+        Contact contact = new Contact();
+        contact.setId(id);
+        if(id.equals("1")){
+            contact.setName("Chen Fishbein");
+            Hashtable phones = new Hashtable();
+            phones.put("mobile", "+111111");
+            phones.put("home", "+222222");
+            contact.setPhoneNumbers(phones);
+            Hashtable emails = new Hashtable();
+            emails.put("work", "chen@codenameone.com");
+            contact.setEmails(emails);
+            
+            Hashtable addresses = new Hashtable();
+            Address addr = new Address();
+            addr.setCountry("IL");
+            addr.setStreetAddress("Sapir 20");
+            addresses.put("home", addr);
+            contact.setAddresses(addresses);
+        }else if(id.equals("2")){
+            contact.setName("Shai Almog");
+            Hashtable phones = new Hashtable();
+            phones.put("mobile", "+111111");
+            phones.put("home", "+222222");
+            contact.setPhoneNumbers(phones);
+            Hashtable emails = new Hashtable();
+            emails.put("work", "shai@codenameone.com");
+            contact.setEmails(emails);
+            
+            Hashtable addresses = new Hashtable();
+            Address addr = new Address();
+            addr.setCountry("IL");
+            addr.setStreetAddress("lev 1");
+            addresses.put("home", addr);
+            contact.setAddresses(addresses);
+        }if(id.equals("3")){
+            contact.setName("Eric Cartman");
+            Hashtable phones = new Hashtable();
+            phones.put("mobile", "+111111");
+            phones.put("home", "+222222");
+            contact.setPhoneNumbers(phones);
+            Hashtable emails = new Hashtable();
+            emails.put("work", "Eric.Cartman@codenameone.com");
+            contact.setEmails(emails);
+            
+            Hashtable addresses = new Hashtable();
+            Address addr = new Address();
+            addr.setCountry("US");
+            addr.setStreetAddress("South Park");
+            addresses.put("home", addr);
+            contact.setAddresses(addresses);
+        }if(id.equals("4")){
+            contact.setName("Kyle Broflovski");
+            Hashtable phones = new Hashtable();
+            phones.put("mobile", "+111111");
+            phones.put("home", "+222222");
+            contact.setPhoneNumbers(phones);
+            Hashtable emails = new Hashtable();
+            emails.put("work", "Kyle.Broflovski@codenameone.com");
+            contact.setEmails(emails);
+            
+            Hashtable addresses = new Hashtable();
+            Address addr = new Address();
+            addr.setCountry("US");
+            addr.setStreetAddress("South Park");
+            addresses.put("home", addr);
+            contact.setAddresses(addresses);
+        }else if(id.equals("5")){
+            contact.setName("Kenny McCormick");
+            Hashtable phones = new Hashtable();
+            phones.put("mobile", "+111111");
+            phones.put("home", "+222222");
+            contact.setPhoneNumbers(phones);
+            Hashtable emails = new Hashtable();
+            emails.put("work", "Kenny.McCormick@codenameone.com");
+            contact.setEmails(emails);
+            
+            Hashtable addresses = new Hashtable();
+            Address addr = new Address();
+            addr.setCountry("US");
+            addr.setStreetAddress("South Park");
+            addresses.put("home", addr);
+            contact.setAddresses(addresses);
+        }
+     
+        return contact;
+    }
+
     
     
     @Override
