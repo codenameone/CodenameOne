@@ -74,6 +74,7 @@ import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.widget.MediaController;
 import android.widget.VideoView;
+import com.codename1.contacts.Contact;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.location.LocationManager;
@@ -672,7 +673,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createImage(String path) throws IOException {
-        int IMAGE_MAX_SIZE = getDisplayHeight()*2;
+        int IMAGE_MAX_SIZE = getDisplayHeight() * 2;
         if (exists(path)) {
             Bitmap b = null;
             try {
@@ -719,14 +720,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createImage(InputStream i) throws IOException {
-        BitmapFactory.Options opts = new BitmapFactory.Options();
-        try {
-            BitmapFactory.Options.class.getField("inPurgeable").set(opts, true);
-        } catch (Exception e) {
-            // inPurgeable not supported
-            // http://www.droidnova.com/2d-sprite-animation-in-android-addendum,505.html
-        }
-        return BitmapFactory.decodeStream(i, null, opts);
+//        BitmapFactory.Options opts = new BitmapFactory.Options();
+//        try {
+//            BitmapFactory.Options.class.getField("inPurgeable").set(opts, true);
+//        } catch (Exception e) {
+//            // inPurgeable not supported
+//            // http://www.droidnova.com/2d-sprite-animation-in-android-addendum,505.html
+//        }
+        return BitmapFactory.decodeStream(i);
     }
 
     @Override
@@ -1401,7 +1402,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } else {
                         v.setVideoURI(Uri.parse(uri));
                     }
-                    video[0] = new Video(v, activity, onCompletion);                    
+                    video[0] = new Video(v, activity, onCompletion);
                     flag[0] = true;
                     synchronized (flag) {
                         flag.notify();
@@ -2666,10 +2667,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendSMS(final String phoneNumber, final String message) throws IOException {
-        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
-                new Intent("SMS_DELIVERED"), 0);
+//        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
+//                new Intent("SMS_DELIVERED"), 0);
         SmsManager sms = SmsManager.getDefault();
-        sms.sendTextMessage(phoneNumber, null, message, deliveredPI, null);
+        ArrayList<String> parts = sms.divideMessage(message);
+        sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
+    }
+
+    @Override
+    public String[] getAllContacts(boolean withNumbers) {
+        return AndroidContactsManager.getInstance().getContacts(activity, withNumbers);
+    }
+
+    @Override
+    public Contact getContactById(String id) {
+        return AndroidContactsManager.getInstance().getContact(activity, id);
     }
 
     /**
@@ -2729,7 +2741,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return false;
                 }
             });
-            
+
         }
 
         @Override
@@ -2961,10 +2973,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-    
-    class CN1MediaController extends MediaController{
-        
-        public CN1MediaController(){
+
+    class CN1MediaController extends MediaController {
+
+        public CN1MediaController() {
             super(activity);
         }
 
@@ -2972,16 +2984,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public boolean dispatchKeyEvent(KeyEvent event) {
             int keycode = event.getKeyCode();
             keycode = AndroidView.internalKeyCodeTranslate(keycode);
-            if(keycode == AndroidImplementation.DROID_IMPL_KEY_BACK){
+            if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
                 Display.getInstance().keyPressed(keycode);
                 Display.getInstance().keyReleased(keycode);
                 return true;
-            }else{            
+            } else {
                 return super.dispatchKeyEvent(event);
             }
         }
-                
-        
     }
-    
 }
