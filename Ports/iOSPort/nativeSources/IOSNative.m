@@ -877,7 +877,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(JAVA_LON
     return i;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long(JAVA_LONG peer, JAVA_INT offset) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     JAVA_OBJECT j = fromNSString([impl getResponseHeaderName:offset]);
