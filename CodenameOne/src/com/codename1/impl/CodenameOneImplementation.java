@@ -3400,6 +3400,15 @@ public abstract class CodenameOneImplementation {
     public abstract String getHeaderField(String name, Object connection) throws IOException;
 
     /**
+     * Returns the HTTP response header field
+     *
+     * @param connection the connection object
+     * @return the value of the header field
+     * @throws IOException if the request failed
+     */
+    public abstract String[] getHeaderFieldNames(Object connection) throws IOException;
+    
+    /**
      * Returns the HTTP response header fields, returns optionally more than one result or null if
      * no field is present.
      *

@@ -41,9 +41,13 @@ import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.Storage;
+import com.codename1.io.Util;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
+import com.codename1.media.Media;
+import com.codename1.messaging.Message;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
@@ -57,6 +61,8 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -282,7 +288,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public Object createImage(String path) throws IOException {
-        return createImage(getResourceAsStream(getClass(), path));
+        InputStream i;
+        if(path.startsWith("file:")) {
+            i = openFileInputStream(path);
+        } else {
+            i = getResourceAsStream(getClass(), path);
+        }
+        Object o = createImage(i);
+        Util.cleanup(i);
+        return o;
     }
 
     public boolean hasNativeTheme() {
@@ -767,6 +781,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(p <= 0) {
                 return null;
             }
+            bindListener();
             Location l = new Location();
             long c = IOSNative.getCurrentLocationObject(p);
             l.setAccuracy((float)IOSNative.getLocationAccuracy(c));
@@ -774,7 +789,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             l.setDirection((float)IOSNative.getLocationDirection(c));
             l.setLatitude(IOSNative.getLocationLatitude(c));
             l.setLongtitude(IOSNative.getLocationLongtitude(c));
-            l.setStatus(LocationManager.AVAILABLE);
+            if(IOSNative.isGoodLocation(p)) {
+                l.setStatus(LocationManager.AVAILABLE);
+            } else {
+                l.setStatus(LocationManager.TEMPORARILY_UNAVAILABLE);
+            }
             l.setTimeStamp(IOSNative.getLocationTimeStamp(c));
             l.setVelocity((float)IOSNative.getLocationVelocity(c));
             IOSNative.releasePeer(c);
@@ -836,14 +855,18 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void capturePictureResult(String r) {
-        
+        if(captureCallback != null) {
+            captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+        }
     }
 
     /**
      * Callback for the native layer
      */
     public static void captureMovieResult(String r) {
-        
+        if(captureCallback != null) {
+            captureCallback.fireActionEvent(new ActionEvent("file:" + r));        
+        }
     }
     
     private static EventDispatcher captureCallback;
@@ -879,6 +902,173 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.captureCamera(true);
     }
 
+    class IOSMedia implements Media {
+        private String uri;
+        private boolean isVideo;
+        private Runnable onCompletion;
+        private InputStream stream;
+        private String mimeType;
+        private PeerComponent component;
+        private boolean nativePlayer;
+        private long moviePlayerPeer;
+        private boolean fullScreen;
+        
+        public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
+            this.uri = uri;
+            this.isVideo = isVideo;
+            this.onCompletion = onCompletion;
+        }
+
+        public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
+            this.stream = stream;
+            this.mimeType = mimeType;
+            this.onCompletion = onCompletion;            
+        }
+
+        @Override
+        public void play() {
+            if(nativePlayer) {
+                if(uri != null) {
+                    moviePlayerPeer = IOSNative.createVideoComponent(uri);
+                } else {
+                    try {
+                        byte[] data = Util.readInputStream(stream);
+                        Util.cleanup(stream);
+                        moviePlayerPeer = IOSNative.createVideoComponent(data);
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                IOSNative.showNativePlayerController(moviePlayerPeer);
+                return;
+            }
+            if(moviePlayerPeer != 0) {
+                IOSNative.startVideoComponent(moviePlayerPeer);
+            }
+        }
+
+        @Override
+        public void pause() {
+            if(moviePlayerPeer != 0) {
+                IOSNative.stopVideoComponent(moviePlayerPeer);
+            }
+        }
+
+        @Override
+        public void cleanup() {
+            if(moviePlayerPeer != 0) {
+                IOSNative.releasePeer(moviePlayerPeer);
+                moviePlayerPeer = 0;
+            }
+        }
+        
+        protected void finalize() {
+            cleanup();
+        }
+
+        @Override
+        public int getTime() {
+            if(moviePlayerPeer != 0) {
+                return IOSNative.getMediaTimeMS(moviePlayerPeer);
+            }
+            return 0;
+        }
+
+        @Override
+        public void setTime(int time) {
+            if(moviePlayerPeer != 0) {
+                IOSNative.setMediaTimeMS(moviePlayerPeer, time);
+            }
+        }
+
+        @Override
+        public int getDuration() {
+            if(moviePlayerPeer != 0) {
+                return IOSNative.getMediaDuration(moviePlayerPeer);
+            }
+            return 0;
+        }
+
+        @Override
+        public void setVolume(int vol) {
+            IOSNative.setVolume(((float)vol) / 100);
+        }
+
+        @Override
+        public int getVolume() {
+            return (int)(IOSNative.getVolume() * 100);
+        }
+
+        @Override
+        public boolean isPlaying() {
+            if(moviePlayerPeer != 0) {
+                return IOSNative.isVideoPlaying(moviePlayerPeer);
+            }
+            return false;
+        }
+
+        @Override
+        public Component getVideoComponent() {
+            if(uri != null) {
+                moviePlayerPeer = IOSNative.createVideoComponent(uri);
+                component = PeerComponent.create(new long[] { IOSNative.getVideoViewPeer(moviePlayerPeer) });
+            } else {
+                try {
+                    byte[] data = Util.readInputStream(stream);
+                    Util.cleanup(stream);
+                    moviePlayerPeer = IOSNative.createVideoComponent(data);
+                    component = PeerComponent.create(new long[] { IOSNative.getVideoViewPeer(moviePlayerPeer) });
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                    return new Label("Error loading video " + ex);
+                }
+            }
+            return component;
+        }
+
+        @Override
+        public boolean isVideo() {
+            return isVideo;
+        }
+
+        @Override
+        public boolean isFullScreen() {
+            long p = get(component);
+            if(p != 0) {
+                return IOSNative.isVideoFullScreen(p);
+            }
+            return false;
+        }
+
+        @Override
+        public void setFullScreen(boolean fullScreen) {
+            this.fullScreen = fullScreen;
+            long p = get(component);
+            if(p != 0) {
+                IOSNative.setVideoFullScreen(p, fullScreen);
+            }
+        }
+
+        @Override
+        public void setNativePlayerMode(boolean nativePlayer) {
+            this.nativePlayer = nativePlayer;
+        }
+
+        @Override
+        public boolean isNativePlayerMode() {
+            return nativePlayer;
+        }
+    }
+    
+    public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+        return new IOSMedia(uri, isVideo, onCompletion);
+    }
+
+
+    public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+        return new IOSMedia(stream, mimeType, onCompletion);
+    }
+    
     /**
      * Extracts the hard reference from the soft/weak reference given
      *
@@ -1432,7 +1622,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
-        super.drawImage(graphics, img, x, y, w, h);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        //System.out.println("Drawing image " + img);
+        ng.checkControl();
+        ng.applyClip();
+        NativeImage nm = (NativeImage)img;
+        ng.nativeDrawImage(nm.peer, ng.alpha, x, y, w, h);
     }
 
     @Override
@@ -1541,7 +1736,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             } 
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";
         }
-        if(key.equalsIgnoreCase("UDID") || key.equalsIgnoreCase("MSISDN")) {
+        if(key.equalsIgnoreCase("UDID")) {
             return IOSNative.getUDID();
         }
         return super.getProperty(key, defaultValue);
@@ -1628,6 +1823,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isNativeVideoPlayerControlsIncluded() {
+        return true;
+    }
+    
+    @Override
+    public void sendMessage(String[] recieptents, String subject, Message msg) {
+        IOSNative.sendEmailMessage(recieptents[0], subject, msg.getContent(), msg.getAttachment(), msg.getMimeType());
+    }
+
+    @Override
     public boolean isTrueTypeSupported() {
         // TODO
         return super.isTrueTypeSupported();
@@ -1691,6 +1896,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }*/
 
     private long get(PeerComponent p) {
+        if(p == null) return 0;
         long[] l = (long[])p.getNativePeer();
         return l[0];
     }
@@ -1874,6 +2080,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 ensureConnectionLock = true;
                 if(body != null) {
+                    try {
+                        body.flush();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
                     IOSNative.setBody(peer, body.toByteArray());
                     body = null;
                 }
@@ -2120,6 +2331,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public String[] getHeaderFieldNames(Object connection) throws IOException {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.ensureConnection();
+        String[] s = new String[IOSNative.getResponseHeaderCount(n.peer)];
+        for(int iter = 0 ; iter < s.length ; iter++) {
+            s[iter] = IOSNative.getResponseHeaderName(n.peer, iter);
+        }
+        return s;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
@@ -2262,6 +2486,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
+        if(file.startsWith("file:/")) {
+            file = file.substring(5);
+        }
         return new NSDataInputStream(file);
     }
 

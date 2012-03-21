@@ -114,6 +114,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -2583,6 +2584,17 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public String getHeaderField(String name, Object connection) throws IOException {
         return ((HttpURLConnection) connection).getHeaderField(name);
+    }
+
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getHeaderFieldNames(Object connection) throws IOException {
+        Set<String> s = ((HttpURLConnection) connection).getHeaderFields().keySet();
+        String[] resp = new String[s.size()];
+        s.toArray(resp);
+        return resp;
     }
 
     /**

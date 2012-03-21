@@ -2529,5 +2529,5 @@ public final class Display {
      */
     public boolean isNativeVideoPlayerControlsIncluded() {
         return impl.isNativeVideoPlayerControlsIncluded();
-    }
+    }    
 }

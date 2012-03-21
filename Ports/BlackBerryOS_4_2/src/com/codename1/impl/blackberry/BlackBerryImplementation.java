@@ -2053,6 +2053,32 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public String getHeaderField(String name, Object connection) throws IOException {
         return ((HttpConnection) connection).getHeaderField(name);
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getHeaderFieldNames(Object connection) throws IOException {
+        HttpConnection c = (HttpConnection)connection;
+        Vector r = new Vector();
+        int i = 0;
+        String key = c.getHeaderFieldKey(i);
+        while (key != null) {
+            if(r.indexOf(key) < 0) {
+                r.addElement(key);
+            }
+            i++;
+            key = c.getHeaderFieldKey(i);
+        }
+        
+        if(r.size() == 0) {
+            return null;
+        }
+        String[] response = new String[r.size()];
+        for(int iter = 0 ; iter < response.length ; iter++) {
+            response[iter] = (String)r.elementAt(iter);
+        }
+        return response;
+    }
 
     /**
      * @inheritDoc

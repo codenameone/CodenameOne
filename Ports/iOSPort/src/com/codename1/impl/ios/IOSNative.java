@@ -180,6 +180,8 @@ public class IOSNative {
     
     public static native long createVideoComponent(String url);
 
+    public static native long createVideoComponent(byte[] video);
+
     public static native void startVideoComponent(long peer); 
     
     public static native void stopVideoComponent(long peer);
@@ -195,6 +197,10 @@ public class IOSNative {
     public static native void setVideoFullScreen(long peer, boolean fullscreen);
 
     public static native boolean isVideoFullScreen(long peer);
+
+    public static native long getVideoViewPeer(long peer);
+    
+    public static native void showNativePlayerController(long peer);
     
     // IO methods
 
@@ -225,6 +231,8 @@ public class IOSNative {
     public static native int getContentLength(long peer);
 
     public static native String getResponseHeader(long peer, String name);
+    public static native int getResponseHeaderCount(long peer);
+    public static native String getResponseHeaderName(long peer, int offset);
 
     public static native void addHeader(long peer, String key, String value);
 
@@ -236,6 +244,7 @@ public class IOSNative {
     
     // location manager
     public static native long createCLLocation();
+    public static native boolean isGoodLocation(long clLocation);
     public static native long getCurrentLocationObject(long clLocation);
     public static native double getLocationLatitude(long location);
     public static native double getLocationAltitude(long location);
@@ -252,4 +261,5 @@ public class IOSNative {
     // capture
     public static native void captureCamera(boolean movie);
 
+    public static native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType);
 }

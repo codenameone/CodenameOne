@@ -100,6 +100,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
@@ -2400,6 +2401,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String getHeaderField(String name, Object connection) throws IOException {
         return ((HttpURLConnection) connection).getHeaderField(name);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getHeaderFieldNames(Object connection) throws IOException {
+        Set<String> s = ((HttpURLConnection) connection).getHeaderFields().keySet();
+        String[] resp = new String[s.size()];
+        s.toArray(resp);
+        return resp;
     }
 
     /**
