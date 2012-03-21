@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.contacts.Contact;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.ui.animations.Animation;
@@ -2519,6 +2520,24 @@ public final class Display {
      */
     public void sendSMS(String phoneNumber, String message) throws IOException{
         impl.sendSMS(phoneNumber, message);
+    }
+    
+    /**
+     * Gets all contacts from the address book of the device
+     * @param withNumbers if true returns only contacts that has a number
+     * @return array of contacts unique ids
+     */
+    public String [] getAllContacts(boolean withNumbers) {
+        return impl.getAllContacts(withNumbers);
+    }
+
+    /**
+     * Get a Contact according to it's contact id.
+     * @param id unique id of the Contact
+     * @return a Contact Object
+     */
+    public Contact getContactById(String id) {
+        return impl.getContactById(id);
     }
     
     /**

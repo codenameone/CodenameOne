@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.contacts.Contact;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
@@ -3962,6 +3963,24 @@ public abstract class CodenameOneImplementation {
         } catch(Throwable t) {
             return new Object[0].getClass();
         }
+    }
+
+    /**
+     * Gets all contacts from the address book of the device
+     * @param withNumbers if true returns only contacts that has a number
+     * @return array of contacts unique ids
+     */
+    public String [] getAllContacts(boolean withNumbers) {
+        return null;
+    }
+
+    /**
+     * Get a Contact according to it's contact id.
+     * @param id unique id of the Contact
+     * @return a Contact Object
+     */
+    public Contact getContactById(String id) {
+        return null;
     }
 
 }
