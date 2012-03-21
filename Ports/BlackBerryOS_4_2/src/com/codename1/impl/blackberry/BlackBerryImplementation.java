@@ -24,6 +24,7 @@
  */
 package com.codename1.impl.blackberry;
 
+import com.codename1.contacts.Contact;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -2812,6 +2813,21 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             return false;
         }
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String [] getAllContacts(boolean withNumbers) {
+        return RIMContactsManager.getInstance().getAllContacts(withNumbers);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Contact getContactById(String id){
+        return RIMContactsManager.getInstance().getContactById(id);
+    }
+    
     /**
      * @inheritDoc
      */
