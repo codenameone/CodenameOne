@@ -1011,7 +1011,7 @@ public class Tabs extends Container {
                                 if (diff > 0) {
                                     activeComponent--;
                                     if (activeComponent < 0) {
-                                        activeComponent = activeComponent = 0;
+                                        activeComponent = 0;
                                     }
                                 } else {
                                     activeComponent++;

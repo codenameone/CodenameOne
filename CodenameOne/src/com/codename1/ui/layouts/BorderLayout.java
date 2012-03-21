@@ -60,11 +60,11 @@ public class BorderLayout extends Layout {
      */
     public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
 
-    private Component portaraitNorth;
-    private Component portaraitSouth;
-    private Component portaraitCenter;
-    private Component portaraitWest;
-    private Component portaraitEast;
+    private Component portraitNorth;
+    private Component portraitSouth;
+    private Component portraitCenter;
+    private Component portraitWest;
+    private Component portraitEast;
 
     private Hashtable landscapeSwap;
 
@@ -114,20 +114,20 @@ public class BorderLayout extends Layout {
         /* Assign the component to one of the known regions of the layout.
          */
         if (CENTER.equals(name)) {
-            previous = portaraitCenter;
-            portaraitCenter = comp;
+            previous = portraitCenter;
+            portraitCenter = comp;
         } else if (NORTH.equals(name)) {
-            previous = portaraitNorth;
-            portaraitNorth = comp;
+            previous = portraitNorth;
+            portraitNorth = comp;
         } else if (SOUTH.equals(name)) {
-            previous = portaraitSouth;
-            portaraitSouth = comp;
+            previous = portraitSouth;
+            portraitSouth = comp;
         } else if (EAST.equals(name)) {
-            previous = portaraitEast;
-            portaraitEast = comp;
+            previous = portraitEast;
+            portraitEast = comp;
         } else if (WEST.equals(name)) {
-            previous = portaraitWest;
-            portaraitWest = comp;
+            previous = portraitWest;
+            portraitWest = comp;
         } else {
             throw new IllegalArgumentException("cannot add to layout: unknown constraint: " + name);
         }
@@ -140,16 +140,16 @@ public class BorderLayout extends Layout {
      * @inheritDoc
      */
     public void removeLayoutComponent(Component comp) {
-        if (comp == portaraitCenter) {
-            portaraitCenter = null;
-        } else if (comp == portaraitNorth) {
-            portaraitNorth = null;
-        } else if (comp == portaraitSouth) {
-            portaraitSouth = null;
-        } else if (comp == portaraitEast) {
-            portaraitEast = null;
-        } else if (comp == portaraitWest) {
-            portaraitWest = null;
+        if (comp == portraitCenter) {
+            portraitCenter = null;
+        } else if (comp == portraitNorth) {
+            portraitNorth = null;
+        } else if (comp == portraitSouth) {
+            portraitSouth = null;
+        } else if (comp == portraitEast) {
+            portraitEast = null;
+        } else if (comp == portraitWest) {
+            portraitWest = null;
         }
     }
 
@@ -160,16 +160,16 @@ public class BorderLayout extends Layout {
      * @return one of the constraints defined in this class
      */
     public Object getComponentConstraint(Component comp) {
-        if (comp == portaraitCenter) {
+        if (comp == portraitCenter) {
             return CENTER;
-        } else if (comp == portaraitNorth) {
+        } else if (comp == portraitNorth) {
             return NORTH;
-        } else if (comp == portaraitSouth) {
+        } else if (comp == portraitSouth) {
             return SOUTH;
-        } else if (comp == portaraitEast) {
+        } else if (comp == portraitEast) {
             return EAST;
         } else {
-            if(comp == portaraitWest) {
+            if(comp == portraitWest) {
                 return WEST;
             }
         }
@@ -340,19 +340,19 @@ public class BorderLayout extends Layout {
     private Component getComponentAtIgnoreLandscape(String constraint) {
         if(constraint != null) {
             if(constraint.equals(NORTH)) {
-                return portaraitNorth;
+                return portraitNorth;
             }
             if(constraint.equals(SOUTH)) {
-                return portaraitSouth;
+                return portraitSouth;
             }
             if(constraint.equals(EAST)) {
-                return portaraitEast;
+                return portraitEast;
             }
             if(constraint.equals(WEST)) {
-                return portaraitWest;
+                return portraitWest;
             }
             if(constraint.equals(CENTER)) {
-                return portaraitCenter;
+                return portraitCenter;
             }
         }
         return null;
@@ -374,7 +374,7 @@ public class BorderLayout extends Layout {
      * @return the component in the constraint
      */
     public Component getSouth() {
-        return getComponentImpl(portaraitSouth, SOUTH);
+        return getComponentImpl(portraitSouth, SOUTH);
     }
 
     /**
@@ -383,7 +383,7 @@ public class BorderLayout extends Layout {
      * @return the component in the constraint
      */
     public Component getCenter() {
-        return getComponentImpl(portaraitCenter, CENTER);
+        return getComponentImpl(portraitCenter, CENTER);
     }
 
     /**
@@ -392,7 +392,7 @@ public class BorderLayout extends Layout {
      * @return the component in the constraint
      */
     public Component getNorth() {
-        return getComponentImpl(portaraitNorth, NORTH);
+        return getComponentImpl(portraitNorth, NORTH);
     }
 
     /**
@@ -401,7 +401,7 @@ public class BorderLayout extends Layout {
      * @return the component in the constraint
      */
     public Component getEast() {
-        return getComponentImpl(portaraitEast, EAST);
+        return getComponentImpl(portraitEast, EAST);
     }
 
     /**
@@ -410,7 +410,7 @@ public class BorderLayout extends Layout {
      * @return the component in the constraint
      */
     public Component getWest() {
-        return getComponentImpl(portaraitWest, WEST);
+        return getComponentImpl(portraitWest, WEST);
     }
 
     /**
