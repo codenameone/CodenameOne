@@ -107,6 +107,16 @@ extern void connectionError(void* peer, NSString* message);
     connectionComplete(self);
 }
 
+- (int)getResponseHeaderCount {
+    return [allHeaderFields count];
+}
+
+- (NSString*)getResponseHeaderName:(int)offset {
+    NSEnumerator* n = [allHeaderFields keyEnumerator];
+    return [[n allObjects] objectAtIndex:offset];
+}
+
+
 -(void)dealloc {
     if(allHeaderFields != nil) {
         [allHeaderFields release];

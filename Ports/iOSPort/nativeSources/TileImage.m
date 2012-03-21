@@ -55,11 +55,11 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     glEnable(GL_TEXTURE_2D);
     GLErrorLog;
-    GLuint tex = [img getTexture];
-    glBindTexture(GL_TEXTURE_2D, tex);
-    GLErrorLog;
     int imageWidth = (int)[[img getImage] size].width;
     int imageHeight = (int)[[img getImage] size].height;
+    GLuint tex = [img getTexture:imageWidth texHeight:imageHeight];
+    glBindTexture(GL_TEXTURE_2D, tex);
+    GLErrorLog;
 
     static const GLshort textureCoordinates[] = {
         0, 1,

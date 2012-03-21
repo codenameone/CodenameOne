@@ -32,6 +32,8 @@ extern int nextPowerOf2(int val);
     name = nil;
     [img retain];
     textureName = 0;
+    textureWidth = -1;
+    textureHeight = -1;
     return self;
 }
 
@@ -39,8 +41,10 @@ extern int nextPowerOf2(int val);
     return img;
 }
 
--(GLuint)getTexture {
+-(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
     if(textureName == 0) {
+        textureWidth = texWidth;
+        textureHeight = texHeight;
         //natural_t memoryBefore = [ExecutableOp get_free_memory];
         glEnableClientState(GL_VERTEX_ARRAY);
         //glEnableClientState(GL_NORMAL_ARRAY);
@@ -51,8 +55,8 @@ extern int nextPowerOf2(int val);
         GLErrorLog;
         glBindTexture(GL_TEXTURE_2D, textureName);
         GLErrorLog;
-        int w = (int)img.size.width;
-        int h = (int)img.size.height;
+        int w = texWidth;//(int)img.size.width;
+        int h = texHeight;//(int)img.size.height;
         int p2w = nextPowerOf2(w);
         int p2h = nextPowerOf2(h);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
@@ -82,6 +86,12 @@ extern int nextPowerOf2(int val);
         //if(name != nil) {
         //    NSLog(@"Allocated texture %@ that takes up %i", name, memoryBefore - memoryAfter);
         //}
+    } else {
+        if(texWidth != textureWidth || texHeight != textureHeight) {
+            glDeleteTextures(1, &textureName);
+            textureName = 0;
+            return [self getTexture:texWidth texHeight:texHeight];
+        }
     }
     return textureName;
 }

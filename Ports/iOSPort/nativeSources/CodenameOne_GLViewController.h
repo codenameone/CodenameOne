@@ -30,8 +30,10 @@
 #import <OpenGLES/ES2/glext.h>
 #import "ExecutableOp.h"
 #import "GLUIImage.h"
+#import <MessageUI/MFMailComposeViewController.h>
+#import <CoreLocation/CoreLocation.h>
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate> {
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, CLLocationManagerDelegate> {
 @private
     EAGLContext *context;
     GLuint program;

@@ -33,10 +33,12 @@
     UIImage* img;
     GLuint textureName;
     NSString* name;
+    int textureWidth;
+    int textureHeight;
 }
 -(id)initWithImage:(UIImage*)i;
 -(UIImage*)getImage;
--(GLuint)getTexture;
+-(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight;
 -(void)setName:(NSString*)s;
 -(void)setImage:(UIImage*)i;
 @end

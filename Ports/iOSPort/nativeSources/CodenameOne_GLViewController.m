@@ -99,12 +99,12 @@ void screenSizeChangedC(int width, int height) {
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 (void* data, int dataLength, int* widthAndHeightReturnValue) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started");
+    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started for dataLength %i", dataLength);
     NSData* nd = [NSData dataWithBytes:data length:dataLength];
     UIImage* img = [UIImage imageWithData:nd];
     widthAndHeightReturnValue[0] = (int)img.size.width;
     widthAndHeightReturnValue[1] = (int)img.size.height;
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished %i", (int)img);
+    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished width %i, height %i", (int)widthAndHeightReturnValue[0], (int)widthAndHeightReturnValue[1]);
     
     return [[GLUIImage alloc] initWithImage:img];
 }
@@ -1395,15 +1395,7 @@ extern int popoverSupported();
 
 
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
-	if([self popoverSupported] && popoverController != nil) {
-		[popoverController dismissPopoverAnimated:YES]; 
-        popoverController.delegate = nil;
-        popoverController = nil;
-	}
-	else {
-		[picker dismissModalViewControllerAnimated:YES]; 
-	}
-
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
@@ -1411,34 +1403,32 @@ extern int popoverSupported();
 
         NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
 			
-        // write to temp directory and reutrn URI
-		// get the temp directory path
-		NSString* docsPath = [NSTemporaryDirectory() stringByStandardizingPath];
-        NSError* err = nil;
-        NSFileManager* fileMgr = [[NSFileManager alloc] init]; //recommended by apple (vs [NSFileManager defaultManager]) to be theadsafe
-			
-        // generate unique file name
-        NSString* filePath;
-        int i = 1;
-        do {
-            filePath = [NSString stringWithFormat:@"%@/photo_%03d.%@", docsPath, i++, @"jpg"];
-        } while([fileMgr fileExistsAtPath: filePath]);
-        // save file
-        if (![data writeToFile: filePath options: NSAtomicWrite error: &err]){
-            // need to send error message in some way...
-        } else {
-            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(filePath));
-        }
-        [fileMgr release];
-			
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        [data writeToFile:path atomically:YES];
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));        
 	} else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
         com_codename1_impl_ios_IOSImplementation_captureMovieResult___java_lang_String(fromNSString(moviePath));
     }
 	
+	if(popoverSupported() && popoverController != nil) {
+		[popoverController dismissPopoverAnimated:YES]; 
+        popoverController.delegate = nil;
+        popoverController = nil;
+	} else {
+		[picker dismissModalViewControllerAnimated:YES]; 
+	}
+    
 	picker.delegate = nil;
-    popoverController = nil;
+    picker = nil;
+    [pool release];
+}
+
+-(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
+	[self dismissModalViewControllerAnimated:YES];
 }
 
 @end

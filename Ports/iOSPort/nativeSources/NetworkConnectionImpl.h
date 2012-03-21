@@ -44,5 +44,7 @@
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error;
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data;
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection;
+- (int)getResponseHeaderCount;
+- (NSString*)getResponseHeaderName:(int)offset;
 
 @end

@@ -36,6 +36,7 @@
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
+#import <MessageUI/MFMailComposeViewController.h>
 
 extern void initVMImpl();
 
@@ -635,8 +636,8 @@ void screenSizeChanged(int width, int height) {
 
 void stringEdit(int finished, int cursorPos, const char* text) {
     com_codename1_impl_ios_IOSImplementation_editingUpdate___java_lang_String_int_boolean(
-        xmlvm_create_java_string(text), cursorPos, finished != 0
-    );
+                                                                                          xmlvm_create_java_string(text), cursorPos, finished != 0
+                                                                                          );
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__()
@@ -768,7 +769,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     const char* chrs = xmlvm_java_string_to_const_char(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns];
-
+    
     org_xmlvm_runtime_XMLVMArray* byteArray = files;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     
@@ -866,6 +867,22 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_
     java_lang_String* str = fromNSString([impl getResponseHeader:nsSrc]);
     [pool release];    
     return str;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
+    JAVA_INT i = [impl getResponseHeaderCount]; 
+    [pool release];    
+    return i;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long(JAVA_LONG peer, JAVA_INT offset) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
+    JAVA_OBJECT j = fromNSString([impl getResponseHeaderName:offset]);
+    [pool release];    
+    return j;
 }
 
 void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lang_String(JAVA_LONG peer, JAVA_OBJECT key, JAVA_OBJECT value) {
@@ -1144,7 +1161,7 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    
     CGFloat components[8] = { 
         ((float)((n1 & 0xFF0000) >> 16))/255.0, 
         ((float)(n1 & 0xff00 >> 8))/255.0,
@@ -1163,8 +1180,8 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
     CGPoint myCentrePoint = CGPointMake(relativeX * width, relativeY * height);
     float myRadius = MIN(width, height) * relativeSize;
     CGContextDrawRadialGradient (UIGraphicsGetCurrentContext(), myGradient, myCentrePoint,
-                                         0, myCentrePoint, myRadius,
-                                         kCGGradientDrawsAfterEndLocation);
+                                 0, myCentrePoint, myRadius,
+                                 kCGGradientDrawsAfterEndLocation);
     CGColorSpaceRelease(colorSpace);
     [pool release];
 }
@@ -1344,6 +1361,53 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
     return moviePlayerInstance;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JAVA_OBJECT dataObject) {
+    __block MPMoviePlayerController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+        
+        [d writeToFile:path atomically:YES];
+        NSURL *u = [NSURL fileURLWithPath:path];        
+        
+        moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        [pool release];
+    });
+    return moviePlayerInstance;
+}
+
+
+
+void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(
+                                                                                                                                              JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
+        picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
+        
+        // Recipient.
+        NSString *recipient = toNSString(recipients);
+        NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
+        [picker setToRecipients:recipientsArray];
+        
+        // Subject.
+        [picker setSubject:toNSString(subject)];
+        
+        // Body.
+        NSString *emailBody = toNSString(content);
+        [picker setMessageBody:emailBody isHTML:NO];
+        
+        [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+        
+        [picker release];
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -1414,6 +1478,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(JAVA_LONG
     return response;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(JAVA_LONG peer) {
+    MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
+    return m.view;
+}
+
+void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
+        [[CodenameOne_GLViewController instance] presentModalViewController:m animated:YES];
+        [pool release];
+    });
+}
+
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__() {
     return [[CLLocationManager alloc] init];
 }
@@ -1464,43 +1543,42 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(JAVA_LONG
 }
 
 UIPopoverController* popoverController;
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_BOOLEAN movie) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
-    popoverController = nil;
-    
-	bool hasCamera = [UIImagePickerController isSourceTypeAvailable:sourceType];
-	if (!hasCamera) {
-		return nil;
-	} else {        
-        UIImagePickerController* pickerController = [[[UIImagePickerController alloc] init] autorelease];
+void com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_BOOLEAN movie) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
+        popoverController = nil;
         
-        pickerController.delegate = [CodenameOne_GLViewController instance];
-        pickerController.sourceType = sourceType;
-                
-        if(movie) {
-            pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.movie", nil];
-        } else {
-            pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.image", nil];
+        bool hasCamera = [UIImagePickerController isSourceTypeAvailable:sourceType];
+        if (hasCamera) {
+            UIImagePickerController* pickerController = [[[UIImagePickerController alloc] init] autorelease];
+            
+            pickerController.delegate = [CodenameOne_GLViewController instance];
+            pickerController.sourceType = sourceType;
+            
+            if(movie) {
+                pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.movie", nil];
+            } else {
+                pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.image", nil];
+            }
+            
+            if(popoverSupported() && sourceType != UIImagePickerControllerSourceTypeCamera)
+            {
+                popoverController = [[[NSClassFromString(@"UIPopoverController") alloc] 
+                                      initWithContentViewController:pickerController] autorelease]; 
+                popoverController.delegate = [CodenameOne_GLViewController instance];
+                [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                                   inView:[CodenameOne_GLViewController instance]
+                                 permittedArrowDirections:UIPopoverArrowDirectionAny 
+                                                 animated:YES]; 
+            }
+            else 
+            { 
+                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES]; 
+            }
+            [pool release];
         }
-        
-        if(popoverSupported() && sourceType != UIImagePickerControllerSourceTypeCamera)
-        {
-            popoverController = [[[NSClassFromString(@"UIPopoverController") alloc] 
-                                                            initWithContentViewController:pickerController] autorelease]; 
-            popoverController.delegate = [CodenameOne_GLViewController instance];
-            [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                                      inView:[CodenameOne_GLViewController instance]
-                                                    permittedArrowDirections:UIPopoverArrowDirectionAny 
-                                                                    animated:YES]; 
-        }
-        else 
-        { 
-            [[CodenameOne_GLViewController instance]
-             presentModalViewController:pickerController animated:YES]; 
-        }
-        [pool release];
-    }
+    });
 }
 
 int popoverSupported()
@@ -1510,12 +1588,32 @@ int popoverSupported()
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__() {
     return fromNSString([[UIDevice currentDevice] uniqueIdentifier]);
+}
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    CLLocationManager* l = (CLLocationManager*)peer;
+    CLLocation* loc = l.location;
+    if(loc == nil) {
+        [pool release];
+        return 0;
+    }
+    
+    // Filter out points by invalid accuracy
+    if (loc.horizontalAccuracy < 0) {
+        [pool release];
+        return 0;
+    }
+    
+    [pool release];
+    // The newLocation is good to use
+    return 1;    
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(JAVA_LONG peer) {
     CLLocationManager* l = (CLLocationManager*)peer;
-    [l startUpdatingHeading];
+    l.delegate = [CodenameOne_GLViewController instance];
+    [l startUpdatingLocation];
 }
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_LONG peer) {

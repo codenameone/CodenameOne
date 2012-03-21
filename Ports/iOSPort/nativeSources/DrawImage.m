@@ -17,11 +17,11 @@
     glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     glEnable(GL_TEXTURE_2D);
     GLErrorLog;
-    GLuint tex = [img getTexture];
-    glBindTexture(GL_TEXTURE_2D, tex);
-    GLErrorLog;
     int w = nextPowerOf2(width);
     int h = nextPowerOf2(height);
+    GLuint tex = [img getTexture:width texHeight:height];
+    glBindTexture(GL_TEXTURE_2D, tex);
+    GLErrorLog;
     GLfloat vertexes[] = {
         x, y,
         x + w, y,
