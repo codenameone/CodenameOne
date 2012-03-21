@@ -24,6 +24,7 @@
 package com.codename1.impl.midp;
 
 import com.codename1.components.MediaPlayer;
+import com.codename1.contacts.Contact;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
@@ -2962,4 +2963,19 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             t.printStackTrace();
         }
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String [] getAllContacts(boolean withNumbers) {
+        return MIDPContactsManager.getInstance().getAllContacts(withNumbers);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Contact getContactById(String id){
+        return MIDPContactsManager.getInstance().getContactById(id);
+    }
+    
 }
