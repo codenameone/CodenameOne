@@ -180,7 +180,8 @@ public class EncodedImage extends Image {
     }
 
     private Image getInternalImpl() {
-        if(imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
+        
+        if(imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
             hardCache = null;
             cache = null;
             width = -1;
