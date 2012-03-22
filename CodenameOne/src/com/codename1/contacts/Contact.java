@@ -35,8 +35,10 @@ public class Contact {
     
     private String id;
     
-    private String name;
+    private String firstName;
     
+    private String familyName;
+
     private String displayName;
     
     private Hashtable phoneNumbers;
@@ -108,13 +110,22 @@ public class Contact {
     }
 
     /**
-     * Gets Contact Name
+     * Gets Contact First Name
      * @return Contact Name
      */
-    public String getName() {
-        return name;
+    public String getFirstName() {
+        return firstName;
     }
 
+    /**
+     * Gets Contact family name
+     * @return 
+     */
+    public String getFamilyName() {
+        return familyName;
+    }
+
+    
     /**
      * Gets Contact Note
      * @return Contact Note
@@ -205,13 +216,22 @@ public class Contact {
     }
 
     /**
-     * Sets Contact name
+     * Sets Contact first name
      * @param name 
      */
-    public void setName(String name) {
-        this.name = name;
+    public void setFirstName(String name) {
+        this.firstName = name;
     }
 
+    /**
+     * Sets Contact family name
+     * @param familyName 
+     */
+    public void setFamilyName(String familyName) {
+        this.familyName = familyName;
+    }
+
+    
     /**
      * Sets Contact note
      * @param note 

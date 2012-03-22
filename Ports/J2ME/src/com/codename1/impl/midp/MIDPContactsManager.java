@@ -63,6 +63,9 @@ public class MIDPContactsManager {
                 String uid = c.getString(Contact.UID, 0);
                 if (uid.equals(id)) {
                     String name = null;
+                    String firstName = null;
+                    String familyName = null;
+
                     String notes = "";
                     String url = "";
                     long bdate = 0;
@@ -72,26 +75,26 @@ public class MIDPContactsManager {
                         }
                     } catch (Exception e) {
                     }
-                    if (name == null) {
-                        try {
-                            if (clist.isSupportedField(Contact.NAME) && c.countValues(Contact.NAME) > 0) {
-                                name = "";
-                                String[] newname = c.getStringArray(Contact.NAME, 0);
-                                if (newname[0] != null) {
-                                    name = newname[0];
+                    try {
+                        if (clist.isSupportedField(Contact.NAME) && c.countValues(Contact.NAME) > 0) {
+                            name = "";
+                            String[] newname = c.getStringArray(Contact.NAME, 0);
+                            if (newname[0] != null) {
+                                firstName = newname[0];
+                            }
+                            if (newname[1] != null ) {
+                                familyName = newname[1];
+                            }
+                            if(name == null){
+                                if(firstName != null){
+                                    name = firstName;
                                 }
-                                if (newname[1] != null && newname[0] != null) {
-                                    name = name + " " + newname[1];
-                                }
-                                if (newname[1] != null && newname[0] == null) {
-                                    name = newname[1];
-                                }
-                                if (newname[0] == null && newname[1] == null) {
-                                    name = "-";
+                                if(familyName != null){
+                                    name += " " + familyName;
                                 }
                             }
-                        } catch (Exception e) {
                         }
+                    } catch (Exception e) {
                     }
                     if (clist.isSupportedField(Contact.BIRTHDAY) && c.countValues(Contact.BIRTHDAY) > 0) {
                         bdate = c.getDate(Contact.BIRTHDAY, 0);
@@ -113,7 +116,7 @@ public class MIDPContactsManager {
                         String key = "other";
                         String val = c.getString(Contact.TEL, i);
                         int attributes = c.getAttributes(Contact.TEL, i);
-                        if (attributes != 0) {                            
+                        if (attributes != 0) {
                             if ((attributes & Contact.ATTR_HOME) != 0) {
                                 key = "home";
                             } else if ((attributes & Contact.ATTR_MOBILE) != 0) {
@@ -122,7 +125,7 @@ public class MIDPContactsManager {
                                 key = "fax";
                             } else if ((attributes & Contact.ATTR_WORK) != 0) {
                                 key = "work";
-                            } 
+                            }
                             //set the preffered
                             if ((attributes & Contact.ATTR_PREFERRED) != 0) {
                                 contact.setPrimaryPhoneNumber(val);
@@ -139,13 +142,13 @@ public class MIDPContactsManager {
                         String val = c.getString(Contact.EMAIL, i);
                         int attributes = c.getAttributes(Contact.EMAIL, i);
                         if (attributes != 0) {
-                            
+
                             if ((attributes & Contact.ATTR_HOME) != 0) {
                                 key = "home";
                             } else if ((attributes & Contact.ATTR_WORK) != 0) {
                                 key = "work";
-                            } 
-                            
+                            }
+
                             //set the preffered
                             if ((attributes & Contact.ATTR_PREFERRED) != 0) {
                                 contact.setPrimaryEmail(val);
@@ -185,7 +188,8 @@ public class MIDPContactsManager {
                     }
 
                     contact.setId(uid);
-                    contact.setName(name);
+                    contact.setFirstName(firstName);
+                    contact.setFamilyName(familyName);                    
                     contact.setDisplayName(name);
                     contact.setNote(notes);
                     contact.setBirthday(bdate);
@@ -220,11 +224,11 @@ public class MIDPContactsManager {
             Contact c = (Contact) contacts.nextElement();
             if (clist.isSupportedField(Contact.UID) && c.countValues(Contact.UID) > 0) {
                 String uid = c.getString(Contact.UID, 0);
-                if(withNumbers){ 
-                    if(clist.isSupportedField(Contact.TEL) && c.countValues(Contact.TEL) > 0){
-                        contactsIDs.addElement(uid);                
+                if (withNumbers) {
+                    if (clist.isSupportedField(Contact.TEL) && c.countValues(Contact.TEL) > 0) {
+                        contactsIDs.addElement(uid);
                     }
-                }else{
+                } else {
                     contactsIDs.addElement(uid);
                 }
             }
@@ -234,7 +238,7 @@ public class MIDPContactsManager {
         } catch (PIMException ex) {
             ex.printStackTrace();
         }
-        
+
         String[] ids = new String[contactsIDs.size()];
         for (int i = 0; i < contactsIDs.size(); i++) {
             String id = (String) contactsIDs.elementAt(i);

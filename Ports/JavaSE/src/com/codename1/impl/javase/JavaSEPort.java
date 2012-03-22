@@ -2811,7 +2811,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         Contact contact = new Contact();
         contact.setId(id);
         if(id.equals("1")){
-            contact.setName("Chen Fishbein");
+            contact.setDisplayName("Chen Fishbein");
+            contact.setFirstName("Chen");
+            contact.setFamilyName("Fishbein");
+            
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -2827,7 +2830,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             addresses.put("home", addr);
             contact.setAddresses(addresses);
         }else if(id.equals("2")){
-            contact.setName("Shai Almog");
+            contact.setDisplayName("Shai Almog");
+            contact.setFirstName("Shai");
+            contact.setFamilyName("Almog");
+            
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -2843,7 +2849,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             addresses.put("home", addr);
             contact.setAddresses(addresses);
         }if(id.equals("3")){
-            contact.setName("Eric Cartman");
+            
+            contact.setDisplayName("Eric Cartman");
+            contact.setFirstName("Eric");
+            contact.setFamilyName("Cartman");
+
+            
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -2859,7 +2870,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             addresses.put("home", addr);
             contact.setAddresses(addresses);
         }if(id.equals("4")){
-            contact.setName("Kyle Broflovski");
+            
+            contact.setDisplayName("Kyle Broflovski");
+            contact.setFirstName("Kyle");
+            contact.setFamilyName("Broflovski");
+
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -2875,7 +2890,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             addresses.put("home", addr);
             contact.setAddresses(addresses);
         }else if(id.equals("5")){
-            contact.setName("Kenny McCormick");
+            
+            contact.setDisplayName("Kenny McCormick");
+            contact.setFirstName("Kenny");
+            contact.setFamilyName("McCormick");
+
+            
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");

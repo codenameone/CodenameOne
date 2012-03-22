@@ -91,7 +91,7 @@ public class AndroidContactsManager {
                 new String[]{id}, null);
         if (result.moveToFirst()) {
             String name = result.getString(result.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-            retVal.setName(name);
+            retVal.setDisplayName(name);
             String photoID = result.getString(result.getColumnIndex(ContactsContract.Contacts.PHOTO_ID));
             if (photoID != null) {
                 InputStream input = loadContactPhoto(cr, Long.parseLong(id), Long.parseLong(photoID));
@@ -104,7 +104,7 @@ public class AndroidContactsManager {
                 }
             }
         }
-
+        
         Hashtable phones = new Hashtable();
         if (Integer.parseInt(result.getString(
                 result.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
@@ -183,6 +183,25 @@ public class AndroidContactsManager {
             }
         }
         birthCur.close();
+
+        String nameWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
+        String[] nameWhereParams = new String[]{id,
+            ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
+        Cursor nameCursor = cr.query(ContactsContract.Data.CONTENT_URI, null,
+                nameWhere,
+                nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
+        
+        while (nameCursor.moveToNext()) {
+            
+            String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));
+            String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));
+            String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));
+            retVal.setFirstName(given);
+            retVal.setFamilyName(family);
+            retVal.setDisplayName(display);
+                        
+        }
+        nameCursor.close();
         
         String noteWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
         String[] noteWhereParams = new String[]{id,
