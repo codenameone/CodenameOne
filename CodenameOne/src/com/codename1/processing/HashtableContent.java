@@ -131,7 +131,12 @@ class HashtableContent implements StructuredContent {
 		}
 		Vector children = new Vector();
 		for (Enumeration elements = array.elements(); elements.hasMoreElements(); ) {
-			children.addElement(new HashtableContent((Hashtable)elements.nextElement(), this));
+			Object o = elements.nextElement();
+			// There is a bug that needs to be addressed, should always have hashtables.
+			// for now prevent the critical cast exception.
+			if (o instanceof Hashtable) {
+				children.addElement(new HashtableContent((Hashtable)o, this));
+			}
 		}
 		return children;
 	}

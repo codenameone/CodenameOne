@@ -28,6 +28,15 @@ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Derivative Revision History:
+ 
+2012-03 - derivative work from original Sun source, removed references
+	to Sun's JSON parser, support for any structured document that implements
+	a StructuredSource interface.  Added globbing and backtracking support 
+	(backed by structured document impl), support for predicate expressions,
+	nested expressions, and various XPath style features.
+
  */
 
 package com.codename1.processing;
@@ -501,7 +510,7 @@ public class Result {
 				return (String) o;
 			}
 			StructuredContent element = (StructuredContent) o;
-			return element.getText(); // element.getChild(0).getText().trim();
+			return element.getText(); 
 		}
 	}
 
@@ -699,7 +708,7 @@ public class Result {
 	public Vector getAsArray(final String path) throws IllegalArgumentException {
 		final Vector tokens = new ResultTokenizer(path).tokenize();
 		if (tokens.isEmpty()) {
-			return new Vector(); // return root;
+			return new Vector(); 
 		}
 		final StructuredContent obj = apply(root, tokens, 0);
 		return obj == null ? null : obj.getChildren((String) tokens
@@ -772,7 +781,7 @@ public class Result {
 									+ tok1);
 				}
 				final String tok3 = (String) tokens.elementAt(i + 2);
-				// TODO: here, allow us to select by attributes
+				
 				Evaluator evaluator = EvaluatorFactory.createEvaluator(tok3);
 
 				if (i + 3 >= nTokens) {
