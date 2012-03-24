@@ -106,6 +106,8 @@
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Tipster" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <mkdir dir="../nightly_builds" />
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
@@ -130,15 +132,23 @@
         <copydir src="../Demos/TZoneFriends" dest="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
         <copydir src="../Demos/NativeDemo" dest="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
         <copydir src="../Demos/CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
+        <copydir src="../Demos/Tipster" dest="build/CodenameOneDist/CodenameOne/demos/Tipster" />
+        <copydir src="../Demos/KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/TZoneFriends" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/NativeDemo/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/CameraDemo/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Tipster/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/KitchenSink/lib" />
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/NativeDemo/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/NativeDemo/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/CameraDemo/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/CameraDemo/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/Tipster/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/Tipster/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/KitchenSink/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/KitchenSink/dist" />        
         
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
@@ -163,7 +173,7 @@
             <arg file="build/designerMac" />
         </exec>
         
-        <delete file="../nightly_bui/lds/CodenameOne_Mac_${tstamp}.dmg" />
+        <delete file="../nightly_builds/CodenameOne_Mac_${tstamp}.dmg" />
         <exec executable="hdiutil">
             <arg value="create" />
             <arg value="-srcfolder" />
