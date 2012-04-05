@@ -37,6 +37,8 @@
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
 #import <MessageUI/MFMailComposeViewController.h>
+#import <AddressBookUI/AddressBookUI.h>
+#import <MessageUI/MFMessageComposeViewController.h>
 
 extern void initVMImpl();
 
@@ -170,6 +172,25 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y
 
 extern int isIPad();
 
+JAVA_OBJECT utf8String = NULL;
+
+const char* stringToUTF8(JAVA_OBJECT str) {
+    if(str == NULL) {
+        return NULL;
+    }
+    if(utf8String == NULL) {
+        utf8String = xmlvm_create_java_string("UTF-8");
+    }
+    org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+
+    JAVA_INT len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    char* cs = XMLVM_ATOMIC_MALLOC(len + 1);
+    memcpy(cs, data, len);
+    cs[len] = '\0';
+    return cs;
+}
+
 void com_codename1_impl_ios_IOSNative_initVM__()
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_initVM__]
@@ -228,7 +249,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, xmlvm_java_string_to_const_char(n10), 0);
+    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, stringToUTF8(n10), 0);
     [pool release];
     //XMLVM_END_WRAPPER
 }
@@ -439,7 +460,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_jav
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chr = xmlvm_java_string_to_const_char(n4);
+    const char* chr = stringToUTF8(n4);
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, n3, chr, strlen(chr), n5, n6);
     [pool release];
     //XMLVM_END_WRAPPER
@@ -449,7 +470,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chr = xmlvm_java_string_to_const_char(n4);
+    const char* chr = stringToUTF8(n4);
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, n3, chr, strlen(chr), n5, n6);
     [pool release];
     //XMLVM_END_WRAPPER
@@ -487,7 +508,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_Str
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chr = xmlvm_java_string_to_const_char(n2);
+    const char* chr = stringToUTF8(n2);
     JAVA_INT i = Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl(n1, chr, strlen(chr));
     [pool release];
     return i;
@@ -528,7 +549,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_jav
 {
     //XMLVM_BEGIN_NATIVE[com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    JAVA_INT i = getResourceSize(xmlvm_java_string_to_const_char(n1), 0, xmlvm_java_string_to_const_char(n2), 0);
+    JAVA_INT i = getResourceSize(stringToUTF8(n1), 0, stringToUTF8(n2), 0);
     [pool release];
     return i;
     //XMLVM_END_NATIVE
@@ -540,7 +561,7 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     org_xmlvm_runtime_XMLVMArray* byteArray = n3;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-    loadResourceFile(xmlvm_java_string_to_const_char(n1), 0, xmlvm_java_string_to_const_char(n2), 0, data);
+    loadResourceFile(stringToUTF8(n1), 0, stringToUTF8(n2), 0, data);
     [pool release];
     //XMLVM_END_NATIVE
 }
@@ -651,13 +672,13 @@ NSString* toNSString(JAVA_OBJECT str) {
     if(str == 0) {
         return 0;
     }
-    const char* chrs = xmlvm_java_string_to_const_char(str);
+    const char* chrs = stringToUTF8(str);
     return [NSString stringWithUTF8String:chrs];
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT n1, JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(path);
+    const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
@@ -669,7 +690,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(path);
+    const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSFileManager *man = [[NSFileManager alloc] init];
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:nil];
@@ -681,7 +702,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OB
 
 void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(JAVA_OBJECT path, JAVA_OBJECT n1) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(path);
+    const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSData* d = [NSData dataWithContentsOfFile:ns];
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
@@ -720,7 +741,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResourcesDir__() {
 void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(file);
+    const char* chrs = stringToUTF8(file);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     [fm removeItemAtPath:ns error:nil];
     [fm release];
@@ -730,7 +751,7 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(file);
+    const char* chrs = stringToUTF8(file);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     JAVA_BOOLEAN b = [fm fileExistsAtPath:ns];
     [fm release];
@@ -741,7 +762,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(JAVA
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(file);
+    const char* chrs = stringToUTF8(file);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     BOOL b = NO;
     BOOL* isDir = (&b);
@@ -754,7 +775,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(JAV
 JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA_OBJECT dir) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(dir);
+    const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns];
     int i = nsArr.count;
@@ -766,7 +787,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA
 void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lang_String_1ARRAY(JAVA_OBJECT dir, JAVA_OBJECT files) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(dir);
+    const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns];
     
@@ -786,7 +807,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
 void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OBJECT dir) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(dir);
+    const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     [fm currentDirectoryPath:ns];
     [fm release];
@@ -796,9 +817,9 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OB
 void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_String(JAVA_OBJECT src, JAVA_OBJECT dest) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(src);
+    const char* chrs = stringToUTF8(src);
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
-    const char* chrsDest = xmlvm_java_string_to_const_char(dest);
+    const char* chrsDest = stringToUTF8(dest);
     NSString* nsDst = [NSString stringWithUTF8String:chrsDest];
     [fm moveItemAtPath:nsSrc toPath:nsDst error:nil];
     [fm release];
@@ -810,7 +831,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nat
 
 void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(JAVA_LONG nativeImage, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(name);
+    const char* chrs = stringToUTF8(name);
     Java_com_codename1_impl_ios_IOSImplementation_setImageName(nativeImage, chrs);
     [pool release];    
 }
@@ -818,7 +839,7 @@ void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(JAVA_
 JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int(JAVA_OBJECT url, JAVA_INT timeout) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = [[NetworkConnectionImpl alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(url);
+    const char* chrs = stringToUTF8(url);
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
     void* response = [impl openConnection:nsSrc timeout:timeout];
     [pool release];    
@@ -835,7 +856,7 @@ void com_codename1_impl_ios_IOSNative_connect___long(JAVA_LONG peer) {
 void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT mtd) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
-    const char* chrs = xmlvm_java_string_to_const_char(mtd);
+    const char* chrs = stringToUTF8(mtd);
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
     [impl setMethod:nsSrc];
     [pool release];    
@@ -862,7 +883,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContentLength___long(JAVA_LONG peer
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
-    const char* chrs = xmlvm_java_string_to_const_char(name);
+    const char* chrs = stringToUTF8(name);
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
     java_lang_String* str = fromNSString([impl getResponseHeader:nsSrc]);
     [pool release];    
@@ -888,9 +909,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(JA
 void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lang_String(JAVA_LONG peer, JAVA_OBJECT key, JAVA_OBJECT value) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
-    const char* chrs = xmlvm_java_string_to_const_char(key);
+    const char* chrs = stringToUTF8(key);
     NSString* nsKey = [NSString stringWithUTF8String:chrs];
-    chrs = xmlvm_java_string_to_const_char(value);
+    chrs = stringToUTF8(value);
     NSString* nsValue = [NSString stringWithUTF8String:chrs];
     [impl addHeader:nsKey value:nsValue];
     [pool release];    
@@ -933,7 +954,7 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(JAVA_LONG peer) {
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_execute___java_lang_String]
-    const char* chrs = xmlvm_java_string_to_const_char(n1);
+    const char* chrs = stringToUTF8(n1);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
     //XMLVM_END_WRAPPER
@@ -1116,7 +1137,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_LONG peer) {
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = xmlvm_java_string_to_const_char(uri);
+    const char* chrs = stringToUTF8(uri);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     AudioPlayer* pl = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
     [pool release];
@@ -1385,7 +1406,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JA
 
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(
-                                                                                                                                              JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
+    JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
         picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
@@ -1619,4 +1640,117 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(JAVA_LONG pee
 void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_LONG peer) {
     CLLocationManager* l = (CLLocationManager*)peer;
     [l stopUpdatingLocation];    
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_BOOLEAN includeNumbers) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    ABAddressBookRef addressBook = ABAddressBookCreate();
+    CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
+    [pool release];
+    return nPeople;
+}
+
+void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    org_xmlvm_runtime_XMLVMArray* iArray = intArray;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    int size = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    ABAddressBookRef addressBook = ABAddressBookCreate();
+    CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
+    for(int iter = 0 ; iter < size ; iter++) {
+        ABRecordRef ref = CFArrayGetValueAtIndex(allPeople, iter);
+        data[iter] = ABRecordGetRecordID(ref);
+    }
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_LONG peer, JAVA_INT offset) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_LONG peer, JAVA_INT offset) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_LONG peer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    [pool release];
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_INT recId) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    JAVA_LONG i = ABAddressBookGetPersonWithRecordID(recId, ABAddressBookCreate());
+    [pool release];
+    return i;
+}
+
+void com_codename1_impl_ios_IOSNative_dial___java_lang_String(JAVA_OBJECT phone) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(phone)]];
+    [pool release];
+}
+
+void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(
+    JAVA_OBJECT  number, JAVA_OBJECT  text) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        MFMessageComposeViewController *picker = [[MFMessageComposeViewController alloc] init];
+        picker.messageComposeDelegate = [CodenameOne_GLViewController instance];
+        
+        // Recipient.
+        NSString *recipient = toNSString(number);
+        NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
+        
+        [picker setRecipients:recipientsArray];
+        
+        // Body.
+        NSString *smsBody = toNSString(text);
+        [picker setBody:smsBody];
+        
+        [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+        
+        [picker release];
+        [pool release];
+    });
 }

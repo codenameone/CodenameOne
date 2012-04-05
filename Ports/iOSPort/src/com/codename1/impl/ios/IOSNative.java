@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.contacts.Contact;
+
 /**
  * Abstraction of the underlying native API's
  *
@@ -262,4 +264,20 @@ public class IOSNative {
     public static native void captureCamera(boolean movie);
 
     public static native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType);
+
+    public static native int getContactCount(boolean withNumbers);
+    public static native void getContactRefIds(int[] refs, boolean withNumbers);
+    public static native long getPersonWithRecordID(int id);
+    public static native String getPersonFirstName(long id);
+    public static native String getPersonSurnameName(long id);
+    public static native int getPersonPhoneCount(long id);
+    public static native String getPersonPhone(long id, int offset);
+    public static native String getPersonPhoneType(long id, int offset);
+    public static native String getPersonPrimaryPhone(long id);
+    public static native String getPersonEmail(long id);
+    public static native String getPersonAddress(long id);
+    public static native long createPersonPhotoImage(long id);
+    
+    public static native void dial(String phone);
+    public static native void sendSMS(String phone, String text);
 }

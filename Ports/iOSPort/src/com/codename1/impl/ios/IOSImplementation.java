@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.contacts.Contact;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
@@ -369,6 +370,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         n.peer = original.peer;
         n.width = width;
         n.height = height;
+        IOSNative.retainPeer(n.peer);
         return n;
     }
 
@@ -743,8 +745,35 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new ByteArrayInputStream(b);
     }
 
+    private static Map softReferenceMap = new HashMap();
+    public static void flushSoftRefMap() {
+        softReferenceMap = new HashMap();
+    }
+    
+    /**
+     * Extracts the hard reference from the soft/weak reference given
+     *
+     * @param o the reference returned by createSoftWeakRef
+     * @return the original object submitted or null
+     */
+    public Object extractHardRef(Object o) {
+        /*SoftReference w = (SoftReference)o;
+        if(w != null) {
+            return w.get();
+        }
+        return null;*/
+        Object val = softReferenceMap.get(o);
+        if(val != null) {
+            return val;
+        }
+        return null;
+    }
+
     public Object createSoftWeakRef(Object o) {
-        return new SoftReference(o);
+        Object key = new Object();
+        softReferenceMap.put(key, o);
+        return key;
+        //return new SoftReference(o);
     }
 
     class Loc extends LocationManager {
@@ -1069,20 +1098,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new IOSMedia(stream, mimeType, onCompletion);
     }
     
-    /**
-     * Extracts the hard reference from the soft/weak reference given
-     *
-     * @param o the reference returned by createSoftWeakRef
-     * @return the original object submitted or null
-     */
-    public Object extractHardRef(Object o) {
-        SoftReference w = (SoftReference)o;
-        if(w != null) {
-            return w.get();
-        }
-        return null;
-    }
-
     private static byte[] loadResource(String name, String type) {
         return IOSNative.loadResource(name, type);
     }
@@ -1354,6 +1369,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void finalize() {
             if(peer != 0) {
                 deleteNativePeer(peer);
+                peer = 0;
             }
         }
     }
@@ -1830,6 +1846,36 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
         IOSNative.sendEmailMessage(recieptents[0], subject, msg.getContent(), msg.getAttachment(), msg.getMimeType());
+    }
+    
+    @Override
+    public String[] getAllContacts(boolean withNumbers) {
+        int[] c = new int[IOSNative.getContactCount(withNumbers)];
+        IOSNative.getContactRefIds(c, withNumbers);
+        String[] r = new String[c.length];
+        for(int iter = 0 ; iter < c.length ; iter++) {
+            r[iter] = "" + c[iter];
+        }
+        return r;
+    }
+
+    @Override
+    public Contact getContactById(String id) {
+        int recId = Integer.parseInt(id);
+        Contact c = new Contact();
+        c.setId("" + id);
+        //IOSNative.fillContactDetails(recId, c);
+        return c;
+    }
+    
+    @Override
+    public void dial(String phoneNumber) {        
+        IOSNative.dial("tel:" + phoneNumber);
+    }
+
+    @Override
+    public void sendSMS(String phoneNumber, String message) throws IOException{
+        IOSNative.sendSMS(phoneNumber, message);
     }
 
     @Override

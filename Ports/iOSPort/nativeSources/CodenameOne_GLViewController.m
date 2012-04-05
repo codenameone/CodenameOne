@@ -918,6 +918,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 {
     // Releases the view if it doesn't have a superview.
     [super didReceiveMemoryWarning];
+    com_codename1_impl_ios_IOSImplementation_flushSoftRefMap__();
     GC_gcollect_and_unmap();
     // Release any cached data, images, etc. that aren't in use.
 }
