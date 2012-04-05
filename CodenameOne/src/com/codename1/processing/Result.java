@@ -62,7 +62,7 @@ import com.codename1.xml.Element;
  * 
  * Some sample expressions:
  * 
- * <code>
+ * <pre>
  *  Simple expression, get the title of the first photo element.
  *  
  *  /photos/photo[1]/title
@@ -83,7 +83,7 @@ import com.codename1.xml.Element;
  * 
  *  //order/lineitem[price > 5]/../@ponum
  * etc
- * </code>
+ * </pre>
  * 
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  * 
@@ -104,11 +104,9 @@ public class Result {
 	 * 
 	 * Create an evaluator object from a StructuredContent element.
 	 * 
-	 * @param content
-	 *            a parsed dom
+	 * @param content a parsed dom
 	 * @return Result a result evaluator object
-	 * @throws IllegalArgumentException
-	 *             thrown if null content is passed.
+	 * @throws IllegalArgumentException thrown if null content is passed.
 	 */
 	static Result fromContent(StructuredContent content)
 			throws IllegalArgumentException {
@@ -125,11 +123,9 @@ public class Result {
 	 * 
 	 * Construct an evaluator object from a StructuredContent element.
 	 * 
-	 * @param content
-	 *            a parsed dom
+	 * @param content a parsed dom
 	 * @return Result a result evaluator object
-	 * @throws IllegalArgumentException
-	 *             thrown if null content is passed.
+	 * @throws IllegalArgumentException thrown if null content is passed.
 	 */
 	private Result(final StructuredContent obj) throws IllegalArgumentException {
 		if (obj == null) {
@@ -145,14 +141,12 @@ public class Result {
 	 * Create an evaluator object from a structured content document (XML, JSON,
 	 * etc) as a string.
 	 * 
-	 * @param content
-	 *            structured content document as a string.
-	 * @param format
-	 *            an identifier for the type of content passed (ie. xml, json,
-	 *            etc).
+	 * @param content structured content document as a string.
+	 * @param format an identifier for the type of content passed (ie. xml,
+	 *            json, etc).
 	 * @return Result a result evaluator object
-	 * @throws IllegalArgumentException
-	 *             thrown if null content or format is passed.
+	 * @throws IllegalArgumentException thrown if null content or format is
+	 *             passed.
 	 */
 	public static Result fromContent(String content, String format)
 			throws IllegalArgumentException {
@@ -176,26 +170,24 @@ public class Result {
 	 * etc) input stream. Normally you would use this method within a content
 	 * request implementation, for example:
 	 * 
-	 * <code>
+	 * <pre>
 	 * ConnectionRequest request = new ConnectionRequest() {
-	 *    protected void readResponse(InputStream input) throws IOException {
-	 *         Result evaluator = Result.fromContent(input, Result.JSON);
-	 *         // ... evaluate the result here
-	 *    }
-	 *    // ... etc
+	 * 	protected void readResponse(InputStream input) throws IOException {
+	 * 		Result evaluator = Result.fromContent(input, Result.JSON);
+	 * 		// ... evaluate the result here
+	 * 	}
+	 * 	// ... etc
 	 * };
-	 * </code>
+	 * </pre>
 	 * 
 	 * 
 	 * 
-	 * @param content
-	 *            structured content document as a string.
-	 * @param format
-	 *            an identifier for the type of content passed (ie. xml, json,
-	 *            etc).
+	 * @param content structured content document as a string.
+	 * @param format an identifier for the type of content passed (ie. xml,
+	 *            json, etc).
 	 * @return Result a result evaluator object
-	 * @throws IllegalArgumentException
-	 *             thrown if null content or format is passed.
+	 * @throws IllegalArgumentException thrown if null content or format is
+	 *             passed.
 	 */
 	public static Result fromContent(InputStream content, String format)
 			throws IllegalArgumentException, IOException {
@@ -219,11 +211,9 @@ public class Result {
 	/**
 	 * Create an evaluator object from a parsed XML DOM.
 	 * 
-	 * @param content
-	 *            a parsed XML DOM.
+	 * @param content a parsed XML DOM.
 	 * @return Result a result evaluator object
-	 * @throws IllegalArgumentException
-	 *             thrown if null content is passed.
+	 * @throws IllegalArgumentException thrown if null content is passed.
 	 */
 	public static Result fromContent(Element content)
 			throws IllegalArgumentException {
@@ -236,11 +226,9 @@ public class Result {
 	/**
 	 * Create an evaluator object from parsed JSON content DOM.
 	 * 
-	 * @param content
-	 *            JSON content input stream
+	 * @param content JSON content input stream
 	 * @return Result a result evaluator object
-	 * @throws IOException
-	 *             thrown if null content is passed.
+	 * @throws IOException thrown if null content is passed.
 	 */
 	public static Result fromContent(Hashtable content)
 			throws IllegalArgumentException {
@@ -281,27 +269,27 @@ public class Result {
 	/**
 	 * Get a boolean value from the requested path.
 	 * 
-	 * For example: <b>JSON</b> <code>
+	 * For example: <b>JSON</b>
+	 * 
+	 * <pre>
 	 * {
 	 * "settings" : [
 	 * {
 	 *     "toggle" : "true",
 	 *     ... etc
-	 * } 
-	 * </code>
+	 * }
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * boolean value = result.getAsBoolean("/settings[0]/toggle"); 
-	 * </code>
+	 * <pre>
+	 * boolean value = result.getAsBoolean(&quot;/settings[0]/toggle&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public boolean getAsBoolean(final String path)
 			throws IllegalArgumentException {
@@ -322,7 +310,7 @@ public class Result {
 	 * 
 	 * For example: <b>JSON</b>
 	 * 
-	 * <code>
+	 * <pre>
 	 * {
 	 * "settings" 
 	 * {
@@ -331,21 +319,19 @@ public class Result {
 	 *          "max_retries" : "20",
 	 *          ... etc
 	 *     }
-	 * } 
-	 * </code>
+	 * }
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * int value = result.getAsInteger("//connection/max_retries"); 
-	 * </code>
+	 * <pre>
+	 * int value = result.getAsInteger(&quot;//connection/max_retries&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalException on error traversing the document, ie. traversing
+	 *             into an array without using subscripts.
 	 */
 	public int getAsInteger(final String path) throws IllegalArgumentException {
 		String s = getAsString(path);
@@ -360,7 +346,7 @@ public class Result {
 	 * 
 	 * For example: <b>JSON</b>
 	 * 
-	 * <code>
+	 * <pre>
 	 * {
 	 * "settings" 
 	 * {
@@ -369,21 +355,19 @@ public class Result {
 	 *          "timeout_milliseconds" : "100000",
 	 *          ... etc
 	 *     }
-	 * } 
-	 * </code>
+	 * }
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * long value = result.getAsLong("/settings/connection/timeout_milliseconds"); 
-	 * </code>
+	 * <pre>
+	 * long value = result.getAsLong(&quot;/settings/connection/timeout_milliseconds&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public long getAsLong(final String path) throws IllegalArgumentException {
 		String s = getAsString(path);
@@ -398,7 +382,7 @@ public class Result {
 	 * 
 	 * For example: <b>JSON</b>
 	 * 
-	 * <code>
+	 * <pre>
 	 * {
 	 *  "geometry" : {
 	 *    "bounds" : {
@@ -427,25 +411,23 @@ public class Result {
 	 *      }
 	 *   }
 	 *   // etc
-	 * </code>
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * double neBoundsLat = result.getAsDouble("//bounds/northeast/lat"); 
-	 * double neBoundsLong = result.getAsDouble("//bounds/northeast/lng"); 
-	 * double swBoundsLat = result.getAsDouble("//bounds/southwest/lat"); 
-	 * double swBoundsLong = result.getAsDouble("//bounds/southwest/lng");
+	 * <pre>
+	 * double neBoundsLat = result.getAsDouble(&quot;//bounds/northeast/lat&quot;);
+	 * double neBoundsLong = result.getAsDouble(&quot;//bounds/northeast/lng&quot;);
+	 * double swBoundsLat = result.getAsDouble(&quot;//bounds/southwest/lat&quot;);
+	 * double swBoundsLong = result.getAsDouble(&quot;//bounds/southwest/lng&quot;);
 	 * 
-	 * double memberDiscount = result.getAsDouble("pricing.members.members");
-	 * </code>
+	 * double memberDiscount = result.getAsDouble(&quot;pricing.members.members&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public double getAsDouble(final String path)
 			throws IllegalArgumentException {
@@ -461,7 +443,7 @@ public class Result {
 	 * 
 	 * For example: <b>JSON</b>
 	 * 
-	 * <code>
+	 * <pre>
 	 * {
 	 * "profile" 
 	 * {
@@ -472,23 +454,21 @@ public class Result {
 	 *          "country" : "Canada",
 	 *          ... etc
 	 *     },
-	 * } 
-	 * </code>
+	 * }
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * String city = result.getAsDouble("//city"); 
-	 * String province = result.getAsDouble("//location//region"); 
-	 * String country = result.getAsDouble("profile//location//country"); 
-	 * </code>
+	 * <pre>
+	 * String city = result.getAsDouble(&quot;//city&quot;);
+	 * String province = result.getAsDouble(&quot;//location//region&quot;);
+	 * String country = result.getAsDouble(&quot;profile//location//country&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public String getAsString(final String path)
 			throws IllegalArgumentException {
@@ -510,14 +490,16 @@ public class Result {
 				return (String) o;
 			}
 			StructuredContent element = (StructuredContent) o;
-			return element.getText(); 
+			return element.getText();
 		}
 	}
 
 	/**
 	 * Get the size of an array at the requested path.
 	 * 
-	 * For example: <b>JSON</b> <code>
+	 * For example: <b>JSON</b>
+	 * 
+	 * <pre>
 	 * {
 	 *    "results" : [
 	 *       {
@@ -540,26 +522,24 @@ public class Result {
 	 *           ... etc
 	 *       }
 	 *  }
-	 * </code>
+	 * </pre>
 	 * 
 	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 *  int size = result.getSizeOfArray("/results[0]/address_components"); 
-	 *  int size2 = result.getSizeOfArray("results"); 
-	 *  int size3 = result.getSizeOfArray("/results[0]/address_components[2]/types"); 
-	 * </code>
+	 * <pre>
+	 * int size = result.getSizeOfArray(&quot;/results[0]/address_components&quot;);
+	 * int size2 = result.getSizeOfArray(&quot;results&quot;);
+	 * int size3 = result.getSizeOfArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public int getSizeOfArray(final String path)
 			throws IllegalArgumentException {
-		final Vector array = getAsArray(path);
+		final Vector array = _internalGetAsArray(path);
 		return array == null ? 0 : array.size();
 	}
 
@@ -568,7 +548,9 @@ public class Result {
 	/**
 	 * Get an array of string values from the requested path.
 	 * 
-	 * For example: <b>JSON</b> <code>
+	 * For example: <b>JSON</b>
+	 * 
+	 * <pre>
 	 * {
 	 *    "results" : [
 	 *       {
@@ -591,27 +573,27 @@ public class Result {
 	 *           ... etc
 	 *       }
 	 *  }
-	 * </code>
+	 * </pre>
 	 * 
-	 * <b>Expression</b> 
+	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * String types[] = result.getAsStringArray("/results[0]/address_components[2]/types");
-	 * </code>
+	 * <pre>
+	 * String types[] = result
+	 * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public String[] getAsStringArray(final String path)
 			throws IllegalArgumentException {
-		final Vector jarr = getAsArray(path);
+		final Vector jarr = _internalGetAsArray(path);
 		final String[] arr = new String[jarr == null ? 0 : jarr.size()];
 		for (int i = 0; i < arr.length; i++) {
-			arr[i] = (String) jarr.elementAt(i);
+			StructuredContent element = (StructuredContent) jarr.elementAt(i);
+			arr[i] = (String) element.getText();
 		}
 		return arr;
 	}
@@ -619,7 +601,9 @@ public class Result {
 	/**
 	 * Get an array of values from the requested path.
 	 * 
-	 * For example: <b>JSON</b> <code>
+	 * For example: <b>JSON</b>
+	 * 
+	 * <pre>
 	 * {
 	 *    "results" : [
 	 *       {
@@ -642,27 +626,30 @@ public class Result {
 	 *           ... etc
 	 *       }
 	 *  }
-	 * </code>
+	 * </pre>
 	 * 
-	 * <b>Expression</b> 
+	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * String types[] = result.getAsStringArray("/results[0]/address_components[2]/types");
-	 * </code>
+	 * <pre>
+	 * String types[] = result
+	 * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
+	 * @throws NumberFormatException if the value at path can not be converted
+	 *             to an integer.
 	 */
 	public int[] getAsIntegerArray(final String path)
 			throws IllegalArgumentException {
-		final Vector jarr = getAsArray(path);
+		final Vector jarr = _internalGetAsArray(path);
 		final int[] arr = new int[jarr == null ? 0 : jarr.size()];
 		for (int i = 0; i < arr.length; i++) {
-			arr[i] = ((Integer) jarr.elementAt(i)).intValue();
+			StructuredContent element = (StructuredContent) jarr.elementAt(i);
+			String s = (String) element.getText();
+			arr[i] = Integer.parseInt(s);
 		}
 		return arr;
 	}
@@ -670,7 +657,9 @@ public class Result {
 	/**
 	 * Get a vector of values from the requested path.
 	 * 
-	 * For example: <b>JSON</b> <code>
+	 * For example: <b>JSON</b>
+	 * 
+	 * <pre>
 	 * {
 	 *    "results" : [
 	 *       {
@@ -688,36 +677,72 @@ public class Result {
 	 *           ... etc
 	 *       }
 	 *  }
-	 * </code>
+	 * </pre>
 	 * 
-	 * <b>Expression</b> 
+	 * <b>Expression</b>
 	 * 
-	 * <code>
-	 * Vector addressComponents = result.getAsVector("/results[0]/address_components"); 
-	 * result = Result.fromContent(addressComponents); 
-	 * String longName = result.getAsString("[1]/long_name"); 
-	 * </code>
+	 * <pre>
+	 * Vector addressComponents = result.getAsVector(&quot;/results[0]/address_components&quot;);
+	 * result = Result.fromContent(addressComponents);
+	 * String longName = result.getAsString(&quot;[1]/long_name&quot;);
+	 * </pre>
 	 * 
-	 * @param path
-	 *            Path expression to evaluate
+	 * @param path Path expression to evaluate
 	 * @return the value at the requested path
-	 * @throws IllegalArgumentException
-	 *             on error traversing the document, ie. traversing into an
-	 *             array without using subscripts.
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
 	 */
 	public Vector getAsArray(final String path) throws IllegalArgumentException {
-		final Vector tokens = new ResultTokenizer(path).tokenize();
-		if (tokens.isEmpty()) {
-			return new Vector(); 
+		Vector array = _internalGetAsArray(path);
+		for (int i = 0; i < array.size(); i++) {
+			array.setElementAt(
+					((StructuredContent) array.elementAt(i)).getNativeRoot(), i);
 		}
-		final StructuredContent obj = apply(root, tokens, 0);
-		return obj == null ? null : obj.getChildren((String) tokens
-				.lastElement());
+		return array;
 	}
 
 	/**
-	 * Internal worker utility method, traverses dom based on path
-	 * tokens
+	 * Internal function, do not use. This version does not convert the
+	 * structured content nodes in the array, so not to be called by end user.
+	 * 
+	 * @param path
+	 * @return
+	 * @throws IllegalArgumentException
+	 */
+	private Vector _internalGetAsArray(final String path)
+			throws IllegalArgumentException {
+		final Vector tokens = new ResultTokenizer(path).tokenize();
+		if (tokens.isEmpty()) {
+			return new Vector();
+		}
+		final StructuredContent obj = apply(root, tokens, 0);
+		if (obj == null) {
+			return null;
+		}
+		String key = (String) tokens.lastElement();
+		// if the last element of expression is a glob, handle it here
+		if ((tokens.size() > 1)
+				&& SELECT_GLOB.equals(tokens.elementAt(tokens.size() - 2))) {
+			return obj.getDescendants(key);
+		}
+		// if the last element of expression is an attribute, handle it here
+		if (key.startsWith("@")) {
+			key = key.substring(1);
+			String v = obj.getAttribute(key);
+			Vector array = new Vector();
+			if (v != null) {
+				// this will allow caller to get parent of an attribute if
+				// needed
+				array.addElement(new HashtableContent(v, obj));
+			}
+			return array;
+		}
+		// otherwise, last element of expression selects a child node.
+		return obj.getChildren(key);
+	}
+
+	/**
+	 * Internal worker utility method, traverses dom based on path tokens
 	 * 
 	 * @param start
 	 * @param tokens
@@ -742,10 +767,7 @@ public class Result {
 			final String tok1 = (String) tokens.elementAt(i);
 			if (tok1.length() == 1
 					&& ResultTokenizer.isDelimiter(tok1.charAt(0))) {
-				if (root.equals(start)) {
-					continue;
-				}
-				return apply(root, tokens, i + 1);
+				continue;
 			}
 			if (tok1.length() == 2) {
 				if (tok1.equals(SELECT_GLOB)) {
@@ -762,70 +784,75 @@ public class Result {
 			final String tok2 = (String) tokens.elementAt(i + 1);
 			final char t2 = tok2.charAt(0);
 			switch (t2) {
-			case SEPARATOR:
-				Vector children;
-				if (glob) {
-					children = start.getDescendants(tok1);
-				} else {
-					children = start.getChildren(tok1);
-				}
-				if (children.size() > 0) {
-					return apply((StructuredContent) children.elementAt(0),
-							tokens, i + 2);
-				}
-				return null;
-			case ARRAY_START:
-				if (i + 2 >= nTokens) {
-					throw new IllegalArgumentException(
-							"Syntax error: array must be followed by a dimension: "
-									+ tok1);
-				}
-				final String tok3 = (String) tokens.elementAt(i + 2);
-				
-				Evaluator evaluator = EvaluatorFactory.createEvaluator(tok3);
-
-				if (i + 3 >= nTokens) {
-					throw new IllegalArgumentException(
-							"Syntax error: array dimension must be closed: "
-									+ tok3);
-				}
-				final String tok4 = (String) tokens.elementAt(i + 3);
-				if (tok4.length() != 1 && tok4.charAt(0) != ARRAY_END) {
-					throw new IllegalArgumentException(
-							"Syntax error: illegal close of array dimension: "
-									+ tok4);
-				}
-				if (i + 4 >= nTokens) {
-					throw new IllegalArgumentException(
-							"Syntax error: array close must be followed by a separator: "
-									+ tok1);
-				}
-				final String tok5 = (String) tokens.elementAt(i + 4);
-				if (tok5.length() != 1 && tok5.charAt(0) != SEPARATOR) {
-					throw new IllegalArgumentException(
-							"Syntax error: illegal separator after array: "
-									+ tok4);
-				}
-				i += 4;
-				final Vector array;
-				if (glob) {
-					array = start.getDescendants(tok1);
-				} else {
-					array = start.getChildren(tok1);
-				}
-
-				Object selected = evaluator.evaluate(array);
-
-				if (selected instanceof StructuredContent) {
-					return apply((StructuredContent) selected, tokens, i + 1);
-				} else {
-					// TODO: need to fix complete this,
-					// return apply((Vector)selected, tokens, i + 1);
-					// For now only processing the first result:
-					if (((Vector)selected).size() > 0) {
-						return apply((StructuredContent)((Vector)selected).elementAt(0), tokens, i + 1);
+				case SEPARATOR :
+					Vector children;
+					if (glob) {
+						children = start.getDescendants(tok1);
+					} else {
+						children = start.getChildren(tok1);
 					}
-				}
+					if (children.size() > 0) {
+						return apply((StructuredContent) children.elementAt(0),
+								tokens, i + 2);
+					}
+					return null;
+				case ARRAY_START :
+					if (i + 2 >= nTokens) {
+						throw new IllegalArgumentException(
+								"Syntax error: array must be followed by a dimension: "
+										+ tok1);
+					}
+					final String tok3 = (String) tokens.elementAt(i + 2);
+
+					Evaluator evaluator = EvaluatorFactory
+							.createEvaluator(tok3);
+
+					if (i + 3 >= nTokens) {
+						throw new IllegalArgumentException(
+								"Syntax error: array dimension must be closed: "
+										+ tok3);
+					}
+					final String tok4 = (String) tokens.elementAt(i + 3);
+					if (tok4.length() != 1 && tok4.charAt(0) != ARRAY_END) {
+						throw new IllegalArgumentException(
+								"Syntax error: illegal close of array dimension: "
+										+ tok4);
+					}
+					if (i + 4 >= nTokens) {
+						throw new IllegalArgumentException(
+								"Syntax error: array close must be followed by a separator: "
+										+ tok1);
+					}
+					final String tok5 = (String) tokens.elementAt(i + 4);
+					if (tok5.length() != 1 && tok5.charAt(0) != SEPARATOR) {
+						throw new IllegalArgumentException(
+								"Syntax error: illegal separator after array: "
+										+ tok4);
+					}
+					i += 4;
+					final Vector array;
+					if (glob) {
+						array = start.getDescendants(tok1);
+					} else {
+						array = start.getChildren(tok1);
+					}
+
+					Object selected = evaluator.evaluate(array);
+
+					if (selected instanceof StructuredContent) {
+						return apply((StructuredContent) selected, tokens,
+								i + 1);
+					} else {
+						// TODO: need to fix complete this,
+						// return apply((Vector)selected, tokens, i + 1);
+						// For now only processing the first result:
+						if (((Vector) selected).size() > 0) {
+							return apply(
+									(StructuredContent) ((Vector) selected)
+											.elementAt(0),
+									tokens, i + 1);
+						}
+					}
 			}
 		}
 

@@ -329,6 +329,11 @@ public class ConnectionRequest implements IOProgressListener {
             output = null;
             connection = null;
         }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                postResponse();
+            }
+        });
     }
 
     /**
@@ -361,6 +366,18 @@ public class ConnectionRequest implements IOProgressListener {
         return Util.getImplementation().getHeaderField(header, connection);
     }
 
+    /**
+     * Returns the HTTP header field names for the given connection, this method is only guaranteed to work
+     * when invoked from the readHeaders method.
+     *
+     * @param connection the connection to the network
+     * @return the names of the headers
+     * @throws java.io.IOException thrown on failure
+     */
+    protected String[] getHeaderFieldNames(Object connection) throws IOException {
+        return Util.getImplementation().getHeaderFieldNames(connection);
+    }
+    
     /**
      * Returns the amount of time to yield for other processes, this is an implicit 
      * method that automatically generates values for lower priority connections
@@ -519,6 +536,16 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /**
+     * A callback method that's invoked on the EDT after the readResponse() method has finished,
+     * this is the place where developers should change their Codename One user interface to
+     * avoid race conditions that might be triggered by modifications within readResponse.
+     * Notice this method is only invoked on a successful response and will not be invoked in case
+     * of a failure.
+     */
+    protected void postResponse() {
+    }
+    
     /**
      * Creates the request URL mostly for a get request
      * 

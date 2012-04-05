@@ -56,8 +56,8 @@ import java.util.Vector;
  * 
  */
 class IndexEvaluator extends AbstractEvaluator {
-	private static String FUNC_LAST = "last()";
-	private static String FUNC_POSITION = "position()";
+	static String FUNC_LAST = "last()";
+	static String FUNC_POSITION = "position()";
 
 	/**
 	 * Construct with a full predicate expression.

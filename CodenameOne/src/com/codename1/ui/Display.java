@@ -394,7 +394,10 @@ public final class Display {
     private static Hashtable virtualKeyboards = new Hashtable();
 
     private boolean dropEvents;
-
+    
+    private Vector backgroundTasks;
+    private Thread backgroundThread;
+    
     /**
      * Private constructor to prevent instanciation
      */
@@ -624,6 +627,44 @@ public final class Display {
         }
     }
 
+    /**
+     * Allows executing a background task in a separate low priority thread. Tasks are serialized
+     * so they don't overload the CPU.
+     * 
+     * @param r the task to perform in the background
+     */
+    public void scheduleBackgroundTask(Runnable r) {
+        synchronized(lock) {
+            if(backgroundTasks == null) {
+                backgroundTasks = new Vector();
+            }
+            backgroundTasks.addElement(r);
+            if(backgroundThread == null) {
+                backgroundThread = new Thread() {
+                    public void run() {
+                        // using while true to avoid double lock optimization with synchronized block
+                        while(true) {
+                            Runnable nextTask = null;
+                            synchronized(lock) {
+                                if(backgroundTasks.size() > 0) {
+                                    nextTask = (Runnable)backgroundTasks.elementAt(0);
+                                } else {
+                                    backgroundThread = null;
+                                    return;
+                                }
+                                backgroundTasks.removeElementAt(0);
+                            }
+                            nextTask.run();
+                            yield();
+                        }
+                    }
+                };
+                backgroundThread.setPriority(Thread.MIN_PRIORITY + 1);
+                backgroundThread.start();
+            }
+        }
+    }
+    
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.

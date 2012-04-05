@@ -27,23 +27,23 @@ import java.util.Vector;
 /**
  * Internal interface, do not use.
  * 
- * An interface to abstract access to structured content DOMs.  Implementations of
- * this interface work similar to a Node/Element object of a typical DOM parser
- * where it, where it represents a position within a structured document.
+ * An interface to abstract access to structured content DOMs. Implementations
+ * of this interface work similar to a Node/Element object of a typical DOM
+ * parser where it, where it represents a position within a structured document.
  * 
  * @author Eric Coolman
- *
+ * 
  */
 interface StructuredContent {
 	/**
-	 * Select all children directly below the current position with a given tag name.  An
-	 * empty vector is returned if no matches found.
+	 * Select all children directly below the current position with a given tag
+	 * name. An empty vector is returned if no matches found.
 	 * 
 	 * @param name tag name to select.
 	 * @return an array of elements that match the tag name.
 	 */
 	public Vector getChildren(String name);
-	
+
 	/**
 	 * Select a single direct child node from the current position.
 	 * 
@@ -53,8 +53,8 @@ interface StructuredContent {
 	public StructuredContent getChild(int index);
 
 	/**
-	 * Globally select all children from the current position with a given tag name.  An
-	 * empty vector is returned if no matches found.
+	 * Globally select all children from the current position with a given tag
+	 * name. An empty vector is returned if no matches found.
 	 * 
 	 * @param name tag name to select.
 	 * @return an array of elements that match the tag name.
@@ -65,7 +65,8 @@ interface StructuredContent {
 	 * Select an attribute from the current node.
 	 * 
 	 * @param name the name of the attribute to select.
-	 * @return the value of the attribute, or null if the attribute is not present.
+	 * @return the value of the attribute, or null if the attribute is not
+	 *         present.
 	 */
 	public String getAttribute(String name);
 
@@ -73,16 +74,26 @@ interface StructuredContent {
 	 * Select the parent of the current node.
 	 * 
 	 * @param name the name of the attribute to select.
-	 * @return the value of the attribute, or null if the attribute is not present.
+	 * @return the value of the attribute, or null if the attribute is not
+	 *         present.
 	 */
 	public StructuredContent getParent();
-	
+
 	/**
-	 * Select the text at the current node.  If the current node is not a text node,
-	 * the a text representation of the current node is returned, for example, a
-	 * JSON fragment could be returned from a JSON document.
+	 * Select the text at the current node. If the current node is not a text
+	 * node, the a text representation of the current node is returned, for
+	 * example, a JSON fragment could be returned from a JSON document.
 	 * 
 	 * @return
 	 */
 	public String getText();
+
+	/**
+	 * Get the native structured document object. For example, an XML document
+	 * would return an Element object, and a JSON document would return a
+	 * Hashtable.
+	 * 
+	 * @return native structured document object.
+	 */
+	public Object getNativeRoot();
 }

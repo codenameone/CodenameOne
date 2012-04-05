@@ -146,4 +146,8 @@ class XMLContent implements StructuredContent {
 		}
 	}
 
+	public Object getNativeRoot() {
+		return root;
+	}
+
 }

@@ -243,6 +243,7 @@ public class JSONParser implements JSONParseCallback {
                         case '7':
                         case '8':
                         case '9':
+                        case '-':
                         case '.':
                         case 'x':
                         case 'd':

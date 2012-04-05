@@ -320,7 +320,12 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
-        getInternalImpl().drawImage(g, nativeGraphics, x, y);
+        Image internal = getInternalImpl();
+        if(width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
+            internal.drawImage(g, nativeGraphics, x, y, width, height);
+        } else {
+            internal.drawImage(g, nativeGraphics, x, y);
+        }
     }
 
     /**

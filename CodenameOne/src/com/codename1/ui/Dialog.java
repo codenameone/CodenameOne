@@ -1437,6 +1437,16 @@ public class Dialog extends Form {
     public static void setAutoAdjustDialogSize(boolean a) {
         autoAdjustDialogSize = a;
     }
+    
+    /**
+     * Indicates whether Codename One should try to automatically adjust a showing dialog size
+     * when a screen size change event occurs
+     *
+     * @return true to indicate that Codename One should make a "best effort" to resize the dialog
+     */
+    public static boolean isAutoAdjustDialogSize() {
+        return autoAdjustDialogSize;
+    }
 
     /**
      * Allows a developer to indicate his interest that the dialog should no longer

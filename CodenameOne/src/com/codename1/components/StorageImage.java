@@ -26,6 +26,7 @@ package com.codename1.components;
 
 import com.codename1.ui.EncodedImage;
 import com.codename1.io.Storage;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -38,6 +39,7 @@ public class StorageImage extends EncodedImage {
     private String fileName;
     private boolean keep;
     private byte[] data;
+    private Object weak;
 
     
     private StorageImage(String fileName, int w, int h, boolean keep) {
@@ -53,9 +55,17 @@ public class StorageImage extends EncodedImage {
         if(data != null) {
             return data;
         }
+        if(weak != null) {
+            byte[] d = (byte[])Display.getInstance().extractHardRef(weak);
+            if(d != null) {
+                return d;
+            }
+        }
         byte[] imageData = (byte[])Storage.getInstance().readObject(fileName);
         if(keep) {
             data = imageData;
+        } else {
+            weak = Display.getInstance().createSoftWeakRef(imageData);
         }
         return imageData;
     }
@@ -74,6 +84,25 @@ public class StorageImage extends EncodedImage {
     public static StorageImage create(String fileName, byte[] data, int width, int height) {
         if(Storage.getInstance().writeObject(fileName, data)){
             return new StorageImage(fileName, width, height, true);
+        }
+        return null;
+    }
+
+    /**
+     * Creates an encoded image that maps to a storage file thus allowing to
+     * seamlessly cache images as needed. This only works reasonably well for very small
+     * files.
+     *
+     * @param fileName the name of the storage file
+     * @param data the data
+     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param keep if set to true keeps the file in RAM once loaded
+     * @return image that will load the file seamlessly or null if the storage failed
+     */
+    public static StorageImage create(String fileName, byte[] data, int width, int height, boolean keep) {
+        if(Storage.getInstance().writeObject(fileName, data)){
+            return new StorageImage(fileName, width, height, keep);
         }
         return null;
     }

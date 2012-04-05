@@ -33,7 +33,7 @@ public class Location {
     private double longtitude;
     private double altitude;
     private float accuracy;
-    private float dircection;
+    private float direction;
     private float velocity;
     private long timeStamp;
 
@@ -61,7 +61,7 @@ public class Location {
      * @return direction in degrees
      */
     public float getDirection() {
-        return dircection;
+        return direction;
     }
 
     /**
@@ -123,7 +123,7 @@ public class Location {
      * @param direction 
      */
     public void setDirection(float direction) {
-        this.dircection = dircection;
+        this.direction = direction;
     }
 
     /**
@@ -173,7 +173,7 @@ public class Location {
         return "altitude = " + altitude
                 + "\nlatitude" + latitude
                 + "\nlongtitude" + longtitude
-                + "\ndirection" + dircection
+                + "\ndirection" + direction
                 + "\ntimeStamp" + timeStamp
                 + "\nvelocity" + velocity;
                 

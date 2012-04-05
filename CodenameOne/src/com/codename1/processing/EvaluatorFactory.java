@@ -42,10 +42,6 @@ package com.codename1.processing;
  *
  */
 class EvaluatorFactory {
-	private static String FUNC_TEXT = "text()";
-	private static String FUNC_LAST = "last()";
-	private static String FUNC_POSITION = "position()";
-	
 	/**
 	 * Construct an evaluator for a given predicate expression.
 	 * 
@@ -57,11 +53,11 @@ class EvaluatorFactory {
 			return new IndexEvaluator(text);
 		} else if (text.startsWith("@")) {
 			return new AttributeEvaluator(text);
-		} else if (text.indexOf(FUNC_LAST) != -1) {
+		} else if (text.indexOf(IndexEvaluator.FUNC_LAST) != -1) {
 			return new IndexEvaluator(text);
-		} else if (text.indexOf(FUNC_TEXT) != -1) { 
+		} else if (text.indexOf(TextEvaluator.FUNC_TEXT) != -1) { 
 			return new TextEvaluator(text);
-		} else if (text.indexOf(FUNC_POSITION) != -1) {
+		} else if (text.indexOf(IndexEvaluator.FUNC_POSITION) != -1) {
 			return new IndexEvaluator(text);
 		} else if (text.startsWith("@")) {
 			return new AttributeEvaluator(text);

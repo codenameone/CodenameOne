@@ -38,20 +38,18 @@ import com.codename1.io.JSONParser;
  * A DOM accessor implementation for working with hashtable data.
  * 
  * @author Eric Coolman
- *
+ * 
  */
 class HashtableContent implements StructuredContent {
 	private Object root;
 	private StructuredContent parent;
-	
+
 	/**
 	 * Construct from parsed hashtable content.
 	 * 
 	 * @param content parsed hashtable content
 	 */
 	public HashtableContent(Hashtable content) {
-		//Hashtable h = new Hashtable();
-		//h.put("ROOT", content);
 		this.root = content;
 	}
 
@@ -74,14 +72,14 @@ class HashtableContent implements StructuredContent {
 	public HashtableContent(InputStream content) throws IOException {
 		this(new JSONParser().parse(new InputStreamReader(content)));
 	}
-	
+
 	/**
 	 * INTERNAL - link a node to it's parent so we can traverse backwards when required.
 	 * 
 	 * @param content a Hashtable, Vector, or String node.
 	 * @param parent the parent element of content.
 	 */
-	private HashtableContent(Object content, StructuredContent parent) {
+	HashtableContent(Object content, StructuredContent parent) {
 		this.root = content;
 		this.parent = parent;
 	}
@@ -93,13 +91,13 @@ class HashtableContent implements StructuredContent {
 	 */
 	public String toString() {
 		if (root instanceof Hashtable) {
-			if (((Hashtable)root).containsKey("ROOT")) {
-				return PrettyPrinter.print((Hashtable)((Hashtable)root).get("ROOT"));
+			if (((Hashtable) root).containsKey("ROOT")) {
+				return PrettyPrinter.print((Hashtable) ((Hashtable) root).get("ROOT"));
 			} else {
-				return PrettyPrinter.print((Hashtable)root);
+				return PrettyPrinter.print((Hashtable) root);
 			}
 		} else if (root instanceof Vector) {
-			return PrettyPrinter.print((Vector)root);
+			return PrettyPrinter.print((Vector) root);
 		} else {
 			return root.toString();
 		}
@@ -130,63 +128,76 @@ class HashtableContent implements StructuredContent {
 			return null;
 		}
 		Vector children = new Vector();
-		for (Enumeration elements = array.elements(); elements.hasMoreElements(); ) {
+		for (Enumeration elements = array.elements(); elements.hasMoreElements();) {
 			Object o = elements.nextElement();
-			// There is a bug that needs to be addressed, should always have hashtables.
+			// There is a bug that needs to be addressed, should always have
+			// hashtables.
 			// for now prevent the critical cast exception.
 			if (o instanceof Hashtable) {
-				children.addElement(new HashtableContent((Hashtable)o, this));
+				children.addElement(new HashtableContent((Hashtable) o, this));
+			} else if (o instanceof String) {
+				children.addElement(new HashtableContent(o, this));
 			}
 		}
 		return children;
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
 	 */
 	public Vector getChildren(String name) {
 		if (root instanceof String) {
 			return new Vector();
 		}
-		// on arrays, auto select first element
+		// on arrays, auto select first element that contains 'name'.
 		Object node = root;
 		if (node instanceof Vector) {
-			node = ((Vector) node).firstElement();
-			if (node == null) {
+			Object tmp = null;
+			for (Enumeration e = ((Vector) node).elements(); e.hasMoreElements();) {
+				tmp = e.nextElement();
+				if ((tmp instanceof Hashtable)) {
+					if (((Hashtable) tmp).containsKey(name)) {
+						break;
+					}
+				}
+				tmp = null;
+			}
+			if (tmp == null) {
 				return new Vector();
 			}
-			if ((node instanceof Hashtable) == false) {
-				System.err.println("Unhandled nested child: " + node.getClass().getName());
-				return new Vector();
-			}
+			node = tmp;
 		}
-		node = ((Hashtable)node).get(name);
+		node = ((Hashtable) node).get(name);
 		if (node == null) {
 			return new Vector();
 		} else if (node instanceof Vector) {
-			return _asStructuredContentArray((Vector)node);
+			return _asStructuredContentArray((Vector) node);
 		} else if (node instanceof Hashtable) {
 			Vector array = new Vector();
-			array.addElement(new HashtableContent((Hashtable)node, this));
+			array.addElement(new HashtableContent((Hashtable) node, this));
 			return array;
 		} else {
 			if ((node instanceof String) == false) {
 				System.err.println("Warning - handled child type as string: " + node.getClass().getName());
 			}
 			Vector array = new Vector();
-			array.addElement(node.toString());
+			array.addElement(new HashtableContent(node.toString(), this));
 			return array;
 		}
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.codename1.processing.StructuredContent#getChild(int)
 	 */
 	public StructuredContent getChild(int index) {
 		if (root instanceof Vector) {
-			return new HashtableContent(((Vector)root).elementAt(index), this);
+			return new HashtableContent(((Vector) root).elementAt(index), this);
 		}
-		Hashtable h = (Hashtable)root;
+		Hashtable h = (Hashtable) root;
 		if (index < 0 || index >= h.size()) {
 			return null;
 		}
@@ -198,25 +209,81 @@ class HashtableContent implements StructuredContent {
 		return new HashtableContent(node, this);
 	}
 
-
-	/* (non-Javadoc)
-	 * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String )
 	 */
 	public Vector getDescendants(String name) {
-		return getChildren(name);
+		Vector decendants = new Vector();
+		if (root instanceof Vector) {
+			_findByName(decendants, (Vector) root, name);
+		} else if (root instanceof Hashtable) {
+			_findByName(decendants, (Hashtable) root, name);
+		}
+		return decendants;
 	}
 
-	/* (non-Javadoc)
+	/**
+	 * Internal method for finding decendant nodes
+	 * 
+	 * @param target vector for collecting results
+	 * @param source source array to search
+	 * @param name node name we are searching for
+	 */
+	private void _findByName(Vector target, Vector source, String name) {
+		for (int i = 0; i < source.size(); i++) {
+			Object o = source.elementAt(i);
+			if (o instanceof Hashtable) {
+				_findByName(target, (Hashtable) o, name);
+			} else if (o instanceof Vector) {
+				_findByName(target, (Vector) o, name);
+			}
+		}
+	}
+
+	/**
+	 * Internal method for finding decendant nodes
+	 * 
+	 * @param target vector for collecting results
+	 * @param source source element to search
+	 * @param name node name we are searching for
+	 */
+	private void _findByName(Vector target, Hashtable source, String name) {
+		if (source.containsKey(name)) {
+			Object o = source.get(name);
+			if (o instanceof StructuredContent) {
+				target.addElement((StructuredContent) o);
+			} else {
+				// TODO: there will be a bug here with parent node, won't be able to walk up more than one node
+				target.addElement(new HashtableContent(o, new HashtableContent(source)));
+			}
+		}
+		for (Enumeration e = source.elements(); e.hasMoreElements();) {
+			Object o = e.nextElement();
+			if (o instanceof Vector) {
+				_findByName(target, (Vector) o, name);
+			} else if (o instanceof Hashtable) {
+				_findByName(target, (Hashtable) o, name);
+			}
+		}
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
 	 */
 	public String getAttribute(String name) {
-		if (root instanceof Hashtable) { 
-			((Hashtable)root).get(name);
+		if (root instanceof Hashtable) {
+			((Hashtable) root).get(name);
 		}
 		return null;
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.codename1.processing.StructuredContent#getParent()
 	 */
 	public StructuredContent getParent() {
@@ -226,18 +293,27 @@ class HashtableContent implements StructuredContent {
 		return parent;
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.codename1.processing.StructuredContent#getText()
 	 */
 	public String getText() {
-		Object obj = getChild(0);
-		if (obj == null) {
+		if (root instanceof String) {
+			return (String) root;
+		}
+		StructuredContent sc = getChild(0);
+		if (sc == null) {
 			return null;
 		}
-		if (obj instanceof String) {
-			return (String)obj;
+		if (sc.getNativeRoot() instanceof String) {
+			return (String) sc.getNativeRoot();
 		}
-		return obj.toString();
+		return sc.toString();
+	}
+
+	public Object getNativeRoot() {
+		return root;
 	}
 
 }

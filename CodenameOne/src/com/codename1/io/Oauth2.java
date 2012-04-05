@@ -30,6 +30,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
@@ -126,14 +127,19 @@ public class Oauth2 {
 
         if (token == null) {
             login = new Dialog();
-            login.setAutoAdjustDialogSize(false);
+            boolean i = Dialog.isAutoAdjustDialogSize();
+            Dialog.setAutoAdjustDialogSize(false);
             login.setLayout(new BorderLayout());
             login.setScrollable(false);
 
             Component html = createLoginComponent();
             login.addComponent(BorderLayout.CENTER, html);
+            login.setScrollable(false);
+            login.setDialogUIID("Container");
+            login.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+            login.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300));
             login.show(0, 0, 0, 0, false, true);
-            login.setAutoAdjustDialogSize(true);
+            Dialog.setAutoAdjustDialogSize(i);
         }
 
         return token;

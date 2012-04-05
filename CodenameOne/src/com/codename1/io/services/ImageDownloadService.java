@@ -37,6 +37,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.components.FileEncodedImage;
 import com.codename1.components.StorageImage;
+import com.codename1.ui.Component;
+import com.codename1.ui.list.ContainerList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Hashtable;
@@ -52,16 +54,53 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class ImageDownloadService extends ConnectionRequest {
+
+    /**
+     * Fast scaling uses runtime draw scaling rather than the Image scaled method. This works 
+     * better on smartphones but doesn't work well on feature phones
+     * @return the fastScale
+     */
+    public static boolean isFastScale() {
+        return fastScale;
+    }
+
+    /**
+     * Fast scaling uses runtime draw scaling rather than the Image scaled method. This works 
+     * better on smartphones but doesn't work well on feature phones
+     * @param aFastScale the fastScale to set
+     */
+    public static void setFastScale(boolean aFastScale) {
+        fastScale = aFastScale;
+    }
+    
+    private static boolean alwaysRevalidate;
+
+    /**
+     * By default lists don't revalidate on every change to avoid "jumpiness" when scrolling
+     * @return the alwaysRevalidate
+     */
+    public static boolean isAlwaysRevalidate() {
+        return alwaysRevalidate;
+    }
+
+    /**
+     * By default lists don't revalidate on every change to avoid "jumpiness" when scrolling
+     * @param aAlwaysRevalidate the alwaysRevalidate to set
+     */
+    public static void setAlwaysRevalidate(boolean aAlwaysRevalidate) {
+        alwaysRevalidate = aAlwaysRevalidate;
+    }
+
     private Label parentLabel;
     private EncodedImage result;
-    private List targetList;
+    private Component targetList;
     private int targetOffset;
     private String targetKey;
     private boolean cacheImages;
     private String destinationFile;
     private Dimension toScale;
     private String cacheId;
-
+    private static boolean fastScale = true;
     
     /**
      * Accepts the url to bind to the list renderer, on completion the action listener
@@ -73,6 +112,24 @@ public class ImageDownloadService extends ConnectionRequest {
     public ImageDownloadService(String url, ActionListener l) {
         setUrl(url);
         addResponseListener(l);
+        setPost(false);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given list
+     * when the response arrives. This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param url the image URL
+     * @param targetList the list that should be updated when the data arrives
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey the key for the hashtable in the target offset
+     */
+    public ImageDownloadService(String url, Component targetList, int targetOffset, String targetKey) {
+        this.targetList = targetList;
+        this.targetKey = targetKey;
+        this.targetOffset = targetOffset;
+        setUrl(url);
         setPost(false);
     }
 
@@ -107,7 +164,6 @@ public class ImageDownloadService extends ConnectionRequest {
         setPost(false);
     }
 
-
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives, it will cache the file locally as a file
@@ -123,14 +179,37 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, List targetList, int targetOffset, 
             String targetKey, String destFile, Dimension toScale) {
-        Image im = cacheImage(null, destFile);
+        createImageToFileSystem(url, targetList, targetOffset, targetKey, destFile, toScale, PRIORITY_NORMAL);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given list
+     * when the response arrives, it will cache the file locally as a file
+     * in the file storage.
+     * This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param url the image URL
+     * @param targetList the list that should be updated when the data arrives
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey the key for the hashtable in the target offset
+     * @param destFile local file to store the data into the given path
+     */
+    public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
+            String targetKey, String destFile, Dimension toScale, byte priority) {
+        Image im = cacheImage(null, destFile, toScale);
         if (im != null) {
-            Hashtable h = (Hashtable) targetList.getModel().getItemAt(targetOffset);
-            if(toScale != null){
+            Hashtable h;
+            if(targetList instanceof List) {
+                h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+            } else {
+                h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+            }
+            if(!fastScale && toScale != null){
                 im = im.scaled(toScale.getWidth(), toScale.getHeight());
             }
             h.put(targetKey, im);
-            targetList.repaint();
+            //targetList.repaint();
             return;
         }
         //image not found on cache go and download from the url
@@ -138,9 +217,9 @@ public class ImageDownloadService extends ConnectionRequest {
         i.cacheImages = true;
         i.destinationFile = destFile;
         i.toScale = toScale;
+        i.setPriority(priority);
         NetworkManager.getInstance().addToQueue(i);
     }
-
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives, it will cache the file locally as a file
@@ -157,14 +236,38 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, List targetList, int targetOffset, 
             String targetKey, String cacheId, Dimension scale) {
-        Image im = cacheImage(cacheId, null);
+        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, scale, PRIORITY_NORMAL);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given list
+     * when the response arrives, it will cache the file locally as a file
+     * in the file storage.
+     * This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param url the image URL
+     * @param targetList the list that should be updated when the data arrives
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey the key for the hashtable in the target offset
+     * @param cacheId a unique identifier to be used to store the image into storage
+     * @param scale the scale of the image to put in the List or null
+     */
+    public static void createImageToStorage(String url, Component targetList, int targetOffset, 
+            String targetKey, String cacheId, Dimension scale, byte priority) {
+        Image im = cacheImage(cacheId, null, scale);
         if (im != null) {
-            Hashtable h = (Hashtable) targetList.getModel().getItemAt(targetOffset);
-            if(scale != null){
+            Hashtable h;
+            if(targetList instanceof List) {
+                h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+            } else {
+                h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+            }
+            if(!fastScale && scale != null){
                 im = im.scaled(scale.getWidth(), scale.getHeight());
             }
             h.put(targetKey, im);
-            targetList.repaint();
+            //targetList.repaint();
             return;
         }
         //image not found on cache go and download from the url
@@ -172,6 +275,7 @@ public class ImageDownloadService extends ConnectionRequest {
         i.cacheImages = true;
         i.cacheId = cacheId;
         i.toScale = scale;
+        i.setPriority(priority);
         NetworkManager.getInstance().addToQueue(i);
     }
 
@@ -186,9 +290,25 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param toScale the scale dimension or null
      */
     public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale) {
-        Image im = cacheImage(cacheId, null);
+        createImageToStorage(url, l, cacheId, toScale, PRIORITY_NORMAL);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given Label
+     * when the response arrives, it will cache the file locally to the Storage
+     *
+     * @param url the image URL
+     * @param l the Label that should be updated when the data arrives
+     * to just use storage and the url as the key
+     * @param cacheId a unique identifier to be used to store the image into storage
+     * @param toScale the scale dimension or null
+     * @param priority the priority for the task
+     */
+    public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale,
+            byte priority) {
+        Image im = cacheImage(cacheId, null, toScale);
         if (im != null) {
-            if(toScale != null){
+            if(!fastScale && toScale != null){
                 im = im.scaled(toScale.getWidth(), toScale.getHeight());
             }
             l.setIcon(im);
@@ -201,8 +321,10 @@ public class ImageDownloadService extends ConnectionRequest {
         i.cacheImages = true;
         i.toScale = toScale;
         i.cacheId = cacheId;
+        i.setPriority(priority);
         NetworkManager.getInstance().addToQueue(i);
     }
+
 
     /**
      * Constructs an image request that will automatically populate the given Label
@@ -214,7 +336,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, ActionListener callback, String destFile) {
 
-        Image im = cacheImage(null, destFile);
+        Image im = cacheImage(null, destFile, null);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -236,7 +358,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, ActionListener callback, String cacheId) {
 
-        Image im = cacheImage(cacheId, null);
+        Image im = cacheImage(cacheId, null, null);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -248,16 +370,26 @@ public class ImageDownloadService extends ConnectionRequest {
         NetworkManager.getInstance().addToQueue(i);
     }
 
-    private static Image cacheImage(String cacheKey, String destFile) {
+    private static Image cacheImage(String cacheKey, String destFile, Dimension scale) {
         
         if (destFile != null) {
             if (FileSystemStorage.getInstance().exists(destFile)) {
-                FileEncodedImage f = FileEncodedImage.create(destFile, -1, -1);
+                FileEncodedImage f;
+                if(fastScale && scale != null) {
+                    f = FileEncodedImage.create(destFile, scale.getWidth(), scale.getHeight());
+                } else {
+                    f = FileEncodedImage.create(destFile, -1, -1);
+                }
                 return f;
             }
         } else if(cacheKey != null){
             if (Storage.getInstance().exists(cacheKey)) {
-                StorageImage s = StorageImage.create(cacheKey, -1, -1);
+                StorageImage s;
+                if(fastScale && scale != null) {
+                    s = StorageImage.create(cacheKey, scale.getWidth(), scale.getHeight(), false);
+                } else {
+                    s = StorageImage.create(cacheKey, -1, -1, false);
+                }
                 return s;
             }
         }
@@ -268,12 +400,17 @@ public class ImageDownloadService extends ConnectionRequest {
      * @inheritDoc
      */
     protected void readResponse(InputStream input) throws IOException  {
+        int imageScaleWidth = -1, imageScaleHeight = -1;
+        if(toScale != null && fastScale) {
+            imageScaleWidth = toScale.getWidth();
+            imageScaleHeight = toScale.getHeight();
+        }
         if(cacheImages) {
             if(destinationFile != null) {
-                result = FileEncodedImage.create(destinationFile, input, -1, -1);
+                result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);
             } else {
                 EncodedImage e = EncodedImage.create(input);
-                result = StorageImage.create(cacheId, e.getImageData(), -1, -1);
+                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, false);
                 //if the storage has failed create the image from the stream
                 if(result == null){
                     result = e;
@@ -288,7 +425,7 @@ public class ImageDownloadService extends ConnectionRequest {
         result.getWidth();
         Image image = result;
 
-        if (toScale != null) {
+        if (toScale != null && toScale.getWidth() != image.getWidth() && toScale.getHeight() != image.getHeight()) {
             image = image.scaled(toScale.getWidth(), toScale.getHeight());
         }
 
@@ -311,9 +448,25 @@ public class ImageDownloadService extends ConnectionRequest {
             return;
         } else {
             if(targetList != null) {
-                Hashtable h = (Hashtable)targetList.getModel().getItemAt(targetOffset);
+                Hashtable h;
+                if(targetList instanceof List) {
+                    h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+                } else {
+                    h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+                }
                 h.put(targetKey, image);
-                targetList.repaint();
+                
+                // revalidate only once to avoid multiple revalidate refreshes during scroll
+                if(targetList.getParent() != null) {
+                    if(alwaysRevalidate) {
+                        targetList.getParent().revalidate();
+                    } else {
+                        if(targetList.getClientProperty("$imgDSReval") == null) {
+                            targetList.putClientProperty("$imgDSReval", Boolean.TRUE);
+                            targetList.getParent().revalidate();
+                        }
+                    }
+                }
             }
         }
 

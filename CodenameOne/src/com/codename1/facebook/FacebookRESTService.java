@@ -46,12 +46,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     private Hashtable entry = new Hashtable();
     private Hashtable currentData = entry;
-    //private Vector currentItems = new Vector();
-    private Vector results = new Vector();
-    //private Vector treeDepthEntries = new Vector();
-    //private Vector treeDepthItems = new Vector();
     private Vector stack = new Vector();
-    //private int treeDepth = 0;
     private String connectionType = "";
     public static String PICTURE = "picture";
     public static String FRIENDS = "friends";
@@ -69,8 +64,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String MESSAGES = "messages";
     public static String EVENTS = "events";
     
-    private String currentBlock = "";
-    private String currentArray = "";
     private DefaultListModel responseDestination;
 
     public static final String GRAPH_URL = "https://graph.facebook.com/";
@@ -139,7 +132,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         if(block.equals("paging")){
             return;
         }
-        currentBlock = block;
         Object node;
         if (stack.size() == 0) {
             if (root == null) {
@@ -177,7 +169,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         if(block.equals("paging")){
             return;
         }
-        currentArray = block;
         Vector items = new Vector();
         Object node;
         if (stack.size() == 1) {

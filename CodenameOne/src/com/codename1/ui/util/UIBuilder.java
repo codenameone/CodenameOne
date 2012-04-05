@@ -2121,7 +2121,8 @@ public class UIBuilder {
      * the same back button as the one in source
      */
     protected boolean isSameBackDestination(Container source, Container destination) {
-        return source.getName().equals(destination.getName());
+        return source.getName() == null || destination.getName() == null || 
+                source.getName().equals(destination.getName());
     }
 
     /**
