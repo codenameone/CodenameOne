@@ -57,7 +57,8 @@ public class DocumentInfo {
      */
     public static int TYPE_CSS = 2;
 
-
+    private static String DEFAULT_ENCODING = ENCODING_ISO;
+    
     private String pageURL;
     private String baseURL;
     private String hostURL;
@@ -65,9 +66,18 @@ public class DocumentInfo {
 
     private String params;
     private boolean postRequest;
-    private String encoding=ENCODING_ISO;
+    private String encoding=DEFAULT_ENCODING;
     private int expectedContentType=TYPE_HTML;
 
+    /**
+     * Sets the default encoding for the document e.g. ENCODING_UTF8
+     * 
+     * @param encoding the encoding string matching ISO standards
+     */
+    public static void setDefaultEncoding(String encoding) {
+        DEFAULT_ENCODING = encoding;
+    }
+    
     /**
      * Constructs the DocumentInfo with the given URL
      * 
