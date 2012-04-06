@@ -21,7 +21,7 @@
  * CA 94065 USA or visit www.oracle.com if you need additional information or
  * have any questions.
  */
-package com.codename1.io.html;
+package com.codename1.ui.html;
 
 import com.codename1.ui.html.DefaultDocumentRequestHandler;
 import com.codename1.ui.html.DocumentInfo;

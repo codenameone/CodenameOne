@@ -43,7 +43,7 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.TextArea;
-import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import java.util.Hashtable;
 import java.util.Vector;
 

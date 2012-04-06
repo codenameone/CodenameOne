@@ -24,7 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ads.AdsService;
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;

@@ -28,7 +28,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLComponent;
-import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;

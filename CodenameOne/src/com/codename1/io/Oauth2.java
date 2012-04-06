@@ -24,7 +24,7 @@
 package com.codename1.io;
 
 import com.codename1.components.WebBrowser;
-import com.codename1.io.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;

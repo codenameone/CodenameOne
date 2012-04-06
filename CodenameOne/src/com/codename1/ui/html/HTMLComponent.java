@@ -61,6 +61,9 @@ import java.util.Vector;
 /**
  * HTMLComponent is a Codename One Component that renders HTML documents that conform to the XHTML Mobile Profile 1.0
  *
+ * @deprecated this component includes some customizability advantages but its probably better for 99% of the use
+ * cases to use the WebBrowser Component from the Components package. That component works with the native
+ * browser when applicable which is a far superior approach.
  * @author Ofir Leitner
  */
 public class HTMLComponent extends Container implements ActionListener,AsyncDocumentRequestHandler.IOCallback {
