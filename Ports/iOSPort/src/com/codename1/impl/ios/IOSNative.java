@@ -163,6 +163,7 @@ public class IOSNative {
     public static native void setBrowserURL(long browserPeer, String url);
     
     public static native void browserBack(long browserPeer);
+    public static native void browserStop(long browserPeer);
 
     public static native void browserClearHistory(long browserPeer);
 

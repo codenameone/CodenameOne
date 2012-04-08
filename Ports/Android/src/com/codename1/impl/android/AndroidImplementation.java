@@ -2039,6 +2039,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidBrowserComponent) browserPeer).setProperty(key, value);
     }
 
+    public void browserStop(PeerComponent browserPeer) {
+        ((AndroidBrowserComponent) browserPeer).stop();
+    }
+    
     public String getBrowserTitle(PeerComponent browserPeer) {
         return ((AndroidBrowserComponent) browserPeer).getTitle();
     }

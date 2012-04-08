@@ -1385,6 +1385,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void browserStop(PeerComponent browserPeer) {
+        IOSNative.browserStop(get(browserPeer));
+    }
+    
+    @Override
     public void browserClearHistory(PeerComponent browserPeer) {
         IOSNative.browserClearHistory(get(browserPeer));
     }

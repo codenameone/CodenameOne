@@ -171,6 +171,8 @@ public class Oauth2 {
             public void onStart(String url) {
                 System.out.println("url " + url);
                 if ((url.startsWith(redirectURI))) {
+                    stop();
+                    
                     //remove the browser component.
                     login.removeAll();
                     login.revalidate();

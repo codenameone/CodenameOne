@@ -3051,6 +3051,13 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Stops loading the current page
+     * @param browserPeer browser instance
+     */
+    public void browserStop(PeerComponent browserPeer) {
+    }
+
+    /**
      * Navigates forward in the history
      * @param browserPeer browser instance
      */

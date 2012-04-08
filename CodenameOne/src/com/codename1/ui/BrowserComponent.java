@@ -201,6 +201,13 @@ public class BrowserComponent extends Container {
             }
         }
     }
+    
+    /**
+     * Cancel the loading of the current page
+     */
+    public void stop() {
+        Display.getInstance().getImplementation().browserStop(internal);
+    }
 
     /**
      * Used internally by the implementation to fire an event from the native browser widget

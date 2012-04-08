@@ -169,7 +169,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     private BufferedImage headerLandscape;
     private String platformName;
     private String[] platformOverrides = new String[0];
+    private static NetworkMonitor netMonitor;
 
+    static void disableNetworkMonitor() {
+        netMonitor = null;
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        pref.putBoolean("NetworkMonitor", false);
+    }
+    
     public static void setBaseResourceDir(File f) {
         baseResourceDir = f;
     }
@@ -945,6 +952,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
+            MenuItem networkMonitor = new MenuItem("Network Monitor");
+            networkMonitor.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    if(netMonitor == null) {
+                        showNetworkMonitor();
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        pref.putBoolean("NetworkMonitor", true);
+                    }
+                }
+            });
+            simulatorMenu.add(networkMonitor);
+            
             Menu skinMenu = new Menu("Skins");
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
@@ -968,6 +988,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     i.addActionListener(new ActionListener() {
 
                         public void actionPerformed(ActionEvent ae) {
+                            if(netMonitor != null) {
+                                netMonitor.dispose();
+                                netMonitor = null;
+                            }
                             String mainClass = System.getProperty("MainClass");
                             if (mainClass != null) {
                                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -1002,6 +1026,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     picker.setVisible(true);
                     String file = picker.getFile();
                     if (file != null) {
+                        if(netMonitor != null) {
+                            netMonitor.dispose();
+                            netMonitor = null;
+                        }
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -1101,6 +1129,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
         }
     }
+    
+    private void showNetworkMonitor() {
+        if(netMonitor == null) {
+            netMonitor = new NetworkMonitor();
+            netMonitor.pack();
+            netMonitor.setLocationByPlatform(true);
+            netMonitor.setVisible(true);
+        }
+    }
 
     private void addSkinName(String f) {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -1194,6 +1231,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void init(Object m) {
+        URLConnection.setDefaultAllowUserInteraction(true);
+        HttpURLConnection.setFollowRedirects(false);
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        if(pref.getBoolean("NetworkMonitor", false)) {
+            showNetworkMonitor();
+        }
         if (defaultInitTarget != null && m == null) {
             m = defaultInitTarget;
         }
@@ -1242,7 +1285,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (f != null) {
                     loadSkinFile(f, frm);
                 } else {
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     String d = System.getProperty("dskin");
                     f = pref.get("skin", d);
                     loadSkinFile(f, frm);
@@ -2490,6 +2532,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         con.setDoInput(read);
         con.setDoOutput(write);
+        if(netMonitor != null) {
+            NetworkRequestObject nr = new NetworkRequestObject();
+            nr.setUrl(url);
+            netMonitor.addRequest(con, nr);
+        }
         return con;
     }
 
@@ -2498,6 +2545,17 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void setHeader(Object connection, String key, String val) {
         ((URLConnection) connection).setRequestProperty(key, val);
+
+        if(netMonitor != null) {
+            HttpURLConnection con = (HttpURLConnection) connection;
+            NetworkRequestObject nr = netMonitor.getByConnection(con);
+            String requestHeaders = "";
+            Map<String, List<String>> props = con.getRequestProperties();
+            for(String header : props.keySet()) {
+                requestHeaders += header + "=" + props.get(header) + "\n";
+            }
+            nr.setHeaders(requestHeaders);
+        }
     }
 
     /**
@@ -2508,6 +2566,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             FileOutputStream fc = new FileOutputStream((String) connection);
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
             return o;
+        }
+        if(netMonitor != null) {
+            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
+            nr.setRequestBody("");
+            HttpURLConnection con = (HttpURLConnection) connection;
+            return new BufferedOutputStream(con.getOutputStream()) {
+                public void write(byte b[], int off, int len) throws IOException {
+                    super.write(b, off, len);
+                    nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
+                }
+            };
         }
         return new BufferedOutputStream(((URLConnection) connection).getOutputStream());
     }
@@ -2533,6 +2602,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
             return o;
         }
+        if(netMonitor != null) {
+            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
+            HttpURLConnection con = (HttpURLConnection) connection;
+            String headers = "";
+            Map<String, List<String>> map = con.getHeaderFields();
+            for(String header : map.keySet()) {
+                headers += header + "=" + map.get(header) + "\n";
+            }
+            nr.setResponseHeaders(headers);
+            nr.setResponseBody("");
+            return new BufferedInputStream(con.getInputStream()) {
+                public synchronized int read(byte b[], int off, int len)
+                    throws IOException {
+                    int s = super.read(b, off, len);
+                    if(s > -1) {
+                        nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
+                    }
+                    return s;
+                }
+            };
+        }
         return new BufferedInputStream(((URLConnection) connection).getInputStream());
     }
 
@@ -2541,10 +2631,15 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void setPostRequest(Object connection, boolean p) {
         try {
+            String mtd = "GET";
             if (p) {
-                ((HttpURLConnection) connection).setRequestMethod("POST");
-            } else {
-                ((HttpURLConnection) connection).setRequestMethod("GET");
+                mtd = "POST";
+            } 
+            ((HttpURLConnection) connection).setRequestMethod(mtd);
+
+            if(netMonitor != null) {
+                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
+                nr.setMethod(mtd);
             }
         } catch (IOException err) {
             // an exception here doesn't make sense
@@ -2556,7 +2651,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getResponseCode(Object connection) throws IOException {
-        return ((HttpURLConnection) connection).getResponseCode();
+        int code = ((HttpURLConnection) connection).getResponseCode();
+        if(netMonitor != null) {
+            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
+            nr.setResponseCode("" + code);
+        }
+        return code;
     }
 
     /**
@@ -2570,7 +2670,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getContentLength(Object connection) {
-        return ((HttpURLConnection) connection).getContentLength();
+        int contentLength = ((HttpURLConnection) connection).getContentLength();
+        if(netMonitor != null) {
+            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
+            nr.setContentLength("" + contentLength);
+        }
+        return contentLength;
     }
 
     /**

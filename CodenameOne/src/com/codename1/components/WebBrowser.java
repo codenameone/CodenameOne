@@ -241,6 +241,17 @@ public class WebBrowser extends Container {
     }
 
     /**
+     * Stop loading the current page
+     */
+    public void stop() {
+        if (isNative) {
+            ((BrowserComponent) internal).stop();
+        } else {
+            ((HTMLComponent) internal).cancel();
+        }
+    }
+    
+    /**
      * Shows the given HTML in the native viewer
      *
      * @param html HTML web page
