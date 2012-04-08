@@ -94,6 +94,7 @@ public class WebBrowser extends Container {
                                 if (docInfo.getParams() != null) {
                                     OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
                                     w.write(docInfo.getParams());
+                                    w.flush();
                                 }
                             }
                         }

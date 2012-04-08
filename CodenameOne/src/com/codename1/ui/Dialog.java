@@ -194,6 +194,8 @@ public class Dialog extends Form {
         super.getContentPane().setUIID(dialogUIID);
         super.getTitleComponent().setText("");
         super.getTitleComponent().setVisible(false);
+        super.getTitleArea().setVisible(false);
+        super.getTitleArea().setUIID("Container");
         titleArea.setVisible(false);
 
         dialogContentPane = new Container();
@@ -397,6 +399,8 @@ public class Dialog extends Form {
      * @param includeTitle whether the title should hang in the top of the screen or
      * be glued onto the content pane
      * @return the last command pressed by the user if such a command exists
+     * @deprecated use the version that doesn't accept the include title, the includeTitle 
+     * feature is no longer supported
      */
     public Command show(int top, int bottom, int left, int right, boolean includeTitle) {
         return show(top, bottom, left, right, includeTitle, true);
@@ -417,9 +421,31 @@ public class Dialog extends Form {
      * @param right space in pixels between the right of the screen and the form
      * @param includeTitle whether the title should hang in the top of the screen or
      * be glued onto the content pane
+     * @return the last command pressed by the user if such a command exists
+     */
+    public Command show(int top, int bottom, int left, int right) {
+        return show(top, bottom, left, right, false, true);
+    }
+    
+    /**
+     * This method shows the form as a modal alert allowing us to produce a behavior
+     * of an alert/dialog box. This method will block the calling thread even if the
+     * calling thread is the EDT. Notice that this method will not release the block
+     * until dispose is called even if show() from another form is called!
+     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
+     * dialogs where you would want the underlying form to "peek" from behind the 
+     * form. 
+     * 
+     * @param top space in pixels between the top of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param left space in pixels between the left of the screen and the form
+     * @param right space in pixels between the right of the screen and the form
+     * @param includeTitle whether the title should hang in the top of the screen or
+     * be glued onto the content pane
      * @param modal indicates the dialog should be modal set to false for modeless dialog
      * which is useful for some use cases
      * @return the last command pressed by the user if such a command exists
+     * @deprecated use showAtPosition, the includeTitle flag is no longer supported
      */
     public Command show(int top, int bottom, int left, int right, boolean includeTitle, boolean modal) {
         this.top = top;
@@ -431,11 +457,46 @@ public class Dialog extends Form {
             this.left = left;
             this.right = right;
         }
-        this.includeTitle = includeTitle;
+        //this.includeTitle = includeTitle;
         setDisposed(false);
         this.modal = modal;
         lastCommandPressed = null;
         showModal(this.top, this.bottom, this.left, this.right, includeTitle, modal, false);
+        return lastCommandPressed;
+    }
+
+    /**
+     * This method shows the form as a modal alert allowing us to produce a behavior
+     * of an alert/dialog box. This method will block the calling thread even if the
+     * calling thread is the EDT. Notice that this method will not release the block
+     * until dispose is called even if show() from another form is called!
+     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
+     * dialogs where you would want the underlying form to "peek" from behind the 
+     * form. 
+     * 
+     * @param top space in pixels between the top of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param left space in pixels between the left of the screen and the form
+     * @param right space in pixels between the right of the screen and the form
+     * @param modal indicates the dialog should be modal set to false for modeless dialog
+     * which is useful for some use cases
+     * @return the last command pressed by the user if such a command exists
+     */
+    public Command showAtPosition(int top, int bottom, int left, int right, boolean modal) {
+        this.top = top;
+        this.bottom = bottom;
+        if(isRTL()){
+            this.left = right;
+            this.right = left;            
+        }else{
+            this.left = left;
+            this.right = right;
+        }
+        //this.includeTitle = includeTitle;
+        setDisposed(false);
+        this.modal = modal;
+        lastCommandPressed = null;
+        showModal(this.top, this.bottom, this.left, this.right, false, modal, false);
         return lastCommandPressed;
     }
 
@@ -538,27 +599,15 @@ public class Dialog extends Form {
                     }
                 }
 
-                if (includeTitle) {
-                    titleStyle.setMargin(Component.TOP, top, true);
-                    titleStyle.setMargin(Component.BOTTOM, 0, true);
-                    titleStyle.setMargin(Component.LEFT, left, true);
-                    titleStyle.setMargin(Component.RIGHT, right, true);
+                titleStyle.setMargin(Component.TOP, 0, true);
+                titleStyle.setMargin(Component.BOTTOM, 0, true);
+                titleStyle.setMargin(Component.LEFT, 0, true);
+                titleStyle.setMargin(Component.RIGHT, 0, true);
 
-                    contentPaneStyle.setMargin(Component.TOP, 0, true);
-                    contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                    contentPaneStyle.setMargin(Component.LEFT, left, true);
-                    contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                } else {
-                    titleStyle.setMargin(Component.TOP, 0, true);
-                    titleStyle.setMargin(Component.BOTTOM, 0, true);
-                    titleStyle.setMargin(Component.LEFT, 0, true);
-                    titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                    contentPaneStyle.setMargin(Component.TOP, top, true);
-                    contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                    contentPaneStyle.setMargin(Component.LEFT, left, true);
-                    contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                }
+                contentPaneStyle.setMargin(Component.TOP, top, true);
+                contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+                contentPaneStyle.setMargin(Component.LEFT, left, true);
+                contentPaneStyle.setMargin(Component.RIGHT, right, true);
                 return;
             } else {
                 int oldW = getWidth();
@@ -579,27 +628,15 @@ public class Dialog extends Form {
                         bottom = Math.max(0, (h - prefHeight) - top);
                         right = Math.max(0, (w - prefWidth) - left);
 
-                        if (includeTitle) {
-                            titleStyle.setMargin(Component.TOP, top, true);
-                            titleStyle.setMargin(Component.BOTTOM, 0, true);
-                            titleStyle.setMargin(Component.LEFT, left, true);
-                            titleStyle.setMargin(Component.RIGHT, right, true);
+                        titleStyle.setMargin(Component.TOP, 0, true);
+                        titleStyle.setMargin(Component.BOTTOM, 0, true);
+                        titleStyle.setMargin(Component.LEFT, 0, true);
+                        titleStyle.setMargin(Component.RIGHT, 0, true);
 
-                            contentPaneStyle.setMargin(Component.TOP, 0, true);
-                            contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                            contentPaneStyle.setMargin(Component.LEFT, left, true);
-                            contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                        } else {
-                            titleStyle.setMargin(Component.TOP, 0, true);
-                            titleStyle.setMargin(Component.BOTTOM, 0, true);
-                            titleStyle.setMargin(Component.LEFT, 0, true);
-                            titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                            contentPaneStyle.setMargin(Component.TOP, top, true);
-                            contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                            contentPaneStyle.setMargin(Component.LEFT, left, true);
-                            contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                        }
+                        contentPaneStyle.setMargin(Component.TOP, top, true);
+                        contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+                        contentPaneStyle.setMargin(Component.LEFT, left, true);
+                        contentPaneStyle.setMargin(Component.RIGHT, right, true);
                         return;
                     } else {
                         float ratioW = ((float) w) / ((float) oldW);
