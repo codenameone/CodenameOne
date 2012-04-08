@@ -23,9 +23,11 @@
  */
 package com.codename1.io;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
 import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -122,8 +124,10 @@ public class Oauth2 {
      *
      * @throws IOException the method will throw an IOException if something went
      * wrong in the communication.
+     * @deprecated use createAuthComponent or showAuthentication which work asynchronously and adapt better
+     * to different platforms
      */
-    public String authenticate() throws IOException {
+    public String authenticate() {
 
         if (token == null) {
             login = new Dialog();
@@ -132,7 +136,7 @@ public class Oauth2 {
             login.setLayout(new BorderLayout());
             login.setScrollable(false);
 
-            Component html = createLoginComponent();
+            Component html = createLoginComponent(null, null, null, null);
             login.addComponent(BorderLayout.CENTER, html);
             login.setScrollable(false);
             login.setDialogUIID("Container");
@@ -144,8 +148,43 @@ public class Oauth2 {
 
         return token;
     }
+    
+    /**
+     * This method creates a component which can authenticate. You will receive either the
+     * authentication key or an Exception object within the ActionListener callback method.
+     * 
+     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to perform the authentication
+     */
+    public Component createAuthComponent(ActionListener al) {
+        return createLoginComponent(al, null, null, null);
+    }
+    
+    /**
+     * This method shows an authentication for login form
+     * 
+     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to perform the authentication
+     */
+    public void showAuthentication(ActionListener al) {
+        InfiniteProgress inf = new InfiniteProgress();
+        Dialog progress = inf.showInifiniteBlocking();
+        Form authenticationForm = new Form("Login");
+        final Form old = Display.getInstance().getCurrent();
+        if(old != null) {
+            Command cancel = new Command("Cancel") {
+                public void actionPerformed(ActionEvent ev) {
+                    old.showBack();
+                }
+            };
+            authenticationForm.addCommand(cancel);
+            authenticationForm.setBackCommand(cancel);
+        }
+        authenticationForm.setLayout(new BorderLayout());
+        authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
+    }
 
-    private Component createLoginComponent() {
+    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
 
         String URL = oauth2URL + "?client_id=" + clientId
                 + "&redirect_uri=" + Util.encodeUrl(redirectURI) + "&scope=" + scope;
@@ -169,13 +208,18 @@ public class Oauth2 {
         WebBrowser web = new WebBrowser(){
 
             public void onStart(String url) {
-                System.out.println("url " + url);
                 if ((url.startsWith(redirectURI))) {
+                    if(Display.getInstance().getCurrent() == progress) {
+                        progress.dispose();
+                    }
+
                     stop();
                     
                     //remove the browser component.
-                    login.removeAll();
-                    login.revalidate();
+                    if(login != null) {
+                        login.removeAll();
+                        login.revalidate();
+                    }
                     
                     if (url.indexOf("code=") > -1) {
                         Hashtable params = getParamsFromURL(url);
@@ -185,7 +229,27 @@ public class Oauth2 {
                                 byte[] tok = Util.readInputStream(input);
                                 token = new String(tok);
                                 token = token.substring(token.indexOf("=") + 1, token.indexOf("&"));
-                                login.dispose();
+                                if(login != null) {
+                                    login.dispose();
+                                }
+                            }
+                            
+                            protected void handleException(Exception err) {
+                                if(backToForm != null) {
+                                    backToForm.showBack();
+                                }
+                                if(al != null) {
+                                    al.actionPerformed(new ActionEvent(err));
+                                }                                
+                            }
+                            
+                            protected void postResponse() {
+                                if(backToForm != null) {
+                                    backToForm.showBack();
+                                }
+                                if(al != null) {
+                                    al.actionPerformed(new ActionEvent(token));
+                                }
                             }
                         };
 
@@ -205,16 +269,30 @@ public class Oauth2 {
                         String error = (String) table.get("error_reason");
                         String description = (String) table.get("error_description");
                         Dialog.show(error, description, "OK", "");
-                        login.dispose();
-                        
+                        if(login != null) {
+                            login.dispose();
+                        }
                     } else {
                         boolean success = url.indexOf("#") > -1;
                         if (success) {
                             String accessToken = url.substring(url.indexOf("#") + 1);
                             token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
-                            login.dispose();
+                            if(login != null) {
+                                login.dispose();
+                            }
+                            if(backToForm != null) {
+                                backToForm.showBack();
+                            }
+                            if(al != null) {
+                                al.actionPerformed(new ActionEvent(token));
+                            }
                         }
                     }
+                } else {
+                    if(frm != null && Display.getInstance().getCurrent() != frm) {
+                        progress.dispose();
+                        frm.show();
+                    } 
                 }
             }
         };

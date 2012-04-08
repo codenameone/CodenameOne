@@ -31,6 +31,7 @@ import com.codename1.io.Oauth2;
 import com.codename1.io.Oauth2;
 import com.codename1.io.Storage;
 import com.codename1.io.services.ImageDownloadService;
+import com.codename1.ui.Component;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.Slider;
@@ -81,8 +82,14 @@ public class FaceBookAccess {
      * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
      * @throws IOException the method will throw an IOException if something went
      * wrong in the communication.
+     * @deprecated use createAuthComponent or showAuthentication which work asynchronously and adapt better
+     * to different platforms
      */
     public void authenticate(String clientId, String redirectURI, String clientSecret, String [] permissions) throws IOException {
+        token = createOAuth(clientId, redirectURI, clientSecret, permissions).authenticate();
+    }
+
+    private Oauth2 createOAuth(String clientId, String redirectURI, String clientSecret, String [] permissions) {
         String scope = "";
         if(permissions != null && permissions.length > 0){
             for (int i = 0; i < permissions.length; i++) {
@@ -93,10 +100,37 @@ public class FaceBookAccess {
         }
         Hashtable additionalParams = new Hashtable();
         additionalParams.put("display", "wap");
-        final Oauth2 oauth = new Oauth2("https://www.facebook.com/dialog/oauth", clientId, redirectURI, scope, "https://graph.facebook.com/oauth/access_token", clientSecret, additionalParams);
-        token = oauth.authenticate();
+        return new Oauth2("https://www.facebook.com/dialog/oauth", clientId, redirectURI, scope, "https://graph.facebook.com/oauth/access_token", clientSecret, additionalParams);
     }
-
+    
+    
+    /**
+     * This method creates a component which can authenticate. You will receive either the
+     * authentication key or an Exception object within the ActionListener callback method.
+     * 
+     * @param clientId the client id (appid) which asks to connect (this is generated when an app is created see: https://developers.facebook.com/apps)
+     * @param redirectURI  the redirectURI  (this is generated when an app is created see: https://developers.facebook.com/apps)
+     * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
+     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to perform the authentication
+     */
+    public Component createAuthComponent(ActionListener al, String clientId, String redirectURI, String clientSecret, String [] permissions) {
+        return createOAuth(clientId, redirectURI, clientSecret, permissions).createAuthComponent(al);
+    }
+    
+    /**
+     * This method shows an authentication for login form
+     * 
+     * @param clientId the client id (appid) which asks to connect (this is generated when an app is created see: https://developers.facebook.com/apps)
+     * @param redirectURI  the redirectURI  (this is generated when an app is created see: https://developers.facebook.com/apps)
+     * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
+     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to perform the authentication
+     */
+    public void showAuthentication(ActionListener al, String clientId, String redirectURI, String clientSecret, String [] permissions) {
+        createOAuth(clientId, redirectURI, clientSecret, permissions).showAuthentication(al);
+    }
+    
     /**
      * This method returns true if the user is authenticated to the facebook service.
      * @return true if authenticated
