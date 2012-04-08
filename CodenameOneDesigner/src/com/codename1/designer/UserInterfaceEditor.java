@@ -1718,6 +1718,10 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneTimeSpinner, com.codename1.ui.spinner.TimeSpinner.class, "TimeSpinner", null);
         makeDraggable(codenameOneDateTimeSpinner, com.codename1.ui.spinner.DateTimeSpinner.class, "DateTimeSpinner", null);
         makeDraggable(codenameOneGenericSpinner, com.codename1.ui.spinner.GenericSpinner.class, "GenericSpinner", null);
+        makeDraggable(codenameOneLikeButton, com.codename1.facebook.ui.LikeButton.class, "LikeButton", null);
+        makeDraggable(codenameOneInfiniteProgress, com.codename1.components.InfiniteProgress.class, "InfiniteProgress", null);
+        makeDraggable(codenameOneMultiButton, com.codename1.components.MultiButton.class, "MultiButton", null);
+        makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -3150,6 +3154,21 @@ public class UserInterfaceEditor extends BaseForm {
                         continue;
                     }
 
+                    if(type == com.codename1.ui.Image.class) {
+                        com.codename1.ui.Image result = (com.codename1.ui.Image)value;
+                        if(result == null) {
+                            out.writeUTF("");
+                        } else {
+                            String id = res.findId(result);
+                            if(id == null) {
+                               out.writeUTF("");
+                            } else {
+                               out.writeUTF(id);
+                            }
+                        }
+                        continue;
+                    }
+
                     if(type == com.codename1.ui.Container.class) {
                         out.writeUTF(((com.codename1.ui.Container)value).getName());
                         continue;
@@ -4021,6 +4040,7 @@ public class UserInterfaceEditor extends BaseForm {
         coreComponents = new javax.swing.JPanel();
         codenameOneLabel = new javax.swing.JButton();
         codenameOneButton = new javax.swing.JButton();
+        codenameOneMultiButton = new javax.swing.JButton();
         codenameOneCheckBox = new javax.swing.JButton();
         codenameOneRadioButton = new javax.swing.JButton();
         codenameOneComboBox = new javax.swing.JButton();
@@ -4044,6 +4064,9 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTimeSpinner = new javax.swing.JButton();
         codenameOneDateTimeSpinner = new javax.swing.JButton();
         codenameOneGenericSpinner = new javax.swing.JButton();
+        codenameOneLikeButton = new javax.swing.JButton();
+        codenameOneInfiniteProgress = new javax.swing.JButton();
+        codenameOneAds = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4108,7 +4131,7 @@ public class UserInterfaceEditor extends BaseForm {
         jPanel1.setLayout(new java.awt.BorderLayout());
 
         coreComponents.setName("coreComponents"); // NOI18N
-        coreComponents.setLayout(new java.awt.GridLayout(6, 2));
+        coreComponents.setLayout(new java.awt.GridLayout(7, 2));
 
         codenameOneLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXLabel32.png"))); // NOI18N
         codenameOneLabel.setText("Label");
@@ -4127,6 +4150,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneButton.setName("codenameOneButton"); // NOI18N
         codenameOneButton.addActionListener(formListener);
         coreComponents.add(codenameOneButton);
+
+        codenameOneMultiButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
+        codenameOneMultiButton.setText("Multi-Button");
+        codenameOneMultiButton.setToolTipText("<html><body><b>MultiButton</b><br> \n<p>\nA Complex button like component allowing multi-line<br>\ninput as well as elaborate functionality. It is based on <br>\na container with a lead component within.</p> </body> </html>"); // NOI18N
+        codenameOneMultiButton.setBorder(null);
+        codenameOneMultiButton.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneMultiButton.setName("codenameOneMultiButton"); // NOI18N
+        codenameOneMultiButton.addActionListener(formListener);
+        coreComponents.add(codenameOneMultiButton);
 
         codenameOneCheckBox.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneCheckBox.setText("Check Box");
@@ -4284,7 +4316,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneNumericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneNumericSpinner.setText("Numeric Spinner");
-        codenameOneNumericSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneNumericSpinner.setToolTipText("<html><body><b>Numeric Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneNumericSpinner.setBorder(null);
         codenameOneNumericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneNumericSpinner.setName("codenameOneNumericSpinner"); // NOI18N
@@ -4293,7 +4325,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneDateSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneDateSpinner.setText("Date Spinner");
-        codenameOneDateSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateSpinner.setToolTipText("<html><body><b>Date Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateSpinner.setBorder(null);
         codenameOneDateSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneDateSpinner.setName("codenameOneDateSpinner"); // NOI18N
@@ -4302,7 +4334,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneTimeSpinner.setText("Time Spinner");
-        codenameOneTimeSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneTimeSpinner.setToolTipText("<html><body><b>Time Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneTimeSpinner.setBorder(null);
         codenameOneTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneTimeSpinner.setName("codenameOneTimeSpinner"); // NOI18N
@@ -4311,7 +4343,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneDateTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneDateTimeSpinner.setText("Date & Time Spinner");
-        codenameOneDateTimeSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateTimeSpinner.setToolTipText("<html><body><b>Date &amp; Time Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateTimeSpinner.setBorder(null);
         codenameOneDateTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneDateTimeSpinner.setName("codenameOneDateTimeSpinner"); // NOI18N
@@ -4320,12 +4352,39 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneGenericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneGenericSpinner.setText("Generic Spinner");
-        codenameOneGenericSpinner.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneGenericSpinner.setToolTipText("<html><body><b>Generic Spinner</b><br> \n<p>\nA spinner component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
         codenameOneGenericSpinner.setBorder(null);
         codenameOneGenericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneGenericSpinner.setName("codenameOneGenericSpinner"); // NOI18N
         codenameOneGenericSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneGenericSpinner);
+
+        codenameOneLikeButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
+        codenameOneLikeButton.setText("Facebook Like Button");
+        codenameOneLikeButton.setToolTipText("<html><body><b>LikeButton</b><br> \n<p>\nSimple Facebook like button</p> </body> </html>"); // NOI18N
+        codenameOneLikeButton.setBorder(null);
+        codenameOneLikeButton.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneLikeButton.setName("codenameOneLikeButton"); // NOI18N
+        codenameOneLikeButton.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneLikeButton);
+
+        codenameOneInfiniteProgress.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneInfiniteProgress.setText("Infinite Progress");
+        codenameOneInfiniteProgress.setToolTipText("<html><body><b>Infinite Progress</b><br> \n<p>\nA constantly spinning wheel component indicating progress<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneInfiniteProgress.setBorder(null);
+        codenameOneInfiniteProgress.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneInfiniteProgress.setName("codenameOneInfiniteProgress"); // NOI18N
+        codenameOneInfiniteProgress.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneInfiniteProgress);
+
+        codenameOneAds.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneAds.setText("Ads");
+        codenameOneAds.setToolTipText("<html><body><b>Ads</b><br> \n<p>\nGeneric pluggable ad component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneAds.setBorder(null);
+        codenameOneAds.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneAds.setName("codenameOneAds"); // NOI18N
+        codenameOneAds.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneAds);
 
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
@@ -4666,6 +4725,18 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneMultiButton) {
+                UserInterfaceEditor.this.codenameOneMultiButtonActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneLikeButton) {
+                UserInterfaceEditor.this.codenameOneLikeButtonActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneInfiniteProgress) {
+                UserInterfaceEditor.this.codenameOneInfiniteProgressActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneAds) {
+                UserInterfaceEditor.this.codenameOneAdsActionPerformed(evt);
             }
         }
 
@@ -5228,6 +5299,38 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.ui.spinner.GenericSpinner(), "GenericSpinner");
 }//GEN-LAST:event_codenameOneGenericSpinnerActionPerformed
 
+    private void codenameOneMultiButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMultiButtonActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.MultiButton(), "MultiButton");
+    }//GEN-LAST:event_codenameOneMultiButtonActionPerformed
+
+    private void codenameOneLikeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneLikeButtonActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.facebook.ui.LikeButton(), "LikeButton");
+    }//GEN-LAST:event_codenameOneLikeButtonActionPerformed
+
+    private void codenameOneInfiniteProgressActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneInfiniteProgressActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.InfiniteProgress(), "InfiniteProgress");
+    }//GEN-LAST:event_codenameOneInfiniteProgressActionPerformed
+
+    private void codenameOneAdsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneAdsActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.Ads(), "Ads");
+    }//GEN-LAST:event_codenameOneAdsActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5324,6 +5427,7 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton bindListModel;
     private javax.swing.JButton bindOnCreate;
     private javax.swing.JButton bindPostShow;
+    private javax.swing.JButton codenameOneAds;
     private javax.swing.JButton codenameOneButton;
     private javax.swing.JButton codenameOneCheckBox;
     private javax.swing.JButton codenameOneComboBox;
@@ -5336,9 +5440,12 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton codenameOneGenericSpinner;
     private javax.swing.JButton codenameOneHTMLComponent;
     private javax.swing.JPanel codenameOneIOComponents;
+    private javax.swing.JButton codenameOneInfiniteProgress;
     private javax.swing.JButton codenameOneLabel;
+    private javax.swing.JButton codenameOneLikeButton;
     private javax.swing.JButton codenameOneList;
     private javax.swing.JButton codenameOneMediaPlayer;
+    private javax.swing.JButton codenameOneMultiButton;
     private javax.swing.JButton codenameOneNumericSpinner;
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneSlider;

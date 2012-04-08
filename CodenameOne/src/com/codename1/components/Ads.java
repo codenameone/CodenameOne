@@ -73,6 +73,19 @@ public class Ads extends Container implements HTMLCallback {
     private String[] keywords;
 
     /**
+     * Default constructor for GUI builder
+     */
+    public Ads() {
+        setUIID("Ads");
+        setLayout(new BorderLayout());
+        setFocusable(true);
+        Label filler = new Label(" ");
+        filler.setPreferredSize(new Dimension(400, 2));
+        filler.getStyle().setBgTransparency(0);
+        addComponent(BorderLayout.CENTER, filler);
+    }
+    
+    /**
      * Simple constructor to create an Ad Component
      * @param appId unique identifier of the app, to gain an appId please refer to 
      * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
@@ -89,35 +102,31 @@ public class Ads extends Container implements HTMLCallback {
      * if false no refresh will occur
      */
     public Ads(String appId, boolean refreshAd) {
-        setUIID("Ads");
-        setLayout(new BorderLayout());
+        this();
         this.appId = appId;
-        this.service = AdsService.createAdsService();
         this.refreshAd = refreshAd;
-        setFocusable(true);
-        Label filler = new Label(" ");
-        filler.setPreferredSize(new Dimension(400, 2));
-        filler.getStyle().setBgTransparency(0);
-        addComponent(BorderLayout.CENTER, filler);
+        this.service = AdsService.createAdsService();
     }
 
     /**
      * @inheritDoc
      */
     public void initComponent() {
-        service.initialize(this);
-        service.addResponseListener(new ActionListener() {
+        if(service != null) {
+            service.initialize(this);
+            service.addResponseListener(new ActionListener() {
 
-            public void actionPerformed(ActionEvent evt) {
-                String a = (String) evt.getSource();
-                setAd(a);
+                public void actionPerformed(ActionEvent evt) {
+                    String a = (String) evt.getSource();
+                    setAd(a);
+                }
+            });
+            if (!refreshAd) {
+                requestAd();
             }
-        });
-        if (!refreshAd) {
-            requestAd();
-        }
-        if (refreshAd) {
-            getComponentForm().registerAnimated(this);
+            if (refreshAd) {
+                getComponentForm().registerAnimated(this);
+            }
         }
     }
 
@@ -345,6 +354,12 @@ public class Ads extends Container implements HTMLCallback {
      */
     public void setAppID(String appId) {
         this.appId = appId;
+        if(service == null) {
+            service = AdsService.createAdsService();
+            if(isInitialized()) {
+                initComponent();
+            }
+        }
     }
 
     /**
@@ -402,8 +417,8 @@ public class Ads extends Container implements HTMLCallback {
      * Sets the users age
      * @param age 
      */
-    public void setAge(int age) {
-        this.age = "" + age;
+    public void setAge(String age) {
+        this.age = age;
     }
 
     /**
@@ -438,5 +453,83 @@ public class Ads extends Container implements HTMLCallback {
      */
     public String getLocation() {
         return location;
+    }
+    
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[]{"appId", "updateDuration", "age", "gender", "category", "location", "keywords"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+        return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, new String[0].getClass()};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if (name.equals("appId")) {
+            return getAppID();
+        }
+        if (name.equals("updateDuration")) {
+            return new Integer(getUpdateDuration());
+        }
+        if (name.equals("age")) {
+            return getAge();
+        }
+        if (name.equals("gender")) {
+            return getGender();
+        }
+        if (name.equals("category")) {
+            return getCategory();
+        }
+        if (name.equals("location")) {
+            return getLocation();
+        }
+        if (name.equals("keywords")) {
+            return getKeywords();
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if (name.equals("appId")) {
+            setAppID((String) value);
+            return null;
+        }
+        if (name.equals("updateDuration")) {
+            setUpdateDuration(((Integer) value).intValue());
+            return null;
+        }
+        if (name.equals("age")) {
+            setAge((String) value);
+            return null;
+        }
+        if (name.equals("gender")) {
+            setGender((String) value);
+            return null;
+        }
+        if (name.equals("category")) {
+            setCategory((String) value);
+            return null;
+        }
+        if (name.equals("location")) {
+            setLocation((String) value);
+            return null;
+        }
+        if (name.equals("keywords")) {
+            setKeywords((String[]) value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
     }
 }

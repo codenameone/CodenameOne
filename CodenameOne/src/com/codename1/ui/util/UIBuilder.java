@@ -768,6 +768,10 @@ public class UIBuilder {
             return result;
         }
 
+        if(type == Image.class) {
+            return res.getImage(in.readUTF());
+        }
+        
         if(type == Container.class) {
             // resource might have been removed we need to fail gracefully
             String[] uiNames = res.getUIResourceNames();

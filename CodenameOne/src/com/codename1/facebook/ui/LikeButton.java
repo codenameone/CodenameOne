@@ -29,12 +29,18 @@ import com.codename1.ui.events.ActionListener;
 import java.io.IOException;
 
 /**
- * Generic "Like" button that enables us to submit a like to facebook
- *
+ * Generic "Like" button that enables us to submit a like to facebook, to get the post id
+ * required for the like functionality you will need to use a tool such as: 
+ * https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts
+ * You can ask it to list your posts and then seek the correct id within the returned JSON
+ * 
  * @author Chen Fishbein
  */
 public class LikeButton extends Button implements ActionListener {
-
+    private String appId;
+    private String redirectURI = "http://www.codenameone.com/";
+    private String clientSecret;
+    private String[] permissions;
     private String postId;
     
     /**
@@ -59,6 +65,13 @@ public class LikeButton extends Button implements ActionListener {
      * @inheritDoc
      */
     public void actionPerformed(ActionEvent evt) {
+        if(!FaceBookAccess.getInstance().isAuthenticated()) {
+            FaceBookAccess.getInstance().showAuthentication(this, appId, redirectURI, clientSecret, permissions);
+            return;
+        }
+        if(evt.getSource() instanceof Exception) {
+            return;
+        }
         try {
             FaceBookAccess.getInstance().postLike(getPostId());
         } catch (IOException ex) {
@@ -80,4 +93,123 @@ public class LikeButton extends Button implements ActionListener {
         this.postId = postId;
     }
     
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[]{"appId", "redirectURI", "clientSecret", "postId", "permissions"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+        return new Class[]{String.class, String.class, String.class, String.class, new String[0].getClass()};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if (name.equals("appId")) {
+            return getAppId();
+        }
+        if (name.equals("redirectURI")) {
+            return getRedirectURI();
+        }
+        if (name.equals("clientSecret")) {
+            return getClientSecret();
+        }
+        if (name.equals("postId")) {
+            return getPostId();
+        }
+        if (name.equals("permissions")) {
+            return getPermissions();
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if (name.equals("appId")) {
+            setAppId((String) value);
+            return null;
+        }
+        if (name.equals("redirectURI")) {
+            setRedirectURI((String) value);
+            return null;
+        }
+        if (name.equals("clientSecret")) {
+            setClientSecret((String) value);
+            return null;
+        }
+        if (name.equals("postId")) {
+            setPostId((String) value);
+            return null;
+        }
+        if (name.equals("permissions")) {
+            setPermissions((String[]) value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * @return the appId
+     */
+    public String getAppId() {
+        return appId;
+    }
+
+    /**
+     * @param appId the appId to set
+     */
+    public void setAppId(String appId) {
+        this.appId = appId;
+    }
+
+    /**
+     * @return the redirectURI
+     */
+    public String getRedirectURI() {
+        return redirectURI;
+    }
+
+    /**
+     * @param redirectURI the redirectURI to set
+     */
+    public void setRedirectURI(String redirectURI) {
+        this.redirectURI = redirectURI;
+    }
+
+    /**
+     * @return the clientSecret
+     */
+    public String getClientSecret() {
+        return clientSecret;
+    }
+
+    /**
+     * @param clientSecret the clientSecret to set
+     */
+    public void setClientSecret(String clientSecret) {
+        this.clientSecret = clientSecret;
+    }
+
+    /**
+     * @return the permissions
+     */
+    public String[] getPermissions() {
+        return permissions;
+    }
+
+    /**
+     * @param permissions the permissions to set
+     */
+    public void setPermissions(String[] permissions) {
+        this.permissions = permissions;
+    }
 }

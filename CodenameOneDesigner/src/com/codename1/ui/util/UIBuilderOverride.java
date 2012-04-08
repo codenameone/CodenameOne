@@ -55,6 +55,10 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("TimeSpinner", com.codename1.ui.spinner.TimeSpinner.class);
         registerCustomComponent("DateTimeSpinner", com.codename1.ui.spinner.DateTimeSpinner.class);
         registerCustomComponent("GenericSpinner", com.codename1.ui.spinner.GenericSpinner.class);
+        registerCustomComponent("LikeButton", com.codename1.facebook.ui.LikeButton.class);
+        registerCustomComponent("InfiniteProgress", com.codename1.components.InfiniteProgress.class);
+        registerCustomComponent("MultiButton", com.codename1.components.MultiButton.class);
+        registerCustomComponent("Ads", com.codename1.components.Ads.class);
     }
 
     void modifyingProperty(com.codename1.ui.Component c, int p) {

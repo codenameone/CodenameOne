@@ -155,6 +155,10 @@ public class PreviewInSimulator {
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("TimeSpinner", com.codename1.ui.spinner.TimeSpinner.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("DateTimeSpinner", com.codename1.ui.spinner.DateTimeSpinner.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("GenericSpinner", com.codename1.ui.spinner.GenericSpinner.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("LikeButton", com.codename1.facebook.ui.LikeButton.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("InfiniteProgress", com.codename1.components.InfiniteProgress.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiButton", com.codename1.components.MultiButton.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("Ads", com.codename1.components.Ads.class);
                     com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
                     com.codename1.ui.Container c = builder.createContainer(res, selection);
                     if(c instanceof com.codename1.ui.Form) {

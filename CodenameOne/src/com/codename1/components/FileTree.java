@@ -39,4 +39,10 @@ public class FileTree extends Tree {
         super(new FileTreeModel(true));
         setUIID("FileTree");
     }
+
+    protected String childToDisplayLabel(Object child) {
+        String s = child.toString();
+        int l = s.lastIndexOf('/');
+        return s.substring(l + 1);
+    }
 }

@@ -60,7 +60,10 @@ public class MultiButton extends Container {
         labels.addComponent(secondRow);
         labels.addComponent(thirdRow);
         labels.addComponent(forthRow);
-        firstRow.setUIID("Label");
+        firstRow.setUIID("MultiLine1");
+        secondRow.setUIID("MultiLine2");
+        thirdRow.setUIID("MultiLine3");
+        forthRow.setUIID("MultiLine4");
         setLeadComponent(firstRow);
         setUIID("Button");
     }
@@ -372,22 +375,22 @@ public class MultiButton extends Container {
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           String.class,
-           Image.class,
-           String.class,
-           String.class,
-           String.class
+           String.class,// line1
+           String.class,// line2
+           String.class,// line3
+           String.class,// line4
+           String.class,// name1
+           String.class,// name2
+           String.class,// name3
+           String.class,// name4
+           String.class,// uiid1
+           String.class,// uiid2
+           String.class,// uiid3
+           String.class,// uiid4
+           Image.class,// icon
+           String.class,// iconName
+           String.class,// iconUiid
+           String.class// iconPosition
        };
     }
 

@@ -45,6 +45,13 @@ public class InfiniteProgress extends Component {
     private Motion spin;
     
     /**
+     * Default constructor to define the UIID
+     */
+    public InfiniteProgress() {
+        setUIID("InfiniteProgress");
+    }
+    
+    /**
      * Shows the infinite progress over the whole screen
      */
     public Dialog showInifiniteBlocking() {

@@ -129,7 +129,7 @@
 
                                   <Layout class="org.netbeans.modules.form.compat2.layouts.DesignGridLayout">
                                     <Property name="columns" type="int" value="2"/>
-                                    <Property name="rows" type="int" value="6"/>
+                                    <Property name="rows" type="int" value="7"/>
                                   </Layout>
                                   <SubComponents>
                                     <Component class="javax.swing.JButton" name="codenameOneLabel">
@@ -164,6 +164,23 @@
                                       </Properties>
                                       <Events>
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneButtonActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneMultiButton">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/JXButton32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Multi-Button"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MultiButton&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A Complex button like component allowing multi-line&lt;br&gt;&#xa;input as well as elaborate functionality. It is based on &lt;br&gt;&#xa;a container with a lead component within.&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneMultiButton" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneMultiButtonActionPerformed"/>
                                       </Events>
                                     </Component>
                                     <Component class="javax.swing.JButton" name="codenameOneCheckBox">
@@ -477,7 +494,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Numeric Spinner"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Numeric Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -494,7 +511,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Date Spinner"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -511,7 +528,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Time Spinner"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -528,7 +545,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Date &amp; Time Spinner"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date &amp;amp; Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -545,7 +562,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Generic Spinner"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Generic Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A spinner component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
@@ -554,6 +571,57 @@
                                       </Properties>
                                       <Events>
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneGenericSpinnerActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneLikeButton">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/JXButton32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Facebook Like Button"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;LikeButton&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Simple Facebook like button&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneLikeButton" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneLikeButtonActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneInfiniteProgress">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Infinite Progress"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Infinite Progress&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A constantly spinning wheel component indicating progress&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneInfiniteProgress" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneInfiniteProgressActionPerformed"/>
+                                      </Events>
+                                    </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneAds">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Ads"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Ads&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Generic pluggable ad component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneAds" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneAdsActionPerformed"/>
                                       </Events>
                                     </Component>
                                   </SubComponents>
