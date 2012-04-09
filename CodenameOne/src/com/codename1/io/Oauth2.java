@@ -182,7 +182,6 @@ public class Oauth2 {
         }
         authenticationForm.setLayout(new BorderLayout());
         authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
-        authenticationForm.show();
     }
 
     private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
