@@ -66,7 +66,11 @@ public class LikeButton extends Button implements ActionListener {
      */
     public void actionPerformed(ActionEvent evt) {
         if(!FaceBookAccess.getInstance().isAuthenticated()) {
-            FaceBookAccess.getInstance().showAuthentication(this, appId, redirectURI, clientSecret, permissions);
+            FaceBookAccess.setClientId(appId);
+            FaceBookAccess.setRedirectURI(redirectURI);
+            FaceBookAccess.setClientSecret(clientSecret);
+            FaceBookAccess.setPermissions(permissions);            
+            FaceBookAccess.getInstance().showAuthentication(this);
             return;
         }
         if(evt.getSource() instanceof Exception) {

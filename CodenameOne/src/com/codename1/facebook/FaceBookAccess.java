@@ -53,45 +53,33 @@ import java.util.Vector;
  */
 public class FaceBookAccess {
 
+    private static String clientId = "132970916828080";
+    private static String redirectURI = "http://www.codenameone.com/";
+    private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
+    private static String[] permissions = new String[]{"user_photos",
+        "friends_photos", "publish_stream", "read_stream", "user_relationships",
+        "user_birthday", "friends_birthday", "friends_relationships",
+        "read_mailbox", "user_events", "friends_events", "user_about_me"};
     private static FaceBookAccess instance = new FaceBookAccess();
-
     private Slider slider;
-
     private ConnectionRequest current;
-
     private Vector responseCodeListeners = new Vector();
-
     private static String token;
 
     private FaceBookAccess() {
     }
-    
+
     /**
      * gets the class instance
      * @return a FaceBookAccess object
      */
-    public static FaceBookAccess getInstance() {        
+    public static FaceBookAccess getInstance() {
         return instance;
     }
 
-    /**
-     * The authentication method to the FB servers
-     *
-     * @param clientId the client id which asks to connect (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param redirectURI  the redirectURI  (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
-     * @throws IOException the method will throw an IOException if something went
-     * wrong in the communication.
-     * @deprecated use createAuthComponent or showAuthentication which work asynchronously and adapt better
-     * to different platforms
-     */
-    public void authenticate(String clientId, String redirectURI, String clientSecret, String [] permissions) throws IOException {
-        token = createOAuth(clientId, redirectURI, clientSecret, permissions).authenticate();
-    }
-
-    private Oauth2 createOAuth(String clientId, String redirectURI, String clientSecret, String [] permissions) {
+    private Oauth2 createOAuth() {
         String scope = "";
-        if(permissions != null && permissions.length > 0){
+        if (permissions != null && permissions.length > 0) {
             for (int i = 0; i < permissions.length; i++) {
                 String permission = permissions[i];
                 scope += permission + ",";
@@ -102,56 +90,66 @@ public class FaceBookAccess {
         additionalParams.put("display", "wap");
         return new Oauth2("https://www.facebook.com/dialog/oauth", clientId, redirectURI, scope, "https://graph.facebook.com/oauth/access_token", clientSecret, additionalParams);
     }
-    
-    
+
     /**
      * This method creates a component which can authenticate. You will receive either the
      * authentication key or an Exception object within the ActionListener callback method.
      * 
-     * @param clientId the client id (appid) which asks to connect (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param redirectURI  the redirectURI  (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
      * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
      * @return a component that should be displayed to the user in order to perform the authentication
      */
-    public Component createAuthComponent(ActionListener al, String clientId, String redirectURI, String clientSecret, String [] permissions) {
-        return createOAuth(clientId, redirectURI, clientSecret, permissions).createAuthComponent(al);
+    public Component createAuthComponent(final ActionListener al) {
+        return createOAuth().createAuthComponent(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                if(evt.getSource() instanceof String){
+                    token = (String) evt.getSource();
+                }
+                al.actionPerformed(evt);
+            }
+        });
     }
-    
+
     /**
      * This method shows an authentication for login form
      * 
-     * @param clientId the client id (appid) which asks to connect (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param redirectURI  the redirectURI  (this is generated when an app is created see: https://developers.facebook.com/apps)
-     * @param permissions the requested permissions of the app http://developers.facebook.com/docs/reference/api/permissions/
      * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
      * @return a component that should be displayed to the user in order to perform the authentication
      */
-    public void showAuthentication(ActionListener al, String clientId, String redirectURI, String clientSecret, String [] permissions) {
-        createOAuth(clientId, redirectURI, clientSecret, permissions).showAuthentication(al);
+    public void showAuthentication(final ActionListener al) {
+        createOAuth().showAuthentication(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                if(evt.getSource() instanceof String){
+                    token = (String) evt.getSource();
+                }
+                al.actionPerformed(evt);
+            }
+        });
     }
-    
+
     /**
      * This method returns true if the user is authenticated to the facebook service.
      * @return true if authenticated
      */
-    public boolean isAuthenticated(){
+    public boolean isAuthenticated() {
         return token != null;
     }
 
-    private void checkAuthentication() throws IOException{
-        if(!isAuthenticated()){
+    private void checkAuthentication() throws IOException {
+        if (!isAuthenticated()) {
             throw new IOException("service is not authenticated, call public void authenticate(String clientId, String redirectURI, String [] permissions) first");
         }
     }
+
     /**
      * Sets the progress indicator to get network updates on the queries
      * @param slider 
      */
-    public void setProgress(Slider slider){
+    public void setProgress(Slider slider) {
         this.slider = slider;
     }
-    
+
     /**
      * This method returns immediately and will call the callback when it returns with
      * the FaceBook Object data.
@@ -173,11 +171,11 @@ public class FaceBookAccess {
                 }
             }
         });
-        if(slider != null){
+        if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
         for (int i = 0; i < responseCodeListeners.size(); i++) {
-            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));            
+            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
         }
         current = con;
         NetworkManager.getInstance().addToQueue(con);
@@ -195,7 +193,7 @@ public class FaceBookAccess {
     public void getFaceBookObjectItems(String faceBookId, String itemsConnection,
             final DefaultListModel feed, Hashtable params, final ActionListener callback) throws IOException {
         checkAuthentication();
-        
+
         final FacebookRESTService con = new FacebookRESTService(token, faceBookId, itemsConnection, false);
         con.setResponseDestination(feed);
         con.addResponseListener(new ActionListener() {
@@ -216,7 +214,7 @@ public class FaceBookAccess {
                 con.addArgument(key, (String) params.get(key));
             }
         }
-        if(slider != null){
+        if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
         for (int i = 0; i < responseCodeListeners.size(); i++) {
@@ -235,7 +233,7 @@ public class FaceBookAccess {
      */
     public void getUser(String userId, final User user, final ActionListener callback) throws IOException {
         String id = userId;
-        if(id == null){
+        if (id == null) {
             id = "me";
         }
         getFaceBookObject(id, new ActionListener() {
@@ -260,7 +258,7 @@ public class FaceBookAccess {
      * @param post an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getPost(String postId, final Post post, final ActionListener callback) throws IOException{
+    public void getPost(String postId, final Post post, final ActionListener callback) throws IOException {
         getFaceBookObject(postId, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -283,7 +281,7 @@ public class FaceBookAccess {
      * @param photo an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getPhoto(String photoId, final Photo photo, final ActionListener callback) throws IOException{
+    public void getPhoto(String photoId, final Photo photo, final ActionListener callback) throws IOException {
         getFaceBookObject(photoId, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -306,7 +304,7 @@ public class FaceBookAccess {
      * @param album an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getAlbum(String albumId, final Album album, final ActionListener callback) throws IOException{
+    public void getAlbum(String albumId, final Album album, final ActionListener callback) throws IOException {
         getFaceBookObject(albumId, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -360,13 +358,13 @@ public class FaceBookAccess {
      */
     public void getPicture(String id, final Label label, Dimension toScale, boolean tempStorage) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
         fb.addArgument("type", "small");
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
-        if(tempStorage && !Storage.getInstance().exists(id)){
+        if (tempStorage && !Storage.getInstance().exists(id)) {
             cacheKey = "temp" + id;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);
@@ -381,18 +379,17 @@ public class FaceBookAccess {
      */
     public void getPicture(String id, final ActionListener callback, boolean tempStorage) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
         fb.addArgument("type", "small");
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
-        if(tempStorage && !Storage.getInstance().exists(id)){
+        if (tempStorage && !Storage.getInstance().exists(id)) {
             cacheKey = "temp" + id;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);
     }
-
 
     /**
      * Gets the picture of the given facebook object id and stores it in the given List in the offset index
@@ -411,16 +408,16 @@ public class FaceBookAccess {
     public void getPicture(String id, final List targetList, final int targetOffset, final String targetKey,
             Dimension toScale, boolean tempStorage) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
         fb.addArgument("type", "small");
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
-        if(tempStorage && !Storage.getInstance().exists(id)){
+        if (tempStorage && !Storage.getInstance().exists(id)) {
             cacheKey = "temp" + id;
         }
-        
+
         ImageDownloadService.createImageToStorage(fb.requestURL(), targetList, targetOffset, targetKey, cacheKey, toScale);
     }
 
@@ -433,13 +430,13 @@ public class FaceBookAccess {
      */
     public void getPhotoThumbnail(String photoId, final ActionListener callback, boolean tempStorage) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService fb = new FacebookRESTService(token, photoId, FacebookRESTService.PICTURE, false);
         fb.addArgument("type", "thumbnail");
         String cacheKey = photoId;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
-        if(tempStorage && !Storage.getInstance().exists(photoId)){
+        if (tempStorage && !Storage.getInstance().exists(photoId)) {
             cacheKey = "temp" + photoId;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);
@@ -454,13 +451,13 @@ public class FaceBookAccess {
      */
     public void getPhotoThumbnail(String photoId, final Label label, Dimension toScale, boolean tempStorage) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService fb = new FacebookRESTService(token, photoId, FacebookRESTService.PICTURE, false);
         fb.addArgument("type", "thumbnail");
         String cacheKey = photoId;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
-        if(tempStorage && !Storage.getInstance().exists(photoId)){
+        if (tempStorage && !Storage.getInstance().exists(photoId)) {
             cacheKey = "temp" + photoId;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);
@@ -543,7 +540,7 @@ public class FaceBookAccess {
      */
     public void postOnWall(String userId, String message) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);
         con.addArgument("message", "" + message);
         if (slider != null) {
@@ -582,7 +579,7 @@ public class FaceBookAccess {
      */
     public void postComment(String postId, String message) throws IOException {
         checkAuthentication();
-        
+
         FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.COMMENTS, true);
         con.addArgument("message", "" + message);
         if (slider != null) {
@@ -610,7 +607,7 @@ public class FaceBookAccess {
     public void getUserNotifications(String userId, String startTime, boolean includeRead,
             DefaultListModel notifications, final ActionListener callback) throws IOException {
         checkAuthentication();
-        
+
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/notifications.getList", false);
         con.addArgument("start_time", startTime);
         con.addArgument("include_read", new Boolean(includeRead).toString());
@@ -647,13 +644,13 @@ public class FaceBookAccess {
      * @param callback the result will call the callback with the result
      * to extrct the data preform the following:
      *  public void actionPerformed(ActionEvent evt) {
-                    Vector data = (Vector) ((NetworkEvent) evt).getMetaData();
-                    Vector users = (Vector) data.elementAt(0);
+    Vector data = (Vector) ((NetworkEvent) evt).getMetaData();
+    Vector users = (Vector) data.elementAt(0);
      * }
      */
-    public void getUsersDetails(String [] usersIds, String [] fields, final ActionListener callback) throws IOException {
+    public void getUsersDetails(String[] usersIds, String[] fields, final ActionListener callback) throws IOException {
         checkAuthentication();
-        
+
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/users.getInfo", false);
         String ids = usersIds[0];
         for (int i = 1; i < usersIds.length; i++) {
@@ -665,7 +662,7 @@ public class FaceBookAccess {
         String fieldsStr = fields[0];
         for (int i = 1; i < fields.length; i++) {
             fieldsStr += "," + fields[i];
-            
+
         }
         con.addArgumentNoEncoding("fields", fieldsStr);
         con.addArgument("format", "json");
@@ -690,7 +687,6 @@ public class FaceBookAccess {
         current = con;
         NetworkManager.getInstance().addToQueue(con);
     }
-    
 
     /**
      * Gets the user events
@@ -704,7 +700,6 @@ public class FaceBookAccess {
         getFaceBookObjectItems(userId, FacebookRESTService.EVENTS, events, null, callback);
     }
 
-
     /**
      * Serach for facebook objects
      *
@@ -714,7 +709,7 @@ public class FaceBookAccess {
      * each entry is an Hashtable Object contaning the Object data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void search(String objectType, String query, DefaultListModel results, ActionListener callback) throws IOException{
+    public void search(String objectType, String query, DefaultListModel results, ActionListener callback) throws IOException {
         Hashtable params = new Hashtable();
         params.put("q", query);
         params.put("type", objectType);
@@ -725,11 +720,10 @@ public class FaceBookAccess {
     /**
      * Kills the current request.
      */
-    public void killCurrentRequest(){
+    public void killCurrentRequest() {
         current.kill();
     }
 
-    
     /**
      * Adds a response listener on the requests
      *
@@ -758,5 +752,42 @@ public class FaceBookAccess {
             model.addItem(obj);
         }
         return model;
+    }
+
+    /**
+     * The client id (appid) which asks to connect (this is generated when an 
+     * app is created see: https://developers.facebook.com/apps)
+     * @param clientId 
+     */
+    public static void setClientId(String clientId) {
+        FaceBookAccess.clientId = clientId;
+    }
+
+    /**
+     * The client secret is been generated by facebook 
+     * see: https://developers.facebook.com/apps
+     * @param clientSecret 
+     */
+    public static void setClientSecret(String clientSecret) {
+        FaceBookAccess.clientSecret = clientSecret;
+    }
+
+    /**
+     * The requested permissions of the app 
+     * http://developers.facebook.com/docs/reference/api/permissions/
+     * @param permissions 
+     */
+    public static void setPermissions(String[] permissions) {
+        FaceBookAccess.permissions = permissions;
+    }
+
+    /**
+     * This is generated when an app is created see: 
+     * https://developers.facebook.com/apps
+     * 
+     * @param redirectURI 
+     */
+    public static void setRedirectURI(String redirectURI) {
+        FaceBookAccess.redirectURI = redirectURI;
     }
 }

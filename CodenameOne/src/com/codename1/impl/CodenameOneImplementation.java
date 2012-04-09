@@ -3990,4 +3990,22 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Indicates if the underlying platform supports sharing capabilities
+     * @return true if the underlying platform handles share.
+     */
+    public boolean isNativeShareSupported(){
+        return false;
+    }
+    
+    /**
+     * Share the required information using the platform sharing services.
+     * a Sharing service can be: mail, sms, facebook, twitter,...
+     * This method is implemented if isNativeShareSupported() returned true for 
+     * a specific platform.
+     * @param toShare String to share.
+     */
+    public void share(String toShare){
+    }
+
 }

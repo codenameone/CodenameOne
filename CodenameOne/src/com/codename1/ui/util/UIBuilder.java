@@ -328,13 +328,8 @@ public class UIBuilder {
      * @return a Codename One container instance
      */
     public Container createContainer(String resPath, String resourceName) {
-        try {
-            setResourceFilePath(resPath);
-            return createContainer(Resources.open(resPath), resourceName);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            return null;
-        }
+        setResourceFilePath(resPath);
+        return createContainer(fetchResourceFile(), resourceName);
     }
 
     /**
