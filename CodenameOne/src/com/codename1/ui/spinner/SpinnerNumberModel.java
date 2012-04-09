@@ -49,6 +49,7 @@ class SpinnerNumberModel implements ListModel {
         } else {
             currentValue = ((Double)value).doubleValue();
         }
+        selectionListener.fireSelectionEvent(-1, -1);
     }
 
     Object getValue() {
