@@ -166,6 +166,18 @@ public class ContainerList extends Container {
             if(i > 0) {
                 getComponentAt(i).requestFocus();
             }
+            bindListeners();
+        }
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    protected void deinitialize() {
+        if (this.model != null && listener != null) {
+            this.model.removeDataChangedListener(listener);
+            this.model.removeSelectionListener(listener);
+            listener = null;
         }
     }
     
@@ -175,7 +187,7 @@ public class ContainerList extends Container {
      * @param model a model class that is mapped into the internal components
      */
     public void setModel(ListModel model) {
-        if (this.model != null) {
+        if (this.model != null && listener != null) {
             this.model.removeDataChangedListener(listener);
             this.model.removeSelectionListener(listener);
             listener = null;

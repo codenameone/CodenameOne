@@ -655,7 +655,10 @@ public final class Display {
                                 backgroundTasks.removeElementAt(0);
                             }
                             nextTask.run();
-                            yield();
+                            try {
+                                Thread.sleep(10);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 };

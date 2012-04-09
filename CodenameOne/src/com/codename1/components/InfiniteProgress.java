@@ -102,6 +102,9 @@ public class InfiniteProgress extends Component {
      */
     protected Dimension calcPreferredSize() {
         if(animation == null) {
+            animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
+        }
+        if(animation == null) {
             return new Dimension(100, 100);
         }
         Style s = getStyle();

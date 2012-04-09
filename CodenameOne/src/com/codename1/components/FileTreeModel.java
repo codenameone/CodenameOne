@@ -71,6 +71,9 @@ public class FileTreeModel implements TreeModel {
                 }
             } else {
                 String name = (String)parent;
+                if(!name.endsWith("/")) {
+                    name += "/";
+                }
                 String[] res = FileSystemStorage.getInstance().listFiles(name);
                 if(showFiles) {
                     for(int iter = 0 ; iter < res.length ; iter++) {

@@ -37,11 +37,11 @@ import java.io.IOException;
  * @author Chen Fishbein
  */
 public class LikeButton extends Button implements ActionListener {
-    private String appId;
+    private String appId = "132970916828080";
     private String redirectURI = "http://www.codenameone.com/";
-    private String clientSecret;
+    private String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private String[] permissions;
-    private String postId;
+    private String postId = "290052831046005_244933438934534";
     
     /**
      * Constructor accepting the post id

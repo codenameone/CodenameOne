@@ -208,6 +208,9 @@ public class TimeSpinner extends BaseSpinner {
         }
         removeAll();
         addComponents();
+        if(isInitialized()) {
+            getParent().revalidate();
+        }
     }
 
     /**
