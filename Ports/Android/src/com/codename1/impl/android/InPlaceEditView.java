@@ -31,6 +31,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.TextArea;
@@ -59,7 +60,6 @@ public class InPlaceEditView extends FrameLayout {
     private FrameLayout.LayoutParams mEditLayoutParams;
     // Reference to the system's input method manager
     private InputMethodManager mInputManager;
-
     // True while editing is in progress
     private static boolean mIsEditing = false;
     // Maps Codename One's input-types to Android input-types
@@ -71,8 +71,8 @@ public class InPlaceEditView extends FrameLayout {
     // Only a single instance of this class can exist
     private static InPlaceEditView sInstance = null;
     private static TextArea nextTextArea = null;
-
     private AndroidImplementation impl;
+
     /**
      * Private constructor
      * To use this class, call the static 'edit' method.
@@ -88,7 +88,7 @@ public class InPlaceEditView extends FrameLayout {
         impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         // We place this view as an overlay that takes up the entire screen
         setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
-        setFocusableInTouchMode(true);        
+        setFocusableInTouchMode(true);
         initInputTypeMap();
     }
 
@@ -187,25 +187,25 @@ public class InPlaceEditView extends FrameLayout {
         int paddingRight = taStyle.getPadding(textArea.isRTL(), Component.RIGHT);
         int paddingBottom = taStyle.getPadding(Component.BOTTOM);
 
-        if(textArea instanceof TextField){
+        if (textArea instanceof TextField) {
             switch (textArea.getVerticalAlignment()) {
                 case Component.BOTTOM:
                     paddingTop = textArea.getHeight() - taStyle.getPadding(false, Component.BOTTOM) - font.getHeight();
                     break;
                 case Component.CENTER:
-                    paddingTop =  textArea.getHeight() / 2 - font.getHeight() / 2;
+                    paddingTop = textArea.getHeight() / 2 - font.getHeight() / 2;
                     break;
                 default:
                     paddingTop = taStyle.getPadding(false, Component.TOP);
                     break;
             }
-        }else{
+        } else {
             paddingTop = taStyle.getPadding(false, Component.TOP);
         }
-        
+
         mLastEditText = initialText;
         mEditText = new EditView(activity, this);
-        
+
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);
         // Set the appropriate gravity so that the left and top margins will be
@@ -214,7 +214,7 @@ public class InPlaceEditView extends FrameLayout {
         mEditLayoutParams.setMargins(txtx, txty, 0, 0);
         mEditLayoutParams.width = textArea.getWidth();
         mEditLayoutParams.height = textArea.getHeight();
-        
+
         mEditText.setLayoutParams(mEditLayoutParams);
 
         // Align text to top
@@ -224,13 +224,15 @@ public class InPlaceEditView extends FrameLayout {
 
         mTextArea = textArea;
         Component nextDown = textArea.getComponentForm().findNextFocusVertical(true);
-        if(nextDown != null && nextDown instanceof TextArea){
-            mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-        }else{
-            mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        if (mTextArea.isSingleLineTextArea()) {
+            if (nextDown != null && nextDown instanceof TextArea) {
+                mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+            } else {
+                mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            }
         }
-
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
+        mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
         invalidate();
         setVisibility(VISIBLE);
@@ -239,18 +241,19 @@ public class InPlaceEditView extends FrameLayout {
         mEditText.requestFocus();
 
         Object nativeFont = font.getNativeFont();
-        if(nativeFont == null){
+        if (nativeFont == null) {
             nativeFont = impl.getDefaultFont();
         }
-        Paint p = (Paint) ((Object[])nativeFont)[0];
+        Paint p = (Paint) ((Object[]) nativeFont)[0];
         mEditText.setTypeface(p.getTypeface());
         mEditText.setTextScaleX(p.getTextScaleX());
         mEditText.setTextSize(TypedValue.COMPLEX_UNIT_PX, p.getTextSize());
 
         int fgColor = taStyle.getFgColor();
         mEditText.setTextColor(Color.rgb(fgColor >> 16, (fgColor & 0x00ff00) >> 8, (fgColor & 0x0000ff)));
-        mEditText.setInputType(getAndroidInputType(codenameOneInputType));
-        
+        if (mTextArea.isSingleLineTextArea()) {
+            mEditText.setInputType(getAndroidInputType(codenameOneInputType));
+        }
         showVirtualKeyboard(true);
     }
 
@@ -305,7 +308,7 @@ public class InPlaceEditView extends FrameLayout {
         Display.getInstance().invokeAndBlock(new Runnable() {
 
             public void run() {
-                while(mIsEditing);
+                while (mIsEditing);
             }
         });
         Log.d(TAG, "waitForEditCompletion - Waiting for lock");
@@ -318,19 +321,18 @@ public class InPlaceEditView extends FrameLayout {
         return mLastEditText;
     }
 
-
     /**
      * This method will be called by our EditText control when the action
      * key (Enter/Go/Send) on the soft keyboard will be pressed.
      * @param actionCode
      */
     void onEditorAction(int actionCode) {
-        if(actionCode == EditorInfo.IME_ACTION_NEXT){
+        if (actionCode == EditorInfo.IME_ACTION_NEXT) {
             Component next = mTextArea.getComponentForm().findNextFocusVertical(true);
-            if(next instanceof TextArea){
-                nextTextArea = (TextArea)next;
+            if (next instanceof TextArea) {
+                nextTextArea = (TextArea) next;
             }
-        }        
+        }
         endEditing(REASON_IME_ACTION);
     }
 
@@ -349,11 +351,33 @@ public class InPlaceEditView extends FrameLayout {
         if (sInstance != null) {
             sInstance.endEditing(REASON_UNDEFINED);
             ViewParent p = sInstance.getParent();
-            if(p != null){
+            if (p != null) {
                 ((ViewGroup) p).removeView(sInstance);
             }
             sInstance = null;
         }
+    }
+
+    public static void reLayoutEdit() {
+        if (sInstance != null) {
+
+            TextArea txt = sInstance.mTextArea;
+            if (txt != null) {
+                int txty = txt.getAbsoluteY();
+                int txtx = txt.getAbsoluteX();
+                int w = txt.getWidth();
+                int h = txt.getHeight();
+
+                sInstance.mEditLayoutParams.setMargins(txtx, txty, 0, 0);
+                sInstance.mEditLayoutParams.width = w;
+                sInstance.mEditLayoutParams.height = h;
+                sInstance.mEditText.requestLayout();
+                sInstance.invalidate();
+                sInstance.setVisibility(VISIBLE);
+                sInstance.bringToFront();
+            }
+        }
+
     }
 
     /**
@@ -374,17 +398,17 @@ public class InPlaceEditView extends FrameLayout {
         if (!(component instanceof TextArea)) {
             throw new IllegalArgumentException("component must be instance of TextArea");
         }
-        
+
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
         Dimension prefSize = textArea.getPreferredSize();
         textArea.setText("");
         textArea.setPreferredSize(prefSize);
-        if(textArea instanceof TextField){
-            ((TextField)textArea).setEditable(false);
+        if (textArea instanceof TextField) {
+            ((TextField) textArea).setEditable(false);
         }
         mIsEditing = true;
-        
+
         impl.activity.runOnUiThread(new Runnable() {
 
             @Override
@@ -399,12 +423,12 @@ public class InPlaceEditView extends FrameLayout {
 
         // Make this call synchronous
         waitForEditCompletion();
-        if(textArea instanceof TextField){
-            ((TextField)textArea).setEditable(true);
+        if (textArea instanceof TextField) {
+            ((TextField) textArea).setEditable(true);
         }
         textArea.setPreferredSize(null);
 
-        if(nextTextArea != null){
+        if (nextTextArea != null) {
             final TextArea next = nextTextArea;
             nextTextArea = null;
             next.requestFocus();
@@ -419,9 +443,9 @@ public class InPlaceEditView extends FrameLayout {
             });
         }
 
-        if(sInstance != null){
+        if (sInstance != null) {
             return sInstance.getText();
-        }else{
+        } else {
             return "";
         }
     }
@@ -512,5 +536,5 @@ public class InPlaceEditView extends FrameLayout {
 
             return super.onKeyDown(keyCode, event);
         }
-    }    
+    }
 }

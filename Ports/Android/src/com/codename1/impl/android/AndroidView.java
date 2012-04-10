@@ -60,8 +60,11 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import com.codename1.ui.Component;
+import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 
 public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
 
@@ -190,21 +193,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
 
-        if (this.implementation.editInProgress()) {
-            if (width != w) {
-                    //InPlaceEditView.endEdit();
-            }
-            /**
-             * while edit is in progress a virtual keyboard might
-             * resize everything.  this is problematic because the
-             * editing (as it is implemented now) blocks the EDT.
-             * so we just drop these resize events for now.  once
-             * editing is complete we might apply the last state.
-             */
-            this.implementation.setLastSizeChangedWH(w, h);
-            return;
-        }
-
         this.handleSizeChange(w, h);
     }
 
@@ -226,7 +214,27 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
              */
             return;
         }
+        
+        if (InPlaceEditView.isEditing()) {            
+            final Form f = this.implementation.getCurrentForm();
+            ActionListener orientation = new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    AndroidView.this.implementation.activity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            InPlaceEditView.reLayoutEdit();
+                        }
+                    });
+                    f.removeOrientationListener(this);
+                }
+                
+            };
+            f.addOrientationListener(orientation);
+        }
         Display.getInstance().sizeChanged(w, h);
+        
     }
 
     @Override
