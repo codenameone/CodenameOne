@@ -207,6 +207,13 @@ public class Slider extends Label {
      * @param value new value for progress
      */
     public void setProgress(int value) {
+        if(this.value != value){
+            fireDataChanged(DataChangedListener.CHANGED, value);
+        }
+        setProgressInternal(value);
+    }
+    
+    private void setProgressInternal(int value) {
         this.value = value;
         if(renderValueOnTop) {
             super.setText("" + value);
@@ -220,6 +227,7 @@ public class Slider extends Label {
             }
         }
     }
+    
 
     /**
      * @inheritDoc
@@ -359,10 +367,10 @@ public class Slider extends Label {
         if(vertical) {
             // turn the coordinate to a local coordinate and invert it
             y = Math.abs(getHeight() - (y - getAbsoluteY()));
-            setProgress((byte)(Math.min(100, ((float)y) / ((float)getHeight()) * 100)));
+            setProgressInternal((byte)(Math.min(100, ((float)y) / ((float)getHeight()) * 100)));
         } else {
             x = Math.abs(x - getAbsoluteX());
-            setProgress((byte)(Math.min(100, ((float)x) / ((float)getWidth()) * 100)));
+            setProgressInternal((byte)(Math.min(100, ((float)x) / ((float)getWidth()) * 100)));
         }
         
         if(vertical) {
@@ -408,7 +416,7 @@ public class Slider extends Label {
             per = (byte)(Math.min(100, ((float)x) / ((float)getWidth()) * 100));
         }
         if(per != getProgress()) {
-            setProgress(per);
+            setProgressInternal(per);
 
             if(vertical) {
                 if(previousY < y){
@@ -462,7 +470,7 @@ public class Slider extends Label {
             switch(game) {
                 case Display.GAME_UP:
                     if(vertical) {
-                        setProgress((byte)(Math.min(maxValue, value + increments)));
+                        setProgressInternal((byte)(Math.min(maxValue, value + increments)));
                         fireDataChanged(DataChangedListener.ADDED, value);
                     } else {
                         setHandlesInput(false);
@@ -470,7 +478,7 @@ public class Slider extends Label {
                     break;
                 case Display.GAME_DOWN:
                     if(vertical) {
-                        setProgress((byte)(Math.max(minValue, value - increments)));
+                        setProgressInternal((byte)(Math.max(minValue, value - increments)));
                         fireDataChanged(DataChangedListener.REMOVED, value);
                     } else {
                         setHandlesInput(false);
@@ -478,7 +486,7 @@ public class Slider extends Label {
                     break;
                 case Display.GAME_LEFT:
                     if(!vertical) {
-                        setProgress((byte)(Math.max(minValue, value - increments)));
+                        setProgressInternal((byte)(Math.max(minValue, value - increments)));
                         fireDataChanged(DataChangedListener.REMOVED, value);
                     } else {
                         setHandlesInput(false);
@@ -486,7 +494,7 @@ public class Slider extends Label {
                     break;
                 case Display.GAME_RIGHT:
                     if(!vertical) {
-                        setProgress((byte)(Math.min(maxValue, value + increments)));
+                        setProgressInternal((byte)(Math.min(maxValue, value + increments)));
                         fireDataChanged(DataChangedListener.ADDED, value);
                     } else {
                         setHandlesInput(false);

@@ -22,16 +22,20 @@
  */
 package com.codename1.share;
 
-import com.codename1.components.ContactsList;
+import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
+import com.codename1.contacts.ContactsModel;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.List;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.GenericListCellRenderer;
+import com.codename1.ui.list.ListCellRenderer;
 import java.io.IOException;
+import java.util.Hashtable;
 
 /**
  * SMS Sharing service
@@ -52,6 +56,7 @@ public class SMSShare extends ShareService {
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
         final Form f = new Form("Contacts");
+        f.setScrollable(false);        
         f.setLayout(new BorderLayout());
         f.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
         f.show();
@@ -59,7 +64,9 @@ public class SMSShare extends ShareService {
 
             public void run() {
                 String[] ids = ContactsManager.getAllContactsWithNumbers();
-                final ContactsList contacts = new ContactsList(ids, true);
+                ContactsModel model = new ContactsModel(ids);
+                final List contacts = new List(model);
+                contacts.setRenderer(createListRenderer());
                 Display.getInstance().callSerially(new Runnable() {
 
                     public void run() {
@@ -68,7 +75,9 @@ public class SMSShare extends ShareService {
 
                             public void actionPerformed(ActionEvent evt) {
                                 final ShareForm [] f = new ShareForm[1];
-                                f[0] = new ShareForm("Send SMS", contacts.getSelectedPhoneNumber(), toShare,
+                                final Hashtable contact = (Hashtable) contacts.getSelectedItem();
+                                
+                                f[0] = new ShareForm("Send SMS", (String)contact.get("phone"), toShare,
                                         new ActionListener() {
 
                                             public void actionPerformed(ActionEvent evt) {
@@ -76,7 +85,7 @@ public class SMSShare extends ShareService {
                                                     Display.getInstance().sendSMS(f[0].getTo(), f[0].getMessage());
                                                 } catch (IOException ex) {
                                                     ex.printStackTrace();
-                                                    System.out.println("failed to send sms to " + contacts.getSelectedPhoneNumber());
+                                                    System.out.println("failed to send sms to " + (String)contact.get("phone"));
                                                 }
                                                 currentForm.show();
                                             }
@@ -92,4 +101,20 @@ public class SMSShare extends ShareService {
             }
         }).start();
     }
+    
+    private MultiButton createRendererMultiButton() {
+        MultiButton b = new MultiButton();
+        b.setIconName("icon");
+        b.setNameLine1("displayName");
+        b.setNameLine2("phone");
+        b.setUIID("Label");
+        return b;
+    }
+    
+    private ListCellRenderer createListRenderer() {
+        MultiButton sel = createRendererMultiButton();
+        MultiButton unsel = createRendererMultiButton();
+        return new GenericListCellRenderer(sel, unsel);
+    }
+    
 }
