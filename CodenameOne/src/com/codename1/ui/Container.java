@@ -980,7 +980,7 @@ public class Container extends Component {
                     Form f = getComponentForm();
                     if (f != null && f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
-                        if(r == c.getBounds()) {
+                        if (r == c.getBounds()) {
                             scrollRectToVisible(new Rectangle(0, 0, 
                                     c.getX() + Math.min(c.getWidth(), getWidth()), 
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
@@ -1024,6 +1024,9 @@ public class Container extends Component {
 
             switch (direction) {
                 case Display.GAME_UP:
+                    if(!cyclic && getScrollY() == 0){
+                        return false;
+                    }
                     y = getScrollY() - scrollIncrement;
                     edge = f.findNextFocusUp() == null;
                     currentLarge = (current != null && current.getVisibleBounds().getSize().getHeight() > getHeight());
