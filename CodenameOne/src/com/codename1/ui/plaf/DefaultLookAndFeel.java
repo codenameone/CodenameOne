@@ -51,7 +51,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] chkBoxImagesFocus = null;
     private Image[] rButtonImagesFocus = null;
     private boolean tickWhenFocused = true;
-
+    private char passwordChar = '\u2022'; 
+    
     /** Creates a new instance of DefaultLookAndFeel */
     public DefaultLookAndFeel(UIManager manager) {
         super(manager);
@@ -555,7 +556,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 String displayText = "";
                 if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
                     for (int j = 0; j < rowText.length(); j++) {
-                        displayText += "*";
+                        displayText += passwordChar;
                     }
                 } else {
                     displayText = rowText;
@@ -1232,13 +1233,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (ta.isPendingCommit()) {
                 if (text.length() > 0) {
                     for (int j = 0; j < text.length() - 1; j++) {
-                        displayText += "*";
+                        displayText += passwordChar;
                     }
                     displayText += text.charAt(text.length() - 1);
                 }
             } else {
                 for (int j = 0; j < text.length(); j++) {
-                    displayText += "*";
+                    displayText += passwordChar;
                 }
             }
         } else {

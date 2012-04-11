@@ -316,15 +316,22 @@ public class Form extends Container {
      */
     void sizeChangedInternal(int w, int h) {
         sizeChanged(w, h);
-        if(orientationListener != null) {
-            orientationListener.fireActionEvent(new ActionEvent(this));
-        }
         Style formStyle = getStyle();
         w = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
         h = h - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
         doLayout();
+        focused = getFocused();
+        if(focused != null){
+            boolean isSmooth = isSmoothScrolling();
+            setSmoothScrolling(false);
+            scrollComponentToVisible(focused);
+            setSmoothScrolling(isSmooth);
+        }
+        if(orientationListener != null) {
+            orientationListener.fireActionEvent(new ActionEvent(this));
+        }
         repaint();
     }
 
