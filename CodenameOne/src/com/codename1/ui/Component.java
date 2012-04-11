@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
@@ -917,6 +918,9 @@ public class Component implements Animation, StyleListener {
     }
 
     final void paintInternal(Graphics g, boolean paintIntersects) {
+        Display d = Display.getInstance();
+        CodenameOneImplementation impl = d.getImplementation();
+        impl.beforeComponentPaint(this);
         if (!isVisible()) {
             return;
         }
@@ -926,7 +930,7 @@ public class Component implements Animation, StyleListener {
                 Image i = (Image)paintLockImage;
                 g.drawImage(i, getX(), getY());
             } else {
-                Image i = (Image)Display.getInstance().extractHardRef(paintLockImage);
+                Image i = (Image)d.extractHardRef(paintLockImage);
                 if(i == null) {
                     i = Image.createImage(getWidth(), getHeight());
                     int x = getX();
@@ -936,13 +940,14 @@ public class Component implements Animation, StyleListener {
                     paintInternalImpl(i.getGraphics(), paintIntersects);
                     setX(x);
                     setY(y);
-                    paintLockImage = Display.getInstance().createSoftWeakRef(i);
+                    paintLockImage = d.createSoftWeakRef(i);
                 }
                 g.drawImage(i, getX(), getY());
             }
             return;
         }
         paintInternalImpl(g, paintIntersects);
+        impl.afterComponentPaint(this);
     }
 
     private void paintInternalImpl(Graphics g, boolean paintIntersects) {

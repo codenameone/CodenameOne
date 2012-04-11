@@ -30,6 +30,8 @@
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="imageSize" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="32767" attributes="0"/>
+                      <Component id="editExternal" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
                       <Component id="convertToMultiImage" min="-2" max="-2" attributes="0"/>
                   </Group>
                   <Component id="preview" min="-2" pref="518" max="-2" attributes="0"/>
@@ -56,6 +58,7 @@
                   <Component id="zoom" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="imageSize" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="convertToMultiImage" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="editExternal" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace min="-2" max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
@@ -64,7 +67,7 @@
                       <EmptySpace min="-2" max="-2" attributes="0"/>
                       <Component id="borderPreview" pref="154" max="32767" attributes="0"/>
                   </Group>
-                  <Component id="preview" pref="318" max="32767" attributes="0"/>
+                  <Component id="preview" pref="320" max="32767" attributes="0"/>
               </Group>
               <EmptySpace min="-2" max="-2" attributes="0"/>
           </Group>
@@ -151,6 +154,16 @@
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="convertToMultiImageActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="editExternal">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Edit"/>
+        <Property name="toolTipText" type="java.lang.String" value="Edit the image with an external tool"/>
+        <Property name="name" type="java.lang.String" value="editExternal" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="editExternalActionPerformed"/>
       </Events>
     </Component>
   </SubComponents>

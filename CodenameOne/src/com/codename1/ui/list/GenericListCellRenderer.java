@@ -92,7 +92,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     private boolean selectionListener = true;
     private boolean firstCharacterRTL;
     private boolean fisheye;
-
+    private boolean waitingForRegisterAnimation;
 
     /**
      * Constructs a generic renderer with the given selected/unselected components
@@ -261,13 +261,13 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                 for(int iter = 0 ; iter < entries.length ; iter++) {
                     String currentName = entries[iter].getName();
                     if(currentName.equals("$number")) {
-                        setComponentValue(entries[iter], "" + (index + 1));
+                        setComponentValue(entries[iter], "" + (index + 1), list);
                         continue;
                     }
-                    setComponentValue(entries[iter], h.get(currentName));
+                    setComponentValue(entries[iter], h.get(currentName), list);
                 }
             } else {
-                setComponentValue(entries[0], value);
+                setComponentValue(entries[0], value, list);
             }
             return cmp;
         }
@@ -287,7 +287,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     }
 
     private void setComponentValueWithTickering(Component cmp, Object value, Component l) {
-        setComponentValue(cmp, value);
+        setComponentValue(cmp, value, l);
         if(cmp instanceof Label) {
             if(selectionListener) {
                 if(l instanceof List) {
@@ -322,7 +322,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
      * @param cmp one of the components that is or is a part of the renderer
      * @param value the value to install into the component
      */
-    protected void setComponentValue(Component cmp, Object value) {
+    private void setComponentValue(Component cmp, Object value, Component parent) {
         // fixed components shouldn't be modified by the renderer, this allows for
         // hardcoded properties in the renderer. We still want them to go through the
         // process so renderer selected/unselected styles are applied
@@ -338,10 +338,26 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     }
                     if(!pendingAnimations.contains(i)) {
                         pendingAnimations.addElement(i);
+                        if(parentList == null) {
+                            parentList = parent;
+                        }
                         if(parentList != null) {
                             Form f = parentList.getComponentForm();
                             if(f != null) {
                                 f.registerAnimated(mon);
+                                waitingForRegisterAnimation = false;
+                            } else {
+                                waitingForRegisterAnimation = true;
+                            }
+                        }
+                    } else {
+                        if(waitingForRegisterAnimation) {
+                            if(parentList != null) {
+                                Form f = parentList.getComponentForm();
+                                if(f != null) {
+                                    f.registerAnimated(mon);
+                                    waitingForRegisterAnimation = false;
+                                }
                             }
                         }
                     }
@@ -481,7 +497,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     int s = pendingAnimations.size();
                     for(int iter = 0 ; iter < s ; iter++) {
                         Image i = (Image)pendingAnimations.elementAt(iter);
-                        repaint = repaint || i.animate();
+                        repaint = i.animate() || repaint;
                     }
                     pendingAnimations.removeAllElements();
                 }

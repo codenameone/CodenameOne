@@ -25,6 +25,7 @@
 package com.codename1.designer;
 
 import com.codename1.designer.ResourceEditorView;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Border;
@@ -115,6 +116,7 @@ public class ImageRGBEditor extends BaseForm {
         zoom = new javax.swing.JSpinner();
         imageSize = new javax.swing.JLabel();
         convertToMultiImage = new javax.swing.JButton();
+        editExternal = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -153,6 +155,11 @@ public class ImageRGBEditor extends BaseForm {
         convertToMultiImage.setName("convertToMultiImage"); // NOI18N
         convertToMultiImage.addActionListener(formListener);
 
+        editExternal.setText("Edit");
+        editExternal.setToolTipText("Edit the image with an external tool");
+        editExternal.setName("editExternal"); // NOI18N
+        editExternal.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
@@ -171,6 +178,8 @@ public class ImageRGBEditor extends BaseForm {
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(imageSize)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(editExternal)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(convertToMultiImage))
                     .add(preview, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 518, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -191,14 +200,15 @@ public class ImageRGBEditor extends BaseForm {
                     .add(imageName)
                     .add(zoom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(imageSize)
-                    .add(convertToMultiImage))
+                    .add(convertToMultiImage)
+                    .add(editExternal))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(layout.createSequentialGroup()
                         .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 158, Short.MAX_VALUE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(borderPreview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 154, Short.MAX_VALUE))
-                    .add(preview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 318, Short.MAX_VALUE))
+                    .add(preview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 320, Short.MAX_VALUE))
                 .addContainerGap())
         );
     }
@@ -213,6 +223,9 @@ public class ImageRGBEditor extends BaseForm {
             }
             else if (evt.getSource() == convertToMultiImage) {
                 ImageRGBEditor.this.convertToMultiImageActionPerformed(evt);
+            }
+            else if (evt.getSource() == editExternal) {
+                ImageRGBEditor.this.editExternalActionPerformed(evt);
             }
         }
 
@@ -261,12 +274,16 @@ public class ImageRGBEditor extends BaseForm {
     }
 
     public void selectFile() {
+        File[] c = createChooser();
+        if (c == null) {
+            return;
+        }
+        File selection = c[0];
+        pickFile(selection);
+    }
+
+    private void pickFile(File selection) {
         try {
-            File[] c = createChooser();
-            if (c == null) {
-                return;
-            }
-            File selection = c[0];
             if(renderer != null) {
                 preview.removeAll();
             }
@@ -280,7 +297,7 @@ public class ImageRGBEditor extends BaseForm {
                 "IO Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
+    
     private void findImageUse(Vector users) {
         findImageUse(name, users, res, borderPreview);
     }
@@ -389,11 +406,28 @@ public class ImageRGBEditor extends BaseForm {
         view.setSelectedResource(name);
     }//GEN-LAST:event_convertToMultiImageActionPerformed
 
+    private void editExternalActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editExternalActionPerformed
+        if(getImage() instanceof EncodedImage) {
+            String ext = ".png";
+            byte[] d = ((EncodedImage)getImage()).getImageData();
+            if((d[0] & 0xff) == 0xff && (d[1] & 0xff) == 0xd8) {
+                ext = ".jpeg";
+            }
+            editResource(this, name + "Image", ext, d, new UpdatedFile() {
+                @Override
+                public void fileUpdated(File f) {
+                    pickFile(f);
+                }
+            });
+        }
+    }//GEN-LAST:event_editExternalActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel borderPreview;
     private javax.swing.JList componentList;
     private javax.swing.JButton convertToMultiImage;
+    private javax.swing.JButton editExternal;
     private javax.swing.JButton editImage;
     private javax.swing.JLabel imageName;
     private javax.swing.JLabel imageSize;

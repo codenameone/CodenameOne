@@ -26,8 +26,12 @@ package com.codename1.designer;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Desktop;
 import java.awt.Graphics2D;
 import java.awt.event.MouseEvent;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
@@ -44,6 +48,7 @@ import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.RootPaneContainer;
 import javax.swing.SwingUtilities;
@@ -172,5 +177,42 @@ public class BaseForm extends JPanel {
             addHighlighter(new ColorHighlighter(HighlightPredicate.ROLLOVER_ROW, null, Color.RED));  
             setColumnControlVisible(true);
         }
+    }
+    
+    public static void editResource(java.awt.Component ui, String name, String extension, byte[] data, final UpdatedFile up) {
+        try {
+            final File tempImage = File.createTempFile(name, extension);
+            tempImage.deleteOnExit();
+            
+            FileOutputStream os = new FileOutputStream(tempImage);
+            os.write(data);
+            os.close();
+            Desktop.getDesktop().edit(tempImage);
+            new Thread() {
+                public void run() {
+                    long tstamp = tempImage.lastModified();
+                    File f = ResourceEditorView.getLoadedFile();
+                    while(f == ResourceEditorView.getLoadedFile() && tempImage.exists()) {
+                        if(tstamp != tempImage.lastModified()) {
+                            tstamp = tempImage.lastModified();
+                            up.fileUpdated(tempImage);
+                        }
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }.start();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(ui, "An error occured working with the file: " + ex,
+                    "Error", JOptionPane.ERROR_MESSAGE);            
+        }
+    }
+    
+    public static interface UpdatedFile {
+        public void fileUpdated(File f);
     }
 }

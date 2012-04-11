@@ -4008,4 +4008,19 @@ public abstract class CodenameOneImplementation {
     public void share(String toShare){
     }
 
+    /**
+     * Called before internal paint of component starts
+     * 
+     * @param c the component about to be painted
+     */
+    public void beforeComponentPaint(Component c) {
+    }
+
+    /**
+     * Called after internal paint of component finishes
+     * 
+     * @param c the component that was painted
+     */
+    public void afterComponentPaint(Component c) {
+    }
 }

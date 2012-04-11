@@ -394,37 +394,13 @@ private void toJpegActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
 }//GEN-LAST:event_toJpegActionPerformed
 
 private void editExternalActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editExternalActionPerformed
-        try {
-            final File tempImage = File.createTempFile("Image", ".png");
-            tempImage.deleteOnExit();
-            com.codename1.ui.EncodedImage img = getByDPI(multi, DPIS[dpi.getSelectedIndex()]);
-            
-            FileOutputStream os = new FileOutputStream(tempImage);
-            os.write(img.getImageData());
-            os.close();
-            Desktop.getDesktop().edit(tempImage);
-            new Thread() {
-                public void run() {
-                    long tstamp = tempImage.lastModified();
-                    File f = ResourceEditorView.getLoadedFile();
-                    while(f == ResourceEditorView.getLoadedFile() && tempImage.exists()) {
-                        if(tstamp != tempImage.lastModified()) {
-                            tstamp = tempImage.lastModified();
-                            pickFile(tempImage);
-                        }
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                }
-            }.start();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "An error occured working with the file: " + ex,
-                    "Error", JOptionPane.ERROR_MESSAGE);            
-        }
+    com.codename1.ui.EncodedImage img = getByDPI(multi, DPIS[dpi.getSelectedIndex()]);
+    editResource(this, name + "Image", ".png", img.getImageData(), new UpdatedFile() {
+            @Override
+            public void fileUpdated(File f) {
+                pickFile(f);
+            }
+        });
 }//GEN-LAST:event_editExternalActionPerformed
 
     public static EditableResources.MultiImage scaleMultiImage(int fromDPI, int toDPI, int scaledWidth, int scaledHeight, EditableResources.MultiImage multi) {

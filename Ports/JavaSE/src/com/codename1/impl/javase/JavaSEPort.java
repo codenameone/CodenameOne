@@ -170,11 +170,23 @@ public class JavaSEPort extends CodenameOneImplementation {
     private String platformName;
     private String[] platformOverrides = new String[0];
     private static NetworkMonitor netMonitor;
-
+    private static PerformanceMonitor perfMonitor;
+    private static boolean blockMonitors;
+    
+    public static void blockMonitors() {
+        blockMonitors = true;
+    }
+    
     static void disableNetworkMonitor() {
         netMonitor = null;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("NetworkMonitor", false);
+    }
+    
+    static void disablePerformanceMonitor() {
+        perfMonitor = null;
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        pref.putBoolean("PerformanceMonitor", false);
     }
     
     public static void setBaseResourceDir(File f) {
@@ -964,6 +976,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(networkMonitor);
+
+            MenuItem performanceMonitor = new MenuItem("Performance Monitor");
+            performanceMonitor.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    if(perfMonitor == null) {
+                        showPerformanceMonitor();
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        pref.putBoolean("PerformanceMonitor", true);
+                    }
+                }
+            });
+            simulatorMenu.add(performanceMonitor);
             
             Menu skinMenu = new Menu("Skins");
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -1139,6 +1164,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void showPerformanceMonitor() {
+        if(perfMonitor == null) {
+            perfMonitor = new PerformanceMonitor();
+            perfMonitor.pack();
+            perfMonitor.setLocationByPlatform(true);
+            perfMonitor.setVisible(true);
+        }
+    }
+
     private void addSkinName(String f) {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
@@ -1234,8 +1268,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        if(pref.getBoolean("NetworkMonitor", false)) {
+        if(!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
+        }
+        if(!blockMonitors && pref.getBoolean("PerformanceMonitor", false)) {
+            showPerformanceMonitor();
         }
         if (defaultInitTarget != null && m == null) {
             m = defaultInitTarget;
@@ -1522,16 +1559,56 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
         ((BufferedImage) nativeImage).getRGB(x, y, width, height, arr, offset, width);
     }
-
+    
+    private BufferedImage createTrackableBufferedImage(final int width, final int height) {
+        return createTrackableBufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+    }
+    private BufferedImage createTrackableBufferedImage(final int width, final int height, int type) {
+        if(perfMonitor != null) {
+            BufferedImage i = new BufferedImage(width, height, type) {
+                public void finalize() throws Throwable {
+                    super.finalize();
+                    if(perfMonitor != null) {
+                        perfMonitor.removeImageRAM(width * height * 4);
+                    }
+                }
+            };
+            perfMonitor.addImageRAM(width * height * 4);
+            return i;
+        } else {
+            return new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        }
+    }
+    
     /**
      * @inheritDoc
      */
-    public Object createImage(int[] rgb, int width, int height) {
-        BufferedImage i = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+    public Object createImage(int[] rgb, final int width, final int height) {
+        BufferedImage i = createTrackableBufferedImage(width, height);
         i.setRGB(0, 0, width, height, rgb, 0, width);
+        if(perfMonitor != null) {
+            perfMonitor.printToLog("Created RGB image width: " + width + " height: " + height + 
+                    " size (bytes) " + (width * height * 4));
+        }
         return i;
     }
 
+    private BufferedImage cloneTrackableBufferedImage(BufferedImage b) {
+        final int width = b.getWidth();
+        final int height = b.getHeight();
+        BufferedImage n = new BufferedImage(width, height, b.getType()) {
+            public void finalize() throws Throwable {
+                super.finalize();
+                if(perfMonitor != null) {
+                    perfMonitor.removeImageRAM(width * height * 4);
+                }
+            }
+        };
+        perfMonitor.addImageRAM(width * height * 4);
+        n.setData(b.getRaster());
+        return n;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -1551,7 +1628,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             // prevents a security exception due to a JDK bug which for some stupid reason chooses
             // to create a temporary file in the spi of Image IO
-            return ImageIO.read(new MemoryCacheImageInputStream(i));
+            BufferedImage b = ImageIO.read(new MemoryCacheImageInputStream(i));
+            if(perfMonitor != null) {
+                b = cloneTrackableBufferedImage(b);
+                perfMonitor.printToLog("Created path image " + path + " width: " + b.getWidth() + " height: " +b.getHeight() + 
+                        " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+            }
+            return b;
         } catch (Throwable t) {
             t.printStackTrace();
             throw new IOException(t.toString());
@@ -1563,7 +1646,13 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object createImage(InputStream i) throws IOException {
         try {
-            return ImageIO.read(i);
+            BufferedImage b = ImageIO.read(i);
+            if(perfMonitor != null) {
+                b = cloneTrackableBufferedImage(b);
+                perfMonitor.printToLog("Created InputStream image width: " + b.getWidth() + " height: " +b.getHeight() + 
+                        " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+            }
+            return b;
         } catch (Throwable t) {
             t.printStackTrace();
             throw new IOException(t.toString());
@@ -1574,16 +1663,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createMutableImage(int width, int height, int fillColor) {
+        if(perfMonitor != null) {
+            perfMonitor.printToLog("Created mutable image width: " + width + " height: " + height + 
+                    " size (bytes) " + (width * height * 4));
+        }
         int a = (fillColor >> 24) & 0xff;
         if (a == 0xff) {
-            BufferedImage b = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            BufferedImage b = createTrackableBufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
             Graphics2D g = b.createGraphics();
             g.setColor(new Color(fillColor));
             g.fillRect(0, 0, width, height);
             g.dispose();
             return b;
         }
-        BufferedImage b = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage b = createTrackableBufferedImage(width, height);
         if (a != 0) {
             Graphics2D g = b.createGraphics();
             g.setColor(new Color(fillColor));
@@ -1605,7 +1698,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object createImage(byte[] bytes, int offset, int len) {
         try {
-            return ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
+            BufferedImage b = ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
+            if(perfMonitor != null) {
+                b = cloneTrackableBufferedImage(b);
+                perfMonitor.printToLog("Created data image width: " + b.getWidth() + " height: " + b.getHeight() + 
+                        " data size (bytes) " + bytes.length + 
+                        " unpacked size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+            }
+            return b;
         } catch (IOException ex) {
             // never happens
             ex.printStackTrace();
@@ -1641,6 +1741,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage image = (BufferedImage) nativeImage;
         int srcWidth = image.getWidth();
         int srcHeight = image.getHeight();
+
+        if(perfMonitor != null) {
+            perfMonitor.printToLog("Scaling image from width: " + srcWidth + " height: " + srcHeight + 
+                    " to width: " + width + " height: " + height + 
+                    " size (bytes) " + (width * height * 4));
+        }
 
         // no need to scale
         if (srcWidth == width && srcHeight == height) {
@@ -2765,7 +2871,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFiles(String directory) throws IOException {
-        return new File(directory).list();
+        return new File(unfile(directory)).list();
     }
 
     /**
@@ -2786,21 +2892,28 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void mkdir(String directory) {
-        new File(directory).mkdirs();
+        new File(unfile(directory)).mkdirs();
     }
 
+    private String unfile(String file) {
+        if(file.startsWith("file://")) {
+            return file.substring(7);
+        }
+        return file;
+    }
+    
     /**
      * @inheritDoc
      */
     public void deleteFile(String file) {
-        new File(file).delete();
+        new File(unfile(file)).delete();
     }
 
     /**
      * @inheritDoc
      */
     public boolean isHidden(String file) {
-        return new File(file).isHidden();
+        return new File(unfile(file)).isHidden();
     }
 
     /**
@@ -2813,14 +2926,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public long getFileLength(String file) {
-        return new File(file).length();
+        return new File(unfile(file)).length();
     }
 
     /**
      * @inheritDoc
      */
     public boolean isDirectory(String file) {
-        return new File(file).isDirectory();
+        return new File(unfile(file)).isDirectory();
     }
 
     /**
@@ -2834,28 +2947,28 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
-        return new FileOutputStream(file);
+        return new FileOutputStream(unfile(file));
     }
 
     /**
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
-        return new FileInputStream(file);
+        return new FileInputStream(unfile(file));
     }
 
     /**
      * @inheritDoc
      */
     public boolean exists(String file) {
-        return new File(file).exists();
+        return new File(unfile(file)).exists();
     }
 
     /**
      * @inheritDoc
      */
     public void rename(String file, String newName) {
-        new File(file).renameTo(new File(new File(file).getParentFile(), newName));
+        new File(unfile(file)).renameTo(new File(new File(file).getParentFile(), newName));
     }
 
     /**
@@ -3403,5 +3516,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return super.getResourceAsStream(cls, resource);
+    }
+
+    public void beforeComponentPaint(Component c) {
+        if(perfMonitor != null) {
+            perfMonitor.beforeComponentPaint(c);
+        }
+    }
+
+    public void afterComponentPaint(Component c) {
+        if(perfMonitor != null) {
+            perfMonitor.afterComponentPaint(c);
+        }
     }
 }

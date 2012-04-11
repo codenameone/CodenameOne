@@ -328,6 +328,9 @@ public class UIBuilder {
      * @return a Codename One container instance
      */
     public Container createContainer(String resPath, String resourceName) {
+        if(this.resourceFilePath == null || (!this.resourceFilePath.equals(resPath))) {
+            resourceFile = null;
+        } 
         setResourceFilePath(resPath);
         return createContainer(fetchResourceFile(), resourceName);
     }

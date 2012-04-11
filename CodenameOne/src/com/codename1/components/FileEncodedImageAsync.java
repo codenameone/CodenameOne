@@ -74,13 +74,7 @@ public class FileEncodedImageAsync extends EncodedImage {
     protected Image getInternal() {
         if(imageData == null) {
             if(!queued) {
-                if(getImageData() != null) {
-                    Image i = super.getInternal();
-                    if(i != null) {
-                        imageCreated = true;
-                        return i;
-                    }
-                }
+                getImageData();
             }
             return placeholderImage;
         }

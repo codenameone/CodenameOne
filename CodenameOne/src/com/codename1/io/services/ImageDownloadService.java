@@ -41,6 +41,8 @@ import com.codename1.components.StorageImage;
 import com.codename1.components.StorageImageAsync;
 import com.codename1.ui.Component;
 import com.codename1.ui.list.ContainerList;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListModel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Hashtable;
@@ -239,16 +241,22 @@ public class ImageDownloadService extends ConnectionRequest {
         Image im = cacheImage(null, destFile, toScale, placeholderImage);
         if (im != null) {
             Hashtable h;
+            ListModel model;
             if(targetList instanceof List) {
-                h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+                model = ((List)targetList).getModel();
             } else {
-                h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+                model = ((ContainerList)targetList).getModel();
             }
+            h = (Hashtable)model.getItemAt(targetOffset);
             if(!fastScale && toScale != null){
                 im = im.scaled(toScale.getWidth(), toScale.getHeight());
             }
             h.put(targetKey, im);
-            targetList.repaint();
+            if(model instanceof DefaultListModel) {
+                 ((DefaultListModel)model).setItem(targetOffset, h);
+            } else {
+                targetList.repaint();
+            }
             return;
         }
         //image not found on cache go and download from the url
@@ -336,16 +344,22 @@ public class ImageDownloadService extends ConnectionRequest {
         Image im = cacheImage(cacheId, null, scale, placeholderImage);
         if (im != null) {
             Hashtable h;
+            ListModel model;
             if(targetList instanceof List) {
-                h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+                model = ((List)targetList).getModel();
             } else {
-                h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+                model = ((ContainerList)targetList).getModel();
             }
+            h = (Hashtable)model.getItemAt(targetOffset);
             if(!fastScale && scale != null){
                 im = im.scaled(scale.getWidth(), scale.getHeight());
             }
             h.put(targetKey, im);
-            targetList.repaint();
+            if(model instanceof DefaultListModel) {
+                 ((DefaultListModel)model).setItem(targetOffset, h);
+            } else {
+                targetList.repaint();
+            }
             return;
         }
         //image not found on cache go and download from the url
@@ -576,11 +590,13 @@ public class ImageDownloadService extends ConnectionRequest {
         } else {
             if(targetList != null) {
                 Hashtable h;
+                ListModel model;
                 if(targetList instanceof List) {
-                    h = (Hashtable)((List)targetList).getModel().getItemAt(targetOffset);
+                    model = ((List)targetList).getModel();
                 } else {
-                    h = (Hashtable)((ContainerList)targetList).getModel().getItemAt(targetOffset);
+                    model = ((ContainerList)targetList).getModel();
                 }
+                h = (Hashtable)model.getItemAt(targetOffset);
                 h.put(targetKey, image);
                 
                 // revalidate only once to avoid multiple revalidate refreshes during scroll
@@ -592,7 +608,11 @@ public class ImageDownloadService extends ConnectionRequest {
                             targetList.putClientProperty("$imgDSReval", Boolean.TRUE);
                             targetList.getParent().revalidate();
                         } else {
-                            targetList.repaint();
+                            if(model instanceof DefaultListModel) {
+                                 ((DefaultListModel)model).setItem(targetOffset, h);
+                            } else {
+                                targetList.repaint();
+                            }
                         }
                     }
                 }
