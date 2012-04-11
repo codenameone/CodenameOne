@@ -1604,8 +1604,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         };
+        Graphics2D g2d = n.createGraphics();
+        g2d.drawImage(b, 0, 0, null);
+        g2d.dispose();
         perfMonitor.addImageRAM(width * height * 4);
-        n.setData(b.getRaster());
         return n;
     }
     
