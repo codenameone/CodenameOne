@@ -25,8 +25,6 @@ package com.codename1.ui.spinner;
 import com.codename1.ui.Component;
 import com.codename1.ui.List;
 import com.codename1.ui.list.DefaultListCellRenderer;
-import java.util.Calendar;
-import java.util.Date;
 
 /**
  * Allows selecting a time of day either in 24 hour batches or AM/PM format
@@ -43,6 +41,7 @@ public class TimeSpinner extends BaseSpinner {
     private int endHour = 13;
     private int minuteStep = 5;
 
+    private boolean durationMode;
     private boolean showMeridiem = true;
     private int currentHour = 8;
     private int currentMinute = 0;
@@ -122,20 +121,26 @@ public class TimeSpinner extends BaseSpinner {
      * @inheritDoc
      */
     public String[] getPropertyNames() {
-        return new String[] {"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem"};
+        return new String[] {"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem", "durationMode"};
     }
 
     /**
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
+       return new Class[] {Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};
     }
 
     /**
      * @inheritDoc
      */
     public Object getPropertyValue(String name) {
+        if(name.equals("durationMode")) {
+            if(durationMode) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
         if(name.equals("currentHour")) {
             return new Integer(currentHour);
         }
@@ -146,10 +151,16 @@ public class TimeSpinner extends BaseSpinner {
             return new Integer(minuteStep);
         }
         if(name.equals("currentMeridiem")) {
-            return new Boolean(currentMeridiem);
+            if(currentMeridiem) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
         }
         if(name.equals("showMeridiem")) {
-            return new Boolean(showMeridiem);
+            if(showMeridiem) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
         }
         return null;
     }
@@ -178,6 +189,10 @@ public class TimeSpinner extends BaseSpinner {
             setShowMeridiem(((Boolean)value).booleanValue());
             return null;
         }
+        if(name.equals("durationMode")) {
+            setDurationMode(((Boolean)value).booleanValue());
+            return null;
+        }
         
         return super.setPropertyValue(name, value);
     }
@@ -203,13 +218,16 @@ public class TimeSpinner extends BaseSpinner {
      * @return the showMeridiem
      */
     public boolean isShowMeridiem() {
-        return showMeridiem;
+        return showMeridiem && !durationMode;
     }
 
     /**
      * @param showMeridiem the showMeridiem to set
      */
     public void setShowMeridiem(boolean showMeridiem) {
+        if(durationMode) {
+            return;
+        }
         this.showMeridiem = showMeridiem;
         if(showMeridiem) {
             startHour = 1;
@@ -272,6 +290,9 @@ public class TimeSpinner extends BaseSpinner {
      * @return the currentMeridiem
      */
     public boolean isCurrentMeridiem() {
+        if(durationMode) {
+            return false;
+        }
         if(amPM != null) {
             return ((Integer)amPM.getValue()).intValue() != 0;
         } 
@@ -282,11 +303,43 @@ public class TimeSpinner extends BaseSpinner {
      * @param currentMeridiem the currentMeridiem to set
      */
     public void setCurrentMeridiem(boolean currentMeridiem) {
+        if(durationMode) {
+            return;
+        }
         this.currentMeridiem = currentMeridiem;
         if(currentMeridiem) {
             amPM.setValue(new Integer(1));
         } else {
             amPM.setValue(new Integer(0));
         }
+    }
+
+    /**
+     * Duration mode uses the time spinner to indicate a duration in hours and minutes
+     * @return the durationMode
+     */
+    public boolean isDurationMode() {
+        return durationMode;
+    }
+
+    /**
+     * Duration mode uses the time spinner to indicate a duration in hours and minutes
+     * @param durationMode the durationMode to set
+     */
+    public void setDurationMode(boolean durationMode) {
+        if(durationMode) {
+            setShowMeridiem(false);
+            startHour = 0;
+            endHour = 24;
+        } else {
+            if(showMeridiem) {
+                startHour = 1;
+                endHour = 13;
+            } else {
+                startHour = 0;
+                endHour = 24;
+            }
+        }
+        this.durationMode = durationMode;
     }
 }
