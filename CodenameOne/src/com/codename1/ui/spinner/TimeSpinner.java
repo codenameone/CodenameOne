@@ -67,6 +67,20 @@ public class TimeSpinner extends BaseSpinner {
             } else {
                 amPM = Spinner.create(0, 2, 0, 1);
             }
+            ((DefaultListCellRenderer)hour.getRenderer()).setRightAlignNumbers(true);
+            DefaultListCellRenderer twoDigitRender = new DefaultListCellRenderer(false) {
+                public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+                    if(value != null && value instanceof Integer) {
+                        int i = ((Integer)value).intValue();
+                        if(i < 10) {
+                            value = "0" + i;
+                        }
+                    }
+                    return super.getListCellRendererComponent(list, value, index, isSelected);
+                }                
+            };
+            minute.setRenderer(twoDigitRender);
+            
             DefaultListCellRenderer render = new DefaultListCellRenderer(false) {
                 public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                     if(value != null && value instanceof Integer) {
@@ -83,6 +97,7 @@ public class TimeSpinner extends BaseSpinner {
             amPM.setRenderer(render);
             render.setRTL(false);
             render.setShowNumbers(false);
+            twoDigitRender.setUIID("SpinnerRenderer");
             render.setUIID("SpinnerRenderer");
             amPM.setRenderingPrototype("WW");
 

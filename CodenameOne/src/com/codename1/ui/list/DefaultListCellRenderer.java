@@ -28,6 +28,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.Hashtable;
 
@@ -42,6 +43,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
     private boolean showNumbersForce;
     private static boolean showNumbersDefault = true;
     private Label focusComponent = new Label();
+    private boolean rightAlignNumbers;
     
     /** 
      * Creates a new instance of DefaultCellRenderer 
@@ -112,7 +114,17 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
             }
         } else {
             if(value != null) {
-                setText(value.toString());
+                String v = value.toString();
+                setText(v);
+                if(isRightAlignNumbers()) {
+                    char c = v.charAt(0);
+                    Style s = getStyle();
+                    if(c >= '0' && c <= '9') {
+                        s.setAlignment(RIGHT);
+                    } else {
+                        s.setAlignment(LEFT);
+                    }
+                }
             } else {
                 setText("null");
             }
@@ -206,5 +218,19 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      */
     public Component getFocusComponent(Component list) {
         return focusComponent;
+    }
+
+    /**
+     * @return the rightAlignNumbers
+     */
+    public boolean isRightAlignNumbers() {
+        return rightAlignNumbers;
+    }
+
+    /**
+     * @param rightAlignNumbers the rightAlignNumbers to set
+     */
+    public void setRightAlignNumbers(boolean rightAlignNumbers) {
+        this.rightAlignNumbers = rightAlignNumbers;
     }
 }
