@@ -23,8 +23,6 @@
  */
 package com.codename1.ui.html;
 
-import com.codename1.ui.html.DefaultDocumentRequestHandler;
-import com.codename1.ui.html.DocumentInfo;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;

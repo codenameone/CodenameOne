@@ -539,9 +539,6 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
         setLayout(new BorderLayout());
         this.handler=handler;
         threadQueue=new ResourceThreadQueue(this);
-        if (eventsEnabled) {
-            eventsListener=new HTMLEventsListener(this);
-        }
         setHandlesInput(true);
         setScrollableY(true);
         setScrollableX(false);
@@ -583,6 +580,15 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
         return handler;
     }
 
+    /**
+     * Changes the document request handler
+     * 
+     * @param handler the new document request handler
+     */
+    public void setRequestHandler(DocumentRequestHandler handler) {
+        this.handler = handler;
+    }
+    
     /**
      * Returns the DocumentInfo that currently represents the document loaded/shown
      *
@@ -1187,7 +1193,7 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
      * @return true if events are enabled, false if not
      */
     public boolean isEventsEnabled() {
-        return isEventsEnabled();
+        return eventsEnabled;
     }
 
     /**

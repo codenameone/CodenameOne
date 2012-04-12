@@ -59,6 +59,7 @@ public class Oauth2 {
 
     public static final String TOKEN = "access_token";
     private String token;
+    private static String expires;
     private String clientId;
     private String redirectURI;
     private String scope;
@@ -92,6 +93,15 @@ public class Oauth2 {
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope,
             String tokenRequestURL, String clientSecret) {
         this(oauth2URL, clientId, redirectURI, scope, tokenRequestURL, clientSecret, null);
+    }
+    
+    /**
+     * Returns the expiry for the token received via oauth
+     * 
+     * @return the expires argument for the token
+     */
+    public static String getExpires() {
+        return expires;
     }
 
     /**
@@ -227,8 +237,16 @@ public class Oauth2 {
 
                             protected void readResponse(InputStream input) throws IOException {
                                 byte[] tok = Util.readInputStream(input);
-                                token = new String(tok);
-                                token = token.substring(token.indexOf("=") + 1, token.indexOf("&"));
+                                String t = new String(tok);
+                                token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
+                                int off = t.indexOf("expires=");
+                                if(off > -1) {
+                                    int end = t.indexOf('&', off);
+                                    if(end < 0 || end < off) {
+                                        end = t.length();
+                                    }
+                                    expires = t.substring(off + 8, end);
+                                }
                                 if(login != null) {
                                     login.dispose();
                                 }
