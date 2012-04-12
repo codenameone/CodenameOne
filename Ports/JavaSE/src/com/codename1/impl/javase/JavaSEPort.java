@@ -95,6 +95,7 @@ import com.codename1.media.Media;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
+import java.awt.MediaTracker;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -321,6 +322,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         boolean painted;
         private Graphics2D g2dInstance;
         private java.awt.Dimension forcedSize;
+        private boolean releaseLock;
 
         C() {
             addKeyListener(this);
@@ -526,6 +528,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void mousePressed(MouseEvent e) {
             e.consume();
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
+                releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidth() && y >= 0 && y < getDisplayHeight()) {
@@ -592,13 +595,20 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseDragged(MouseEvent e) {
             e.consume();
-            if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
+            if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidth() && y >= 0 && y < getDisplayHeight()) {
                     if (touchDevice) {
                         JavaSEPort.this.pointerDragged(x, y);
                     }
+                } else {
+                    x = Math.min(x, getDisplayWidth());
+                    x = Math.max(x, 0);
+                    y = Math.min(y, getDisplayHeight());
+                    y = Math.max(y, 0);
+                    JavaSEPort.this.pointerReleased(x, y);
+                    releaseLock = true;
                 }
             }
         }
@@ -1017,6 +1027,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 netMonitor.dispose();
                                 netMonitor = null;
                             }
+                            if(perfMonitor != null) {
+                                perfMonitor.dispose();
+                                perfMonitor = null;
+                            }
                             String mainClass = System.getProperty("MainClass");
                             if (mainClass != null) {
                                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -1054,6 +1068,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if(netMonitor != null) {
                             netMonitor.dispose();
                             netMonitor = null;
+                        }
+                        if(perfMonitor != null) {
+                            perfMonitor.dispose();
+                            perfMonitor = null;
                         }
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
@@ -1596,7 +1614,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private BufferedImage cloneTrackableBufferedImage(BufferedImage b) {
         final int width = b.getWidth();
         final int height = b.getHeight();
-        BufferedImage n = new BufferedImage(width, height, b.getType()) {
+        BufferedImage n = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB) {
             public void finalize() throws Throwable {
                 super.finalize();
                 if(perfMonitor != null) {
@@ -1605,7 +1623,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         };
         Graphics2D g2d = n.createGraphics();
-        g2d.drawImage(b, 0, 0, null);
+        g2d.drawImage(b, 0, 0, canvas);
         g2d.dispose();
         perfMonitor.addImageRAM(width * height * 4);
         return n;
