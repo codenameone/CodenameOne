@@ -1838,10 +1838,10 @@ public class List extends Component {
                 float speed = Display.getInstance().getDragSpeed(vertical);
                 if (vertical) {
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           getElementSize(false, true).getHeight()*getModel().getSize() , speed, 0.0004f);
+                           Integer.MAX_VALUE, speed, 0.0004f);
                 }else{
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           getElementSize(false, true).getWidth()*getModel().getSize() , speed, 0.0004f);
+                           Integer.MAX_VALUE , speed, 0.0004f);
                 }
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
                 Form p = getComponentForm();
@@ -1962,13 +1962,13 @@ public class List extends Component {
         // parent is performing the animation we shouldn't do anything in this case
         // this is the scrolling animation which we don't want to interfear with
         boolean parentFinished = super.animate();
-        if ((animationPosition != 0)&& listMotion != null && !isDragActivated()) {
+        if ((animationPosition != 0) && listMotion != null && !isDragActivated()) {
             if (animationPosition < 0) {
                 animationPosition = Math.min(listMotion.getValue() - destination, 0);
             } else {
                 animationPosition = Math.max(destination - listMotion.getValue(), 0);
             }
-            if(animationPosition == 0) {
+            if (animationPosition == 0) {
                 listMotion = null;
                 deregisterAnimatedInternal();
             }
@@ -1977,48 +1977,77 @@ public class List extends Component {
         if (fixedDraggedMotion != null) {
             int val = -fixedDraggedMotion.getValue();
             fixedDraggedAnimationPosition = fixedDraggedAnimationPosition - (fixedDraggedPosition - val);
-            fixedDraggedPosition = val; 
+            fixedDraggedPosition = val;
             Dimension size = getElementSize(false, true);
             int s;
-            if(orientation == VERTICAL){
+            if (orientation == VERTICAL) {
                 s = size.getHeight();
-            }else{
+            } else {
                 s = size.getWidth();
             }
-            if (fixedDraggedAnimationPosition <= -s) {
-                fixedDraggedSelection++;
-                if (fixedDraggedSelection >= model.getSize()) {
-                    fixedDraggedSelection = 0;
-                }
-                fixedDraggedPosition = val;
-            }else if (fixedDraggedAnimationPosition >= s) {
-                fixedDraggedSelection--;
-                if (fixedDraggedSelection < 0) {
-                    fixedDraggedSelection = model.getSize() - 1;
-                }
-                fixedDraggedPosition = val;
-            }
-            fixedDraggedAnimationPosition = fixedDraggedAnimationPosition % s;
-            
+
             if (fixedDraggedMotion.isFinished()) {
                 deregisterAnimatedInternal();
+                //if after dragging the list is in the middle check which item
+                //is the closest and animate to it.
+                if (fixedDraggedAnimationPosition <= -s / 2) {
+                    fixedDraggedSelection++;
+                    if (fixedDraggedSelection >= model.getSize()) {
+                        fixedDraggedSelection = 0;
+                    }
+                } else if (fixedDraggedAnimationPosition >= s / 2) {
+                    fixedDraggedSelection--;
+                    if (fixedDraggedSelection < 0) {
+                        fixedDraggedSelection = model.getSize() - 1;
+                    }
+                }
+
                 if (fixedDraggedAnimationPosition != 0) {
                     if (fixedDraggedAnimationPosition < 0) {
-                        destination = -fixedDraggedAnimationPosition;
+                        if (fixedDraggedAnimationPosition < -s / 2) {
+                            destination = s+fixedDraggedAnimationPosition;
+                            animationPosition = destination;
+                        } else {
+                            destination = -fixedDraggedAnimationPosition;
+                            animationPosition = fixedDraggedAnimationPosition;
+                        }
+                        
                     } else {
-                        destination = fixedDraggedAnimationPosition;
+                        if (fixedDraggedAnimationPosition > s / 2) {
+                            destination = (s-fixedDraggedAnimationPosition);
+                            animationPosition = -destination;
+                        } else {
+                            destination = fixedDraggedAnimationPosition;
+                            animationPosition = fixedDraggedAnimationPosition;
+                        }
                     }
-                    animationPosition = fixedDraggedAnimationPosition;
                     initListMotion();
                     fixedDraggedAnimationPosition = 0;
                 }
-                
                 // this happens when dragging an empty list causing an exception on a negative selection
-                if(fixedDraggedSelection >= 0 && fixedDraggedSelection < getModel().getSize()) { 
-                    setSelectedIndex(fixedDraggedSelection);
+                if (fixedDraggedSelection >= 0 && fixedDraggedSelection < getModel().getSize()) {
+                    setSelectedIndex(fixedDraggedSelection, false);
                 }
                 setDragActivated(false);
                 fixedDraggedMotion = null;
+                return false;
+            } else {
+                if (fixedDraggedAnimationPosition <= -s) {
+                    fixedDraggedSelection++;
+                    if (fixedDraggedSelection >= model.getSize()) {
+                        fixedDraggedSelection = 0;
+                    }
+                    fixedDraggedPosition = val;
+                } else if (fixedDraggedAnimationPosition >= s) {
+                    fixedDraggedSelection--;
+                    if (fixedDraggedSelection < 0) {
+                        fixedDraggedSelection = model.getSize() - 1;
+                    }
+                    fixedDraggedPosition = val;
+                }
+                fixedDraggedAnimationPosition = fixedDraggedAnimationPosition % s;
+
+
             }
             return true;
         }
