@@ -180,6 +180,7 @@ public class Oauth2 {
         InfiniteProgress inf = new InfiniteProgress();
         Dialog progress = inf.showInifiniteBlocking();
         Form authenticationForm = new Form("Login");
+        authenticationForm.setScrollable(false);
         final Form old = Display.getInstance().getCurrent();
         if(old != null) {
             Command cancel = new Command("Cancel") {

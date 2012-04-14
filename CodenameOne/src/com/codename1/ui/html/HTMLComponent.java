@@ -965,6 +965,7 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
         //clickTimer(null);
         this.docInfo=docInfo; // Moved here since when getting CSS imports in embedded style segments, we need to know the relative URL
 
+        this.pageURL = docInfo.getFullUrl();
         if (handler instanceof AsyncDocumentRequestHandler) {
                setPageStatus(HTMLCallback.STATUS_REQUESTED);
                ((AsyncDocumentRequestHandler)handler).resourceRequestedAsync(docInfo,HTMLComponent.this);
