@@ -27,6 +27,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
@@ -117,6 +118,10 @@ public class ContainerList extends Container {
                 while(getComponentCount() > modelCount) {
                     removeComponent(getComponentAt(getComponentCount() - 1));
                 }
+            }
+            Form f = getComponentForm();
+            if(f != null) {
+                f.revalidate();
             }
         }
     }
