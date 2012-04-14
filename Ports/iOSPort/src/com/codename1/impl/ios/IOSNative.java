@@ -156,7 +156,7 @@ public class IOSNative {
     public static native void releasePeer(long peer);
     public static native void retainPeer(long peer);
 
-    public static native long createBrowserComponent();
+    public static native long createBrowserComponent(Object bc);
 
     public static native void setBrowserPage(long browserPeer, String html, String baseUrl);
 

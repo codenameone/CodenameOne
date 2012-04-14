@@ -36,6 +36,7 @@ import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -2613,4 +2614,12 @@ public final class Display {
         impl.share(toShare);
     }
     
+    /**
+     * Returns the localization manager instance for this platform
+     * 
+     * @return an instance of the localization manager
+     */
+    public L10NManager getLocalizationManager() {
+        return impl.getLocalizationManager();
+    }
 }

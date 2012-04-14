@@ -90,9 +90,11 @@ import net.rim.device.api.servicebook.ServiceRecord;
 import com.codename1.io.NetworkManager;
 
 // requires signing
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import java.util.Date;
 import javax.microedition.io.Datagram;
 import javax.microedition.io.DatagramConnection;
 import javax.wireless.messaging.MessageConnection;
@@ -112,6 +114,8 @@ import net.rim.device.api.system.CodeModuleGroupManager;
 import net.rim.blackberry.api.phone.Phone;
 import net.rim.device.api.applicationcontrol.ApplicationPermissions;
 import net.rim.device.api.applicationcontrol.ApplicationPermissionsManager;
+import net.rim.device.api.i18n.DateFormat;
+import net.rim.device.api.i18n.Locale;
 import net.rim.device.api.io.IOUtilities;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
@@ -2840,5 +2844,51 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public String[] getPlatformOverrides() {
         return new String[]{"phone", "rim"};
+    }
+
+    private L10NManager l10n;
+
+    /**
+     * @inheritDoc
+     */
+    public L10NManager getLocalizationManager() {
+        if(l10n == null) {
+            Locale l = Locale.getDefault();
+            l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+                public String format(int number) {
+                    return super.format(number);
+                }
+
+                public String format(double number) {
+                    return super.format(number);
+                }
+
+                public String formatCurrency(double currency) {
+                    return super.formatCurrency(currency);
+                }
+
+                public String formatDateLongStyle(Date d) {
+                    return DateFormat.getInstance(DateFormat.DATE_LONG).format(d);
+                }
+
+                public String formatDateShortStyle(Date d) {
+                    return DateFormat.getInstance(DateFormat.DATE_SHORT).format(d);
+                }
+
+                public String formatDateTime(Date d) {
+                    return DateFormat.getInstance(DateFormat.DATE_FULL).format(d);
+                }
+
+                public String getCurrencySymbol() {
+                    return super.getCurrencySymbol();
+                }
+                
+                public void setLocale(String locale, String language) {
+                    super.setLocale(locale, language);
+                    Locale.setDefault(Locale.get(language, locale));
+                }
+            };
+        }
+        return l10n;
     }
 }

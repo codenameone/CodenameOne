@@ -43,6 +43,7 @@ import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -58,8 +59,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.text.DateFormat;
+import java.text.NumberFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -674,8 +679,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeFont fnt = f(nativeFont);
         return stringWidthNative(fnt.peer, str);
     }
-
+    
+    private Map<String, Integer> stringWidthCache = new HashMap<String, Integer>();
     private int stringWidthNative(long peer, String str) {
+        if(str.length() < 50) {
+            Integer i = stringWidthCache.get(str);
+            if(i != null) {
+                return i.intValue();
+            }
+            int val = IOSNative.stringWidthNative(peer, str);
+            stringWidthCache.put(str, new Integer(val));
+            return val;
+        }
         return IOSNative.stringWidthNative(peer, str);
     }
 
@@ -1501,7 +1516,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        long browserPeer = IOSNative.createBrowserComponent();
+        long browserPeer = IOSNative.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
         IOSNative.releasePeer(browserPeer);
         return pc;
@@ -2588,5 +2603,52 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             return new String[] {"phone", "ios", "iphone"};
         }
+    }
+
+    private L10NManager l10n;
+
+    /**
+     * @inheritDoc
+     */
+    public L10NManager getLocalizationManager() {
+        if(l10n == null) {
+            Locale l = Locale.getDefault();
+            l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+                public String format(int number) {
+                    return NumberFormat.getNumberInstance().format(number);
+                }
+
+                public String format(double number) {
+                    return NumberFormat.getNumberInstance().format(number);
+                }
+
+                public String formatCurrency(double currency) {
+                    return NumberFormat.getCurrencyInstance().format(currency);
+                }
+
+                public String formatDateLongStyle(Date d) {
+                    return DateFormat.getDateInstance(DateFormat.LONG).format(d);
+                }
+
+                public String formatDateShortStyle(Date d) {
+                    return DateFormat.getDateInstance(DateFormat.SHORT).format(d);
+                }
+
+                public String formatDateTime(Date d) {
+                    return DateFormat.getDateTimeInstance().format(d);
+                }
+
+                public String getCurrencySymbol() {
+                    return NumberFormat.getInstance().getCurrency().getSymbol();
+                }
+
+                public void setLocale(String locale, String language) {
+                    super.setLocale(locale, language);
+                    Locale l = new Locale(language, locale);
+                    Locale.setDefault(l);
+                }
+            };
+        }
+        return l10n;
     }
 }

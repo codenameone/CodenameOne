@@ -77,6 +77,7 @@ import android.widget.VideoView;
 import com.codename1.contacts.Contact;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Form;
@@ -97,10 +98,13 @@ import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.DateFormat;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
@@ -2992,5 +2996,53 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return super.dispatchKeyEvent(event);
             }
         }
+    }
+
+    
+    private L10NManager l10n;
+
+    /**
+     * @inheritDoc
+     */
+    public L10NManager getLocalizationManager() {
+        if(l10n == null) {
+            Locale l = Locale.getDefault();
+            l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+                public String format(int number) {
+                    return NumberFormat.getNumberInstance().format(number);
+                }
+
+                public String format(double number) {
+                    return NumberFormat.getNumberInstance().format(number);
+                }
+
+                public String formatCurrency(double currency) {
+                    return NumberFormat.getCurrencyInstance().format(currency);
+                }
+
+                public String formatDateLongStyle(Date d) {
+                    return DateFormat.getDateInstance(DateFormat.LONG).format(d);
+                }
+
+                public String formatDateShortStyle(Date d) {
+                    return DateFormat.getDateInstance(DateFormat.SHORT).format(d);
+                }
+
+                public String formatDateTime(Date d) {
+                    return DateFormat.getDateTimeInstance().format(d);
+                }
+
+                public String getCurrencySymbol() {
+                    return NumberFormat.getInstance().getCurrency().getSymbol();
+                }
+
+                public void setLocale(String locale, String language) {
+                    super.setLocale(locale, language);
+                    Locale l = new Locale(language, locale);
+                    Locale.setDefault(l);
+                }
+            };
+        }
+        return l10n;
     }
 }

@@ -52,6 +52,7 @@ import javax.microedition.media.control.VideoControl;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.ui.Label;
@@ -2978,4 +2979,50 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return MIDPContactsManager.getInstance().getContactById(id);
     }
     
+    private L10NManager lm;
+
+    /**
+     * @inheritDoc
+     */
+    public L10NManager getLocalizationManager() {
+        if(lm == null) {
+            String l = System.getProperty("microedition.locale");
+            String lang = "en";
+            String country = "US";
+            if(l != null && l.length() >= 5) {
+                lang = l.substring(0, 2);
+                country = l.substring(3, 5);
+            }
+            lm = new L10NManager(lang, country) {
+                public String format(int number) {
+                    return super.format(number);
+                }
+
+                public String format(double number) {
+                    return super.format(number);
+                }
+
+                public String formatCurrency(double currency) {
+                    return super.formatCurrency(currency);
+                }
+
+                public String formatDateLongStyle(Date d) {
+                    return super.formatDateLongStyle(d);
+                }
+
+                public String formatDateShortStyle(Date d) {
+                    return super.formatDateShortStyle(d);
+                }
+
+                public String formatDateTime(Date d) {
+                    return super.formatDateTime(d);
+                }
+
+                public String getCurrencySymbol() {
+                    return super.getCurrencySymbol();
+                }
+            };
+        }
+        return lm;
+    }
 }

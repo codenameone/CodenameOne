@@ -28,6 +28,7 @@ import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
@@ -4023,4 +4024,9 @@ public abstract class CodenameOneImplementation {
      */
     public void afterComponentPaint(Component c) {
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public abstract L10NManager getLocalizationManager();
 }
