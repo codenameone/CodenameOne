@@ -2432,6 +2432,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("OS".equals(key)) {
             return "SE";
         }
+        if("AppVersion".equals(key)) {
+            File f = new File("codenameone_settings.properties");
+            if(f.exists()) {
+                try {
+                    Properties p = new Properties();
+                    p.load(new FileInputStream(f));
+                    return p.getProperty("codename1.version");
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            return null;
+        }
         String s = System.getProperty(key);
         if (s == null) {
             return defaultValue;
