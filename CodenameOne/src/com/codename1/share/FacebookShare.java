@@ -69,7 +69,7 @@ public class FacebookShare extends ShareService {
 
         
         final ShareForm[] f = new ShareForm[1];
-        f[0] = new ShareForm("Post on My Wall", null, toShare,
+        f[0] = new ShareForm(currentForm, "Post on My Wall", null, toShare,
                 new ActionListener() {
 
                     public void actionPerformed(ActionEvent evt) {

@@ -25,6 +25,7 @@ package com.codename1.share;
 import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.contacts.ContactsModel;
+import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -55,11 +56,11 @@ public class SMSShare extends ShareService {
      */
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
-        final Form f = new Form("Contacts");
-        f.setScrollable(false);        
-        f.setLayout(new BorderLayout());
-        f.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
-        f.show();
+        final Form contactsForm = new Form("Contacts");
+        contactsForm.setScrollable(false);        
+        contactsForm.setLayout(new BorderLayout());
+        contactsForm.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
+        contactsForm.show();
         new Thread(new Runnable() {
 
             public void run() {
@@ -77,7 +78,7 @@ public class SMSShare extends ShareService {
                                 final ShareForm [] f = new ShareForm[1];
                                 final Hashtable contact = (Hashtable) contacts.getSelectedItem();
                                 
-                                f[0] = new ShareForm("Send SMS", (String)contact.get("phone"), toShare,
+                                f[0] = new ShareForm(contactsForm, "Send SMS", (String)contact.get("phone"), toShare,
                                         new ActionListener() {
 
                                             public void actionPerformed(ActionEvent evt) {
@@ -94,8 +95,17 @@ public class SMSShare extends ShareService {
                                 
                             }
                         });
-                        f.addComponent(BorderLayout.CENTER, contacts);
-                        f.revalidate();
+                        contactsForm.addComponent(BorderLayout.CENTER, contacts);
+                        Command back = new Command("Back"){
+
+                            public void actionPerformed(ActionEvent evt) {
+                                currentForm.showBack();
+                            }
+                            
+                        };
+                        contactsForm.addCommand(back);
+                        contactsForm.setBackCommand(back);                        
+                        contactsForm.revalidate();
                     }
                 });
             }

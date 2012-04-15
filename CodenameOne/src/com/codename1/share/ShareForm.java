@@ -23,9 +23,11 @@
 package com.codename1.share;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Command;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -39,7 +41,7 @@ class ShareForm extends Form{
     private TextArea message = new TextArea(5, 20);
     private Button post = new Button("Post");
     
-    ShareForm(String title, String toShare, String txt, ActionListener share) {
+    ShareForm(final Form contacts, String title, String toShare, String txt, ActionListener share) {
         setTitle(title);
         setLayout(new BorderLayout());
         this.message.setText(txt);
@@ -50,6 +52,15 @@ class ShareForm extends Form{
         }
         addComponent(BorderLayout.CENTER, message);
         addComponent(BorderLayout.SOUTH, post);
+        Command back = new Command("Back") {
+
+            public void actionPerformed(ActionEvent evt) {
+                contacts.showBack();
+            }
+        };
+        addCommand(back);
+        setBackCommand(back);
+
     }
     
     String getTo(){

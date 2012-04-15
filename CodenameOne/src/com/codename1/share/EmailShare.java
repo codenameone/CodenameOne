@@ -26,6 +26,7 @@ import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.contacts.ContactsModel;
 import com.codename1.messaging.Message;
+import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -56,11 +57,11 @@ public class EmailShare extends ShareService {
      */
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
-        final Form f = new Form("Contacts");
-        f.setLayout(new BorderLayout());
-        f.setScrollable(false);
-        f.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
-        f.show();
+        final Form contactsForm = new Form("Contacts");
+        contactsForm.setLayout(new BorderLayout());
+        contactsForm.setScrollable(false);
+        contactsForm.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
+        contactsForm.show();
         new Thread(new Runnable() {
 
             public void run() {
@@ -79,7 +80,7 @@ public class EmailShare extends ShareService {
                             public void actionPerformed(ActionEvent evt) {
                                 final ShareForm [] f = new ShareForm[1];
                                 Hashtable contact = (Hashtable) contacts.getSelectedItem();
-                                f[0] = new ShareForm("Send Email", (String)contact.get("email"), toShare,
+                                f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare,
                                         new ActionListener() {
 
                                             public void actionPerformed(ActionEvent evt) {
@@ -93,8 +94,17 @@ public class EmailShare extends ShareService {
                                 f[0].show();
                             }
                         });
-                        f.addComponent(BorderLayout.CENTER, contacts);
-                        f.revalidate();
+                        contactsForm.addComponent(BorderLayout.CENTER, contacts);
+                        Command back = new Command("Back"){
+
+                            public void actionPerformed(ActionEvent evt) {
+                                currentForm.showBack();
+                            }
+                            
+                        };
+                        contactsForm.addCommand(back);
+                        contactsForm.setBackCommand(back);                        
+                        contactsForm.revalidate();
                     }
                 });
             }
