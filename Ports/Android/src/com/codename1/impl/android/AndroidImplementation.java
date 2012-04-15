@@ -2688,6 +2688,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return AndroidContactsManager.getInstance().getContact(activity, id);
     }
 
+    @Override
+    public boolean isNativeShareSupported(){
+        return true;
+    }
+    
+    @Override
+    public void share(String toShare){
+        Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, toShare);
+        activity.startActivity(Intent.createChooser(shareIntent, "Share with..."));
+    }
+    
     /**
      * @inheritDoc
      */
