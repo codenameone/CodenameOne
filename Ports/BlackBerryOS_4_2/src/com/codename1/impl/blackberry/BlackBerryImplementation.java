@@ -1899,7 +1899,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void setCurrentAccessPoint(String id) {
         currentAccessPoint = id;
         int t = getAPType(id);
-        deviceSide = t == NetworkManager.ACCESS_POINT_TYPE_NETWORK3G || t == NetworkManager.ACCESS_POINT_TYPE_WLAN;
+        deviceSide = t == NetworkManager.ACCESS_POINT_TYPE_NETWORK3G || 
+                t == NetworkManager.ACCESS_POINT_TYPE_NETWORK2G || 
+                t == NetworkManager.ACCESS_POINT_TYPE_WLAN;
     }
 
     /**

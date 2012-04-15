@@ -3175,7 +3175,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public boolean shouldAutoDetectAccessPoint() {
-        return true;
+        return false;
     }
 
     /**

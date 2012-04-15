@@ -341,6 +341,14 @@ public class NetworkManager {
                         }
                     }
                 }
+                
+                // add all the 2G networks at the end
+                for(int iter = 0 ; iter < ids.length ; iter++) {
+                    int t = getAPType(ids[iter]);
+                    if(t == ACCESS_POINT_TYPE_NETWORK2G) {
+                        aps.addElement(ids[iter]);
+                    }
+                }
             }
             if(currentAP >= aps.size()) {
                 return null;
