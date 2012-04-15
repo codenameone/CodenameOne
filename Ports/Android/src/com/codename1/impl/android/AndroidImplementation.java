@@ -1671,7 +1671,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                          */
                         layoutWrapper = new AndroidRelativeLayout(activity, AndroidPeer.this, v);
                         v.setFocusable(AndroidPeer.this.isFocusable());
-                        v.setFocusableInTouchMode(false);
+                        v.setFocusableInTouchMode(true);
                         ArrayList<View> viewList = new ArrayList<View>();
                         viewList.add(layoutWrapper);
                         v.addFocusables(viewList, View.FOCUS_DOWN);
@@ -1716,7 +1716,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
 
                             public boolean onTouch(View v, MotionEvent me) {
-                                return false;//myView.onTouchEvent(me);
+                                return myView.onTouchEvent(me);
                             }
                         });
                     }
@@ -2166,7 +2166,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private WebView web;
         private BrowserComponent parent;
 
-        public AndroidBrowserComponent(WebView web, Activity act, Object p) {
+        public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
             parent = (BrowserComponent) p;
             this.web = web;
@@ -2178,6 +2178,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void onLoadResource(WebView view, String url) {
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
                     super.onLoadResource(view, url);
+                    setShouldCalcPreferredSize(true);
                 }
 
                 @Override
@@ -2189,6 +2190,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void onPageFinished(WebView view, String url) {
                     parent.fireWebEvent("onLoad", new ActionEvent(url));
                     super.onPageFinished(view, url);
+                    setShouldCalcPreferredSize(true);
                 }
 
                 public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
