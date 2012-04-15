@@ -144,7 +144,7 @@ public class Form extends Container {
      * Indicates whether focus should cycle within the form
      */
     private boolean cyclicFocus = true;
-
+    
     private int tactileTouchDuration;
 
     private EventDispatcher showListener;
@@ -324,10 +324,9 @@ public class Form extends Container {
         doLayout();
         focused = getFocused();
         if(focused != null){
-            boolean isSmooth = isSmoothScrolling();
-            setSmoothScrolling(false);
+            Component.setDisableSmoothScrolling(true);
             scrollComponentToVisible(focused);
-            setSmoothScrolling(isSmooth);
+            Component.setDisableSmoothScrolling(false);
         }
         if(orientationListener != null) {
             orientationListener.fireActionEvent(new ActionEvent(this));

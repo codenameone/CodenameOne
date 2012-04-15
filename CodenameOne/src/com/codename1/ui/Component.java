@@ -162,6 +162,9 @@ public class Component implements Animation, StyleListener {
      * Indicates that moving through the component should work as an animation
      */
     private boolean smoothScrolling;
+    
+    private static boolean disableSmoothScrolling = false;
+
     /**
      * Animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
@@ -1801,7 +1804,7 @@ public class Component implements Animation, StyleListener {
      * @return whether this component use smooth scrolling
      */
     public boolean isSmoothScrolling() {
-        return smoothScrolling;
+        return smoothScrolling && !disableSmoothScrolling;
     }
 
     /**
@@ -1813,6 +1816,14 @@ public class Component implements Animation, StyleListener {
         this.smoothScrolling = smoothScrolling;
     }
 
+    /**
+     * Disable smooth scrolling on all components
+     * @param disableSmoothScrolling 
+     */
+    static void setDisableSmoothScrolling(boolean disableSmoothScrolling) {
+        Component.disableSmoothScrolling = disableSmoothScrolling;
+    }
+    
     /**
      * Invoked for devices where the pointer can hover without actually clicking
      * the display. This is true for PC mouse pointer as well as some devices such
@@ -2513,7 +2524,9 @@ public class Component implements Animation, StyleListener {
     public void requestFocus() {
         Form rootForm = getComponentForm();
         if (rootForm != null) {
+            Component.setDisableSmoothScrolling(true);
             rootForm.requestFocus(this);
+            Component.setDisableSmoothScrolling(false);
         }
     }
 
