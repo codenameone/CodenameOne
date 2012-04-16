@@ -128,6 +128,9 @@ public class NetworkMonitor extends javax.swing.JFrame {
         setTitle("Network Monitor");
         addWindowListener(formListener);
 
+        jSplitPane1.setContinuousLayout(true);
+        jSplitPane1.setOneTouchExpandable(true);
+
         request.addListSelectionListener(formListener);
         jScrollPane1.setViewportView(request);
 
@@ -199,7 +202,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
         postBody.setRows(5);
         jScrollPane3.setViewportView(postBody);
 
-        jLabel3.setText("Request Headers");
+        jLabel3.setText("Request Headers (Partial List!)");
 
         requestHeaders.setColumns(20);
         requestHeaders.setEditable(false);
@@ -242,7 +245,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
         responseBody.setRows(5);
         jScrollPane2.setViewportView(responseBody);
 
-        jLabel4.setText("Response Headers");
+        jLabel4.setText("Response Headers (Partial List)");
 
         responseHeaders.setColumns(20);
         responseHeaders.setRows(5);

@@ -2650,8 +2650,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private File getStorageDir() {
         if (storageDir == null) {
-            if(getStorageData()==null){
-                setStorageData("cn1");
+            if(getStorageData() == null) {
+                String mainClass = System.getProperty("MainClass");
+                if(mainClass != null) {
+                    setStorageData(mainClass);
+                } else {
+                    setStorageData("CodenameOneStorage");
+                }
             }
             storageDir = new File(System.getProperty("user.home"), "." + ((String) getStorageData()));
             storageDir.mkdirs();
@@ -2691,10 +2696,13 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setHeader(Object connection, String key, String val) {
-        ((URLConnection) connection).setRequestProperty(key, val);
+        HttpURLConnection con = ((HttpURLConnection) connection);
+        con.setRequestProperty(key, val);
+        updateRequestHeaders(con);
+    }
 
+    private void updateRequestHeaders(HttpURLConnection con) {
         if(netMonitor != null) {
-            HttpURLConnection con = (HttpURLConnection) connection;
             NetworkRequestObject nr = netMonitor.getByConnection(con);
             String requestHeaders = "";
             Map<String, List<String>> props = con.getRequestProperties();
@@ -2704,7 +2712,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             nr.setHeaders(requestHeaders);
         }
     }
-
+    
     /**
      * @inheritDoc
      */
@@ -2718,12 +2726,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
             nr.setRequestBody("");
             HttpURLConnection con = (HttpURLConnection) connection;
-            return new BufferedOutputStream(con.getOutputStream()) {
+            OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
                 public void write(byte b[], int off, int len) throws IOException {
                     super.write(b, off, len);
                     nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
                 }
             };
+            return o;
         }
         return new BufferedOutputStream(((URLConnection) connection).getOutputStream());
     }
@@ -2759,7 +2768,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             nr.setResponseHeaders(headers);
             nr.setResponseBody("");
-            return new BufferedInputStream(con.getInputStream()) {
+            InputStream i = new BufferedInputStream(con.getInputStream()) {
                 public synchronized int read(byte b[], int off, int len)
                     throws IOException {
                     int s = super.read(b, off, len);
@@ -2769,6 +2778,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return s;
                 }
             };
+            return i;
         }
         return new BufferedInputStream(((URLConnection) connection).getInputStream());
     }
