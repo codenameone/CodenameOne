@@ -2650,6 +2650,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private File getStorageDir() {
         if (storageDir == null) {
+            if(getStorageData()==null){
+                setStorageData("cn1");
+            }
             storageDir = new File(System.getProperty("user.home"), "." + ((String) getStorageData()));
             storageDir.mkdirs();
         }
