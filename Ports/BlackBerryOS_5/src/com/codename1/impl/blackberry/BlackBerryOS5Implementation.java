@@ -49,6 +49,7 @@ import net.rim.device.api.script.Scriptable;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.DeviceInfo;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.ui.Field;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.UiApplication;
 
@@ -260,6 +261,14 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         }
     }
 
+    protected int getFieldWidth(Field fld) {
+        return Math.max(fld.getWidth(), fld.getPreferredWidth()) + fld.getPaddingLeft() + fld.getPaddingRight();
+    }
+
+    protected int getFieldHeight(Field fld) {
+        return Math.max(fld.getHeight(), fld.getPreferredHeight()) + fld.getPaddingBottom() + fld.getPaddingTop();
+    }
+    
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
         synchronized (UiApplication.getEventLock()) {
             try {

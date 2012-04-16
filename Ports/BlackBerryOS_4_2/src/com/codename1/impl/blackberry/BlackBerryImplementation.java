@@ -1586,6 +1586,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
         }
     }
+    
+    protected int getFieldWidth(Field fld) {
+        return Math.max(fld.getWidth(), fld.getPreferredWidth());
+    }
+
+    protected int getFieldHeight(Field fld) {
+        return Math.max(fld.getHeight(), fld.getPreferredHeight());
+    }
 
     /**
      * This class is here to unify multiple invocations of invoke later
@@ -1629,8 +1637,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     break;
 
                 case INVOKE_AND_WAIT_calcPreferredSize:
-                    dim.setWidth(Math.max(fld.getWidth(), fld.getPreferredWidth()) + fld.getPaddingLeft() + fld.getPaddingRight());
-                    dim.setHeight(Math.max(fld.getHeight(), fld.getPreferredHeight()) + fld.getPaddingBottom() + fld.getPaddingTop());
+                    dim.setWidth(getFieldWidth(fld));
+                    dim.setHeight(getFieldHeight(fld));
                     break;
 
                 case INVOKE_AND_WAIT_setFocus:
