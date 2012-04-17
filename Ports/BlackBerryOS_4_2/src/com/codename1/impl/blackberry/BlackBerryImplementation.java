@@ -1679,7 +1679,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
         } else {
             // requires signing
-            net.rim.blackberry.api.browser.Browser.getDefaultSession().displayPage(url);
+            net.rim.blackberry.api.browser.BrowserSession browserSession = net.rim.blackberry.api.browser.Browser.getDefaultSession();
+            browserSession.displayPage(url);
+            browserSession.showBrowser();
         }
     }
 
