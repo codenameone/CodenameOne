@@ -1918,7 +1918,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean shouldAutoDetectAccessPoint() {
-        return true;
+        return false;
     }
     
     /**
@@ -1929,6 +1929,25 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             url += ";ConnectionUID=" + currentAccessPoint;
             if (deviceSide) {
                 url += ";deviceside=true";
+            }
+        } else {
+            URLFactory uu = new URLFactory(url);
+            TransportDetective td = new TransportDetective();
+            int tr = td.getBestTransportForActiveCoverage();
+            switch(tr) {
+            case TransportDetective.TRANSPORT_TCP_WIFI:
+                url = uu.getHttpTcpWiFiUrl();
+                break;
+            case TransportDetective.TRANSPORT_MDS:
+                url = uu.getHttpMdsUrl(false);
+                break;
+            case TransportDetective.TRANSPORT_BIS_B:
+                url = uu.getHttpBisUrl();
+                break;
+            case TransportDetective.TCP_CELLULAR_APN_SERVICE_BOOK:
+            case TransportDetective.TRANSPORT_TCP_CELLULAR:
+                url = uu.getHttpTcpCellularUrl(null, null, null);
+                break;
             }
         }
         return connectImpl(url, read, write);
