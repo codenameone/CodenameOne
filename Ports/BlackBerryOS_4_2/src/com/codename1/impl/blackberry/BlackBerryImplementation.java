@@ -1709,7 +1709,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             if ("MSISDN".equals(key)) {
                 return Phone.getDevicePhoneNumber(true);
             }
-
+            if ("AppVersion".equals(key)) {
+               return ApplicationDescriptor.currentApplicationDescriptor().getVersion();
+            }
             if (initGetProperty) {
                 initGetProperty = false;
                 ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
