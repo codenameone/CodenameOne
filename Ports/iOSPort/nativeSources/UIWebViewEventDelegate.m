@@ -41,15 +41,15 @@
 }
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
-    //com_codename1_impl_ios_IOSImplementation_fireWebViewShouldStart___com_codename1_ui_BrowserComponent(c);
+    com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(request.URL.absoluteString.UTF8String));
+    return YES;
 }
 
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
-    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, fromNSString(webView.request.URL.absoluteURL));
+    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(webView.request.URL.absoluteString.UTF8String));
 }
 
 - (void)webViewDidStartLoad:(UIWebView *)webView {
-    com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, fromNSString(webView.request.URL.absoluteURL));
 }
 
 @end

@@ -96,7 +96,7 @@
         </propertyfile>
     </target>
     
-    <target name="release" depends="init,stamp">
+    <target name="release" depends="jar">
         <delete dir="build/CodenameOneDist" />        
         <mkdir dir="build/CodenameOneDist/CodenameOne" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/docs" />
@@ -139,6 +139,27 @@
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/CameraDemo/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Tipster/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/KitchenSink/lib" />
+        <zip basedir="src" destfile="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <copy file="dist/CodenameOne.jar" todir="../Demos/TZoneFriends/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/NativeDemo/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/NativeDemo/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/CameraDemo/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/CameraDemo/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/Tipster/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Tipster/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/KitchenSink/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/KitchenSink/lib" />
+
+        <deltree dir="build/tmp"/>
+        <mkdir dir="build/tmp"/>
+        <copy file="dist/CodenameOne.jar" todir="build/tmp" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="build/tmp" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
+        <zip basedir="build/tmp" compress="true" file="../../java/eclipse/workspace/LiveEditPreview/war/updatedLibs.zip" />
+        <deltree dir="build/tmp"/>
+
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/NativeDemo/dist" />        

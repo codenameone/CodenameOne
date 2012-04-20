@@ -111,7 +111,9 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImage, const char* name) {
     GLUIImage* img = (GLUIImage*)nativeImage;
-    [img setName:[NSString stringWithUTF8String:name]];
+    if(name != nil) {
+        [img setName:[NSString stringWithUTF8String:name]];
+    }
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl

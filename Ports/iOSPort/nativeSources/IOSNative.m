@@ -39,6 +39,7 @@
 #import <MessageUI/MFMailComposeViewController.h>
 #import <AddressBookUI/AddressBookUI.h>
 #import <MessageUI/MFMessageComposeViewController.h>
+#import "UIWebViewEventDelegate.h"
 
 extern void initVMImpl();
 
@@ -1006,7 +1007,7 @@ void com_codename1_impl_ios_IOSNative_vibrate___int(JAVA_INT duration) {
 // Peer Component methods
 
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         CGSize s = [v sizeThatFits:CGSizeMake(w, h)];
@@ -1019,7 +1020,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 }
 
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         float scale = [UIScreen mainScreen].scale;
@@ -1034,7 +1035,7 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
 }
 
 void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_LONG peer, JAVA_BOOLEAN b) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         if(!b) {
@@ -1051,7 +1052,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_LONG pe
 }
 
 void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAVA_LONG peer, int x, int y, int w, int h) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         if([v superview] == nil) {
@@ -1079,7 +1080,7 @@ void repaintUI() {
 }
 
 void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         if(v.superview != nil) {
@@ -1248,12 +1249,14 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(JAVA_LONG peer) {
     });
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent__() {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(JAVA_OBJECT obj) {
     __block UIWebView* response = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         response = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
         response.backgroundColor = [UIColor whiteColor];
         response.autoresizesSubviews = YES;
+        UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+        response.delegate = del;
         response.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
         [response setAllowsInlineMediaPlayback:YES];
         [response retain];
@@ -1290,6 +1293,15 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(JAVA_LONG peer) {
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
         [w goBack];
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_browserStop___long(JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIWebView* w = (UIWebView*)peer;
+        [w stopLoading];
         [pool release];
     });
 }
@@ -1666,61 +1678,89 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
-    [pool release];
+    //NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    //[pool release];
+    return 1;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneMainLabel);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonEmailProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonAddressProperty);    
+    JAVA_OBJECT ret = fromNSString(k);
     [pool release];
+    return ret;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-
+    ABRecordRef i = (ABRecordRef)peer;
+    GLUIImage* g = nil;
+    if(ABPersonHasImageData(i)){
+        UIImage* img = [UIImage imageWithData:(NSData *)ABPersonCopyImageData(i)];
+        g = [[GLUIImage alloc] initWithImage:img];
+    }    
     [pool release];
+    return g;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_INT recId) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    JAVA_LONG i = ABAddressBookGetPersonWithRecordID(recId, ABAddressBookCreate());
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(recId, ABAddressBookCreate());
+    [i retain];
     [pool release];
     return i;
 }
