@@ -1884,7 +1884,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId("" + id);
-        //IOSNative.fillContactDetails(recId, c);
+        long person = IOSNative.getPersonWithRecordID(recId);
+        c.setFirstName(IOSNative.getPersonFirstName(person));
+        c.setFamilyName(IOSNative.getPersonSurnameName(person));
+        
+        c.setPrimaryEmail(IOSNative.getPersonEmail(person));
+        
+        int phones = IOSNative.getPersonPhoneCount(person);
+        Hashtable h = new Hashtable();
+        for(int iter = 0 ; iter < phones ; iter++) {
+            h.put(IOSNative.getPersonPhoneType(person, iter), IOSNative.getPersonPhone(person, iter));
+        }
+        c.setPhoneNumbers(h);
+        
+        c.setPrimaryPhoneNumber(IOSNative.getPersonPrimaryPhone(person));
+        
+        h = new Hashtable();
+        h.put("Work", h);
+        c.setAddresses(h);
+        IOSNative.releasePeer(person);
         return c;
     }
     

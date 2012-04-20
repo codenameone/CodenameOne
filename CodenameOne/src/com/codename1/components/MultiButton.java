@@ -23,12 +23,13 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.list.GenericListCellRenderer;
 
 /**
  * A powerful button like component that allows multiple rows/and an icon to be added
@@ -38,12 +39,14 @@ import com.codename1.ui.list.GenericListCellRenderer;
  * @author Shai Almog
  */
 public class MultiButton extends Container {
-    private Button firstRow = new Button();
+    private Label firstRow = new Label("MultiButton");
     private Label secondRow = new Label();
     private Label thirdRow = new Label();
     private Label forthRow = new Label();
     private Label icon = new Label();
-    private Container labels = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+    private Button emblem = new Button();
+    private boolean invert;
+    private String group;    
     
     /**
      * Default constructor allowing the designer to create an instance of this class
@@ -51,12 +54,20 @@ public class MultiButton extends Container {
     public MultiButton() {
         setLayout(new BorderLayout());
         BorderLayout bl = new BorderLayout();
-        bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        //bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
         Container iconContainer = new Container(bl);
         iconContainer.addComponent(BorderLayout.CENTER, icon);
-        addComponent(BorderLayout.CENTER, labels);
+        Container labels = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        Container labelsBorder = new Container(new BorderLayout());
+        labelsBorder.addComponent(BorderLayout.SOUTH, labels);
+        addComponent(BorderLayout.CENTER, labelsBorder);
         addComponent(BorderLayout.WEST, iconContainer);
-        labels.addComponent(firstRow);
+        bl = new BorderLayout();
+        //bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        Container emblemContainer = new Container(bl);
+        emblemContainer.addComponent(BorderLayout.CENTER, emblem);
+        addComponent(BorderLayout.EAST, emblemContainer);
+        labelsBorder.addComponent(BorderLayout.CENTER, firstRow);
         labels.addComponent(secondRow);
         labels.addComponent(thirdRow);
         labels.addComponent(forthRow);
@@ -64,8 +75,128 @@ public class MultiButton extends Container {
         secondRow.setUIID("MultiLine2");
         thirdRow.setUIID("MultiLine3");
         forthRow.setUIID("MultiLine4");
-        setLeadComponent(firstRow);
-        setUIID("Button");
+        emblem.setUIID("Emblem");
+        setLeadComponent(emblem);
+        setUIID("MultiButton");
+    }
+    
+    /**
+     * Turns the multi-button into a checkbox multi-button
+     * 
+     * @param b true for a checkbox multi-button
+     */
+    public void setCheckBox(boolean b) {
+        if(b != isCheckBox()) {
+            Container par = emblem.getParent();
+            Button old = emblem;
+            if(b) {
+                emblem = new CheckBox();
+            } else {
+                emblem = new Button();
+            }
+            emblem.setUIID(old.getUIID());
+            par.replace(old, emblem, null);
+            setLeadComponent(emblem);
+        }
+    }
+    
+    /**
+     * Returns true if this is a checkbox button
+     * 
+     * @return true for a checkbox button
+     */
+    public boolean isCheckBox() {
+        return emblem instanceof CheckBox;
+    }
+    
+    /**
+     * Turns the multi-button into a radio multi-button
+     * 
+     * @param b true for a radio multi-button
+     */
+    public void setRadioButton(boolean b) {
+        if(b != isRadioButton()) {
+            Container par = emblem.getParent();
+            Button old = emblem;
+            if(b) {
+                emblem = new RadioButton();
+                if(group != null) {
+                    ((RadioButton)emblem).setGroup(group);
+                }
+            } else {
+                emblem = new Button();
+            }
+            emblem.setUIID(old.getUIID());
+            par.replace(old, emblem, null);
+            setLeadComponent(emblem);
+        }
+    }
+    
+    /**
+     * Returns true if this is a radio button
+     * 
+     * @return true for a radio button
+     */
+    public boolean isRadioButton() {
+        return emblem instanceof RadioButton;
+    }
+    
+    /**
+     * Indicates the first two labels should be side by side
+     * 
+     * @param b true to place the first two labels side by side
+     */
+    public void setHorizontalLayout(boolean b) {
+        if(isHorizontalLayout() != b) {
+            secondRow.getParent().removeComponent(secondRow);
+            if(b) {
+                Container c = firstRow.getParent();
+                c.addComponent(BorderLayout.EAST, secondRow);
+            } else {
+                Container c = thirdRow.getParent();
+                c.addComponent(0, secondRow);
+            }
+        }
+    }
+    
+    /**
+     * Indicates whether the first two labels are be side by side
+     * 
+     * @return true if the first two labels are side by side
+     */
+    public boolean isHorizontalLayout() {
+        return secondRow.getParent().getLayout() instanceof BorderLayout;
+    }
+    
+    /**
+     * Inverts the order of the first two entries so the second line appears first. 
+     * This only works in horizontal mode!
+     * 
+     * @param b true to place the second row entry as the first entry
+     */
+    public void setInvertFirstTwoEntries(boolean b) {
+        if(b != invert) {
+            invert = b;
+            if(isHorizontalLayout()) {
+                Container c = firstRow.getParent();
+                c.removeComponent(secondRow);
+                if(invert) {
+                    c.addComponent(BorderLayout.WEST, secondRow);
+                } else {
+                    c.addComponent(BorderLayout.EAST, secondRow);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Inverts the order of the first two entries so the second line appears first. 
+     * This only works in horizontal mode!
+     * 
+     * @return true when the second row entry should be placed before the first entry
+     */
+    public boolean isInvertFirstTwoEntries() {
+        return invert;
     }
     
     /**
@@ -304,6 +435,24 @@ public class MultiButton extends Container {
     }
 
     /**
+     * Sets the emblem
+     * 
+     * @param i the icon
+     */
+    public void setEmblem(Image i) {
+        emblem.setIcon(i);
+    }
+    
+    /**
+     * Returns the emblem image
+     * 
+     * @return the image instance
+     */
+    public Image getEmblem() {
+        return emblem.getIcon();
+    }
+    
+    /**
      * Sets the icon position based on border layout constraints
      * 
      * @param s position either North/South/East/West
@@ -323,6 +472,26 @@ public class MultiButton extends Container {
         return (String)getLayout().getComponentConstraint(icon.getParent());
     }
 
+
+    /**
+     * Sets the emblem position based on border layout constraints
+     * 
+     * @param s position either North/South/East/West
+     */
+    public void setEmblemPosition(String t) {
+        removeComponent(emblem.getParent());
+        addComponent(t, emblem.getParent());
+        revalidate();
+    }
+    
+    /**
+     * Returns the emblem position based on border layout constraints
+     * 
+     * @return position either North/South/East/West
+     */
+    public String getEmblemPosition() {
+        return (String)getLayout().getComponentConstraint(emblem.getParent());
+    }
     
     /**
      * Sets the name of the icon (important for use in generic renderers
@@ -360,6 +529,42 @@ public class MultiButton extends Container {
         return icon.getUIID();
     }
 
+    /**
+     * Sets the name of the emblem (important for use in generic renderers
+     * 
+     * @param t name to set
+     */
+    public void setEmblemName(String t) {
+        emblem.setName(t);
+    }
+    
+    /**
+     * Returns the name of the emblem
+     * 
+     * @return the name
+     */
+    public String getEmblemName() {
+        return emblem.getName();
+    }
+
+    /**
+     * Sets the UIID of the emblem
+     * 
+     * @param t UIID to set
+     */
+    public void setEmblemUIID(String t) {
+        emblem.setUIID(t);
+    }
+    
+    /**
+     * Returns the UIID of the Emblem
+     * 
+     * @return the UIID 
+     */
+    public String getEmblemUIID() {
+        return emblem.getUIID();
+    }
+
 
     /**
      * @inheritDoc
@@ -367,7 +572,9 @@ public class MultiButton extends Container {
     public String[] getPropertyNames() {
         return new String[] {
             "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4", 
-            "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition"};
+            "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition",
+            "emblem", "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
+            "invertFirstTwoEntries", "checkBox", "radioButton", "group"};
     }
 
     /**
@@ -390,7 +597,16 @@ public class MultiButton extends Container {
            Image.class,// icon
            String.class,// iconName
            String.class,// iconUiid
-           String.class// iconPosition
+           String.class,// iconPosition
+           Image.class,// emblem
+           String.class,// emblemName
+           String.class,// emblemUiid
+           String.class,// emblemPosition
+           Boolean.class,
+           Boolean.class,
+           Boolean.class,
+           Boolean.class,
+           String.class,// group
        };
     }
 
@@ -445,6 +661,45 @@ public class MultiButton extends Container {
         }
         if(name.equals("iconPosition")) {
             return getIconPosition();
+        }
+        if(name.equals("emblem")) {
+            return getEmblem();
+        }
+        if(name.equals("emblemName")) {
+            return getEmblemName();
+        }
+        if(name.equals("emblemUiid")) {
+            return getEmblemUIID();
+        }
+        if(name.equals("emblemPosition")) {
+            return getEmblemPosition();
+        }
+        if(name.equals("horizontalLayout")) {
+            if(isHorizontalLayout()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(name.equals("invertFirstTwoEntries")) {
+            if(isInvertFirstTwoEntries()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(name.equals("checkBox")) {
+            if(isCheckBox()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(name.equals("radioButton")) {
+            if(isRadioButton()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(name.equals("group")) {
+            return getGroup();
         }
         return null;
     }
@@ -517,6 +772,61 @@ public class MultiButton extends Container {
             setIconPosition((String)value);
             return null;
         }
+        if(name.equals("emblem")) {
+            setEmblem((Image)value);
+            return null;
+        }
+        if(name.equals("emblemUiid")) {
+            setEmblemUIID((String)value);
+            return null;
+        }
+        if(name.equals("emblemName")) {
+            setEmblemName((String)value);
+            return null;
+        }
+        if(name.equals("emblemPosition")) {
+            setEmblemPosition((String)value);
+            return null;
+        }
+        if(name.equals("horizontalLayout")) {
+            setHorizontalLayout(((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("invertFirstTwoEntries")) {
+            setInvertFirstTwoEntries(((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("checkBox")) {
+            setCheckBox(((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("radioButton")) {
+            setRadioButton(((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("group")) {
+            setGroup((String)value);
+            return null;
+        }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * Indicates the group for the radio button
+     * @return the group
+     */
+    public String getGroup() {
+        return group;
+    }
+
+    /**
+     * Indicates the group for the radio button
+     * @param group the group to set
+     */
+    public void setGroup(String group) {
+        this.group = group;
+        if(emblem instanceof RadioButton) {
+            ((RadioButton)emblem).setGroup(group);
+        }
     }
 }

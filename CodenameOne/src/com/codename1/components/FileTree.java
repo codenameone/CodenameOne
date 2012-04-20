@@ -42,6 +42,9 @@ public class FileTree extends Tree {
 
     protected String childToDisplayLabel(Object child) {
         String s = child.toString();
+        if(s.equals("/")) {
+            return "Root";
+        }
         int l = s.lastIndexOf('/');
         return s.substring(l + 1);
     }
