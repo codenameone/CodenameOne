@@ -1980,11 +1980,18 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                             }
                         }
                     }
+                    com.codename1.ui.Component actual = cmp;
+                    if(cmp instanceof com.codename1.ui.Container) {
+                        actual = ((com.codename1.ui.Container)cmp).getLeadComponent();
+                        if(actual == null) {
+                            actual = cmp;
+                        }
+                    }
                     if(actionComponentNames != null &&
-                            (cmp instanceof com.codename1.ui.Button || cmp instanceof com.codename1.ui.List ||
-                            cmp instanceof com.codename1.ui.TextArea)) {
-                        if(cmp instanceof com.codename1.ui.Button) {
-                            if(((com.codename1.ui.Button)cmp).getCommand() != null) {
+                            (actual instanceof com.codename1.ui.Button || actual instanceof com.codename1.ui.List ||
+                            actual instanceof com.codename1.ui.TextArea)) {
+                        if(actual instanceof com.codename1.ui.Button) {
+                            if(((com.codename1.ui.Button)actual).getCommand() != null) {
                                 return;
                             }
                         }
@@ -2361,6 +2368,9 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 w.write("        Container rootContainerAncestor = getRootAncestor(c);\n");
                 w.write("        if(rootContainerAncestor == null) return;\n");
                 w.write("        String rootContainerName = rootContainerAncestor.getName();\n");
+                w.write("        if(c.getParent().getLeadParent() != null) {\n");
+                w.write("            c = c.getParent().getLeadParent();\n");
+                w.write("        }\n");
                 w.write("        if(rootContainerName == null) return;\n");
                 for(String[] currentCmp : actionComponents) {
                     if(lastFormName != currentCmp[1]) {

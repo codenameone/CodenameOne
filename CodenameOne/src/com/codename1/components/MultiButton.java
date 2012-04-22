@@ -24,10 +24,12 @@ package com.codename1.components;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
+import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -95,9 +97,50 @@ public class MultiButton extends Container {
                 emblem = new Button();
             }
             emblem.setUIID(old.getUIID());
+            if(old.getCommand() != null) {
+                emblem.setCommand(old.getCommand());
+                emblem.setText("");
+            }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
         }
+    }
+    
+    /**
+     * Adds an action listener
+     * 
+     * @param al the action listener
+     */
+    public void addActionListener(ActionListener al) {
+        emblem.addActionListener(al);
+    }
+
+    /**
+     * Removes an action listener
+     * 
+     * @param al the action listener
+     */
+    public void removeActionListener(ActionListener al) {
+        emblem.removeActionListener(al);
+    }
+    
+    /**
+     * Sets the command for the component, it doesn't affe
+     * 
+     * @param c the command
+     */
+    public void setCommand(Command c) {
+        emblem.setCommand(c);
+        emblem.setText("");
+    }
+
+    /**
+     * Returns the command for the emblem
+     * 
+     * @return the command instance
+     */
+    public Command getCommand() {
+        return emblem.getCommand();
     }
     
     /**
@@ -127,6 +170,10 @@ public class MultiButton extends Container {
                 emblem = new Button();
             }
             emblem.setUIID(old.getUIID());
+            if(old.getCommand() != null) {
+                emblem.setCommand(old.getCommand());
+                emblem.setText("");
+            }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
         }

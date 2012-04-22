@@ -534,6 +534,9 @@ public class UIBuilder {
      * @param listener the listener object
      */
     protected void bindListenerToComponent(Component cmp, Object listener) {
+        if(cmp instanceof Container) {
+            cmp = ((Container)cmp).getLeadComponent();
+        }
         if(listener instanceof FocusListener) {
             cmp.addFocusListener((FocusListener)listener);
             return;
@@ -856,22 +859,30 @@ public class UIBuilder {
             }
         }
 
-        if(cmp instanceof Button) {
+        Component actualLead = cmp;
+        if(actualLead instanceof Container) {
+            Container cnt = (Container)actualLead;
+            actualLead = cnt.getLeadComponent();
+            if(actualLead == null) {
+                actualLead = cmp;
+            }
+        }
+        if(actualLead instanceof Button) {
             ActionListener l = getFormListenerInstance(root, embedded);
             if(l != null) {
-                ((Button)cmp).addActionListener(l);
+                ((Button)actualLead).addActionListener(l);
             }
         } else {
-            if(cmp instanceof TextArea) {
+            if(actualLead instanceof TextArea) {
                 ActionListener l = getFormListenerInstance(root, embedded);
                 if(l != null) {
-                    ((TextArea)cmp).addActionListener(l);
+                    ((TextArea)actualLead).addActionListener(l);
                 }
             } else {
-                if(cmp instanceof List) {
+                if(actualLead instanceof List) {
                     ActionListener l = getFormListenerInstance(root, embedded);
                     if(l != null) {
-                        ((List)cmp).addActionListener(l);
+                        ((List)actualLead).addActionListener(l);
                     }
                 }
             }
