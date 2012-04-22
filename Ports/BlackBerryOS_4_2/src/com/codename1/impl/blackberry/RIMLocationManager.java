@@ -108,6 +108,10 @@ class RIMLocationManager extends  LocationManager implements javax.microedition.
         currentCoordinates = coor;
         return retVal;
     }
+
+    public Location getLastKnownLocation(){        
+        return convert(LocationProvider.getLastKnownLocation());
+    }
     
     
 }

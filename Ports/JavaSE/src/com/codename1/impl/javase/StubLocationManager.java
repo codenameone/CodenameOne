@@ -44,8 +44,8 @@ class StubLocationManager extends LocationManager {
     private static StubLocationManager instance = new StubLocationManager();
     
     private StubLocationManager() {
-        loc.setLongtitude(31);
-        loc.setLatitude(34);
+        loc.setLongtitude(34.777222);
+        loc.setLatitude(32.07792);
     }
 
     public static LocationManager getLocationManager(){
@@ -54,6 +54,12 @@ class StubLocationManager extends LocationManager {
     
     @Override
     public Location getCurrentLocation() throws IOException {       
+        loc.setTimeStamp(System.currentTimeMillis());
+        return loc;
+    }
+    
+    @Override
+    public Location getLastKnownLocation(){        
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
     }
