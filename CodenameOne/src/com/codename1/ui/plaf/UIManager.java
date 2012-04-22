@@ -27,6 +27,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Enumeration;
@@ -1100,7 +1101,7 @@ public class UIManager {
                 }
                 String vkbInputMode = (String)resourceBundle.get("@vkb");
                 if(vkbInputMode != null && vkbInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(tokenizeString(vkbInputMode, '|'));
+                    String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
                     VirtualKeyboard.setDefaultInputModeOrder(tokenized);
                     for(int iter = 0 ; iter < tokenized.length ; iter++) {
                         String val = tokenized[iter];
@@ -1112,7 +1113,7 @@ public class UIManager {
                 }
                 String textFieldInputMode = (String)resourceBundle.get("@im");
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(tokenizeString(textFieldInputMode, '|'));
+                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
                     for(int iter = 0 ; iter < tokenized.length ; iter++) {
                         String val = tokenized[iter];
@@ -1128,7 +1129,7 @@ public class UIManager {
     }
 
     private Hashtable parseTextFieldInputMode(String s) {
-        Vector tokens = tokenizeString(s, '|');
+        Vector tokens = StringUtil.tokenizeString(s, '|');
         Hashtable response = new Hashtable();
         int count = tokens.size();
         for(int iter = 0 ; iter < count ; iter++) {
@@ -1157,43 +1158,14 @@ public class UIManager {
     }
 
     private String[][] tokenizeMultiArray(String s, char separator, char lineBreak) {
-        Vector lines = tokenizeString(s, lineBreak);
+        Vector lines = StringUtil.tokenizeString(s, lineBreak);
         int lineCount = lines.size();
         String[][] result = new String[lineCount][];
         for(int iter = 0 ; iter < lineCount ; iter++) {
             String currentString = (String)lines.elementAt(iter);
-            result[iter] = toStringArray(tokenizeString(currentString, separator));
+            result[iter] = toStringArray(StringUtil.tokenizeString(currentString, separator));
         }
         return result;
-    }
-
-    private Vector tokenizeString(String s, char separator) {
-        Vector tokenized = new Vector();
-        int len = s.length();
-        boolean lastSeparator = false;
-        StringBuffer buf = new StringBuffer();
-        for(int iter = 0 ; iter < len ; iter++) {
-            char current = s.charAt(iter);
-            if(current == separator) {
-                if(lastSeparator) {
-                    buf.append(separator);
-                    lastSeparator = false;
-                    continue;
-                }
-                lastSeparator = true;
-                if(buf.length() > 0) {
-                    tokenized.addElement(buf.toString());
-                    buf = new StringBuffer();
-                }
-            } else {
-                lastSeparator = false;
-                buf.append(current);
-            }
-        }
-        if(buf.length() > 0) {
-            tokenized.addElement(buf.toString());
-        }
-        return tokenized;
     }
 
     /**

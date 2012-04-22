@@ -74,6 +74,13 @@ public abstract class LocationManager {
     public abstract Location getCurrentLocation() throws IOException;
 
     /**
+     * Gets the last known Location of the device.
+     * 
+     * @return a Location Object
+     */
+    public abstract Location getLastKnownLocation();
+    
+    /**
      * Sets a LocationListener on the device, use this method if you need to be
      * updated on the device Locations rather then calling getCurrentLocation.
      * @param listener a LocationListener
