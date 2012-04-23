@@ -2697,7 +2697,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void setHeader(Object connection, String key, String val) {
         HttpURLConnection con = ((HttpURLConnection) connection);
-        con.setRequestProperty(key, val);
+        String url = con.getURL().toString();
+        //a patch go get a readable login page for facebook
+        if(key.equals("User-Agent") && url.contains("facebook.com")){
+            //blackberry user-agent gets an html without javascript.
+            con.setRequestProperty("User-Agent", "Mozilla/5.0 (BlackBerry; U; BlackBerry 9860; en-GB) AppleWebKit/534.11+ (KHTML, like Gecko) Version/7.0.0.296 Mobile Safari/534.11+");        
+        }else{
+            con.setRequestProperty(key, val);
+        }
         updateRequestHeaders(con);
     }
 
