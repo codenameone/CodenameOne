@@ -34,6 +34,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -562,6 +563,84 @@ public class Util {
         return encode(toCharArray(str), spaceChar);
     }
     
+    /**
+     * Decodes a String URL encoded URL
+     * 
+     * @param s the string
+     * @param enc the encoding (defaults to UTF-8 if null)
+     * @param plusToSpace true if plus signs be converted to spaces
+     * @return a decoded string
+     */
+    public static String decode(String s, String enc, boolean plusToSpace) {
+        boolean modified = false;
+        if(enc == null || enc.length() == 0) {
+            enc = "UTF-8";
+        }
+        int numChars = s.length();
+        StringBuffer sb = new StringBuffer(numChars > 500 ? numChars / 2 : numChars);
+        int i = 0;
+
+        char c;
+        byte[] bytes = null;
+        while (i < numChars) {
+            c = s.charAt(i);
+            switch (c) {
+                case '+':
+                    if(plusToSpace) {
+                        sb.append(' ');
+                    } else {
+                        sb.append('+');
+                    }
+                    i++;
+                    modified = true;
+                    break;
+
+                case '%':
+                    try {
+                        if (bytes == null) {
+                            bytes = new byte[(numChars - i) / 3];
+                        }
+                        
+                        int pos = 0;
+
+                        while (((i + 2) < numChars) && (c == '%')) {
+                            bytes[pos++] = (byte) Integer.parseInt(s.substring(i + 1, i + 3), 16);
+                            i += 3;
+                            if (i < numChars) {
+                                c = s.charAt(i);
+                            }
+                        }
+
+                        if ((i < numChars) && (c == '%')) {
+                            throw new IllegalArgumentException("Illegal URL % character: " + s);
+                        }
+
+                        try {
+                            sb.append(new String(bytes, 0, pos, enc));
+                        }
+                        catch (UnsupportedEncodingException e) {
+                            throw new RuntimeException(e.toString());
+                        }
+                    }
+                    catch (NumberFormatException e) {
+                            throw new IllegalArgumentException("Illegal URL encoding: " + s);
+                    }
+                    modified = true;
+                    break;
+
+                default:
+                    sb.append(c);
+                    i++;
+                    break;
+            }
+        }
+
+        if(modified) {
+            return sb.toString();
+        }
+        return s;
+    }
+   
     private static String encode(char[] buf, String spaceChar) {
         final StringBuffer sbuf = new StringBuffer(buf.length * 3);
         for (int i = 0; i < buf.length; i++) {
