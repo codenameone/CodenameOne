@@ -139,6 +139,8 @@ class XMLContent implements StructuredContent {
 	public String getText() {
 		if (root.isTextElement()) {
 			return root.getText();
+                } else if (root.getNumChildren() == 0) {
+                        return "";
 		} else if (root.getChildAt(0).isTextElement()){
 			return root.getChildAt(0).getText();
 		} else {
