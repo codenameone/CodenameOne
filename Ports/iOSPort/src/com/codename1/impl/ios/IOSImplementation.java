@@ -866,7 +866,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                 locationUpdating = false;
                 IOSNative.stopUpdatingLocation(p);
             }
-        }        
+        }
+
+        @Override
+        public Location getLastKnownLocation() {
+            return getCurrentLocation();
+        }
     }
     
     private static Loc lm;
