@@ -2291,7 +2291,7 @@ public class Component implements Animation, StyleListener {
                     }
                 }
             }
-            float speed = Display.getInstance().getDragSpeed(!shouldScrollX);
+            float speed = getDragSpeed(!shouldScrollX);
             int tl;
             if(getTensileLength() > -1) {
                 tl = getTensileLength();
@@ -2321,6 +2321,17 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+
+    /**
+     * This method returns the dragging speed based on the latest dragged
+     * events
+     * @param yAxis indicates what axis speed is required
+     * @return the dragging speed
+     */
+    protected float getDragSpeed(boolean vertical) {
+        return Display.getInstance().getDragSpeed(vertical);
+    }
+    
     /**
      * Returns the Component Style allowing us to manipulate the look of the 
      * component

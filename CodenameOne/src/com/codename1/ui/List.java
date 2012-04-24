@@ -1835,7 +1835,7 @@ public class List extends Component {
                 super.pointerReleased(x, y);
             } else {
                 boolean vertical = getOrientation() == VERTICAL;
-                float speed = Display.getInstance().getDragSpeed(vertical);
+                float speed = getDragSpeed(vertical);
                 if (vertical) {
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
                            Integer.MAX_VALUE, speed, 0.0004f);

@@ -34,13 +34,17 @@ import java.util.Vector;
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.layers.AbstractLayer;
 import com.codename1.maps.providers.OpenStreetMapProvider;
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 
 /**
  * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class MapComponent extends Component {
+public class MapComponent extends Container {
 
     protected Coord _center;
     protected int _zoom;
@@ -118,7 +122,30 @@ public class MapComponent extends Component {
         _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
         _zoom = zoomLevel;
         _layers = new Vector();
-        setFocusable(true);
+        setFocusable(!Display.getInstance().isTouchScreenDevice());
+        if (Display.getInstance().isTouchScreenDevice()) {
+            setLayout(new BorderLayout());
+            Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
+            Button out = new Button("-");
+            out.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    zoomOut();
+                    repaint();
+                }
+            });
+            buttonsbar.addComponent(out);
+            Button in = new Button("+");
+            in.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    zoomIn();
+                    repaint();
+                }
+            });
+            buttonsbar.addComponent(in);
+            addComponent(BorderLayout.SOUTH, buttonsbar);
+        }
     }
 
     private void toggleDebug() {
@@ -166,36 +193,27 @@ public class MapComponent extends Component {
     /**
      * @inheritDoc
      */
-    public void pointerReleased(int x, int y) {
-        super.pointerReleased(x, y);
-    }
-
-    /**
-     * @inheritDoc
-     */
     public void keyPressed(int keyCode) {
-        Coord scale = _map.scale(_zoom);
-        double partX = 1.0 * getWidth() / 4;
-        double partY = 1.0 * getHeight() / 4;
         int oldZoom = _zoom;
         Coord oldCenter = _center;
+        
         if (isLeftKey(keyCode)) {
-            _center = _center.translate(0, partX * -scale.getLongitude());
+            moveLeft();
         } else if (isRightKey(keyCode)) {
-            _center = _center.translate(0, partX * scale.getLongitude());
+            moveRight();
         } else if (isDownKey(keyCode)) {
-            _center = _center.translate(partY * -scale.getLatitude(), 0);
+            moveDown();
         } else if (isUpKey(keyCode)) {
-            _center = _center.translate(partY * scale.getLatitude(), 0);
+            moveUp();
         }
         if (!_map.projection().extent().contains(_center)) {
             _center = oldCenter;
         }
-        if (_zoom < _map.maxZoomLevel() && isZoomInKey(keyCode)) {
-            _zoom += 1;
+        if (isZoomInKey(keyCode)) {
+            zoomIn();
         }
-        if (_zoom > _map.minZoomLevel() && isZoomOutKey(keyCode)) {
-            _zoom -= 1;
+        if (isZoomOutKey(keyCode)) {
+            zoomOut();
         }
         if (isZoomToLayersKey(keyCode)) {
             zoomToLayers();
@@ -226,6 +244,8 @@ public class MapComponent extends Component {
         drawPointer(g);
         drawAttribution(g, _map.attribution());
         g.translate(-getX(), -getY());
+        
+        super.paint(g);
     }
 
     /**
@@ -376,6 +396,66 @@ public class MapComponent extends Component {
     }
 
     /**
+     * move the map 25% left
+     */
+    public void moveLeft() {
+        Coord scale = _map.scale(_zoom);
+        double partX = 1.0 * getWidth() / 4;
+        _center = _center.translate(0, partX * -scale.getLongitude());
+        _needTiles = true;        
+    }
+
+    /**
+     * move the map 25% right
+     */
+    public void moveRight() {
+        Coord scale = _map.scale(_zoom);
+        double partX = 1.0 * getWidth() / 4;
+        _center = _center.translate(0, partX * scale.getLongitude());        
+        _needTiles = true;        
+    }
+
+    /**
+     * move the map 25% up
+     */
+    public void moveUp() {
+        Coord scale = _map.scale(_zoom);
+        double partY = 1.0 * getHeight() / 4;
+        _center = _center.translate(partY * scale.getLatitude(), 0);        
+        _needTiles = true;        
+    }
+
+    /**
+     * move the map 25% down
+     */
+    public void moveDown() {
+        Coord scale = _map.scale(_zoom);
+        double partY = 1.0 * getHeight() / 4;
+        _center = _center.translate(partY * -scale.getLatitude(), 0);        
+        _needTiles = true;        
+    }
+
+    /**
+     * zoom in the map one level if possible
+     */
+    public void zoomIn() {
+        if (_zoom < _map.maxZoomLevel()) {
+            _zoom += 1;
+            _needTiles = true;
+        }
+    }
+
+    /**
+     * zoom out the map one level if possible
+     */
+    public void zoomOut() {
+        if (_zoom > _map.minZoomLevel()) {
+            _zoom -= 1;
+            _needTiles = true;
+        }
+    }
+
+    /**
      * Zoom the map the the giving bounding box
      * @param boundingBox to zoom to
      */
@@ -392,7 +472,6 @@ public class MapComponent extends Component {
         _center = tile.position(tile.dimension().getWidth() / 2, tile.dimension().getHeight() / 2);
         repaint();
     }
-
 
     /**
      * Zoom map to the center of the given coordinate with the given zoom level

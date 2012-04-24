@@ -34,6 +34,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DefaultHTMLCallback;
+import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
 import java.io.InputStream;
@@ -132,6 +133,9 @@ public class WebBrowser extends Container {
 
                         public boolean onRedirect(String url) {
                             onStart(url);
+                            if(((HTMLComponent)internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED){
+                                return true;
+                            }
                             return super.onRedirect(url);                            
                         }
                         
