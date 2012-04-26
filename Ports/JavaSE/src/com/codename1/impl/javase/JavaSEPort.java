@@ -1742,6 +1742,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageWidth(Object i) {
+        if(i == null) return 0;
         return ((BufferedImage) i).getWidth();
     }
 
@@ -1749,6 +1750,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageHeight(Object i) {
+        if(i == null) return 0;
         return ((BufferedImage) i).getHeight();
     }
 
