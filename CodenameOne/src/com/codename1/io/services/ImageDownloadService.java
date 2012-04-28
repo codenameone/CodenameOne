@@ -40,6 +40,8 @@ import com.codename1.components.FileEncodedImageAsync;
 import com.codename1.components.StorageImage;
 import com.codename1.components.StorageImageAsync;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
@@ -236,8 +238,20 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param targetKey the key for the hashtable in the target offset
      * @param destFile local file to store the data into the given path
      */
-    private static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
-            String targetKey, String destFile, Dimension toScale, byte priority, Image placeholderImage) {
+    private static void createImageToFileSystem(final String url, final Component targetList, final int targetOffset,
+            final String targetKey, final String destFile, final Dimension toScale, final byte priority, final Image placeholderImage) {
+        if (Display.getInstance().isEdt()) {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+
+                public void run() {
+                    createImageToFileSystem(url, targetList, targetOffset,
+                            targetKey, destFile, toScale, priority, placeholderImage);
+                }
+            });
+            return;
+        }
+
+
         Image im = cacheImage(null, destFile, toScale, placeholderImage);
         if (im != null) {
             Hashtable h;
@@ -254,7 +268,7 @@ public class ImageDownloadService extends ConnectionRequest {
             h.put(targetKey, im);
             if(model instanceof DefaultListModel) {
                  ((DefaultListModel)model).setItem(targetOffset, h);
-            } else {
+            }else{
                 targetList.repaint();
             }
             return;
@@ -339,14 +353,24 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param scale the scale of the image to put in the List or null
      */
-    private static void createImageToStorage(String url, Component targetList, int targetOffset, 
-            String targetKey, String cacheId, Dimension scale, byte priority, Image placeholderImage) {
+    private static void createImageToStorage(final String url, final Component targetList, final int targetOffset,
+            final String targetKey, final String cacheId, final Dimension scale, final byte priority, final Image placeholderImage) {
+        if (Display.getInstance().isEdt()) {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+
+                public void run() {
+                    createImageToStorage(url, targetList, targetOffset,
+                            targetKey, cacheId, scale, priority, placeholderImage);
+                }
+            });
+            return;
+        }
         Image im = cacheImage(cacheId, null, scale, placeholderImage);
         if (im != null) {
             Hashtable h;
             ListModel model;
-            if(targetList instanceof List) {
-                model = ((List)targetList).getModel();
+            if (targetList instanceof List) {
+                model = ((List) targetList).getModel();
             } else {
                 model = ((ContainerList)targetList).getModel();
             }
@@ -357,8 +381,8 @@ public class ImageDownloadService extends ConnectionRequest {
             h.put(targetKey, im);
             if(model instanceof DefaultListModel) {
                  ((DefaultListModel)model).setItem(targetOffset, h);
-            } else {
-                targetList.repaint();
+            }else{
+                targetList.repaint();            
             }
             return;
         }
@@ -429,15 +453,25 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param toScale the scale dimension or null
      * @param priority the priority for the task
      */
-    private static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale,
-            byte priority, Image placeholder) {
+    private static void createImageToStorage(final String url, final Label l, final String cacheId, final Dimension toScale,
+            final byte priority, final Image placeholder) {
+        if (Display.getInstance().isEdt()) {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+
+                public void run() {
+                    createImageToStorage(url, l, cacheId, toScale,
+                            priority, placeholder);
+                }
+            });
+            return;
+        }
+        
         Image im = cacheImage(cacheId, null, toScale, placeholder);
         if (im != null) {
-            if(!fastScale && toScale != null){
+            if (!fastScale && toScale != null) {
                 im = im.scaled(toScale.getWidth(), toScale.getHeight());
             }
             l.setIcon(im);
-            l.repaint();
             return;
         }
         //image not found on cache go and download from the url
@@ -610,8 +644,8 @@ public class ImageDownloadService extends ConnectionRequest {
                         } else {
                             if(model instanceof DefaultListModel) {
                                  ((DefaultListModel)model).setItem(targetOffset, h);
-                            } else {
-                                targetList.repaint();
+                            }else{
+                                targetList.repaint();                            
                             }
                         }
                     }
