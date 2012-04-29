@@ -268,9 +268,9 @@ public class ImageDownloadService extends ConnectionRequest {
             h.put(targetKey, im);
             if(model instanceof DefaultListModel) {
                  ((DefaultListModel)model).setItem(targetOffset, h);
-            }else{
-                targetList.repaint();
             }
+            targetList.repaint();
+            
             return;
         }
         //image not found on cache go and download from the url
@@ -381,9 +381,9 @@ public class ImageDownloadService extends ConnectionRequest {
             h.put(targetKey, im);
             if(model instanceof DefaultListModel) {
                  ((DefaultListModel)model).setItem(targetOffset, h);
-            }else{
-                targetList.repaint();            
             }
+            targetList.repaint();            
+            
             return;
         }
         //image not found on cache go and download from the url
@@ -644,9 +644,8 @@ public class ImageDownloadService extends ConnectionRequest {
                         } else {
                             if(model instanceof DefaultListModel) {
                                  ((DefaultListModel)model).setItem(targetOffset, h);
-                            }else{
-                                targetList.repaint();                            
                             }
+                            targetList.repaint();
                         }
                     }
                 }
