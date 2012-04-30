@@ -25,10 +25,15 @@ import com.codename1.ui.Image;
 import java.util.Vector;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
+import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
 import com.codename1.ui.geom.Point;
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.Tile;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import java.util.Hashtable;
 
 /**
  * This is a Points Layer
@@ -38,9 +43,23 @@ import com.codename1.maps.Tile;
 public class PointsLayer extends AbstractLayer {
 
     private Vector points = new Vector();
-
     private Image icon;
-    
+    private EventDispatcher dispatcher = new EventDispatcher();
+
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public PointsLayer() {
+        super(new Mercator(), "");
+    }
+
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public PointsLayer(String name) {
+        super(new Mercator(), name);
+    }
+
     /**
      * @inheritDoc
      */
@@ -64,7 +83,7 @@ public class PointsLayer extends AbstractLayer {
         g.setColor(0);
         g.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
         for (int i = 0; i < length; i++) {
-            LayerPoint point = (LayerPoint) points.elementAt(i);
+            PointLayer point = (PointLayer) points.elementAt(i);
             if (tile.getBoundingBox().contains(point)) {
                 point.paint(g, tile);
             }
@@ -75,25 +94,19 @@ public class PointsLayer extends AbstractLayer {
      * Adds a point to the Layer
      * 
      * @param position the position of the point
-     * @param description the description of the point
      */
-    public void addPoint(Coord position, String description) {
-        addPoint(position, description, icon);
-    }
-
-    /**
-     * Adds a point to the Layer
-     * 
-     * @param position the position of the point
-     * @param description the description of the point
-     * @param icon the icon of the point if null the Layer icon is taken.
-     */
-    public void addPoint(Coord position, String description, Image pointIcon) {
+    public void addPoint(PointLayer point) {
+        Image pointIcon = point.getIcon();
         if (pointIcon == null) {
-            pointIcon = icon;
+            point.setIcon(icon);
         }
-        Coord projectedPosition = position.isProjected() ? position : getProjection().fromWGS84(position);
-        points.addElement(new LayerPoint(projectedPosition, description, pointIcon));
+        if(!point.isProjected()){
+            Coord c = getProjection().fromWGS84(point);
+            point.setLatitude(c.getLatitude());
+            point.setLongitude(c.getLongitude());
+            point.setProjected(true);
+        }
+        points.addElement(point);
     }
 
     /**
@@ -101,5 +114,41 @@ public class PointsLayer extends AbstractLayer {
      */
     public BoundingBox boundingBox() {
         return BoundingBox.create(points);
+    }
+
+    /**
+     * Adds a listener to the Points Layer which will cause an event to dispatch 
+     * on click the ActionEvent will contain the pressed PointLayer unprojected
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void addActionListener(ActionListener l) {
+        dispatcher.addListener(l);
+    }
+
+    /**
+     * Removes the given action listener Points Layer
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void removeActionListener(ActionListener l) {
+        dispatcher.removeListener(l);
+    }
+
+    /**
+     * Trigger an event for the points that in contained in the BoundingBox
+     * @param box the BoundingBox to trigger event.
+     */
+    public void fireActionEvent(BoundingBox box) {
+        for (int i = 0; i < points.size(); i++) {
+            PointLayer point = (PointLayer) points.elementAt(i);
+            if (box.contains(point)) {
+                Coord c = projection.toWGS84(point);
+                //unprojected point
+                PointLayer pl = new PointLayer(c, point.getName(), point.getIcon());
+                dispatcher.fireActionEvent(new ActionEvent(pl));
+                return;
+            }
+        }
     }
 }

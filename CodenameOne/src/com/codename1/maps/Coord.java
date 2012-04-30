@@ -28,8 +28,8 @@ import com.codename1.ui.geom.Dimension;
  */
 public class Coord {
 
-    private final double longitude;
-    private final double latitude;
+    private double longitude;
+    private double latitude;
     // Projected to local coordinate system. False means WGS84
     private boolean projected;
     private static double DELTA = 0.0000001;
@@ -82,6 +82,21 @@ public class Coord {
         return latitude;
     }
 
+    /**
+     * Sets the Coord Longitude.
+     */
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
+    }
+
+    /**
+     * Sets the Coord Latitude.
+     */
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    
     /**
      * @inheritDoc
      */

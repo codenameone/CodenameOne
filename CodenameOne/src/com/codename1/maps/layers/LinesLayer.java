@@ -23,6 +23,7 @@ import com.codename1.ui.Graphics;
 import java.util.Vector;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
+import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
 import com.codename1.ui.geom.Point;
 import com.codename1.maps.providers.MapProvider;
@@ -38,6 +39,20 @@ public class LinesLayer extends AbstractLayer {
     private Vector _lineSegments;
     protected int _lineColor;
 
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public LinesLayer() {
+        this(new Mercator(), "");
+    }
+    
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public LinesLayer(String name) {
+        this(new Mercator(), name);
+    }
+    
     /**
      * @inheritDoc
      */

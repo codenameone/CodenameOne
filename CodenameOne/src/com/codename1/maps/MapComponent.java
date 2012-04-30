@@ -28,17 +28,21 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Vector;
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.layers.AbstractLayer;
+import com.codename1.maps.layers.PointsLayer;
 import com.codename1.maps.providers.OpenStreetMapProvider;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
+import com.codename1.ui.Painter;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+
 
 /**
  * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
@@ -65,6 +69,16 @@ public class MapComponent extends Container {
         Location l = LocationManager.getLocationManager().getLastKnownLocation();
         Coord centerPosition = new Coord(l.getLatitude(), l.getLongtitude());
         _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
+        Painter bg = new Painter() {
+            public void paint(Graphics g, Rectangle rect) {
+                paintmap(g);
+            }
+        };
+        getUnselectedStyle().setBgTransparency(255);
+        getStyle().setBgTransparency(255);        
+        getUnselectedStyle().setBgPainter(bg);
+        getStyle().setBgPainter(bg);
+        
     }
 
     /**
@@ -188,6 +202,25 @@ public class MapComponent extends Container {
         super.pointerPressed(x, y);
         draggedx = x;
         draggedy = y;
+        x = x - getAbsoluteX();
+        y = y - getAbsoluteY();
+        
+        Tile t = screenTile();
+        
+        Coord southWest = t.position(x - 20, t.dimension().getHeight() - y - 20);
+        Coord c = Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());
+        Coord northEast = t.position(x + 20, t.dimension().getHeight() - y + 20);
+        c = Mercator.inverseMercator(northEast.getLatitude(), northEast.getLongitude());
+        
+        BoundingBox bbox = new BoundingBox(southWest, northEast);
+        Enumeration e = _layers.elements();
+        while (e.hasMoreElements()) {
+            LayerWithZoomLevels layer = (LayerWithZoomLevels) e.nextElement();
+            if(layer.layer instanceof PointsLayer){
+                ((PointsLayer)layer.layer).fireActionEvent(bbox);
+            }
+        }
+
     }
 
     /**
@@ -196,7 +229,7 @@ public class MapComponent extends Container {
     public void keyPressed(int keyCode) {
         int oldZoom = _zoom;
         Coord oldCenter = _center;
-        
+
         if (isLeftKey(keyCode)) {
             moveLeft();
         } else if (isRightKey(keyCode)) {
@@ -225,12 +258,7 @@ public class MapComponent extends Container {
         repaint();
     }
 
-    /**
-     * @inheritDoc
-     */
-    public void paint(Graphics g) {
-        //#debug
-//        System.out.println("= Painting. Center: " + _center + " zoom: " + _zoom);
+    private void paintmap(Graphics g) {
         g.translate(getX(), getY());
         if (_needTiles) {
             getTiles();
@@ -244,8 +272,6 @@ public class MapComponent extends Container {
         drawPointer(g);
         drawAttribution(g, _map.attribution());
         g.translate(-getX(), -getY());
-        
-        super.paint(g);
     }
 
     /**
@@ -306,9 +332,7 @@ public class MapComponent extends Container {
         g.translate(-_delta.getX(), -_delta.getY());
         while (e.hasMoreElements()) {
             PositionedTile pt = (PositionedTile) e.nextElement();
-//            g.translate(pt.position().getX(), pt.position().getY());
             pt.tile().paint(g, pt.position().getX(), pt.position().getY());
-//            g.translate(-pt.position().getX(), -pt.position().getY());
         }
         g.translate(_delta.getX(), _delta.getY());
     }
@@ -391,7 +415,7 @@ public class MapComponent extends Container {
      * Gets the map provider
      * @return the map provider
      */
-    public MapProvider provider() {
+    public MapProvider getProvider() {
         return _map;
     }
 
@@ -402,7 +426,7 @@ public class MapComponent extends Container {
         Coord scale = _map.scale(_zoom);
         double partX = 1.0 * getWidth() / 4;
         _center = _center.translate(0, partX * -scale.getLongitude());
-        _needTiles = true;        
+        _needTiles = true;
     }
 
     /**
@@ -411,8 +435,8 @@ public class MapComponent extends Container {
     public void moveRight() {
         Coord scale = _map.scale(_zoom);
         double partX = 1.0 * getWidth() / 4;
-        _center = _center.translate(0, partX * scale.getLongitude());        
-        _needTiles = true;        
+        _center = _center.translate(0, partX * scale.getLongitude());
+        _needTiles = true;
     }
 
     /**
@@ -421,8 +445,8 @@ public class MapComponent extends Container {
     public void moveUp() {
         Coord scale = _map.scale(_zoom);
         double partY = 1.0 * getHeight() / 4;
-        _center = _center.translate(partY * scale.getLatitude(), 0);        
-        _needTiles = true;        
+        _center = _center.translate(partY * scale.getLatitude(), 0);
+        _needTiles = true;
     }
 
     /**
@@ -431,8 +455,8 @@ public class MapComponent extends Container {
     public void moveDown() {
         Coord scale = _map.scale(_zoom);
         double partY = 1.0 * getHeight() / 4;
-        _center = _center.translate(partY * -scale.getLatitude(), 0);        
-        _needTiles = true;        
+        _center = _center.translate(partY * -scale.getLatitude(), 0);
+        _needTiles = true;
     }
 
     /**
@@ -582,7 +606,6 @@ public class MapComponent extends Container {
         return keyCode == '5';
     }
 }
-
 class LayerWithZoomLevels {
 
     public AbstractLayer layer;

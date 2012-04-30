@@ -126,10 +126,11 @@ public class BoundingBox {
         if (coords.length <= 0) {
             throw new RuntimeException("There must be at least 1 coordinate.");
         }
-        double north = Double.MIN_VALUE;
-        double south = Double.MAX_VALUE;
-        double east = Double.MIN_VALUE;
-        double west = Double.MAX_VALUE;
+        
+        double north = coords[0].getLatitude();
+        double south = coords[0].getLatitude();
+        double east = coords[0].getLongitude();
+        double west = coords[0].getLongitude();
 
         boolean projected = true;
         for (int i = 0; i < coords.length; i++) {

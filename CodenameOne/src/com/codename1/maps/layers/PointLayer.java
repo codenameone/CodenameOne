@@ -30,30 +30,31 @@ import com.codename1.ui.Image;
  * 
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class LayerPoint extends Coord implements Layer{
+public class PointLayer extends Coord implements Layer{
 
-    private final String description;
+    private final String name;
     private Image icon;
-
+    private boolean displayName;
+    
     /**
      * Creates a Point Layer.
      * 
      * @param position the position of the Point
-     * @param getDescription the getDescription of the Point
+     * @param getName the getName of the Point
      * @param icon icon of the Point
      */
-    public LayerPoint(Coord position, String description, Image icon) {
+    public PointLayer(Coord position, String name, Image icon) {
         super(position);
-        this.description = description;
+        this.name = name;
         this.icon = icon;
     }
-
+    
     /**
-     * Gets the Point description
-     * @return the Point description
+     * Gets the Point name
+     * @return the Point name
      */
-    public String getDescription() {
-        return description;
+    public String getName() {
+        return name;
     }
 
     /**
@@ -64,6 +65,23 @@ public class LayerPoint extends Coord implements Layer{
         return icon;
     }
 
+    /**
+     * Sets the display icon
+     * @param icon 
+     */
+    public void setIcon(Image icon) {
+        this.icon = icon;
+    }
+
+    /**
+     * This method declares if the point name should be displayed
+     * 
+     * @param displayName 
+     */
+    public void setDisplayName(boolean displayName){
+        this.displayName = displayName;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -83,8 +101,17 @@ public class LayerPoint extends Coord implements Layer{
         } else {
             g.drawImage(icon, x, y);
         }
-        if (description != null) {
-            g.drawString(getDescription(), x + width + 1, pos.getY() - g.getFont().getHeight() / 2 - 1);
+        if (name != null && displayName) {
+            g.drawString(getName(), x + width + 1, pos.getY() - g.getFont().getHeight() / 2 - 1);
         }
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String toString() {
+        return super.toString() + " " + name;
+    }
+    
+    
 }
