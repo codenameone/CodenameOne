@@ -1991,8 +1991,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    public PeerComponent createBrowserComponent(Object parent) {
-        final WebView[] r = new WebView[1];
+    public PeerComponent createBrowserComponent(final Object parent) {
+        final AndroidBrowserComponent [] bc = new AndroidBrowserComponent[1];
+
         final Object lock = new Object();
         synchronized (lock) {
             activity.runOnUiThread(new Runnable() {
@@ -2000,7 +2001,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void run() {
                     synchronized (lock) {
-                        r[0] = new WebView(activity) {
+                        WebView wv = new WebView(activity) {
 
                             public boolean onKeyDown(int keyCode, KeyEvent event) {
                                 switch (keyCode) {
@@ -2026,6 +2027,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return super.onKeyUp(keyCode, event);
                             }
                         };
+                        bc[0] = new AndroidBrowserComponent(wv, activity, parent);
                         lock.notify();
                     }
                 }
@@ -2036,7 +2038,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 ex.printStackTrace();
             }
         }
-        return new AndroidBrowserComponent(r[0], activity, parent);
+        return bc[0];
     }
 
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
