@@ -44,8 +44,9 @@ class StubLocationManager extends LocationManager {
     private static StubLocationManager instance = new StubLocationManager();
     
     private StubLocationManager() {
-        loc.setLongtitude(34.777222);
-        loc.setLatitude(32.07792);
+        //new york
+        loc.setLongtitude(-74.005973);
+        loc.setLatitude(40.714353);
     }
 
     public static LocationManager getLocationManager(){
@@ -75,8 +76,8 @@ class StubLocationManager extends LocationManager {
                 Location loc;
                 try {
                     loc = getCurrentLocation();
-                    loc.setLongtitude(loc.getLongtitude() + 1);
-                    loc.setLatitude(loc.getLatitude() + 1);                    
+                    loc.setLongtitude(loc.getLongtitude() + 0.001);
+                    loc.setLatitude(loc.getLatitude() + + 0.001);                    
                     l.locationUpdated(loc);
                 } catch (IOException ex) {
                     Logger.getLogger(StubLocationManager.class.getName()).log(Level.SEVERE, null, ex);
