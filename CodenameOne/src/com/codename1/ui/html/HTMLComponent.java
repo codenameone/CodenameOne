@@ -1151,6 +1151,7 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
                 }
             });
         } else { // Page was cancelled
+            cancelled = false;
             InputStreamReader isr=getStream("Page loading cancelled by user",null);
             HTMLElement newDoc=parser.parseHTML(isr);
             documentReady(docInfo, newDoc);
