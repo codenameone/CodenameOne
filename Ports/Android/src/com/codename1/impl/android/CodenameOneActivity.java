@@ -24,6 +24,7 @@
 package com.codename1.impl.android;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
@@ -158,6 +159,16 @@ public class CodenameOneActivity extends Activity {
     }
 
             
+    public void registerForPush(String userEmail) {
+        Intent registrationIntent = new Intent("com.google.android.c2dm.intent.REGISTER");
+        registrationIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0)); // boilerplate
+        registrationIntent.putExtra("sender", userEmail);
+        startService(registrationIntent);
+    }
     
-    
+    public void stopReceivingPush() {
+        Intent unregIntent = new Intent("com.google.android.c2dm.intent.UNREGISTER");
+        unregIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0));
+        startService(unregIntent);
+    }
 }

@@ -1051,27 +1051,6 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="resetNetbeansSettingsActionPerformed"/>
                   </Events>
                 </MenuItem>
-                <MenuItem class="javax.swing.JMenuItem" name="pickMIDlet">
-                  <Properties>
-                    <Property name="mnemonic" type="int" value="80"/>
-                    <Property name="text" type="java.lang.String" value="Pick Application"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Restore Default"/>
-                    <Property name="name" type="java.lang.String" value="pickMIDlet" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="pickMIDletActionPerformed"/>
-                  </Events>
-                </MenuItem>
-                <MenuItem class="javax.swing.JMenuItem" name="resetToDefault">
-                  <Properties>
-                    <Property name="mnemonic" type="int" value="82"/>
-                    <Property name="text" type="java.lang.String" value="Restore Default (Undo Pick Application)"/>
-                    <Property name="name" type="java.lang.String" value="resetToDefault" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="resetToDefaultActionPerformed"/>
-                  </Events>
-                </MenuItem>
               </SubComponents>
             </Menu>
           </SubComponents>

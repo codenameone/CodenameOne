@@ -475,6 +475,7 @@ class ResourceThreadQueue {
                 if (!cancelled) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
+                            // prevent a redirect or another thread from breaking the UI
                             handleImage(img,imgLabel);
                             if (labels!=null) {
                                 for(Enumeration e=labels.elements();e.hasMoreElements();) {

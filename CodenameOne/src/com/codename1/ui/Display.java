@@ -2622,4 +2622,24 @@ public final class Display {
     public L10NManager getLocalizationManager() {
         return impl.getLocalizationManager();
     }
+
+    
+    /**
+     * User register to receive push notification
+     * 
+     * @param id the id for the user
+     * @param noFallback some devices don't support an efficient push API and will resort to polling 
+     * to provide push like functionality. If this flag is set to true no polling will occur and 
+     * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     */
+    public void registerPush(String id, boolean noFallback) {
+        impl.registerPush(id, noFallback);
+    }
+
+    /**
+     * Stop receiving push notifications to this client application
+     */
+    public void deregisterPush() {
+        impl.deregisterPush();
+    }
 }

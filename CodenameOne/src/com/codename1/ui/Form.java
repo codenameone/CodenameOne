@@ -1425,6 +1425,7 @@ public class Form extends Container {
                 }
             } else {
                 Display.getInstance().setCurrent(previousForm, false);
+                previousForm.revalidate();
             }
 
             // enable GC to cleanup the previous form if no longer referenced

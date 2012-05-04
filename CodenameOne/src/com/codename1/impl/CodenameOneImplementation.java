@@ -4029,4 +4029,21 @@ public abstract class CodenameOneImplementation {
      * @inheritDoc
      */
     public abstract L10NManager getLocalizationManager();
+    
+    /**
+     * User register to receive push notification
+     * 
+     * @param id the id for the user
+     * @param noFallback some devices don't support an efficient push API and will resort to polling 
+     * to provide push like functionality. If this flag is set to true no polling will occur and 
+     * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     */
+    public void registerPush(String id, boolean noFallback) {
+    }
+
+    /**
+     * Stop receiving push notifications to this client application
+     */
+    public void deregisterPush() {
+    }
 }

@@ -390,7 +390,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * User’s age
+     * Users age
      * @return the user age
      */
     public String getAge() {

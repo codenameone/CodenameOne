@@ -759,8 +759,6 @@ public class ResourceEditorView extends FrameView {
         livePreviewUI = new javax.swing.JCheckBoxMenuItem();
         jMenu6 = new javax.swing.JMenu();
         resetNetbeansSettings = new javax.swing.JMenuItem();
-        pickMIDlet = new javax.swing.JMenuItem();
-        resetToDefault = new javax.swing.JMenuItem();
         jMenu1 = new javax.swing.JMenu();
         iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu3 = new javax.swing.JMenu();
@@ -1331,19 +1329,6 @@ public class ResourceEditorView extends FrameView {
         resetNetbeansSettings.addActionListener(formListener);
         jMenu6.add(resetNetbeansSettings);
 
-        pickMIDlet.setMnemonic('P');
-        pickMIDlet.setText("Pick Application");
-        pickMIDlet.setToolTipText("Restore Default");
-        pickMIDlet.setName("pickMIDlet"); // NOI18N
-        pickMIDlet.addActionListener(formListener);
-        jMenu6.add(pickMIDlet);
-
-        resetToDefault.setMnemonic('R');
-        resetToDefault.setText("Restore Default (Undo Pick Application)");
-        resetToDefault.setName("resetToDefault"); // NOI18N
-        resetToDefault.addActionListener(formListener);
-        jMenu6.add(resetToDefault);
-
         jMenu8.add(jMenu6);
 
         menuBar.add(jMenu8);
@@ -1539,20 +1524,17 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == duplicateItem) {
                 ResourceEditorView.this.duplicateItemActionPerformed(evt);
             }
-            else if (evt.getSource() == resetNetbeansSettings) {
-                ResourceEditorView.this.resetNetbeansSettingsActionPerformed(evt);
-            }
-            else if (evt.getSource() == pickMIDlet) {
-                ResourceEditorView.this.pickMIDletActionPerformed(evt);
-            }
-            else if (evt.getSource() == resetToDefault) {
-                ResourceEditorView.this.resetToDefaultActionPerformed(evt);
-            }
             else if (evt.getSource() == signup) {
                 ResourceEditorView.this.signupActionPerformed(evt);
             }
             else if (evt.getSource() == login) {
                 ResourceEditorView.this.loginActionPerformed(evt);
+            }
+            else if (evt.getSource() == livePreviewUI) {
+                ResourceEditorView.this.livePreviewUIActionPerformed(evt);
+            }
+            else if (evt.getSource() == resetNetbeansSettings) {
+                ResourceEditorView.this.resetNetbeansSettingsActionPerformed(evt);
             }
             else if (evt.getSource() == iosNativeTheme) {
                 ResourceEditorView.this.iosNativeThemeActionPerformed(evt);
@@ -1602,9 +1584,6 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
             }
-            else if (evt.getSource() == livePreviewUI) {
-                ResourceEditorView.this.livePreviewUIActionPerformed(evt);
-            }
         }
     }// </editor-fold>//GEN-END:initComponents
 
@@ -1612,14 +1591,6 @@ public class ResourceEditorView extends FrameView {
         return loadedResources;
     }
     
-private void pickMIDletActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pickMIDletActionPerformed
-    PickMIDlet.showPickMIDletDialog(mainPanel);
-}//GEN-LAST:event_pickMIDletActionPerformed
-
-private void resetToDefaultActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_resetToDefaultActionPerformed
-    PickMIDlet.resetSettings();
-}//GEN-LAST:event_resetToDefaultActionPerformed
-
 private void addThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addThemeActionPerformed
     showAddThemeResourceDialog();
 }//GEN-LAST:event_addThemeActionPerformed
@@ -4588,14 +4559,12 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.ButtonGroup nativeThemeButtonGroup;
     private javax.swing.JMenuItem newMenuItem;
     private javax.swing.JMenuItem openMenuItem;
-    private javax.swing.JMenuItem pickMIDlet;
     private javax.swing.JMenuItem pulsateEffect;
     private javax.swing.JMenu recentMenu;
     private javax.swing.JMenuItem redoItem;
     private javax.swing.JMenuItem renameItem;
     private javax.swing.JMenuItem resPassword;
     private javax.swing.JMenuItem resetNetbeansSettings;
-    private javax.swing.JMenuItem resetToDefault;
     private javax.swing.JPanel resourceEditor;
     private javax.swing.JMenuItem saveAsMenuItem;
     private javax.swing.JMenuItem saveMenuItem;

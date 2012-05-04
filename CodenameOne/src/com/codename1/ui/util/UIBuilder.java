@@ -417,13 +417,19 @@ public class UIBuilder {
                 backCommands.addElement(cmd);
             }
         }
-        ((Button)c).setCommand(cmd);
+        Button btn;
+        if(c instanceof Container) {
+            btn = (Button)((Container)c).getLeadComponent();
+        } else {
+            btn = ((Button)c);
+        }
+        btn.setCommand(cmd);
 
         // prevent duplicate action handling only in the case of a component form
         // the embeded component doesn't have a global command listener since it has
         // no menu
         if(c.getComponentForm() != null) {
-            ((Button)c).removeActionListener(getFormListenerInstance(parent, null));
+            btn.removeActionListener(getFormListenerInstance(parent, null));
         }
         cmd.putClientProperty(COMMAND_ARGUMENTS, commandArgument);
         cmd.putClientProperty(COMMAND_ACTION, commandAction);

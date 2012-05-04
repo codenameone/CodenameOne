@@ -2288,7 +2288,11 @@ public class UserInterfaceEditor extends BaseForm {
         }
 
         public void actionPerformed(ActionEvent e) {
-            com.codename1.ui.Button b = (com.codename1.ui.Button)getSelectedComponents()[0];
+            com.codename1.ui.Component selectedCMP = getSelectedComponents()[0];
+            if(selectedCMP instanceof com.codename1.ui.Container) {
+                selectedCMP = ((com.codename1.ui.Container)selectedCMP).getLeadComponent();
+            }
+            com.codename1.ui.Button b = (com.codename1.ui.Button)selectedCMP;
             ActionCommand a = (ActionCommand)b.getCommand();
             if(a == null) {
                 a = new ActionCommand(b.getText(), b.getIcon(), ActionCommand.getCommandUniqueId(), null, false, "");
@@ -2507,7 +2511,12 @@ public class UserInterfaceEditor extends BaseForm {
         if(isPropertyModified(cmp, PROPERTY_COMMAND) || isPropertyModified(cmp, PROPERTY_COMMAND_LEGACY)) {
             out.writeUTF(cmp.getName());
             out.writeInt(PROPERTY_COMMAND);
-            ActionCommand cmd = (ActionCommand)((com.codename1.ui.Button)cmp).getCommand();
+            ActionCommand cmd;
+            if(cmp instanceof com.codename1.ui.Container) {
+                cmd = (ActionCommand)((com.codename1.ui.Button) ((com.codename1.ui.Container)cmp).getLeadComponent()).getCommand();
+            } else {
+                cmd = (ActionCommand)((com.codename1.ui.Button)cmp).getCommand();
+            }
             out.writeUTF(cmd.getCommandName());
             if(cmd.getIcon() != null) {
                 out.writeUTF(res.findId(cmd.getIcon()));

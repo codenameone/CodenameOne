@@ -77,6 +77,9 @@ import android.widget.VideoView;
 import com.codename1.contacts.Contact;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -84,6 +87,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -2977,6 +2981,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         return mediaFile;
+    }
+
+    @Override
+    public void registerPush(String id, boolean noFallback) {
+        ((CodenameOneActivity)activity).registerForPush(id);
+    }
+
+    @Override
+    public void deregisterPush() {
+        ((CodenameOneActivity)activity).stopReceivingPush();
+        long i = Preferences.get("CN1C2DKServerId", -1);
+        if(i > -1) {
+            ConnectionRequest r = new ConnectionRequest();
+            r.setPost(false);
+            r.setUrl("https://codename-one.appspot.com/deregisterPush");
+            r.addArgument("p", Preferences.get("CN1C2DKRegistration", ""));
+            r.addArgument("a", activity.getPackageName());
+            NetworkManager.getInstance().addToQueue(r);
+            Preferences.set("CN1C2DKServerId", null);
+            Preferences.set("CN1C2DKRegistration", null);
+        }
     }
 
     private static String convertImageUriToFilePath(Uri imageUri, Activity activity) {
