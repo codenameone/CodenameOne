@@ -85,6 +85,25 @@
 //    [self.viewController stopAnimation];
 }
 
+- (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
+    NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
+                stringByReplacingOccurrencesOfString:@" " withString:@""];
+    java_lang_String* str = fromNSString(tokenAsString);
+    com_codename1_impl_ios_IOSImplementation_pushRegistered___java_lang_String(str);
+}
+ 
+- (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
+	NSLog(@"Failed to get token, error: %@", error);
+    java_lang_String* str = fromNSString([error localizedDescription]);
+    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(str);
+}
+
+- (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo {
+	NSLog(@"Received notification: %@", userInfo);
+	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+}
+
 - (void)dealloc
 {
     [_window release];

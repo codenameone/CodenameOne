@@ -1794,3 +1794,13 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
         [pool release];
     });
 }
+
+
+void com_codename1_impl_ios_IOSNative_registerPush__() {
+    [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+		(UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+}
+
+void com_codename1_impl_ios_IOSNative_deregisterPush__() {
+    [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+}
