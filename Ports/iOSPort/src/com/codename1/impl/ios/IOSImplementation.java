@@ -41,6 +41,9 @@ import java.lang.ref.SoftReference;
 import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
@@ -48,12 +51,14 @@ import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -680,15 +685,34 @@ public class IOSImplementation extends CodenameOneImplementation {
         return stringWidthNative(fnt.peer, str);
     }
     
-    private Map<String, Integer> stringWidthCache = new HashMap<String, Integer>();
+    class FontStringCache {
+        String txt;
+        long peer;
+        
+        public FontStringCache(String t, long i) {
+            txt = t;
+            peer = i;
+        }
+        
+        public int hashCode() {
+            return txt.hashCode() + ((int)peer);
+        }
+        
+        public boolean equals(Object o) {
+            FontStringCache c = (FontStringCache)o;
+            return c.peer == peer && txt.equalsIgnoreCase(c.txt);
+        }
+    }
+    private Map<FontStringCache, Integer> stringWidthCache = new HashMap<FontStringCache, Integer>();
     private int stringWidthNative(long peer, String str) {
         if(str.length() < 50) {
-            Integer i = stringWidthCache.get(str);
+            FontStringCache c = new FontStringCache(str, peer);
+            Integer i = stringWidthCache.get(c);
             if(i != null) {
                 return i.intValue();
             }
             int val = IOSNative.stringWidthNative(peer, str);
-            stringWidthCache.put(str, new Integer(val));
+            stringWidthCache.put(c, new Integer(val));
             return val;
         }
         return IOSNative.stringWidthNative(peer, str);
@@ -1251,13 +1275,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void shear(float x, float y) {
         }
 
-        public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        /*public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
             IOSNative.fillRectRadialGradientMutable(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
     
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
             IOSNative.fillLinearGradientMutable(startColor, endColor, x, y, width, height, horizontal);
-        }
+        }*/
     }
 
     class GlobalGraphics extends NativeGraphics {
@@ -1330,13 +1354,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeDrawImageGlobal(peer, alpha, x, y, width, height);
         }
 
-        public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        /*public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
             IOSNative.fillRectRadialGradientGlobal(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
     
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
             IOSNative.fillLinearGradientGlobal(startColor, endColor, x, y, width, height, horizontal);
-        }
+        }*/
     }
 
     class NativeFont {
@@ -2103,7 +2127,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         return false;
     }
 
-    public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+    /*public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
         ng.applyClip();
@@ -2115,7 +2139,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.checkControl();
         ng.applyClip();
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
-    }
+    }*/
 
     public static void appendData(long peer, byte[] data) {
         NetworkConnection n = connections.get(peer);
@@ -2628,6 +2652,75 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void registerPush(String id, boolean noFallback) {
+        IOSNative.registerPush();
+    }
+
+    @Override
+    public void deregisterPush() {
+        IOSNative.deregisterPush();
+    }
+
+    private static PushCallback pushCallback;
+    
+    public static void pushReceived(final String message) {
+        if(pushCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    pushCallback.push(message);
+                }
+            });
+        }
+    }
+    public static void pushRegistered(final String deviceKey) {
+        System.out.println("Push handleRegistration() Sending registration to server!");
+        ConnectionRequest r = new ConnectionRequest() {
+            protected void readResponse(InputStream input) throws IOException  {
+                DataInputStream d = new DataInputStream(input);
+                Preferences.set("CN1C2DKServerId", d.readLong());
+            }
+        };
+        r.setPost(false);
+        r.setUrl("https://codename-one.appspot.com/registerPush");
+        long val = Preferences.get("CN1C2DKServerId", (long)-1);
+        if(val > -1) {
+            r.addArgument("i", "" + val);
+        }
+        r.addArgument("p", deviceKey);
+        String k = Display.getInstance().getProperty("built_by_user", "Unknown Build Key") + '/' +
+                Display.getInstance().getProperty("package_name", "Unknown Build Key");
+        r.addArgument("k", k);
+        r.addArgument("os", "iOS");
+        r.addArgument("t", "2");
+        //r.addArgument("ud", ((TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId());
+        String clsName = callback.getClass().getName();
+        clsName.substring(0, clsName.lastIndexOf('.'));
+        r.addArgument("r", clsName);
+        NetworkManager.getInstance().addToQueue(r);
+        if(pushCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    pushCallback.registeredForPush(deviceKey);
+                }
+            });
+        }
+    }
+
+    public static void pushRegistrationError(final String message) {
+        if(pushCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    pushCallback.pushRegistrationError(message, 0);
+                }
+            });
+        }
+    }
+
+    public static void setPushCallback(PushCallback callback) {
+        pushCallback = callback;
+    }
+    
     private L10NManager l10n;
 
     /**

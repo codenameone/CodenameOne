@@ -281,4 +281,8 @@ public class IOSNative {
     
     public static native void dial(String phone);
     public static native void sendSMS(String phone, String text);
+
+    public static native void registerPush();
+
+    public static native void deregisterPush();
 }
