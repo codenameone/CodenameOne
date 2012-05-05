@@ -117,6 +117,7 @@ public class MultipartRequest extends ConnectionRequest {
                 writer.write("Content-Transfer-Encoding: binary");
                 writer.write(CRLF);
                 writer.write(CRLF);
+                writer.flush();
                 if(value instanceof InputStream) {
                     InputStream i = (InputStream)value;
                     byte[] buffer = new byte[8192];
@@ -128,7 +129,6 @@ public class MultipartRequest extends ConnectionRequest {
                 } else {
                     os.write((byte[])value);
                 }
-                writer.write(CRLF);
                 writer.flush();
             }
             writer.write(CRLF);
