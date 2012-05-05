@@ -66,7 +66,7 @@ public class MultipartRequest extends ConnectionRequest {
     public void addData(String name, byte[] data, String mimeType) {
         args.put(name, data);
         mimeTypes.put(name, mimeType);
-        if(!filenames.contains(name)) {
+        if(!filenames.containsKey(name)) {
             filenames.put(name, name);
         }
     }
@@ -79,7 +79,7 @@ public class MultipartRequest extends ConnectionRequest {
      */
     public void addData(String name, InputStream data, String mimeType) {
         args.put(name, data);
-        if(!filenames.contains(name)) {
+        if(!filenames.containsKey(name)) {
             filenames.put(name, name);
         }
         mimeTypes.put(name, mimeType);
@@ -99,7 +99,7 @@ public class MultipartRequest extends ConnectionRequest {
      */
     public void addArgument(String name, String value) {
         args.put(name, value);
-        if(!filenames.contains(name)) {
+        if(!filenames.containsKey(name)) {
             filenames.put(name, name);
         }
     }
