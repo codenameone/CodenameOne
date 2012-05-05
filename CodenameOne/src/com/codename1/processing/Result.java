@@ -299,7 +299,7 @@ public class Result {
 		}
 		if ("true".equals(s)) {
 			return true;
-		} else if ("0".equals(s)) {
+		} else if ("1".equals(s)) {
 			return true;
 		}
 		return false;
@@ -472,6 +472,39 @@ public class Result {
 	 */
 	public String getAsString(final String path)
 			throws IllegalArgumentException {
+		Object o = _internalGet(path);
+		if (o instanceof StructuredContent) {
+			return ((StructuredContent)o).getText();
+		}
+		return (String)o;
+	}
+
+	/**
+	 * Get the object value from the requested path.  This method may
+	 * return a Hashtable, Vector, String, or null.
+	 * 
+	 * @param path
+	 * @return the object at the given path, or null.
+	 * @throws IllegalArgumentException
+	 */
+	public Object get(final String path)
+			throws IllegalArgumentException {
+		Object o = _internalGet(path);
+		if (o instanceof StructuredContent) {
+			return ((StructuredContent)o).getNativeRoot();
+		}
+		return o;
+	}
+
+	/**
+	 * Internal function, do not use. This version does not convert the
+	 * structured content nodes, so not to be called by end user.
+	 * 
+	 * @param path
+	 * @return a StructuredContent node, a String, or null
+	 * @throws IllegalArgumentException
+	 */
+	private Object _internalGet(final String path) throws IllegalArgumentException {
 		final Vector tokens = new ResultTokenizer(path).tokenize();
 		final StructuredContent obj = apply(root, tokens, 0);
 		if (obj == null) {
@@ -485,15 +518,10 @@ public class Result {
 			if (result.size() == 0) {
 				return null;
 			}
-			Object o = result.elementAt(0);
-			if (o instanceof String) {
-				return (String) o;
-			}
-			StructuredContent element = (StructuredContent) o;
-			return element.getText();
+			return result.elementAt(0);
 		}
 	}
-
+	
 	/**
 	 * Get the size of an array at the requested path.
 	 * 
@@ -655,6 +683,88 @@ public class Result {
 	}
 
 	/**
+	 * Get an array of values from the requested path.
+	 * <pre>
+	 * String types[] = result
+	 * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
+	 * 
+	 * @param path Path expression to evaluate
+	 * @return the value at the requested path
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
+	 * @throws NumberFormatException if the value at path can not be converted
+	 *             to an long.
+	 */
+	public long[] getAsLongArray(final String path)
+			throws IllegalArgumentException {
+		final Vector jarr = _internalGetAsArray(path);
+		final long[] arr = new long[jarr == null ? 0 : jarr.size()];
+		for (int i = 0; i < arr.length; i++) {
+			StructuredContent element = (StructuredContent) jarr.elementAt(i);
+			String s = (String) element.getText();
+			arr[i] = Long.parseLong(s);
+		}
+		return arr;
+	}
+	
+	/**
+	 * Get an array of values from the requested path.
+	 * <pre>
+	 * String types[] = result
+	 * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
+	 * 
+	 * @param path Path expression to evaluate
+	 * @return the value at the requested path
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
+	 * @throws NumberFormatException if the value at path can not be converted
+	 *             to an double.
+	 */
+	public double[] getAsDoubleArray(final String path)
+			throws IllegalArgumentException {
+		final Vector jarr = _internalGetAsArray(path);
+		final double[] arr = new double[jarr == null ? 0 : jarr.size()];
+		for (int i = 0; i < arr.length; i++) {
+			StructuredContent element = (StructuredContent) jarr.elementAt(i);
+			String s = (String) element.getText();
+			arr[i] = Double.parseDouble(s);
+		}
+		return arr;
+	}
+
+	/**
+	 * Get an array of values from the requested path.
+	 * <pre>
+	 * String types[] = result
+	 * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+	 * </pre>
+	 * 
+	 * @param path Path expression to evaluate
+	 * @return the value at the requested path
+	 * @throws IllegalArgumentException on error traversing the document, ie.
+	 *             traversing into an array without using subscripts.
+	 */
+	public boolean[] getAsBooleanArray(final String path)
+			throws IllegalArgumentException {
+		final Vector jarr = _internalGetAsArray(path);
+		final boolean[] arr = new boolean[jarr == null ? 0 : jarr.size()];
+		for (int i = 0; i < arr.length; i++) {
+			StructuredContent element = (StructuredContent) jarr.elementAt(i);
+			String s = (String) element.getText();
+			boolean b = false;
+			if ("true".equals(s)) {
+				b = true;
+			} else if ("1".equals(s)) {
+				b = true;
+			}
+			arr[i] = b;
+		}
+		return arr;
+	}
+	
+	/**
 	 * Get a vector of values from the requested path.
 	 * 
 	 * For example: <b>JSON</b>
@@ -717,7 +827,7 @@ public class Result {
 		}
 		final StructuredContent obj = apply(root, tokens, 0);
 		if (obj == null) {
-			return null;
+			return new Vector();
 		}
 		String key = (String) tokens.lastElement();
 		// if the last element of expression is a glob, handle it here
