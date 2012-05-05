@@ -39,6 +39,7 @@ import java.util.Hashtable;
 public class MultipartRequest extends ConnectionRequest {
     private String boundary;
     private Hashtable args = new Hashtable();
+    private Hashtable filenames = new Hashtable();
     private Hashtable mimeTypes = new Hashtable();
     private static final String CRLF = "\r\n"; 
     
@@ -65,6 +66,9 @@ public class MultipartRequest extends ConnectionRequest {
     public void addData(String name, byte[] data, String mimeType) {
         args.put(name, data);
         mimeTypes.put(name, mimeType);
+        if(!filenames.contains(name)) {
+            filenames.put(name, name);
+        }
     }
 
     /**
@@ -75,7 +79,19 @@ public class MultipartRequest extends ConnectionRequest {
      */
     public void addData(String name, InputStream data, String mimeType) {
         args.put(name, data);
+        if(!filenames.contains(name)) {
+            filenames.put(name, name);
+        }
         mimeTypes.put(name, mimeType);
+    }
+    
+    /**
+     * Sets the filename for the given argument
+     * @param arg the argument name 
+     * @param filename the file name
+     */
+    public void setFilename(String arg, String filename) {
+        filenames.put(arg, filename);
     }
     
     /**
@@ -83,6 +99,9 @@ public class MultipartRequest extends ConnectionRequest {
      */
     public void addArgument(String name, String value) {
         args.put(name, value);
+        if(!filenames.contains(name)) {
+            filenames.put(name, name);
+        }
     }
 
     /**
@@ -109,7 +128,7 @@ public class MultipartRequest extends ConnectionRequest {
                 writer.write(CRLF);
                 writer.flush();
             } else {
-                writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + key +"\"");
+                writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) +"\"");
                 writer.write(CRLF);
                 writer.write("Content-Type: ");
                 writer.write((String)mimeTypes.get(key));
@@ -126,6 +145,7 @@ public class MultipartRequest extends ConnectionRequest {
                         os.write(buffer, 0, s);
                         s = i.read(buffer);
                     }
+                    Util.cleanup(i);
                 } else {
                     os.write((byte[])value);
                 }
