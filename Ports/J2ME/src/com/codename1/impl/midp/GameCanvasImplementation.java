@@ -2434,7 +2434,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         FileConnection fc = null;
         try {
             fc = (FileConnection)Connector.open(directory, Connector.READ);
-            return enumToStringArr(fc.list());
+            return enumToStringArr(fc.list("*", true));
         } finally {
             cleanup(fc);
         }
