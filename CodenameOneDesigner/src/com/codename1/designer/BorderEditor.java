@@ -293,51 +293,53 @@ public class BorderEditor extends javax.swing.JPanel {
     private void initComponents() {
 
         jPanel1 = new javax.swing.JPanel();
+        jPanel3 = new javax.swing.JPanel();
         okButton = new javax.swing.JButton();
         cancelButton = new javax.swing.JButton();
-        jSplitPane1 = new javax.swing.JSplitPane();
-        jScrollPane1 = new javax.swing.JScrollPane();
-        help = new javax.swing.JTextPane();
+        jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel2 = new javax.swing.JPanel();
         changeHighlightColor = new javax.swing.JButton();
         thickness = new javax.swing.JSpinner();
         jLabel10 = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
         arcHeight = new javax.swing.JSpinner();
-        center = new javax.swing.JComboBox();
         changeSecondaryHighlightColor = new javax.swing.JButton();
         changeSecondaryShadowColor = new javax.swing.JButton();
-        right = new javax.swing.JComboBox();
-        left = new javax.swing.JComboBox();
-        topRight = new javax.swing.JComboBox();
         shadowColor = new javax.swing.JTextField();
         jLabel11 = new javax.swing.JLabel();
-        bottomRight = new javax.swing.JComboBox();
         changeLineColor = new javax.swing.JButton();
         borderType = new javax.swing.JComboBox();
         jLabel3 = new javax.swing.JLabel();
         secondaryShadowColor = new javax.swing.JTextField();
         jLabel6 = new javax.swing.JLabel();
-        bottomLeft = new javax.swing.JComboBox();
         jLabel1 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         highlightColor = new javax.swing.JTextField();
         jLabel12 = new javax.swing.JLabel();
         secondaryHighlightColor = new javax.swing.JTextField();
-        top = new javax.swing.JComboBox();
         arcWidth = new javax.swing.JSpinner();
-        bottom = new javax.swing.JComboBox();
         imageMode = new javax.swing.JCheckBox();
         raisedBorder = new javax.swing.JCheckBox();
         changeShadowColor = new javax.swing.JButton();
         jLabel8 = new javax.swing.JLabel();
         lineColor = new javax.swing.JTextField();
         jLabel9 = new javax.swing.JLabel();
-        topLeft = new javax.swing.JComboBox();
         themeColors = new javax.swing.JCheckBox();
         imageBorderPreview = new com.codename1.ui.resource.util.CodenameOneComponentWrapper();
         jLabel7 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
+        jPanel4 = new javax.swing.JPanel();
+        topLeft = new javax.swing.JComboBox();
+        top = new javax.swing.JComboBox();
+        topRight = new javax.swing.JComboBox();
+        left = new javax.swing.JComboBox();
+        center = new javax.swing.JComboBox();
+        right = new javax.swing.JComboBox();
+        bottomLeft = new javax.swing.JComboBox();
+        bottom = new javax.swing.JComboBox();
+        bottomRight = new javax.swing.JComboBox();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        help = new javax.swing.JTextPane();
 
         FormListener formListener = new FormListener();
 
@@ -346,32 +348,24 @@ public class BorderEditor extends javax.swing.JPanel {
 
         jPanel1.setName("jPanel1"); // NOI18N
 
+        jPanel3.setName("jPanel3"); // NOI18N
+        jPanel3.setLayout(new java.awt.GridLayout(1, 2));
+
         okButton.setText("OK");
         okButton.setName("okButton"); // NOI18N
         okButton.addActionListener(formListener);
-        jPanel1.add(okButton);
+        jPanel3.add(okButton);
 
         cancelButton.setText("Cancel");
         cancelButton.setName("cancelButton"); // NOI18N
         cancelButton.addActionListener(formListener);
-        jPanel1.add(cancelButton);
+        jPanel3.add(cancelButton);
+
+        jPanel1.add(jPanel3);
 
         add(jPanel1, java.awt.BorderLayout.SOUTH);
 
-        jSplitPane1.setDividerLocation(450);
-        jSplitPane1.setResizeWeight(1.0);
-        jSplitPane1.setName("jSplitPane1"); // NOI18N
-        jSplitPane1.setOneTouchExpandable(true);
-        jSplitPane1.setPreferredSize(new java.awt.Dimension(650, 500));
-
-        jScrollPane1.setName("jScrollPane1"); // NOI18N
-
-        help.setContentType("text/html");
-        help.setEditable(false);
-        help.setName("help"); // NOI18N
-        jScrollPane1.setViewportView(help);
-
-        jSplitPane1.setRightComponent(jScrollPane1);
+        jTabbedPane1.setName("jTabbedPane1"); // NOI18N
 
         jPanel2.setMinimumSize(new java.awt.Dimension(50, 50));
         jPanel2.setName("jPanel2"); // NOI18N
@@ -395,9 +389,6 @@ public class BorderEditor extends javax.swing.JPanel {
         arcHeight.setName("arcHeight"); // NOI18N
         arcHeight.addChangeListener(formListener);
 
-        center.setName("center"); // NOI18N
-        center.addActionListener(formListener);
-
         changeSecondaryHighlightColor.setText("...");
         changeSecondaryHighlightColor.setEnabled(false);
         changeSecondaryHighlightColor.setName("changeSecondaryHighlightColor"); // NOI18N
@@ -406,24 +397,12 @@ public class BorderEditor extends javax.swing.JPanel {
         changeSecondaryShadowColor.setEnabled(false);
         changeSecondaryShadowColor.setName("changeSecondaryShadowColor"); // NOI18N
 
-        right.setName("right"); // NOI18N
-        right.addActionListener(formListener);
-
-        left.setName("left"); // NOI18N
-        left.addActionListener(formListener);
-
-        topRight.setName("topRight"); // NOI18N
-        topRight.addActionListener(formListener);
-
         shadowColor.setText("000000");
         shadowColor.setEnabled(false);
         shadowColor.setName("shadowColor"); // NOI18N
 
         jLabel11.setText("Image Border");
         jLabel11.setName("jLabel11"); // NOI18N
-
-        bottomRight.setName("bottomRight"); // NOI18N
-        bottomRight.addActionListener(formListener);
 
         changeLineColor.setText("...");
         changeLineColor.setEnabled(false);
@@ -443,9 +422,6 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel6.setText("Secondary");
         jLabel6.setName("jLabel6"); // NOI18N
 
-        bottomLeft.setName("bottomLeft"); // NOI18N
-        bottomLeft.addActionListener(formListener);
-
         jLabel1.setText("Type");
         jLabel1.setName("jLabel1"); // NOI18N
 
@@ -463,15 +439,9 @@ public class BorderEditor extends javax.swing.JPanel {
         secondaryHighlightColor.setEnabled(false);
         secondaryHighlightColor.setName("secondaryHighlightColor"); // NOI18N
 
-        top.setName("top"); // NOI18N
-        top.addActionListener(formListener);
-
         arcWidth.setEnabled(false);
         arcWidth.setName("arcWidth"); // NOI18N
         arcWidth.addChangeListener(formListener);
-
-        bottom.setName("bottom"); // NOI18N
-        bottom.addActionListener(formListener);
 
         imageMode.setText("3 Image Mode");
         imageMode.setEnabled(false);
@@ -498,9 +468,6 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel9.setText("Arc Height");
         jLabel9.setName("jLabel9"); // NOI18N
 
-        topLeft.setName("topLeft"); // NOI18N
-        topLeft.addActionListener(formListener);
-
         themeColors.setText("Theme Colors");
         themeColors.setEnabled(false);
         themeColors.setName("themeColors"); // NOI18N
@@ -516,6 +483,46 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel5.setText("Secondary");
         jLabel5.setName("jLabel5"); // NOI18N
 
+        jPanel4.setOpaque(false);
+        jPanel4.setName("jPanel4"); // NOI18N
+        jPanel4.setLayout(new java.awt.GridLayout(3, 3));
+
+        topLeft.setName("topLeft"); // NOI18N
+        topLeft.addActionListener(formListener);
+        jPanel4.add(topLeft);
+
+        top.setName("top"); // NOI18N
+        top.addActionListener(formListener);
+        jPanel4.add(top);
+
+        topRight.setName("topRight"); // NOI18N
+        topRight.addActionListener(formListener);
+        jPanel4.add(topRight);
+
+        left.setName("left"); // NOI18N
+        left.addActionListener(formListener);
+        jPanel4.add(left);
+
+        center.setName("center"); // NOI18N
+        center.addActionListener(formListener);
+        jPanel4.add(center);
+
+        right.setName("right"); // NOI18N
+        right.addActionListener(formListener);
+        jPanel4.add(right);
+
+        bottomLeft.setName("bottomLeft"); // NOI18N
+        bottomLeft.addActionListener(formListener);
+        jPanel4.add(bottomLeft);
+
+        bottom.setName("bottom"); // NOI18N
+        bottom.addActionListener(formListener);
+        jPanel4.add(bottom);
+
+        bottomRight.setName("bottomRight"); // NOI18N
+        bottomRight.addActionListener(formListener);
+        jPanel4.add(bottomRight);
+
         org.jdesktop.layout.GroupLayout jPanel2Layout = new org.jdesktop.layout.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
@@ -525,7 +532,7 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel2Layout.createSequentialGroup()
                         .add(imageBorderPreview, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 486, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addContainerGap())
+                        .add(370, 370, 370))
                     .add(jPanel2Layout.createSequentialGroup()
                         .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
@@ -540,59 +547,29 @@ public class BorderEditor extends javax.swing.JPanel {
                         .add(6, 6, 6)
                         .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jPanel2Layout.createSequentialGroup()
-                                .add(left, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(center, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(6, 6, 6)
-                                .add(right, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel2Layout.createSequentialGroup()
                                 .add(imageMode)
                                 .add(235, 235, 235))
                             .add(jPanel2Layout.createSequentialGroup()
                                 .add(raisedBorder)
                                 .add(307, 307, 307))
                             .add(jPanel2Layout.createSequentialGroup()
-                                .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeShadowColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel6)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeSecondaryShadowColor)
-                                .add(79, 79, 79))
-                            .add(jPanel2Layout.createSequentialGroup()
                                 .add(arcWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
                                 .add(56, 56, 56)
                                 .add(jLabel9)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(arcHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
-                                .add(130, 130, 130))
+                                .add(126, 126, 126))
                             .add(jPanel2Layout.createSequentialGroup()
                                 .add(lineColor)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(changeLineColor)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(themeColors)
-                                .add(134, 134, 134))
-                            .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                .add(jPanel2Layout.createSequentialGroup()
-                                    .add(bottomLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                    .add(bottom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .add(6, 6, 6)
-                                    .add(bottomRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                .add(jPanel2Layout.createSequentialGroup()
-                                    .add(topLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 104, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                    .add(top, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .add(6, 6, 6)
-                                    .add(topRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .add(113, 113, 113))
                             .add(jPanel2Layout.createSequentialGroup()
-                                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                                    .add(org.jdesktop.layout.GroupLayout.LEADING, borderType, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                    .add(org.jdesktop.layout.GroupLayout.LEADING, thickness)
+                                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, borderType, 0, 375, Short.MAX_VALUE)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, thickness, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 375, Short.MAX_VALUE)
                                     .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
                                         .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -603,20 +580,31 @@ public class BorderEditor extends javax.swing.JPanel {
                                         .add(secondaryHighlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                         .add(changeSecondaryHighlightColor)))
-                                .add(79, 79, 79)))
-                        .add(296, 296, 296))))
+                                .add(8, 8, 8))
+                            .add(jPanel2Layout.createSequentialGroup()
+                                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 375, Short.MAX_VALUE)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
+                                        .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(changeShadowColor)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(jLabel6)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(changeSecondaryShadowColor)))
+                                .add(8, 8, 8)))
+                        .add(6, 6, 6))))
         );
 
         jPanel2Layout.linkSize(new java.awt.Component[] {arcHeight, arcWidth, highlightColor, lineColor, secondaryHighlightColor, secondaryShadowColor, shadowColor}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
         jPanel2Layout.linkSize(new java.awt.Component[] {changeHighlightColor, changeLineColor, changeSecondaryHighlightColor, changeSecondaryShadowColor, changeShadowColor}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
-        jPanel2Layout.linkSize(new java.awt.Component[] {bottom, bottomLeft, bottomRight, center, left, right, top, topLeft, topRight}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
-
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel2Layout.createSequentialGroup()
-                .addContainerGap()
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel1)
                     .add(borderType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
@@ -662,32 +650,26 @@ public class BorderEditor extends javax.swing.JPanel {
                     .add(imageMode))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel2Layout.createSequentialGroup()
-                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                            .add(topLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 36, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(top, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(topRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                            .add(bottomLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(bottom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(bottomRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                            .add(left, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(center, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(right, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                    .add(jLabel11))
-                .add(18, 18, 18)
-                .add(imageBorderPreview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 130, Short.MAX_VALUE)
-                .addContainerGap())
+                    .add(jLabel11)
+                    .add(jPanel4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 93, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(imageBorderPreview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 93, Short.MAX_VALUE)
+                .add(5, 5, 5))
         );
 
-        jPanel2Layout.linkSize(new java.awt.Component[] {bottom, bottomLeft, bottomRight, center, left, right, top, topLeft, topRight}, org.jdesktop.layout.GroupLayout.VERTICAL);
+        jTabbedPane1.addTab("Border", jPanel2);
 
-        jSplitPane1.setLeftComponent(jPanel2);
+        jScrollPane1.setName("jScrollPane1"); // NOI18N
+        jScrollPane1.setPreferredSize(new java.awt.Dimension(400, 500));
 
-        add(jSplitPane1, java.awt.BorderLayout.CENTER);
+        help.setContentType("text/html");
+        help.setEditable(false);
+        help.setName("help"); // NOI18N
+        jScrollPane1.setViewportView(help);
+
+        jTabbedPane1.addTab("Help", jScrollPane1);
+
+        add(jTabbedPane1, java.awt.BorderLayout.CENTER);
     }
 
     // Code for dispatching events from components to event handlers.
@@ -1052,8 +1034,10 @@ public Border getResult() {
     private javax.swing.JLabel jLabel9;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
+    private javax.swing.JPanel jPanel3;
+    private javax.swing.JPanel jPanel4;
     private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JSplitPane jSplitPane1;
+    private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JComboBox left;
     private javax.swing.JTextField lineColor;
     private javax.swing.JButton okButton;
