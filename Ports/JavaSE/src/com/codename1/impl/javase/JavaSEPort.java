@@ -173,7 +173,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Class clsInstance;
     private BufferedImage header;
     private BufferedImage headerLandscape;
-    private String platformName;
+    private String platformName = "ios";
     private String[] platformOverrides = new String[0];
     private static NetworkMonitor netMonitor;
     private static PerformanceMonitor perfMonitor;
