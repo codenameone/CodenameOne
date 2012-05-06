@@ -36,6 +36,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.util.Resources;
 import java.util.Hashtable;
 
 /**
@@ -49,7 +50,7 @@ public class EmailShare extends ShareService {
      * Default Constructor
      */
     public EmailShare() {
-        super("Email", null);
+        super("Email", Resources.getSystemResource().getImage("mail.png"));
     }
     
     /**

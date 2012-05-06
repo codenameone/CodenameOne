@@ -30,10 +30,12 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.List;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
@@ -54,6 +56,8 @@ public class ShareButton extends Button implements ActionListener{
      */
     public ShareButton() {
         setUIID("ShareButton");
+        Image shareIcon = Resources.getSystemResource().getImage("share.png");
+        setIcon(shareIcon);
         addActionListener(this);
         shareServices.addElement(new SMSShare());
         shareServices.addElement(new EmailShare());

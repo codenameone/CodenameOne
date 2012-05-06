@@ -28,6 +28,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.Resources;
 import java.io.IOException;
 
 /**
@@ -41,7 +42,7 @@ public class FacebookShare extends ShareService {
      * Default Constructor
      */
     public FacebookShare() {
-        super("Facebook", null);
+        super("Facebook", Resources.getSystemResource().getImage("facebook.png"));
     }
 
     /**

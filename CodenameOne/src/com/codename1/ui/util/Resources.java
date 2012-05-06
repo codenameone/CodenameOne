@@ -114,6 +114,8 @@ public class Resources {
 
     private static boolean runtimeMultiImages;
     
+    private static final String systemResourceLocation = "/CN1Resource.res";
+    
     /**
      * This flag should be off and it is off by default, some special case implementations for development
      * e.g. the AWT implementation activate this flag in order to use the EncodedImage multi-image support
@@ -1526,5 +1528,19 @@ public class Resources {
         byte[] data = new byte[width * height];
         input.readFully(data, 0, data.length);
         return Image.createIndexed(width, height, palette, data);
+    }
+    
+    /**
+     * Gets the system resource which can be located /CN1Images.res.
+     * 
+     * @return a Resources object which contains the system resources
+     */
+    public static Resources getSystemResource(){
+        try {
+            return open(systemResourceLocation);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        return null;
     }
 }

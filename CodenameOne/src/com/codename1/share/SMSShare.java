@@ -35,6 +35,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.util.Resources;
 import java.io.IOException;
 import java.util.Hashtable;
 
@@ -48,7 +49,7 @@ public class SMSShare extends ShareService {
      * Default Constructor
      */
     public SMSShare() {
-        super("SMS", null);
+        super("SMS", Resources.getSystemResource().getImage("sms.png"));
     }
     
     /**
