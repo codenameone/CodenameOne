@@ -64,6 +64,8 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.util.Vector;
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.media.MediaPlayer;
 import android.os.Environment;
@@ -83,6 +85,7 @@ import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -2983,29 +2986,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return mediaFile;
     }
 
+    private boolean hasAndroidMarket() {
+        return hasAndroidMarket(activity);
+    }
+    
+    /**
+     * Indicates whether this is a Google certified device which means that it has Android market
+     * etc.
+     */
+    public static boolean hasAndroidMarket(Context activity) {
+        final PackageManager packageManager = activity.getPackageManager();
+
+        String packagename = activity.getPackageName();
+
+        String url = "market://details?id=" + packagename;
+
+        Intent i2 = new Intent(Intent.ACTION_VIEW);
+        i2.setData(Uri.parse(url));
+
+        List<ResolveInfo> resolveInfo = packageManager.queryIntentActivities(i2,PackageManager.MATCH_DEFAULT_ONLY);
+
+        return resolveInfo.size() > 0;
+    }
+    
     @Override
     public void registerPush(String id, boolean noFallback) {
-        ((CodenameOneActivity)activity).registerForPush(id);
+        boolean has = hasAndroidMarket();
+        if(noFallback && !has) {
+            return;
+        } 
+        if(has) {
+            ((CodenameOneActivity)activity).registerForPush(id);
+        } else {
+            PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);
+        }
+    }
+
+    public static void stopPollingLoop() {
+        stopPolling();
+    }
+    
+    public static void registerPolling() {
+        registerPollingFallback();
     }
 
     @Override
     public void deregisterPush() {
-        ((CodenameOneActivity)activity).stopReceivingPush();
-        long i = Preferences.get("CN1C2DKServerId", -1);
-        if(i > -1) {
-            ConnectionRequest r = new ConnectionRequest();
-            r.setPost(false);
-            r.setUrl("https://codename-one.appspot.com/deregisterPush");
-            r.addArgument("p", Preferences.get("CN1C2DKRegistration", ""));
-            r.addArgument("a", activity.getPackageName());
-            NetworkManager.getInstance().addToQueue(r);
-            Preferences.set("CN1C2DKServerId", null);
-            Preferences.set("CN1C2DKRegistration", null);
+        boolean has = hasAndroidMarket();
+        if(has) {
+            ((CodenameOneActivity)activity).stopReceivingPush();
+            deregisterPushFromServer();
+        } else {
+            super.deregisterPush();
         }
     }
 
     private static String convertImageUriToFilePath(Uri imageUri, Activity activity) {
-
         Cursor cursor = null;
         try {
             String[] proj = {MediaStore.Images.Media.DATA};

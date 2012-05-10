@@ -187,14 +187,8 @@ class Spinner extends List {
         setOrientation(VERTICAL);
         setInputOnFocus(false);
         setIsScrollVisible(false);
-        DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());
-        render.setRTL(false);
-        render.setShowNumbers(false);
-        render.setUIID("SpinnerRenderer");
-        Component bgFocus = render.getListFocusComponent(this);
-        bgFocus.getSelectedStyle().setBgTransparency(0);
-        bgFocus.getUnselectedStyle().setBgTransparency(0);
-
+        initSpinnerRenderer();
+        
         quickType.setReplaceMenu(false);
         quickType.setInputModeOrder(new String[]{"123"});
         quickType.setFocus(true);
@@ -210,6 +204,18 @@ class Spinner extends List {
         }
     }
 
+    void initSpinnerRenderer() {
+        DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());
+        render.setRTL(false);
+        render.setShowNumbers(false);
+        render.setUIID("SpinnerRenderer");
+        Component bgFocus = render.getListFocusComponent(this);
+        bgFocus.setUIID("SpinnerRendererFocus");
+        bgFocus.getSelectedStyle().setBgTransparency(0);
+        bgFocus.getUnselectedStyle().setBgTransparency(0);
+        render.setAlwaysRenderSelection(true);
+    }
+    
     /**
      * @inheritDoc
      */

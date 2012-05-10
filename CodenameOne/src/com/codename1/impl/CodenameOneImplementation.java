@@ -24,21 +24,27 @@
 package com.codename1.impl;
 
 import com.codename1.contacts.Contact;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.util.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -83,7 +89,8 @@ public abstract class CodenameOneImplementation {
     private Graphics codenameOneGraphics;
 
     private static boolean bidi;
-
+    private String packageName;
+    
     /**
      * Useful since the content of a single element touch event is often recycled
      * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
@@ -105,8 +112,30 @@ public abstract class CodenameOneImplementation {
     private Object storageData;
     private Hashtable cookies;
     private ActionListener logger;
+    private static boolean pollingThreadRunning;
+    private static PushCallback callback;
     
+    /**
+     * Invoked by the display init method allowing the implementation to "bind"
+     * 
+     * @param m the object passed to the Display init method
+     */
+    public final void initImpl(Object m) {
+        init(m);
+        if(m != null) {
+            String clsName = m.getClass().getName();
+            packageName = clsName.substring(0, clsName.lastIndexOf('.'));
+        }
+    }
     
+    /**
+     * Allows the system to register to receive push callbacks
+     * @param push the callback object
+     */
+    public static void setPushCallback(PushCallback push) {
+        callback = push;
+    }
+
     /**
      * Invoked by the display init method allowing the implementation to "bind"
      * 
@@ -118,6 +147,9 @@ public abstract class CodenameOneImplementation {
      * Some implementations might need to perform initializations of the EDT thread
      */
     public void initEDT() {
+        if(Preferences.get("PollingPush", false) && callback != null) {
+            registerPollingFallback();
+        }
     }
 
     /**
@@ -4031,6 +4063,13 @@ public abstract class CodenameOneImplementation {
     public abstract L10NManager getLocalizationManager();
     
     /**
+     * Returns the package name for the application
+     */
+    protected String getPackageName() {
+        return packageName;
+    }
+    
+    /**
      * User register to receive push notification
      * 
      * @param id the id for the user
@@ -4039,11 +4078,137 @@ public abstract class CodenameOneImplementation {
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
     public void registerPush(String id, boolean noFallback) {
+        if(!noFallback) {
+            Preferences.set("PollingPush", true);
+            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            registerPollingFallback();
+        }
     }
 
     /**
      * Stop receiving push notifications to this client application
      */
     public void deregisterPush() {
+        Preferences.delete("PollingPush");
+        stopPolling();
+    }
+    
+    /**
+     * Stops the polling push loop
+     */
+    protected static void stopPolling() {
+        pollingThreadRunning = false;
+    }
+    
+    /**
+     * Returns the key for the application comprised of the builders email coupled with the 
+     * package name. It should uniquely identify the application across different builds 
+     * which allows interaction with the cloud.
+     * 
+     * @return a unique string with the format builders_email/packagename
+     */
+    protected static String getApplicationKey() {
+        Display d = Display.getInstance();
+        return d.getProperty("built_by_user", "Unknown Build Key") + '/' +
+                d.getProperty("package_name", "Unknown Build Key");
+    }
+    
+    /**
+     * Sends a server request to register push support. This is a method for use
+     * by implementations.
+     * 
+     * @param id the platform specific push ID
+     * @param applicationKey the unique id of the application
+     * @param pushType for server side type
+     * @param packageName the application package name used by the push service
+     */
+    public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
+            String packageName) {
+        Preferences.set("push_key", id);
+        ConnectionRequest r = new ConnectionRequest() {
+            protected void readResponse(InputStream input) throws IOException  {
+                DataInputStream d = new DataInputStream(input);
+                Preferences.set("push_id", d.readLong());
+            }
+        };
+        r.setPost(false);
+        r.setUrl("https://codename-one.appspot.com/registerPush");
+        long val = Preferences.get("push_id", (long)-1);
+        if(val > -1) {
+            r.addArgument("i", "" + val);
+        }
+        r.addArgument("p", id);
+        r.addArgument("k", applicationKey);
+        r.addArgument("os", Display.getInstance().getPlatformName());
+        r.addArgument("t", "" + pushType);
+        r.addArgument("ud", udid);
+        r.addArgument("r", packageName);
+        NetworkManager.getInstance().addToQueue(r);
+    }
+
+    /**
+     * For use by implementations, stop receiving push notifications from the server
+     */
+    public static void deregisterPushFromServer() {
+        long i = Preferences.get("push_id", -1);
+        if(i > -1) {
+            ConnectionRequest r = new ConnectionRequest();
+            r.setPost(false);
+            r.setUrl("https://codename-one.appspot.com/deregisterPush");
+            r.addArgument("p", Preferences.get("push_id", ""));
+            r.addArgument("a", getApplicationKey());
+            NetworkManager.getInstance().addToQueue(r);
+            Preferences.set("push_id", null);
+            Preferences.set("push_key", null);
+        }
+    }
+    
+    /**
+     * Registers a polling thread to simulate push notification
+     */
+    protected static void registerPollingFallback() {
+        if(pollingThreadRunning || callback == null) {
+            return;
+        }
+        pollingThreadRunning = true;
+        final String pushId = Preferences.get("push_id", null);
+        if(pushId != null) {
+            new Thread() {
+                public void run() {
+                    String lastReq = Preferences.get("last_push_req", "0");
+                    while(pollingThreadRunning) {
+                        try {
+                            try {
+                                Thread.sleep(50000);
+                            } catch(Throwable t) {
+                                t.printStackTrace();
+                            }
+                            ConnectionRequest cr = new ConnectionRequest();
+                            cr.setPost(false);
+                            cr.addArgument("i", pushId);
+                            cr.addArgument("last", lastReq);
+                            NetworkManager.getInstance().addToQueueAndWait(cr);
+                            DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));
+                            if(di.readBoolean()) {
+                                byte type = di.readByte();
+                                String message = di.readUTF();
+                                lastReq = "" + di.readLong();
+                                Preferences.set("last_push_req", lastReq);
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }.start();
+        }
+    }
+
+    /**
+     * Returns the image IO instance that allows scaling image files.
+     * @return the image IO instance
+     */
+    public ImageIO getImageIO() {
+        return null;
     }
 }

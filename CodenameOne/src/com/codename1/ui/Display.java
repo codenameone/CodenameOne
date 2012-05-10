@@ -36,10 +36,12 @@ import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
@@ -422,7 +424,7 @@ public final class Display {
             INSTANCE.impl = (CodenameOneImplementation)ImplementationFactory.getInstance().createImplementation();
 
             INSTANCE.impl.setDisplayLock(lock);
-            INSTANCE.impl.init(m);
+            INSTANCE.impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
@@ -2633,7 +2635,9 @@ public final class Display {
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
     public void registerPush(String id, boolean noFallback) {
-        impl.registerPush(id, noFallback);
+        if(Preferences.get("push_id", null) == null) {
+            impl.registerPush(id, noFallback);
+        }
     }
 
     /**
@@ -2641,5 +2645,13 @@ public final class Display {
      */
     public void deregisterPush() {
         impl.deregisterPush();
+    }
+
+    /**
+     * Returns the image IO instance that allows scaling image files.
+     * @return the image IO instance or null if image IO isn't supported for the given platform
+     */
+    public ImageIO getImageIO() {
+        return impl.getImageIO();
     }
 }

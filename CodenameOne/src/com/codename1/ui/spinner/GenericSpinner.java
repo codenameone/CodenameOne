@@ -66,6 +66,7 @@ public class GenericSpinner extends BaseSpinner {
         spin.setRenderingPrototype(null);
         spin.setShouldCalcPreferredSize(true);
         spin.setListSizeCalculationSampleCount(30);
+        spin.initSpinnerRenderer();
         return spin;
     }
 

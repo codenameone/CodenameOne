@@ -285,4 +285,8 @@ public class IOSNative {
     public static native void registerPush();
 
     public static native void deregisterPush();
+
+    public static native long createImageFile(long imagePeer, boolean jpeg, float quality);
+    public static native int getNSDataSize(long nsData);
+    public static native void nsDataToByteArray(long nsData, byte[] data);
 }

@@ -44,6 +44,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
     private static boolean showNumbersDefault = true;
     private Label focusComponent = new Label();
     private boolean rightAlignNumbers;
+    private boolean alwaysRenderSelection;
     
     /** 
      * Creates a new instance of DefaultCellRenderer 
@@ -94,7 +95,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      * @inheritDoc
      */
     public Component getCellRendererComponent(Component list, Object model, Object value, int index, boolean isSelected) {
-        if(!Display.getInstance().shouldRenderSelection(list)) {
+        if(!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
             isSelected = false;
         }
         setFocus(isSelected);
@@ -134,6 +135,17 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
             setEnabled(((Command)value).isEnabled());
         }
         return this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Style getStyle() {
+        if (alwaysRenderSelection && hasFocus()) {
+            return getSelectedStyle();
+        }
+
+        return super.getStyle();
     }
 
     /**
@@ -232,5 +244,23 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
      */
     public void setRightAlignNumbers(boolean rightAlignNumbers) {
         this.rightAlignNumbers = rightAlignNumbers;
+    }
+
+    /**
+     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+     * 
+     * @return the alwaysRenderSelection
+     */
+    public boolean isAlwaysRenderSelection() {
+        return alwaysRenderSelection;
+    }
+
+    /**
+     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+     * 
+     * @param alwaysRenderSelection the alwaysRenderSelection to set
+     */
+    public void setAlwaysRenderSelection(boolean alwaysRenderSelection) {
+        this.alwaysRenderSelection = alwaysRenderSelection;
     }
 }

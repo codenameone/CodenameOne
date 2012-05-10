@@ -80,9 +80,7 @@ public class DateSpinner extends BaseSpinner {
                 }                
             };
             month.setRenderer(render);
-            render.setRTL(false);
-            render.setShowNumbers(false);
-            render.setUIID("SpinnerRenderer");
+            month.initSpinnerRenderer();
             month.setRenderingPrototype("WWW");
 
             year = Spinner.create(startYear, endYear, currentYear, 1);

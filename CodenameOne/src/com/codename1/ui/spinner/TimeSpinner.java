@@ -99,6 +99,8 @@ public class TimeSpinner extends BaseSpinner {
             twoDigitRender.setUIID("SpinnerRenderer");
             render.setUIID("SpinnerRenderer");
             amPM.setRenderingPrototype("WW");
+            amPM.initSpinnerRenderer();
+            minute.initSpinnerRenderer();
 
             addComponents();
         }

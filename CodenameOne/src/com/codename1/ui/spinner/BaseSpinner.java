@@ -88,6 +88,10 @@ public abstract class BaseSpinner extends Container {
      */
     protected void paintGlass(Graphics g) {
         super.paintGlass(g);
+        paintOverlay(g);
+    }   
+    
+    private void paintOverlay(Graphics g) {
         int x = getParent().getAbsoluteX();
         int y = getParent().getAbsoluteY();
         g.translate(x, y);
@@ -97,6 +101,6 @@ public abstract class BaseSpinner extends Container {
         } else {
             overlayStyle.getBgPainter().paint(g, getBounds());
         }
-        g.translate(-x, -y);
-    }    
+        g.translate(-x, -y);        
+    }
 }
