@@ -31,6 +31,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.VirtualKeyboard;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.plaf.UIManager;
@@ -78,6 +79,7 @@ import java.io.FilenameFilter;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -126,6 +128,9 @@ import javax.media.ControllerListener;
 import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
+import javax.swing.JFormattedTextField;
+import javax.swing.text.JTextComponent;
+import javax.swing.text.MaskFormatter;
 import jmapps.ui.VideoPanel;
 
 /**
@@ -134,7 +139,6 @@ import jmapps.ui.VideoPanel;
  * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
-
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin";
     private boolean touchDevice = true;
@@ -178,7 +182,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static NetworkMonitor netMonitor;
     private static PerformanceMonitor perfMonitor;
     private static boolean blockMonitors;
-    
+        
     public static void blockMonitors() {
         blockMonitors = true;
     }
@@ -1455,23 +1459,98 @@ public class JavaSEPort extends CodenameOneImplementation {
         return useNativeInput;
     }
 
+    private void setText(java.awt.Component c, String text) {
+        if(c instanceof java.awt.TextComponent) {
+            ((java.awt.TextComponent)c).setText(text);
+        } else {
+            ((JTextComponent)c).setText(text);
+        }
+    }
+
+    private String getText(java.awt.Component c) {
+        if(c instanceof java.awt.TextComponent) {
+            return ((java.awt.TextComponent)c).getText();
+        } else {
+            return ((JTextComponent)c).getText();
+        }
+    }
+    
+    private void setCaretPosition(java.awt.Component c, int p) {
+        if(c instanceof java.awt.TextComponent) {
+            ((java.awt.TextComponent)c).setCaretPosition(p);
+        } else {
+            ((JTextComponent)c).setCaretPosition(p);
+        }
+    }
+
+    private int getCaretPosition(java.awt.Component c) {
+        if(c instanceof java.awt.TextComponent) {
+            return ((java.awt.TextComponent)c).getCaretPosition();
+        } else {
+            return ((JTextComponent)c).getCaretPosition();
+        }
+    }
+    
     /**
      * @inheritDoc
      */
     public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
-        java.awt.TextComponent awtTf;
-        if (cmp instanceof com.codename1.ui.TextField) {
-            awtTf = new java.awt.TextField();
+        java.awt.Component awtTf;
+        /*if ((constraint & com.codename1.ui.TextArea.DECIMAL) == com.codename1.ui.TextArea.DECIMAL) {
+            awtTf = new JFormattedTextField(NumberFormat.getNumberInstance());
         } else {
-            awtTf = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);
-        }
-        final java.awt.TextComponent tf = awtTf;
+            if ((constraint & com.codename1.ui.TextArea.EMAILADDR) == com.codename1.ui.TextArea.EMAILADDR) {
+                try {
+                    awtTf = new JFormattedTextField(new MaskFormatter("*@*.*"));
+                } catch (ParseException ex) {
+                    ex.printStackTrace();
+                    return;
+                }
+            } else {
+                if ((constraint & com.codename1.ui.TextArea.NUMERIC) == com.codename1.ui.TextArea.NUMERIC) {
+                    awtTf = new JFormattedTextField(NumberFormat.getIntegerInstance());
+                } else {
+                    if ((constraint & com.codename1.ui.TextArea.PHONENUMBER) == com.codename1.ui.TextArea.PHONENUMBER) {
+                        try {
+                            awtTf = new JFormattedTextField(new MaskFormatter("(###) ###-####"));
+                        } catch (ParseException ex) {
+                            ex.printStackTrace();
+                            return;
+                        }
+                    } else {
+                        if (cmp instanceof com.codename1.ui.TextField) {
+                            java.awt.TextField t = new java.awt.TextField();
+                            awtTf = t;
+                            t.setSelectionEnd(0);
+                            t.setSelectionStart(0);
+                        } else {
+                            java.awt.TextArea t = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);;
+                            awtTf = t;
+                            t.setSelectionEnd(0);
+                            t.setSelectionStart(0);
+                        }                        
+                    }
+                }
+            }
+        }*/
+        if (cmp instanceof com.codename1.ui.TextField) {
+            java.awt.TextField t = new java.awt.TextField();
+            awtTf = t;
+            t.setSelectionEnd(0);
+            t.setSelectionStart(0);
+        } else {
+            java.awt.TextArea t = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);;
+            awtTf = t;
+            t.setSelectionEnd(0);
+            t.setSelectionStart(0);
+        }                        
+        final java.awt.Component tf = awtTf;
         if (keyCode > 0) {
             text += ((char) keyCode);
-            tf.setText(text);
-            tf.setCaretPosition(text.length());
+            setText(tf, text);
+            setCaretPosition(tf, text.length());
         } else {
-            tf.setText(text);
+            setText(tf, text);
         }
         canvas.add(tf);
         if (getSkin() != null) {
@@ -1497,7 +1576,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void actionPerformed(ActionEvent e) {
-                Display.getInstance().onEditingComplete(cmp, tf.getText());
+                Display.getInstance().onEditingComplete(cmp, getText(tf));
                 if (tf instanceof java.awt.TextField) {
                     ((java.awt.TextField) tf).removeActionListener(this);
                 }
@@ -1527,7 +1606,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (tf instanceof java.awt.TextField) {
                         actionPerformed(null);
                     } else {
-                        if (tf.getCaretPosition() >= tf.getText().length() - 1) {
+                        if (getCaretPosition(tf) >= getText(tf).length() - 1) {
                             actionPerformed(null);
                         }
                     }
@@ -1537,7 +1616,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (tf instanceof java.awt.TextField) {
                         actionPerformed(null);
                     } else {
-                        if (tf.getCaretPosition() <= 2) {
+                        if (getCaretPosition(tf) <= 2) {
                             actionPerformed(null);
                         }
                     }
@@ -1551,8 +1630,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         tf.addKeyListener(l);
         tf.addFocusListener(l);
-        tf.setSelectionEnd(0);
-        tf.setSelectionStart(0);
         Display.getInstance().invokeAndBlock(l);
     }
 
@@ -3635,5 +3712,46 @@ public class JavaSEPort extends CodenameOneImplementation {
             };
         }
         return l10n;
+    }
+    
+    private com.codename1.ui.util.ImageIO imIO;
+    
+    @Override
+    public com.codename1.ui.util.ImageIO getImageIO() {
+        if(imIO == null) {
+            imIO = new com.codename1.ui.util.ImageIO() {
+
+                @Override
+                public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
+                    String f = "png";
+                    if(format == FORMAT_JPEG) {
+                        f = "jpeg";
+                    }
+                    Image img = Image.createImage(image).scaled(width, height);
+                    if(width < 0) {
+                        width = img.getWidth();
+                    }
+                    if(height < 0) {
+                        width = img.getHeight();
+                    }
+                    ImageIO.write(((BufferedImage)img.getImage()), f, response);
+                }
+
+                @Override
+                protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
+                    String f = "png";
+                    if(format == FORMAT_JPEG) {
+                        f = "jpeg";
+                    }
+                    ImageIO.write(((BufferedImage)img.getImage()), f, response);
+                }
+
+                @Override
+                public boolean isFormatSupported(String format) {
+                    return format == FORMAT_JPEG || format == FORMAT_PNG;
+                }
+            };
+        }
+        return imIO;
     }
 }
