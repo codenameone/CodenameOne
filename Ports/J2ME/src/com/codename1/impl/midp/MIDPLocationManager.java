@@ -101,7 +101,7 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
             retVal.setDirection(coor.azimuthTo(currentCoordinates));
         }
         retVal.setLatitude(coor.getLatitude());
-        retVal.setLongtitude(coor.getLongitude());
+        retVal.setLongitude(coor.getLongitude());
         retVal.setTimeStamp(loc.getTimestamp());
         retVal.setVelocity(loc.getSpeed());
 

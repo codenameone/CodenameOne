@@ -2978,6 +2978,15 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     public Contact getContactById(String id){
         return MIDPContactsManager.getInstance().getContactById(id);
     }
+
+    /**
+     * @inheritDoc
+     */
+    public Media createMediaRecorder(String path) throws IOException {
+        return new MediaRecorder(path);        
+    }
+    
+    
     
     private L10NManager lm;
 
