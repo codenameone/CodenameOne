@@ -3713,6 +3713,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return l10n;
     }
+
+    @Override
+    public Media createMediaRecorder(String path) throws IOException {
+        throw new IOException("Not supported on Simulator");
+    }
+    
+    
     
     private com.codename1.ui.util.ImageIO imIO;
     
