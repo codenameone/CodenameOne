@@ -30,7 +30,7 @@ public class Location {
     private int status;
     
     private double latitude;
-    private double longtitude;
+    private double longitude;
     private double altitude;
     private float accuracy;
     private float direction;
@@ -73,11 +73,11 @@ public class Location {
     }
 
     /**
-     * Returns the longtitude of this Location
-     * @return longtitude
+     * Returns the longitude of this Location
+     * @return longitude
      */
-    public double getLongtitude() {
-        return longtitude;
+    public double getLongitude() {
+        return longitude;
     }
 
     /**
@@ -135,11 +135,11 @@ public class Location {
     }
 
     /**
-     * Sets the longtitude of this Location
-     * @param longtitude 
+     * Sets the longitude of this Location
+     * @param longitude 
      */
-    public void setLongtitude(double longtitude) {
-        this.longtitude = longtitude;
+    public void setLongitude(double longtitude) {
+        this.longitude = longtitude;
     }
 
     /**
@@ -172,7 +172,7 @@ public class Location {
     public String toString() {
         return "altitude = " + altitude
                 + "\nlatitude" + latitude
-                + "\nlongtitude" + longtitude
+                + "\nlongtitude" + longitude
                 + "\ndirection" + direction
                 + "\ntimeStamp" + timeStamp
                 + "\nvelocity" + velocity;

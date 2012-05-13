@@ -95,5 +95,18 @@ public class MediaManager {
     public static Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return Display.getInstance().createMedia(stream, mimeType, onCompletion);
     }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * The output format will be amr-nb if supported by the platform.
+     * 
+     * @param path a file path to where to store the recording, if the file does
+     * not exists it will be created.
+     */
+    public static Media createMediaRecorder(String path) throws IOException {
+        return Display.getInstance().createMediaRecorder(path);
+    }
+    
 
 }

@@ -51,21 +51,21 @@ public interface Media {
     public void cleanup();
 
     /**
-     * Returns the time in seconds in the audio file
+     * Returns the time in seconds in the audio file or -1 if not known
      *
      * @return time in milli seconds
      */
     public int getTime();
 
     /**
-     * Sets the position in the audio file
+     * Sets the position in the audio file or doesn't effect if not supported 
      *
      * @param time in milli seconds
      */
     public void setTime(int time);
 
     /**
-     * Returns the length in seconds of the audio file
+     * Returns the length in seconds of the audio file or -1 if not known
      *
      * @return time in milli seconds
      */

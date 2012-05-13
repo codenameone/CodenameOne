@@ -4092,6 +4092,18 @@ public abstract class CodenameOneImplementation {
         Preferences.delete("PollingPush");
         stopPolling();
     }
+
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * The output format will be amr-nb if supported by the platform.
+     * 
+     * @param path a file path to where to store the recording, if the file does
+     * not exists it will be created.
+     */
+    public Media createMediaRecorder(String path) throws IOException{
+        return null;
+    }
     
     /**
      * Stops the polling push loop

@@ -67,7 +67,7 @@ public class MapComponent extends Container {
     public MapComponent() {
         this(new OpenStreetMapProvider());
         Location l = LocationManager.getLocationManager().getLastKnownLocation();
-        Coord centerPosition = new Coord(l.getLatitude(), l.getLongtitude());
+        Coord centerPosition = new Coord(l.getLatitude(), l.getLongitude());
         _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
         Painter bg = new Painter() {
             public void paint(Graphics g, Rectangle rect) {
@@ -75,9 +75,10 @@ public class MapComponent extends Container {
             }
         };
         getUnselectedStyle().setBgTransparency(255);
-        getStyle().setBgTransparency(255);        
+        getSelectedStyle().setBgTransparency(255);        
         getUnselectedStyle().setBgPainter(bg);
-        getStyle().setBgPainter(bg);
+        getSelectedStyle().setBgPainter(bg);
+        
         
     }
 
@@ -109,7 +110,7 @@ public class MapComponent extends Container {
      * @param cacheEnabled is cache enabled
      */
     public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel, boolean cacheEnabled) {
-        this(provider, new Coord(centerPosition.getLatitude(), centerPosition.getLongtitude()), zoomLevel, cacheEnabled);
+        this(provider, new Coord(centerPosition.getLatitude(), centerPosition.getLongitude()), zoomLevel, cacheEnabled);
     }
 
     /**
@@ -136,7 +137,7 @@ public class MapComponent extends Container {
         _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
         _zoom = zoomLevel;
         _layers = new Vector();
-        setFocusable(!Display.getInstance().isTouchScreenDevice());
+        setFocusable(false);
         if (Display.getInstance().isTouchScreenDevice()) {
             setLayout(new BorderLayout());
             Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
@@ -223,6 +224,20 @@ public class MapComponent extends Container {
 
     }
 
+    /**
+     * Gets the Coord location on the map from a x, y position.
+     * 
+     * @param x
+     * @param y
+     * @return a Coord Object.
+     */
+    public Coord getCoordFromPosition(int x, int y){
+        x = x - getAbsoluteX();
+        y = y - getAbsoluteY();        
+        Tile t = screenTile();        
+        return t.position(x , t.dimension().getHeight() - y);    
+    }
+    
     /**
      * @inheritDoc
      */
