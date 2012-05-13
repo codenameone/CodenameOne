@@ -79,7 +79,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         retVal.setAccuracy(loc.getAccuracy());
         retVal.setAltitude(loc.getAltitude());
         retVal.setLatitude(loc.getLatitude());
-        retVal.setLongtitude(loc.getLongitude());
+        retVal.setLongitude(loc.getLongitude());
         retVal.setTimeStamp(loc.getTime());
         retVal.setVelocity(loc.getSpeed());
         retVal.setDirection(loc.getBearing());

@@ -68,6 +68,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -113,6 +114,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
@@ -1443,7 +1446,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return retVal;
     }
-
+ 
     /**
      * @inheritDoc
      */
@@ -1503,6 +1506,57 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
     }
+
+    @Override
+    public Media createMediaRecorder(final String path) throws IOException {
+        
+        final AndroidRecorder [] record = new AndroidRecorder[1];
+        final IOException [] error = new IOException[1];
+
+        final Object lock = new Object();
+        synchronized (lock) {
+            activity.runOnUiThread(new Runnable() {
+
+                @Override
+                public void run() {
+                    synchronized (lock) {
+                        MediaRecorder recorder = new MediaRecorder();
+                        recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                        recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+                        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                        recorder.setOutputFile(path);
+                        try {
+                            recorder.prepare();
+                            record[0] = new AndroidRecorder(recorder);
+                        } catch (IllegalStateException ex) {
+                            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IOException ex) {
+                            error[0] = ex;
+                        }finally{
+                            lock.notify();
+                        }
+
+                        
+                    }
+                }
+            });
+            
+            try {
+                lock.wait();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+            
+            if(error[0] != null){
+                throw error[0];
+            }
+            
+            return record[0];
+        }
+
+        
+    }
+
 
     /**
      * @inheritDoc
