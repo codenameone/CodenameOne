@@ -269,7 +269,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                     String uiid = (String)value;
                     if(index > 0 && index < currentFormUIIDs.size() + 1) {
-                        value = "<html><body><b>" + value;
+                        value = "<html><body><b>" + value + "</b></body></html>";
                     } else {
                         if(value == null || ((String)value).length() == 0) {
                             value = "[null]";
@@ -423,7 +423,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         if(t.startsWith("<html")) {
             return;
         }
-        addTabs.setTitleAt(index, "<html><body><b>" + t);
+        addTabs.setTitleAt(index, "<html><body><b>" + t + "</b></body></html>");
     }
 
     private void setKeyValue(String key, Object value) {
