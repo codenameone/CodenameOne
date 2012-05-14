@@ -2805,4 +2805,103 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return imageIO;
     }
+
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofObjArray(Object o) {
+        try {
+            Object[] a = (Object[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofByteArray(Object o) {
+        try {
+            byte[] a = (byte[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofShortArray(Object o) {
+        try {
+            short[] a = (short[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofLongArray(Object o) {
+        try {
+            long[] a = (long[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofIntArray(Object o) {
+        try {
+            int[] a = (int[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofFloatArray(Object o) {
+        try {
+            float[] a = (float[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofDoubleArray(Object o) {
+        try {
+            double[] a = (double[])o;
+            
+            // so the optimizer doesn't remove the cast above
+            return a.length > -1;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
 }

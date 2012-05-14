@@ -77,6 +77,12 @@ public class MultiButton extends Container {
         secondRow.setUIID("MultiLine2");
         thirdRow.setUIID("MultiLine3");
         forthRow.setUIID("MultiLine4");
+        firstRow.setName("Line1");
+        secondRow.setName("Line2");
+        thirdRow.setName("Line3");
+        forthRow.setName("Line4");
+        icon.setName("icon");
+        emblem.setName("emblem");
         emblem.setUIID("Emblem");
         setLeadComponent(emblem);
         setUIID("MultiButton");

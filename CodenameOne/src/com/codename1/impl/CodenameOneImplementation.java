@@ -4223,4 +4223,53 @@ public abstract class CodenameOneImplementation {
     public ImageIO getImageIO() {
         return null;
     }
+
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofObjArray(Object o) {
+        return o instanceof Object[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofByteArray(Object o) {
+        return o instanceof byte[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofShortArray(Object o) {
+        return o instanceof short[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofLongArray(Object o) {
+        return o instanceof long[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofIntArray(Object o) {
+        return o instanceof int[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofFloatArray(Object o) {
+        return o instanceof float[];
+    }
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    public boolean instanceofDoubleArray(Object o) {
+        return o instanceof double[];
+    }
 }

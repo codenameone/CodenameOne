@@ -1722,6 +1722,8 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneInfiniteProgress, com.codename1.components.InfiniteProgress.class, "InfiniteProgress", null);
         makeDraggable(codenameOneMultiButton, com.codename1.components.MultiButton.class, "MultiButton", null);
         makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
+        makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
+        makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -1859,7 +1861,7 @@ public class UserInterfaceEditor extends BaseForm {
                 ((com.codename1.ui.TextArea)cmp).setText(cmp.getName());
                 setPropertyModified(cmp, PROPERTY_TEXT);
             } else {
-                if(cmp instanceof com.codename1.ui.List) {
+                if(cmp instanceof com.codename1.ui.List && !(cmp instanceof com.codename1.ui.list.MultiList)) {
                     if(!(cmp instanceof com.codename1.components.RSSReader)) {
                         ((com.codename1.ui.List)cmp).setModel(new com.codename1.ui.list.DefaultListModel(
                                 new Object[] {"Item 1", "Item 2", "Item 3"}));
@@ -2586,6 +2588,17 @@ public class UserInterfaceEditor extends BaseForm {
             }
         }
     }
+    
+    private boolean hasBackCommand(com.codename1.ui.Form frm, com.codename1.ui.Command cmd) {
+        if(frm.getBackCommand() != null) {
+            for(int iter = frm.getCommandCount() - 1 ; iter >= 0 ; iter--) {
+                if(frm.getCommand(iter) == frm.getBackCommand()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     public void persistComponent(com.codename1.ui.Component cmp, DataOutputStream out) throws IOException {
         if(cmp.getClientProperty("%base_form%") != null) {
@@ -2732,10 +2745,46 @@ public class UserInterfaceEditor extends BaseForm {
                         }
                     }
 
-                    if(frm.getCommandCount() > 0) {
+                    if(frm.getCommandCount() > 0 || frm.getBackCommand() != null) {
                         if(isPropertyModified(cmp, PROPERTY_COMMANDS) || isPropertyModified(cmp, PROPERTY_COMMANDS_LEGACY)) {
                             out.writeInt(PROPERTY_COMMANDS);
-                            out.writeInt(frm.getCommandCount());
+                            if(frm.getBackCommand() != null && !hasBackCommand(frm, frm.getBackCommand())) {
+                                out.writeInt(frm.getCommandCount() + 1);
+                                ActionCommand cmd = (ActionCommand)frm.getBackCommand();
+                                out.writeUTF(cmd.getCommandName());
+                                if(cmd.getIcon() != null) {
+                                    out.writeUTF(res.findId(cmd.getIcon()));
+                                } else {
+                                    out.writeUTF("");
+                                }
+                                if(cmd.getRolloverIcon() != null) {
+                                    out.writeUTF(res.findId(cmd.getRolloverIcon()));
+                                } else {
+                                    out.writeUTF("");
+                                }
+                                if(cmd.getPressedIcon() != null) {
+                                    out.writeUTF(res.findId(cmd.getPressedIcon()));
+                                } else {
+                                    out.writeUTF("");
+                                }
+                                if(cmd.getDisabledIcon() != null) {
+                                    out.writeUTF(res.findId(cmd.getDisabledIcon()));
+                                } else {
+                                    out.writeUTF("");
+                                }
+                                out.writeInt(cmd.getId());
+                                if(cmd.getAction() != null) {
+                                    out.writeUTF(cmd.getAction());
+                                    if(cmd.getAction().equals("$Execute")) {
+                                        out.writeUTF(cmd.getArgument());
+                                    }
+                                } else {
+                                    out.writeUTF("");
+                                }
+                                out.writeBoolean(frm.getBackCommand() == cmd);
+                            } else {
+                                out.writeInt(frm.getCommandCount());
+                            }
                             for(int iter = frm.getCommandCount() - 1 ; iter >= 0 ; iter--) {
                                 ActionCommand cmd = (ActionCommand)frm.getCommand(iter);
                                 out.writeUTF(cmd.getCommandName());
@@ -4054,6 +4103,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneRadioButton = new javax.swing.JButton();
         codenameOneComboBox = new javax.swing.JButton();
         codenameOneList = new javax.swing.JButton();
+        codenameOneMultiList = new javax.swing.JButton();
         codenameOneTextArea = new javax.swing.JButton();
         codenameOneTextField = new javax.swing.JButton();
         codenameOneSlider = new javax.swing.JButton();
@@ -4076,6 +4126,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneLikeButton = new javax.swing.JButton();
         codenameOneInfiniteProgress = new javax.swing.JButton();
         codenameOneAds = new javax.swing.JButton();
+        codenameOneMap = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4204,6 +4255,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneList.setName("codenameOneList"); // NOI18N
         codenameOneList.addActionListener(formListener);
         coreComponents.add(codenameOneList);
+
+        codenameOneMultiList.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"))); // NOI18N
+        codenameOneMultiList.setText("Multi-List");
+        codenameOneMultiList.setToolTipText("<html><body><b>Multi-List</b><br> \n<p>\nA list component with a multi-button renderer by default aleviating the need of setting a renderer.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneMultiList.setBorder(null);
+        codenameOneMultiList.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneMultiList.setName("codenameOneMultiList"); // NOI18N
+        codenameOneMultiList.addActionListener(formListener);
+        coreComponents.add(codenameOneMultiList);
 
         codenameOneTextArea.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneTextArea.setText("Text Area");
@@ -4394,6 +4454,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneAds.setName("codenameOneAds"); // NOI18N
         codenameOneAds.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneAds);
+
+        codenameOneMap.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneMap.setText("Map");
+        codenameOneMap.setToolTipText("<html><body><b>Map</b><br> \n<p>\nDisplays a user navigatable Map on the screen.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneMap.setBorder(null);
+        codenameOneMap.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneMap.setName("codenameOneMap"); // NOI18N
+        codenameOneMap.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneMap);
 
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
@@ -4636,6 +4705,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneButton) {
                 UserInterfaceEditor.this.codenameOneButtonActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneMultiButton) {
+                UserInterfaceEditor.this.codenameOneMultiButtonActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneCheckBox) {
                 UserInterfaceEditor.this.codenameOneCheckBoxActionPerformed(evt);
             }
@@ -4699,6 +4771,15 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneGenericSpinner) {
                 UserInterfaceEditor.this.codenameOneGenericSpinnerActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneLikeButton) {
+                UserInterfaceEditor.this.codenameOneLikeButtonActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneInfiniteProgress) {
+                UserInterfaceEditor.this.codenameOneInfiniteProgressActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneAds) {
+                UserInterfaceEditor.this.codenameOneAdsActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
@@ -4735,17 +4816,11 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneMultiButton) {
-                UserInterfaceEditor.this.codenameOneMultiButtonActionPerformed(evt);
+            else if (evt.getSource() == codenameOneMap) {
+                UserInterfaceEditor.this.codenameOneMapActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneLikeButton) {
-                UserInterfaceEditor.this.codenameOneLikeButtonActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneInfiniteProgress) {
-                UserInterfaceEditor.this.codenameOneInfiniteProgressActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneAds) {
-                UserInterfaceEditor.this.codenameOneAdsActionPerformed(evt);
+            else if (evt.getSource() == codenameOneMultiList) {
+                UserInterfaceEditor.this.codenameOneMultiListActionPerformed(evt);
             }
         }
 
@@ -5340,6 +5415,22 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.components.Ads(), "Ads");
     }//GEN-LAST:event_codenameOneAdsActionPerformed
 
+    private void codenameOneMapActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMapActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.maps.MapComponent(), "Map");
+    }//GEN-LAST:event_codenameOneMapActionPerformed
+
+    private void codenameOneMultiListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMultiListActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.list.MultiList(), "MultiList");
+    }//GEN-LAST:event_codenameOneMultiListActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5453,8 +5544,10 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton codenameOneLabel;
     private javax.swing.JButton codenameOneLikeButton;
     private javax.swing.JButton codenameOneList;
+    private javax.swing.JButton codenameOneMap;
     private javax.swing.JButton codenameOneMediaPlayer;
     private javax.swing.JButton codenameOneMultiButton;
+    private javax.swing.JButton codenameOneMultiList;
     private javax.swing.JButton codenameOneNumericSpinner;
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneSlider;

@@ -353,52 +353,31 @@ public class Util {
     }
 
     private static boolean instanceofObjArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new Object[0].getClass();
-        }
-        return o instanceof Object[];
+        return getImplementation().instanceofObjArray(o);
     }
     
     private static boolean instanceofByteArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new byte[0].getClass();
-        }
-        return o instanceof byte[];
+        return getImplementation().instanceofByteArray(o);
     }
     
     private static boolean instanceofShortArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new short[0].getClass();
-        }
-        return o instanceof short[];
+        return getImplementation().instanceofShortArray(o);
     }
     
     private static boolean instanceofLongArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new long[0].getClass();
-        }
-        return o instanceof long[];
+        return getImplementation().instanceofLongArray(o);
     }
     
     private static boolean instanceofIntArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new int[0].getClass();
-        }
-        return o instanceof int[];
+        return getImplementation().instanceofIntArray(o);
     }
     
     private static boolean instanceofFloatArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new float[0].getClass();
-        }
-        return o instanceof float[];
+        return getImplementation().instanceofFloatArray(o);
     }
     
     private static boolean instanceofDoubleArray(Object o) {
-        if(xmlVMInstanceofBug) {
-            return o.getClass() == new double[0].getClass();
-        }
-        return o instanceof double[];
+        return getImplementation().instanceofDoubleArray(o);
     }
 
     /**

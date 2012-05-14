@@ -144,11 +144,11 @@ public class Preferences {
      * @return the default value or the value
      */
     public static String get(String pref, String def) {
-        String t = (String)get().get(pref);
+        Object t = get().get(pref);
         if(t == null) {
             return def;
         }
-        return t;
+        return t.toString();
     }
 
     /**

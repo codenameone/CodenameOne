@@ -78,6 +78,7 @@ import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -373,6 +374,8 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("InfiniteProgress", com.codename1.components.InfiniteProgress.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiButton", com.codename1.components.MultiButton.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("Ads", com.codename1.components.Ads.class);
+            com.codename1.ui.util.UIBuilder.registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
+            com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
             com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
             com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
             if(c instanceof com.codename1.ui.Form) {
@@ -453,6 +456,52 @@ public class ThemeEditor extends BaseForm {
                 setEnabled(table.getSelectedRow() > -1);
             }
         }
+        
+        class Derive extends AbstractAction implements ListSelectionListener {
+            private String destination;
+            Derive(String title, String destination) {
+                putValue(NAME, title);
+                this.destination = destination;
+                table.getSelectionModel().addListSelectionListener(this);
+                valueChanged(null);
+            }
+            public void actionPerformed(ActionEvent e) {
+                int r = table.getSelectedRow();
+                if(r > -1) {
+                    r = getModelSelection(getCurrentStyleTable());
+                    String key = (String)getCurrentStyleModel().getValueAt(r, 0);
+                    String deriveKey = key + ".";
+                    if(getCurrentStyleModel().prefix != null) {
+                        deriveKey += getCurrentStyleModel().prefix;
+                    }
+                    if(destination == null) {
+                        resources.setThemeProperty(themeName, key + ".sel#derive", deriveKey);
+                        resources.setThemeProperty(themeName, key + ".press#derive", deriveKey);
+                        resources.setThemeProperty(themeName, key + ".dis#derive", deriveKey);
+                    } else {
+                        resources.setThemeProperty(themeName, key + "." + destination + "derive", deriveKey);
+                    }
+                    initTableModel(theme, null);
+                    initTableModel(selectedStyles, "sel#");
+                    initTableModel(pressedStyles, "press#");
+                    initTableModel(disabledStyles, "dis#");
+                    refreshTheme(themeHash);
+                }
+            }
+
+            public void valueChanged(ListSelectionEvent e) {
+                if(destination == null && getCurrentStyleModel().prefix != null) {
+                    setEnabled(false);
+                    return;
+                }
+                if(getCurrentStyleModel().prefix != null && getCurrentStyleModel().prefix.equals(destination)) {
+                    setEnabled(false);
+                    return;
+                }
+                setEnabled(table.getSelectedRow() > -1);
+            }
+        }
+        
         class CopyAttribute extends AbstractAction implements ListSelectionListener {
             CopyAttribute() {
                 putValue(NAME, "Copy Attribute");
@@ -595,6 +644,12 @@ public class ThemeEditor extends BaseForm {
                         popupMenu.add(paste);
                         popupMenu.add(edit);
                         popupMenu.add(delete);
+                        JMenu deriveMenu = new JMenu("Derive");
+                        popupMenu.add(deriveMenu);
+                        deriveMenu.add(new Derive("Derive All", null));
+                        deriveMenu.add(new Derive("Derive Selected", "sel#"));
+                        deriveMenu.add(new Derive("Derive Pressed", "press#"));
+                        deriveMenu.add(new Derive("Derive Disabled", "dis#"));
                     }
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 }
@@ -1195,7 +1250,7 @@ public class ThemeEditor extends BaseForm {
 
     private void themeMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_themeMouseClicked
         // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled()) {
+        if(evt.getClickCount() == 2 && editEntry.isEnabled() && SwingUtilities.isLeftMouseButton(evt)) {
             editEntryActionPerformed(null);
         }
     }//GEN-LAST:event_themeMouseClicked
