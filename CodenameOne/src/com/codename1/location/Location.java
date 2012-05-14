@@ -81,6 +81,15 @@ public class Location {
     }
 
     /**
+     * Returns the longitude of this Location
+     * @return longitude
+     * @deprecated use getLongitude
+     */
+    public double getLongtitude() {
+        return longitude;
+    }
+
+    /**
      * The status of the location one of: LocationManager.AVAILABLE, 
      * LocationManager.OUT_OF_SERVICE or LocationManager.TEMPORARILY_UNAVAILABLE:
      */
@@ -139,6 +148,15 @@ public class Location {
      * @param longitude 
      */
     public void setLongitude(double longtitude) {
+        this.longitude = longtitude;
+    }
+
+    /**
+     * Sets the longitude of this Location
+     * @param longitude 
+     * @deprecated use setLongitude
+     */
+    public void setLongtitude(double longtitude) {
         this.longitude = longtitude;
     }
 
