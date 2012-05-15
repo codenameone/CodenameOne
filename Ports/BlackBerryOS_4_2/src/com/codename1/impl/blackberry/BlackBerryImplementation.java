@@ -94,6 +94,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.ui.Image;
 import java.util.Date;
 import javax.microedition.io.Datagram;
 import javax.microedition.io.DatagramConnection;
@@ -126,6 +127,7 @@ import net.rim.device.api.system.ApplicationManagerException;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.CodeModuleManager;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.system.JPEGEncodedImage;
 import net.rim.device.api.system.RadioInfo;
 
 /**
@@ -466,7 +468,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public Object createImage(String path) throws IOException {
-        if (exists(path)) {
+        if (path.startsWith("file:") && exists(path)) {
             InputStream is = null;
             try {
                 is = openInputStream(path);
@@ -2931,4 +2933,5 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
         return l10n;
     }
+       
 }

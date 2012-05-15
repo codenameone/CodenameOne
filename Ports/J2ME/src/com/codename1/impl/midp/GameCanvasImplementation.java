@@ -736,7 +736,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(String path) throws IOException {
-        if(exists(path)){
+        if(path.startsWith("file:") && exists(path)){
             InputStream is = null;
             try {
                 is = openInputStream(path);

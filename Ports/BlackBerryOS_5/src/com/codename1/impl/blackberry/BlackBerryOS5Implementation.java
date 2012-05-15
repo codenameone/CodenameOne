@@ -27,12 +27,14 @@ package com.codename1.impl.blackberry;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.device.api.script.ScriptEngine;
@@ -46,9 +48,12 @@ import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.script.Scriptable;
+import net.rim.device.api.system.Bitmap;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.DeviceInfo;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.system.JPEGEncodedImage;
+import net.rim.device.api.system.PNGEncodedImage;
 import net.rim.device.api.ui.Field;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.UiApplication;
@@ -331,4 +336,53 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments(CameraArguments.ARG_VIDEO_RECORDER));
         }
     }
+    
+    
+    private com.codename1.ui.util.ImageIO imIO;
+    
+    /**
+     * @inheritDoc
+     */
+    public com.codename1.ui.util.ImageIO getImageIO() {
+        if(imIO == null) {
+            imIO = new com.codename1.ui.util.ImageIO() {
+
+                public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
+                    Image img = Image.createImage(image).scaled(width, height);
+                    if(width < 0) {
+                        width = img.getWidth();
+                    }
+                    if(height < 0) {
+                        width = img.getHeight();
+                    }
+                    Bitmap bitmap = (Bitmap) img.getImage();
+                    if(format == FORMAT_JPEG) {
+                        JPEGEncodedImage enc = JPEGEncodedImage.encode(bitmap, (int)(quality*100));
+                        response.write(enc.getData(), 0, enc.getData().length); 
+                    }else{
+                        PNGEncodedImage enc = PNGEncodedImage.encode(bitmap);
+                        response.write(enc.getData(), 0, enc.getData().length);                         
+                    }
+                }
+
+                protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
+                    Bitmap bitmap = (Bitmap) img.getImage();
+                    if(format == FORMAT_JPEG) {
+                        JPEGEncodedImage enc = JPEGEncodedImage.encode(bitmap, (int)(quality*100));
+                        response.write(enc.getData(), 0, enc.getData().length); 
+                    }else{
+                        PNGEncodedImage enc = PNGEncodedImage.encode(bitmap);
+                        response.write(enc.getData(), 0, enc.getData().length);                         
+                    }
+                }
+
+                public boolean isFormatSupported(String format) {
+                    return format == FORMAT_JPEG || format == FORMAT_PNG;
+                }
+            };
+        }
+        return imIO;
+    }
+    
+    
 }

@@ -26,6 +26,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import java.io.IOException;
+import java.io.OutputStream;
 import javax.microedition.media.Manager;
 import javax.microedition.media.MediaException;
 import javax.microedition.media.Player;
@@ -40,13 +41,16 @@ public class MediaRecorder implements Media {
     private Player recorder;
     private RecordControl rc;
     private boolean isPlaying = false;
-
+    private OutputStream out;
+    
     public MediaRecorder(String path) throws IOException {
         try {
-            recorder = Manager.createPlayer("capture://audio?encoding=audio/amr&bitrate=12200&voipMode=true");
+            //recorder = Manager.createPlayer("capture://audio?encoding=audio/amr&bitrate=12200&voipMode=true");
+            recorder = Manager.createPlayer("capture://audio?encoding=audio/amr");            
             recorder.realize();
             rc = (RecordControl) recorder.getControl("RecordControl");
-            rc.setRecordStream(FileSystemStorage.getInstance().openOutputStream(path));
+            out = FileSystemStorage.getInstance().openOutputStream(path);
+            rc.setRecordStream(out);
         } catch (MediaException ex) {
             ex.printStackTrace();
         }
@@ -73,6 +77,7 @@ public class MediaRecorder implements Media {
     public void cleanup() {
          try {
             rc.commit();
+            out.close();
             recorder.close();
         } catch (Exception ex) {
             ex.printStackTrace();

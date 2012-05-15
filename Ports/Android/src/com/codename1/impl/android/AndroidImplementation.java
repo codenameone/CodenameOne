@@ -91,6 +91,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.ImageIO;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -1557,7 +1558,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
 
-
     /**
      * @inheritDoc
      */
@@ -2940,9 +2940,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        System.out.println("requestCode " + requestCode);
-        System.out.println("resultCode " + resultCode);
-        System.out.println("intent " + intent);
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
@@ -3177,4 +3174,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return l10n;
     }
+    
+    private com.codename1.ui.util.ImageIO imIO;
+    
+    @Override
+    public com.codename1.ui.util.ImageIO getImageIO() {
+        if(imIO == null) {
+            imIO = new com.codename1.ui.util.ImageIO() {
+
+                @Override
+                public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
+                    Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
+                    if(format == FORMAT_JPEG) {
+                        f = Bitmap.CompressFormat.JPEG;
+                    }
+                    Image img = Image.createImage(image).scaled(width, height);
+                    if(width < 0) {
+                        width = img.getWidth();
+                    }
+                    if(height < 0) {
+                        width = img.getHeight();
+                    }
+                    Bitmap b = (Bitmap) img.getImage();                    
+                    b.compress(f, (int)(quality * 100), response);
+                }
+
+                @Override
+                protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
+                    Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
+                    if(format == FORMAT_JPEG) {
+                        f = Bitmap.CompressFormat.JPEG;
+                    }
+                    Bitmap b = (Bitmap) img.getImage();
+                    b.compress(f, (int)(quality * 100), response);
+                }
+
+                @Override
+                public boolean isFormatSupported(String format) {
+                    return format == FORMAT_JPEG || format == FORMAT_PNG;
+                }
+            };
+        }
+        return imIO;
+    }
+    
 }
