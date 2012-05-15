@@ -43,7 +43,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 
-
 /**
  * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
@@ -67,19 +66,22 @@ public class MapComponent extends Container {
     public MapComponent() {
         this(new OpenStreetMapProvider());
         Location l = LocationManager.getLocationManager().getLastKnownLocation();
-        Coord centerPosition = new Coord(l.getLatitude(), l.getLongitude());
-        _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
+        if (l != null) {
+            Coord centerPosition = new Coord(l.getLatitude(), l.getLongitude());
+            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
+        } else {
+            _center = new Coord(0, 0, true);
+        }
         Painter bg = new Painter() {
+
             public void paint(Graphics g, Rectangle rect) {
                 paintmap(g);
             }
         };
         getUnselectedStyle().setBgTransparency(255);
-        getSelectedStyle().setBgTransparency(255);        
+        getSelectedStyle().setBgTransparency(255);
         getUnselectedStyle().setBgPainter(bg);
         getSelectedStyle().setBgPainter(bg);
-        
-        
     }
 
     /**
@@ -163,10 +165,6 @@ public class MapComponent extends Container {
         }
     }
 
-    private void toggleDebug() {
-        _debugInfo = !_debugInfo;
-    }
-
     /**
      * @inheritDoc
      */
@@ -205,20 +203,20 @@ public class MapComponent extends Container {
         draggedy = y;
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
-        
+
         Tile t = screenTile();
-        
+
         Coord southWest = t.position(x - 20, t.dimension().getHeight() - y - 20);
         Coord c = Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());
         Coord northEast = t.position(x + 20, t.dimension().getHeight() - y + 20);
         c = Mercator.inverseMercator(northEast.getLatitude(), northEast.getLongitude());
-        
+
         BoundingBox bbox = new BoundingBox(southWest, northEast);
         Enumeration e = _layers.elements();
         while (e.hasMoreElements()) {
             LayerWithZoomLevels layer = (LayerWithZoomLevels) e.nextElement();
-            if(layer.layer instanceof PointsLayer){
-                ((PointsLayer)layer.layer).fireActionEvent(bbox);
+            if (layer.layer instanceof PointsLayer) {
+                ((PointsLayer) layer.layer).fireActionEvent(bbox);
             }
         }
 
@@ -231,13 +229,13 @@ public class MapComponent extends Container {
      * @param y
      * @return a Coord Object.
      */
-    public Coord getCoordFromPosition(int x, int y){
+    public Coord getCoordFromPosition(int x, int y) {
         x = x - getAbsoluteX();
-        y = y - getAbsoluteY();        
-        Tile t = screenTile();        
-        return t.position(x , t.dimension().getHeight() - y);    
+        y = y - getAbsoluteY();
+        Tile t = screenTile();
+        return t.position(x, t.dimension().getHeight() - y);
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -310,16 +308,11 @@ public class MapComponent extends Container {
             while (posX - tileSize.getWidth() < getWidth()) {
                 Tile tile;
                 Coord cur = _map.translate(_center, _zoom, posX - getWidth() / 2, getHeight() / 2 - posY);
-                if (!_map.projection().extent().contains(cur)) {
-//                    tile = _unavailableTile;
-                } else {
+                if (_map.projection().extent().contains(cur)) {
                     tile = _map.tileFor(_map.bboxFor(cur, _zoom));
-                    //_map.tileFor(cur, _zoom);
-                    //#mdebug
-                    if (!tile.getBoundingBox().contains(cur)) {
-                        throw new RuntimeException("Map returned bad tile (" + tile.getBoundingBox() + ") for: " + cur.toString());
-                    }
-                    //#enddebug
+//                    if (!tile.getBoundingBox().contains(cur)) {
+//                        throw new RuntimeException("Map returned bad tile (" + tile.getBoundingBox() + ") for: " + cur.toString());
+//                    }
                     if (_delta == null) {
                         _delta = tile.pointPosition(cur);
                     }
@@ -621,6 +614,7 @@ public class MapComponent extends Container {
         return keyCode == '5';
     }
 }
+
 class LayerWithZoomLevels {
 
     public AbstractLayer layer;
