@@ -41,6 +41,8 @@ public class Capture {
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
      * 
+     * if evt returns null the image capture was cancelled by the user.
+     * 
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
