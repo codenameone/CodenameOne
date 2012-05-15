@@ -537,6 +537,7 @@ public class MapComponent extends Container {
         if (bbox != null) {
             zoomTo(bbox);
         }
+        _needTiles = true;
     }
 
     /**
