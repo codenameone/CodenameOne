@@ -42,6 +42,7 @@ import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
@@ -857,7 +858,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             l.setAltitude(IOSNative.getLocationAltitude(c));
             l.setDirection((float)IOSNative.getLocationDirection(c));
             l.setLatitude(IOSNative.getLocationLatitude(c));
-            l.setLongtitude(IOSNative.getLocationLongtitude(c));
+            l.setLongitude(IOSNative.getLocationLongtitude(c));
             if(IOSNative.isGoodLocation(p)) {
                 l.setStatus(LocationManager.AVAILABLE);
             } else {
@@ -924,13 +925,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return lm;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String getMediaRecorderingMimeType() {
+        return "audio/aac";
+    }
     
     /**
      * Callback for the native layer
      */
     public static void capturePictureResult(String r) {
         if(captureCallback != null) {
-            captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+            if(r != null) {
+                captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+            } else {
+                captureCallback.fireActionEvent(null);
+            }
+            captureCallback = null;
         }
     }
 
@@ -938,9 +951,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void captureMovieResult(String r) {
-        if(captureCallback != null) {
-            captureCallback.fireActionEvent(new ActionEvent("file:" + r));        
-        }
+        capturePictureResult(r);
     }
     
     private static EventDispatcher captureCallback;
@@ -955,17 +966,95 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.captureCamera(false);
     }
 
-    /**
-     * Captures a audio and notifies with the raw data when available
-     * @param response callback for the resulting data
-     */
-    public void captureAudio(ActionListener response) {
-        captureCallback = new EventDispatcher();
-        captureCallback.addListener(response);
-        
-        // TODO
-    }
+    public Media createMediaRecorder(String path) throws IOException{
+        final long[] peer = new long[] { IOSNative.createAudioRecorder(path) };
+        return new Media() {
+            private boolean playing;
+            @Override
+            public void play() {
+                IOSNative.startAudioRecord(peer[0]);
+                playing = true;
+            }
 
+            @Override
+            public void pause() {
+                IOSNative.pauseAudioRecord(peer[0]);
+                playing = false;
+            }
+            
+            protected void finalize() {
+                if(peer[0] != 0) {
+                    cleanup();
+                }
+            }
+
+            @Override
+            public void cleanup() {
+                if(playing) {
+                    IOSNative.pauseAudioRecord(peer[0]);
+                }
+                IOSNative.cleanupAudioRecord(peer[0]);
+                peer[0] = 0;
+            }
+
+            @Override
+            public int getTime() {
+                return -1;
+            }
+
+            @Override
+            public void setTime(int time) {
+            }
+
+            @Override
+            public int getDuration() {
+                return -1;
+            }
+
+            @Override
+            public void setVolume(int vol) {
+            }
+
+            @Override
+            public int getVolume() {
+                return -1;
+            }
+
+            @Override
+            public boolean isPlaying() {
+                return playing;
+            }
+
+            @Override
+            public Component getVideoComponent() {
+                return null;
+            }
+
+            @Override
+            public boolean isVideo() {
+                return false;
+            }
+
+            @Override
+            public boolean isFullScreen() {
+                return false;
+            }
+
+            @Override
+            public void setFullScreen(boolean fullScreen) {
+            }
+
+            @Override
+            public void setNativePlayerMode(boolean nativePlayer) {
+            }
+
+            @Override
+            public boolean isNativePlayerMode() {
+                return false;
+            }
+        };
+    }
+    
     /**
      * Captures a video and notifies with the data when available
      * @param response callback for the resulting video
@@ -991,47 +1080,70 @@ public class IOSImplementation extends CodenameOneImplementation {
             this.uri = uri;
             this.isVideo = isVideo;
             this.onCompletion = onCompletion;
+            if(!isVideo) {
+                moviePlayerPeer = IOSNative.createAudio(uri, onCompletion);
+            }
         }
 
         public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
             this.stream = stream;
             this.mimeType = mimeType;
             this.onCompletion = onCompletion;            
+            isVideo = mimeType.indexOf("video") > -1;
+            if(!isVideo) {
+                try {
+                    moviePlayerPeer = IOSNative.createAudio(Util.readInputStream(stream), onCompletion);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
 
         @Override
         public void play() {
-            if(nativePlayer) {
-                if(uri != null) {
-                    moviePlayerPeer = IOSNative.createVideoComponent(uri);
-                } else {
-                    try {
-                        byte[] data = Util.readInputStream(stream);
-                        Util.cleanup(stream);
-                        moviePlayerPeer = IOSNative.createVideoComponent(data);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
+            if(isVideo) {
+                if(nativePlayer) {
+                    if(uri != null) {
+                        moviePlayerPeer = IOSNative.createVideoComponent(uri);
+                    } else {
+                        try {
+                            byte[] data = Util.readInputStream(stream);
+                            Util.cleanup(stream);
+                            moviePlayerPeer = IOSNative.createVideoComponent(data);
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
                     }
+                    IOSNative.showNativePlayerController(moviePlayerPeer);
+                    return;
                 }
-                IOSNative.showNativePlayerController(moviePlayerPeer);
-                return;
-            }
-            if(moviePlayerPeer != 0) {
-                IOSNative.startVideoComponent(moviePlayerPeer);
+                if(moviePlayerPeer != 0) {
+                    IOSNative.startVideoComponent(moviePlayerPeer);
+                }
+            } else {
+                IOSNative.playAudio(moviePlayerPeer);                
             }
         }
 
         @Override
         public void pause() {
             if(moviePlayerPeer != 0) {
-                IOSNative.stopVideoComponent(moviePlayerPeer);
+                if(isVideo) {
+                    IOSNative.stopVideoComponent(moviePlayerPeer);
+                } else {
+                    IOSNative.pauseAudio(moviePlayerPeer);
+                }
             }
         }
 
         @Override
         public void cleanup() {
             if(moviePlayerPeer != 0) {
-                IOSNative.releasePeer(moviePlayerPeer);
+                if(isVideo) {
+                    IOSNative.releasePeer(moviePlayerPeer);
+                } else {
+                    IOSNative.cleanupAudio(moviePlayerPeer);                    
+                }
                 moviePlayerPeer = 0;
             }
         }
@@ -1043,7 +1155,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int getTime() {
             if(moviePlayerPeer != 0) {
-                return IOSNative.getMediaTimeMS(moviePlayerPeer);
+                if(isVideo) {
+                    return IOSNative.getMediaTimeMS(moviePlayerPeer);
+                } else {
+                    return IOSNative.getAudioTime(moviePlayerPeer);
+                }
             }
             return 0;
         }
@@ -1051,14 +1167,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void setTime(int time) {
             if(moviePlayerPeer != 0) {
-                IOSNative.setMediaTimeMS(moviePlayerPeer, time);
+                if(isVideo) {
+                    IOSNative.setMediaTimeMS(moviePlayerPeer, time);
+                } else {
+                    IOSNative.setAudioTime(moviePlayerPeer, time);
+                }
             }
         }
 
         @Override
         public int getDuration() {
             if(moviePlayerPeer != 0) {
-                return IOSNative.getMediaDuration(moviePlayerPeer);
+                if(isVideo) {
+                    return IOSNative.getMediaDuration(moviePlayerPeer);
+                } else {
+                    return IOSNative.getAudioDuration(moviePlayerPeer);
+                }
             }
             return 0;
         }
@@ -1076,7 +1200,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public boolean isPlaying() {
             if(moviePlayerPeer != 0) {
-                return IOSNative.isVideoPlaying(moviePlayerPeer);
+                if(isVideo) {
+                    return IOSNative.isVideoPlaying(moviePlayerPeer);
+                } else {
+                    return IOSNative.isAudioPlaying(moviePlayerPeer);
+                }
             }
             return false;
         }
@@ -2521,6 +2649,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public int getRootType(String root) {
+        return FileSystemStorage.ROOT_TYPE_UNKNOWN;
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public String[] listFiles(String directory) throws IOException {
         String[] a = new String[IOSNative.fileCountInDir(directory)];
         IOSNative.listFilesInDir(directory, a);
@@ -2755,30 +2890,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public ImageIO getImageIO() {
         if(imageIO == null) {
             imageIO = new ImageIO() {
-                private Image scale(Image i, int w, int h) {
-                    if(w < 1) {
-                        w = i.getWidth();
-                    }
-                    if(h < 1) {
-                        h = i.getHeight();
-                    }
-                    Image img = Image.createImage(w, h, 0);
-                    img.getGraphics().drawImage(i, 0, 0, w, h);
-                    return img;
-                }
-                
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Image img = Image.createImage(image);
-                    img = scale(img, width, height);
                     NativeImage ni = (NativeImage)img.getImage();
-                    if(width < 1) {
-                        width = ni.width;
-                    }
-                    if(height < 1) {
-                        height = ni.height;
-                    }
-                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, quality);
+                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, width, height, quality);
                     writeNSData(p, response);
                 }
 
@@ -2792,8 +2908,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     NativeImage ni = (NativeImage)img.getImage();
-                    img = scale(img, img.getWidth(), img.getHeight());
-                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, quality);
+                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, img.getWidth(), img.getHeight(), quality);
                     writeNSData(p, response);
                 }
 
@@ -2811,97 +2926,83 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Workaround for XMLVM bug
      */
     public boolean instanceofObjArray(Object o) {
-        try {
-            Object[] a = (Object[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofObjArrayI(o);        
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofByteArray(Object o) {
-        try {
-            byte[] a = (byte[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofByteArrayI(o);
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofShortArray(Object o) {
-        try {
-            short[] a = (short[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofShortArrayI(o);        
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofLongArray(Object o) {
-        try {
-            long[] a = (long[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofLongArrayI(o);        
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofIntArray(Object o) {
-        try {
-            int[] a = (int[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofIntArrayI(o);        
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofFloatArray(Object o) {
-        try {
-            float[] a = (float[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofFloatArrayI(o);        
     }
     
     /**
      * Workaround for XMLVM bug
      */
     public boolean instanceofDoubleArray(Object o) {
-        try {
-            double[] a = (double[])o;
-            
-            // so the optimizer doesn't remove the cast above
-            return a.length > -1;
-        } catch(Throwable t) {
-            return false;
-        }
+        return instanceofDoubleArrayI(o);        
     }
+
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofObjArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofByteArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofShortArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofLongArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofIntArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofFloatArrayI(Object o);
+    
+    /**
+     * Workaround for XMLVM bug
+     */
+    private static native boolean instanceofDoubleArrayI(Object o);
 }

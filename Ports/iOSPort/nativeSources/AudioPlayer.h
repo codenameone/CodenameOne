@@ -42,7 +42,7 @@
 - (void)pauseAudio;
 - (void)playAudio;
 - (void)setAudioTime:(int)time;
-
+- (BOOL) isPlaying; 
 + (float)getVolume;
 + (void)setVolume:(float)vol;
 

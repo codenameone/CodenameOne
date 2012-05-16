@@ -131,6 +131,7 @@ public class IOSNative {
     public static native void pauseAudio(long peer);
 
     public static native void setAudioTime(long peer, int time);
+    public static native boolean isAudioPlaying(long peer);
 
     public static native void cleanupAudio(long peer);
 
@@ -263,6 +264,10 @@ public class IOSNative {
     
     // capture
     public static native void captureCamera(boolean movie);
+    public static native long createAudioRecorder(String destinationFile);
+    public static native void startAudioRecord(long peer);
+    public static native void pauseAudioRecord(long peer);
+    public static native void cleanupAudioRecord(long peer);
 
     public static native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType);
 
@@ -286,7 +291,7 @@ public class IOSNative {
 
     public static native void deregisterPush();
 
-    public static native long createImageFile(long imagePeer, boolean jpeg, float quality);
+    public static native long createImageFile(long imagePeer, boolean jpeg, int width, int height, float quality);
     public static native int getNSDataSize(long nsData);
     public static native void nsDataToByteArray(long nsData, byte[] data);
 }

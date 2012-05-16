@@ -32,8 +32,8 @@ AudioPlayer* currentlyPlaying = nil;
     self = [super init];
     if (self) {
         runnableCallback = callback;
-        errorInfo = [[NSError alloc] init];
-        playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:errorInfo];
+        errorInfo = nil;
+        playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
         playerInstance.delegate = self;
         if(volume > -1) {
             playerInstance.volume = volume;
@@ -51,8 +51,7 @@ AudioPlayer* currentlyPlaying = nil;
     self = [super init];
     if (self) {
         runnableCallback = callback;
-        errorInfo = [[NSError alloc] init];
-        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:errorInfo];
+        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:&errorInfo];
         playerInstance.delegate = self;
         if(volume > -1) {
             playerInstance.volume = volume;
@@ -71,11 +70,15 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(NSError *)error {
-    (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+    if(runnableCallback != 0) {
+        (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+    }
 }
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
-    (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+    if(runnableCallback != 0) {
+        (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+    }
 }
 
 - (void)audioPlayerEndInterruption:(AVAudioPlayer *)player {
@@ -118,12 +121,14 @@ AudioPlayer* currentlyPlaying = nil;
     }
 }
 
+- (BOOL) isPlaying {
+    return playerInstance.isPlaying;
+}
 
 -(void)dealloc {
     if(currentlyPlaying == self) {
         currentlyPlaying = nil;
     }
-    [errorInfo release];
     [playerInstance release];
 	[super dealloc];
 }

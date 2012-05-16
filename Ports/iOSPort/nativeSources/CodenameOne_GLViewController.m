@@ -1396,6 +1396,11 @@ static BOOL skipNextTouch = NO;
 extern UIPopoverController* popoverController;
 extern int popoverSupported();
 
+-(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+        //[self dismissModalViewControllerAnimated:YES];
+    com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(nil);            
+    [picker dismissModalViewControllerAnimated:YES]; 
+}
 
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

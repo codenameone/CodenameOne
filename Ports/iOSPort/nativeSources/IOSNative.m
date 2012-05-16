@@ -694,7 +694,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OB
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
     NSFileManager *man = [[NSFileManager alloc] init];
-    NSDictionary *attrs = [man attributesOfItemAtPath:ns error:nil];
+    NSError *error = nil;
+    NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
+    if(error != nil) {  
+        NSLog(@"Error getFileSize: %@", [error localizedDescription]);        
+    }
     UInt32 result = [attrs fileSize];
     [man release];
     [pool release];
@@ -744,7 +748,11 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT 
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(file);
     NSString* ns = [NSString stringWithUTF8String:chrs];
-    [fm removeItemAtPath:ns error:nil];
+    NSError *error = nil;
+    [fm removeItemAtPath:ns error:&error];
+    if(error != nil) {  
+        NSLog(@"Error in deleteFile: %@", [error localizedDescription]);        
+    }
     [fm release];
     [pool release];
 }
@@ -778,7 +786,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
-    NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns];
+    NSError *error = nil;
+    NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
+    if(error != nil) {  
+        NSLog(@"Error in recording: %@", [error localizedDescription]);        
+    }
     int i = nsArr.count;
     [fm release];
     [pool release];
@@ -790,7 +802,11 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
-    NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns];
+    NSError *error = nil;
+    NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
+    if(error != nil) {  
+        NSLog(@"Error in listing files: %@", [error localizedDescription]);        
+    }
     
     org_xmlvm_runtime_XMLVMArray* byteArray = files;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
@@ -822,7 +838,11 @@ void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_Stri
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
     const char* chrsDest = stringToUTF8(dest);
     NSString* nsDst = [NSString stringWithUTF8String:chrsDest];
-    [fm moveItemAtPath:nsSrc toPath:nsDst error:nil];
+    NSError *error = nil;
+    [fm moveItemAtPath:nsSrc toPath:nsDst error:&error];
+    if(error != nil) {  
+        NSLog(@"Error in moving file: %@", [error localizedDescription]);        
+    }
     [fm release];
     [pool release];    
 }
@@ -1092,65 +1112,97 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_LONG peer) {
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    int dur = [pl getAudioDuration];
-    [pool release];
+    __block JAVA_INT dur = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        dur = [pl getAudioDuration];
+        [pool release];
+    });
     return dur;
 }
 
 void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    [pl playAudio];
-    [pool release];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        [pl playAudio];
+        [pool release];
+    });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying___long(JAVA_LONG peer) {
+    __block JAVA_BOOLEAN result = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        result = [pl isPlaying];
+        [pool release];
+    });
+    return result;
+}
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    int dur = [pl getAudioTime];
-    [pool release];
+    __block JAVA_INT dur = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        dur = [pl getAudioTime];
+        [pool release];
+    });
     return dur;
 }
 
 void com_codename1_impl_ios_IOSNative_pauseAudio___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    [pl pauseAudio];
-    [pool release];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        [pl pauseAudio];
+        [pool release];
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(JAVA_LONG peer, JAVA_INT time) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    [pl setAudioTime:time];
-    [pool release];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        [pl setAudioTime:time];
+        [pool release];
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    AudioPlayer* pl = (AudioPlayer*)peer;
-    [pl release];
-    [pool release];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AudioPlayer* pl = (AudioPlayer*)peer;
+        [pl release];
+        [pool release];
+    });
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chrs = stringToUTF8(uri);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
-    AudioPlayer* pl = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
-    [pool release];
+    __block JAVA_LONG p = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        const char* chrs = stringToUTF8(uri);
+        NSString* ns = [NSString stringWithUTF8String:chrs];
+        p = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
+        [pool release];
+    });
+    return p;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_Runnable(JAVA_OBJECT b, JAVA_OBJECT onCompletion) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    org_xmlvm_runtime_XMLVMArray* byteArray = b;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
-    NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
-    AudioPlayer* pl = [[AudioPlayer alloc] initWithURL:d callback:onCompletion];
-    [pool release];
+    __block JAVA_LONG p = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        org_xmlvm_runtime_XMLVMArray* byteArray = b;
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+        p = [[AudioPlayer alloc] initWithNSData:d callback:onCompletion];
+        [pool release];
+    });
+    return p;
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__() {
@@ -1527,15 +1579,22 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_LON
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__() {
-    return [[CLLocationManager alloc] init];
+    __block CLLocationManager* loc = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        loc = [[CLLocationManager alloc] init];
+    });
+    return loc;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(JAVA_LONG peer) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    CLLocationManager* l = (CLLocationManager*)peer;
-    CLLocation* loc = l.location;
-    [loc retain];
-    [pool release];
+    __block CLLocation* loc;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        CLLocationManager* l = (CLLocationManager*)peer;
+        loc = l.location;
+        [loc retain];
+        [pool release];
+    });
     return loc;
 }
 
@@ -1803,4 +1862,180 @@ void com_codename1_impl_ios_IOSNative_registerPush__() {
 
 void com_codename1_impl_ios_IOSNative_deregisterPush__() {
     [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+}
+
+UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
+    const size_t originalWidth = img.size.width;
+    const size_t originalHeight = img.size.height;
+    
+    CGContextRef bmContext = CGBitmapContextCreate(NULL, destWidth, destHeight, 8, destWidth * 4, CGColorSpaceCreateDeviceRGB(), kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedFirst);
+    
+
+    if (!bmContext) {
+        return nil;
+    }
+    
+    if (UIImageOrientationLeft == img.imageOrientation) {
+        CGContextRotateCTM(bmContext, M_PI_2);
+        CGContextTranslateCTM(bmContext, 0, -destHeight);
+    } else if (UIImageOrientationRight == img.imageOrientation) {
+        CGContextRotateCTM(bmContext, -M_PI_2);
+        CGContextTranslateCTM(bmContext, -destWidth, 0);
+    } else if (UIImageOrientationDown == img.imageOrientation) {
+        CGContextTranslateCTM(bmContext, destWidth, destHeight);
+        CGContextRotateCTM(bmContext, -M_PI);
+    }
+    
+    CGContextSetShouldAntialias(bmContext, true);
+    CGContextSetAllowsAntialiasing(bmContext, true);
+    CGContextSetInterpolationQuality(bmContext, kCGInterpolationHigh);
+    
+    CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), img.CGImage);
+    
+    CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
+    UIImage* scaled = [UIImage imageWithCGImage:scaledImageRef];
+    
+    CGImageRelease(scaledImageRef);
+    CGContextRelease(bmContext);
+    
+    return scaled;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    UIImage* i = [(GLUIImage*)imagePeer getImage];
+    if(width == -1) {
+        width = (int)i.size.width;
+    }
+    if(height == -1) {
+        height = (int)i.size.width;
+    }
+    NSData* data;
+    if(width != ((int)i.size.width) || height != ((int)i.size.height)) {
+        i = scaleImage(width, height, i);
+    } 
+    if(jpeg) {
+        data = UIImageJPEGRepresentation(i, quality);
+    } else {
+        data = UIImagePNGRepresentation(i);
+    }
+    
+    [data retain];
+    [pool release];
+    return data;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long(JAVA_LONG nsData) {
+    NSData* d = (NSData*)nsData;
+    return d.length;
+} 
+
+void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_LONG nsData, JAVA_OBJECT dataArray) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)nsData;
+    org_xmlvm_runtime_XMLVMArray* byteArray = dataArray;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(data, d.bytes, d.length);
+    [pool release];
+}
+
+
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(
+    JAVA_OBJECT  destinationFile) {
+    __block AVAudioRecorder* recorder = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSString * filePath = toNSString(destinationFile);
+        NSLog(@"Recording audio to: %@", filePath);
+        NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
+        [NSNumber numberWithFloat: 44100.0], AVSampleRateKey,
+        [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
+        [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
+        [NSNumber numberWithInt: AVAudioQualityMax], AVEncoderAudioQualityKey,nil];
+        NSError *error = nil;
+        recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:filePath]
+             settings: recordSettings
+             error: &error];
+        if(error != nil) {  
+            NSLog(@"Error in recording: %@", [error localizedDescription]);        
+        }
+        [pool release];
+    });
+    return recorder;
+}
+
+void com_codename1_impl_ios_IOSNative_startAudioRecord___long(
+    JAVA_LONG  peer) {
+    AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [recorder prepareToRecord];
+        [recorder record];
+        [recorder retain];
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(
+    JAVA_LONG  peer) {
+    AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [recorder pause];
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(
+    JAVA_LONG  peer) {
+    AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [recorder stop];
+        [recorder release];
+        [pool release];
+    });
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_java_lang_Object_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofByteArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_byte_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofShortArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_short_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofLongArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_long_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofIntArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_int_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofFloatArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_float_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___java_lang_Object(JAVA_OBJECT n1)
+{
+    org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
+    return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_double_1ARRAY;
 }
