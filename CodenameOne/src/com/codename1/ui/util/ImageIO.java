@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import java.io.ByteArrayInputStream;
@@ -93,4 +94,14 @@ public abstract class ImageIO {
      * @return true if supported
      */
     public abstract boolean isFormatSupported(String format);
+    
+    
+    /**
+     * Gets the ImageIO instance 
+     * 
+     * @return ImageIO instance
+     */
+    public static ImageIO getImageIO(){
+        return Display.getInstance().getImageIO();
+    }
 }

@@ -2666,4 +2666,14 @@ public final class Display {
     public ImageIO getImageIO() {
         return impl.getImageIO();
     }
+
+    /**
+     * Gets the recording mime type for the returned Media from the 
+     * createMediaRecorder method
+     * 
+     * @return the recording mime type
+     */
+    public String getMediaRecorderingMimeType() {
+        return impl.getMediaRecorderingMimeType();
+    }
 }

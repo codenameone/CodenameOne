@@ -4272,4 +4272,14 @@ public abstract class CodenameOneImplementation {
     public boolean instanceofDoubleArray(Object o) {
         return o instanceof double[];
     }
+
+    /**
+     * Gets the recording mime type for the returned Media from the 
+     * createMediaRecorder method
+     * 
+     * @return the recording mime type
+     */
+    public String getMediaRecorderingMimeType() {
+        return "audio/amr";
+    }
 }

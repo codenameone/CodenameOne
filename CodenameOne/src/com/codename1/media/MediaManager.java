@@ -108,5 +108,13 @@ public class MediaManager {
         return Display.getInstance().createMediaRecorder(path);
     }
     
-
+    /**
+     * Gets the recording mime type for the returned Media from the 
+     * createMediaRecorder method
+     * 
+     * @return the recording mime type
+     */
+    public static String getMediaRecorderingMimeType(){
+        return Display.getInstance().getMediaRecorderingMimeType();
+    }
 }
