@@ -293,6 +293,7 @@ public final class CommonTransitions extends Transition {
                 originalHeight = c.getHeight();
                 return;
             }
+            transitionType = TYPE_EMPTY;
             motion = createMotion(0, 0, 0);
             pulseState = (byte)3;
             return;

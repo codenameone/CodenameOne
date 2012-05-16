@@ -1724,6 +1724,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
         makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
+        makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -4127,6 +4128,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneInfiniteProgress = new javax.swing.JButton();
         codenameOneAds = new javax.swing.JButton();
         codenameOneMap = new javax.swing.JButton();
+        codenameOneShare = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4464,6 +4466,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMap.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneMap);
 
+        codenameOneShare.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
+        codenameOneShare.setText("Share Button");
+        codenameOneShare.setToolTipText("<html><body><b>Share Button</b><br> \n<p>\nSocial share button</p> </body> </html>"); // NOI18N
+        codenameOneShare.setBorder(null);
+        codenameOneShare.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneShare.setName("codenameOneShare"); // NOI18N
+        codenameOneShare.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneShare);
+
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
         jTabbedPane1.addTab("Additional Components", jPanel6);
@@ -4720,6 +4731,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneList) {
                 UserInterfaceEditor.this.codenameOneListActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneMultiList) {
+                UserInterfaceEditor.this.codenameOneMultiListActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneTextArea) {
                 UserInterfaceEditor.this.codenameOneTextAreaActionPerformed(evt);
             }
@@ -4780,6 +4794,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneAds) {
                 UserInterfaceEditor.this.codenameOneAdsActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneMap) {
+                UserInterfaceEditor.this.codenameOneMapActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
@@ -4816,11 +4833,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneMap) {
-                UserInterfaceEditor.this.codenameOneMapActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneMultiList) {
-                UserInterfaceEditor.this.codenameOneMultiListActionPerformed(evt);
+            else if (evt.getSource() == codenameOneShare) {
+                UserInterfaceEditor.this.codenameOneShareActionPerformed(evt);
             }
         }
 
@@ -5431,6 +5445,14 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.ui.list.MultiList(), "MultiList");
     }//GEN-LAST:event_codenameOneMultiListActionPerformed
 
+    private void codenameOneShareActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneShareActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.ShareButton(), "ShareButton");
+    }//GEN-LAST:event_codenameOneShareActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5550,6 +5572,7 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton codenameOneMultiList;
     private javax.swing.JButton codenameOneNumericSpinner;
     private javax.swing.JButton codenameOneRadioButton;
+    private javax.swing.JButton codenameOneShare;
     private javax.swing.JButton codenameOneSlider;
     private javax.swing.JButton codenameOneTable;
     private javax.swing.JButton codenameOneTabs;

@@ -161,6 +161,7 @@ public class PreviewInSimulator {
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("Ads", com.codename1.components.Ads.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
                     com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
                     com.codename1.ui.Container c = builder.createContainer(res, selection);
                     if(c instanceof com.codename1.ui.Form) {

@@ -362,7 +362,7 @@ public class EventDispatcher {
      */
     private void fireActionSync(ActionListener[] array, ActionEvent ev) {
         for(int iter = 0 ; iter < array.length ; iter++) {
-            if(!ev.isConsumed()) {
+            if(ev == null || !ev.isConsumed()) {
                 array[iter].actionPerformed(ev);
             }
         }

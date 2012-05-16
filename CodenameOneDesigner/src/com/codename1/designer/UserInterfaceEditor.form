@@ -658,6 +658,23 @@
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneMapActionPerformed"/>
                                       </Events>
                                     </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneShare">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/JXButton32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="Share Button"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Share Button&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Social share button&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                          <Border info="null"/>
+                                        </Property>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneShare" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneShareActionPerformed"/>
+                                      </Events>
+                                    </Component>
                                   </SubComponents>
                                 </Container>
                               </SubComponents>

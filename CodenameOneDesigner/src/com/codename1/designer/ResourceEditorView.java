@@ -522,7 +522,6 @@ public class ResourceEditorView extends FrameView {
             if(platformOverrides.getSelectedIndex() > 0) {
                 String name = loadedFile.getName();
                 name = name.substring(0, name.length() - 4);
-                name.substring(0, name.length() - 4);
                 return new File(overrideDir, name + "_" + OVERRIDE_NAMES[platformOverrides.getSelectedIndex()] + ".ovr");
             }
         }
@@ -1627,49 +1626,51 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
 
     private void removeImageOrAnimation(String resourceToRemove) {
         Object resourceValue = loadedResources.getImage(resourceToRemove);
-        for(String themeName : loadedResources.getThemeResourceNames()) {
-            Hashtable theme = loadedResources.getTheme(themeName);
-            if(theme.values().contains(resourceValue)) {
-                JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme" + 
-                    "\nYou must remove it from the theme first", "Image In Use", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            // we need to check the existance of image borders to replace images there...
-            for(Object v : theme.values()) {
-                if(v instanceof Border) {
-                    Border b = (Border)v;
-                    // BORDER_TYPE_IMAGE
-                    if(Accessor.getType(b) == 8) {
-                        com.codename1.ui.Image[] images = Accessor.getImages(b);
-                        for(int i = 0 ; i < images.length ; i++) {
-                            if(images[i] == resourceValue) {
-                                JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme in a border" +
-                                    "\nYou must remove it from the theme first", "Image In Use", JOptionPane.ERROR_MESSAGE);
-                                return;
+        if(!loadedResources.isOverrideMode()) {
+            for(String themeName : loadedResources.getThemeResourceNames()) {
+                Hashtable theme = loadedResources.getTheme(themeName);
+                if(theme.values().contains(resourceValue)) {
+                    JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme" + 
+                        "\nYou must remove it from the theme first", "Image In Use", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                // we need to check the existance of image borders to replace images there...
+                for(Object v : theme.values()) {
+                    if(v instanceof Border) {
+                        Border b = (Border)v;
+                        // BORDER_TYPE_IMAGE
+                        if(Accessor.getType(b) == 8) {
+                            com.codename1.ui.Image[] images = Accessor.getImages(b);
+                            for(int i = 0 ; i < images.length ; i++) {
+                                if(images[i] == resourceValue) {
+                                    JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme in a border" +
+                                        "\nYou must remove it from the theme first", "Image In Use", JOptionPane.ERROR_MESSAGE);
+                                    return;
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // check if a timeline is making use of said image and replace it
-        for(String image : loadedResources.getImageResourceNames()) {
-            com.codename1.ui.Image current = loadedResources.getImage(image);
-            if(current instanceof com.codename1.ui.animations.Timeline) {
-                com.codename1.ui.animations.Timeline time = (com.codename1.ui.animations.Timeline)current;
-                for(int iter = 0 ; iter < time.getAnimationCount() ; iter++) {
-                    com.codename1.ui.animations.AnimationObject o = time.getAnimation(iter);
-                    if(AnimationAccessor.getImage(o) == resourceValue) {
-                        JOptionPane.showMessageDialog(mainPanel, "Image is in use by a timeline: " + image, "Image In Use", JOptionPane.ERROR_MESSAGE);
-                        return;
+            // check if a timeline is making use of said image and replace it
+            for(String image : loadedResources.getImageResourceNames()) {
+                com.codename1.ui.Image current = loadedResources.getImage(image);
+                if(current instanceof com.codename1.ui.animations.Timeline) {
+                    com.codename1.ui.animations.Timeline time = (com.codename1.ui.animations.Timeline)current;
+                    for(int iter = 0 ; iter < time.getAnimationCount() ; iter++) {
+                        com.codename1.ui.animations.AnimationObject o = time.getAnimation(iter);
+                        if(AnimationAccessor.getImage(o) == resourceValue) {
+                            JOptionPane.showMessageDialog(mainPanel, "Image is in use by a timeline: " + image, "Image In Use", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
                     }
                 }
             }
-        }
-        if(isInUse(loadedResources.getImage(resourceToRemove))) {
-            JOptionPane.showMessageDialog(mainPanel, "Image is in use in the resource file", "Image In Use", JOptionPane.ERROR_MESSAGE);
-            return;
+            if(isInUse(loadedResources.getImage(resourceToRemove))) {
+                JOptionPane.showMessageDialog(mainPanel, "Image is in use in the resource file", "Image In Use", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
         removeSelection(resourceToRemove);
         imageList.refresh();
