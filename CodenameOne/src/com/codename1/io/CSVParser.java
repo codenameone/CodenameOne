@@ -115,6 +115,7 @@ public class CSVParser {
                     int next = peekNextChar();
                     if(next == '"') {
                         stringBuf.append('"');
+                        nextChar();
                     } else {
                         if(next == -1) {
                             stringBuf.append('"');
