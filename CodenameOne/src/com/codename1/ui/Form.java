@@ -1374,7 +1374,6 @@ public class Form extends Container {
         if (modal) {
             // called to display a dialog and wait for modality  
             Display.getInstance().invokeAndBlock(new RunnableWrapper(this, p, reverse));
-
             // if the virtual keyboard was opend by the dialog close it
             Display.getInstance().setShowVirtualKeyboard(false);
         }
@@ -1425,7 +1424,7 @@ public class Form extends Container {
                 }
             } else {
                 Display.getInstance().setCurrent(previousForm, false);
-                previousForm.revalidate();
+                //previousForm.revalidate();
             }
 
             // enable GC to cleanup the previous form if no longer referenced

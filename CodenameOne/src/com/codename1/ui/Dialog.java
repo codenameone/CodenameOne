@@ -1275,6 +1275,9 @@ public class Dialog extends Form {
      * EDT in the process 
      */
     public void dispose() {
+        if(isDisposed()){
+            return;
+        }
         setDisposed(true);
 
         // the dispose parent method might send us back to the form while the command
@@ -1589,5 +1592,17 @@ public class Dialog extends Form {
         this.dialogPosition = dialogPosition;
     }
     
+    /**
+     * @inheritDoc
+     */
+    void repaint(Component cmp) {
+        if(getParent() != null){
+            super.repaint(cmp);
+            return;
+        }
+        if (isVisible() && !disposed) {
+            Display.getInstance().repaint(cmp);
+        }
+    }
     
 }
