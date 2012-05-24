@@ -352,31 +352,87 @@ public class Util {
                 + " value: " + o);
     }
 
-    private static boolean instanceofObjArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofObjArray(Object o) {
         return getImplementation().instanceofObjArray(o);
     }
     
-    private static boolean instanceofByteArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofByteArray(Object o) {
         return getImplementation().instanceofByteArray(o);
     }
     
-    private static boolean instanceofShortArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofShortArray(Object o) {
         return getImplementation().instanceofShortArray(o);
     }
     
-    private static boolean instanceofLongArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofLongArray(Object o) {
         return getImplementation().instanceofLongArray(o);
     }
     
-    private static boolean instanceofIntArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofIntArray(Object o) {
         return getImplementation().instanceofIntArray(o);
     }
     
-    private static boolean instanceofFloatArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofFloatArray(Object o) {
         return getImplementation().instanceofFloatArray(o);
     }
     
-    private static boolean instanceofDoubleArray(Object o) {
+    /**
+     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
+     * 
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * once the bug is fixed
+     */
+    public static boolean instanceofDoubleArray(Object o) {
         return getImplementation().instanceofDoubleArray(o);
     }
 
@@ -517,7 +573,14 @@ public class Util {
         return encode(str, "%20");
     }
 
-    private static char[] toCharArray(String s) {
+    /**
+     * toCharArray should return a new array always, however some devices might
+     * suffer a bug that allows mutating a String (serious security hole in the JVM)
+     * hence this method simulates the proper behavior
+     * @param s a string
+     * @return the contents of the string as a char array guaranteed to be a copy of the current array
+     */
+    public static char[] toCharArray(String s) {
         // toCharArray should return a new array always, however some devices might
         // suffer a bug that allows mutating a String (serious security hole in the JVM)
         // hence this method simulates the proper behavior
@@ -702,7 +765,11 @@ public class Util {
         int secLiteral = ch % 256;
         if(firstLiteral == 0 && secLiteral < 127) {
             sbuf.append("%");
-            sbuf.append(Integer.toHexString(secLiteral).toUpperCase());
+            String s = Integer.toHexString(secLiteral).toUpperCase();
+            if(s.length() == 1) {
+                sbuf.append("0");
+            } 
+            sbuf.append(s);
             return;
         }
         if (ch <= 0x07ff) {
