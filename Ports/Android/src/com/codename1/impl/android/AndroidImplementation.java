@@ -91,6 +91,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import java.io.DataInputStream;
 import java.io.File;
@@ -158,7 +159,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
     private Uri imageUri;
-    private ActionListener intentResponse;
+    private EventDispatcher captureCallback;
+
 
     @Override
     public void init(Object m) {
@@ -2713,13 +2715,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
-        Intent emailIntent = new Intent(android.content.Intent.ACTION_SEND);
-        emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
-        emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
-        emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
-        emailIntent.setType(msg.getMimeType());
+        Intent emailIntent;
+
         if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
+            emailIntent = new Intent(android.content.Intent.ACTION_SEND);
+            emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+            emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+            emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
+            emailIntent.setType(msg.getMimeType());
             emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
+        } else {
+            StringBuilder to = new StringBuilder();
+            for (int i = 0; i < recipients.length; i++) {
+                to.append(recipients[i]);
+                to.append(";");
+            }
+            emailIntent = new Intent(Intent.ACTION_SENDTO,
+                    Uri.parse(
+                    "mailto:" + to.toString()
+                    + "?subject=" + Uri.encode(subject)
+                    + "&body=" + Uri.encode(msg.getContent())));
+            
         }
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }
@@ -2952,7 +2968,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     picture.recycle();
                     picture = null;
                     new File(path).delete();
-                    intentResponse.actionPerformed(new ActionEvent(f.getAbsolutePath()));
+                    captureCallback.fireActionEvent(new ActionEvent(f.getAbsolutePath()));
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -2960,19 +2976,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (requestCode == CAPTURE_VIDEO || requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, activity);
-                intentResponse.actionPerformed(new ActionEvent(path));
+                captureCallback.fireActionEvent(new ActionEvent(path));
                 return;
             }
         }
-        intentResponse.actionPerformed(null);
+        captureCallback.fireActionEvent(null);
 
     }
 
     @Override
     public void capturePhoto(ActionListener response) {
-        intentResponse = response;
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-
+        
         String fileName = "temp.jpg";
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.TITLE, fileName);
@@ -2985,14 +3002,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void captureVideo(ActionListener response) {
-        intentResponse = response;
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
         this.activity.startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
     @Override
     public void captureAudio(ActionListener response) {
-        intentResponse = response;
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
         this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
     }
@@ -3217,5 +3236,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return imIO;
     }
+            
     
 }
