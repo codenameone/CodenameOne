@@ -626,7 +626,7 @@ public final class Display {
     public void callSerially(Runnable r){
         synchronized(lock) {
             pendingSerialCalls.addElement(r);
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
