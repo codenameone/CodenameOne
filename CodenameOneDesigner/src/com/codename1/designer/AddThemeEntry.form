@@ -26,12 +26,12 @@
           <Group type="102" alignment="1" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="1" attributes="0">
-                  <Component id="previewPane" alignment="0" pref="645" max="32767" attributes="0"/>
-                  <Component id="addTabs" alignment="0" pref="645" max="32767" attributes="0"/>
+                  <Component id="previewPane" alignment="0" pref="751" max="32767" attributes="0"/>
+                  <Component id="addTabs" alignment="0" pref="751" max="32767" attributes="0"/>
                   <Group type="102" alignment="0" attributes="0">
                       <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                      <Component id="componentName" pref="177" max="32767" attributes="0"/>
+                      <Component id="componentName" pref="283" max="32767" attributes="0"/>
                       <EmptySpace type="separate" max="-2" attributes="0"/>
                       <Component id="styleType" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
@@ -130,7 +130,7 @@
                           <Group type="102" attributes="0">
                               <EmptySpace min="10" pref="10" max="10" attributes="0"/>
                               <Component id="deriveBackground" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="391" max="32767" attributes="0"/>
+                              <EmptySpace pref="497" max="32767" attributes="0"/>
                               <Component id="deriveHelp" linkSize="6" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Group type="102" alignment="0" attributes="0">
@@ -432,10 +432,10 @@
                                       <Component id="colorValueFG" min="-2" pref="66" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
                                       <Component id="changeColorButtonFG" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace pref="221" max="32767" attributes="0"/>
+                                      <EmptySpace pref="327" max="32767" attributes="0"/>
                                       <Component id="colorHelp" linkSize="7" min="-2" max="-2" attributes="0"/>
                                   </Group>
-                                  <Component id="transparencyValue" alignment="0" pref="488" max="32767" attributes="0"/>
+                                  <Component id="transparencyValue" alignment="0" pref="594" max="32767" attributes="0"/>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="colorValueBG" min="-2" pref="66" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
@@ -450,7 +450,7 @@
                           <Group type="102" alignment="0" attributes="0">
                               <EmptySpace min="10" pref="10" max="10" attributes="0"/>
                               <Component id="deriveForegroundColor" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="329" max="32767" attributes="0"/>
+                              <EmptySpace pref="435" max="32767" attributes="0"/>
                               <Component id="deriveHelp1" linkSize="7" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Group type="102" alignment="0" attributes="0">
@@ -629,13 +629,13 @@
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" alignment="0" attributes="0">
                               <Component id="deriveAlignment" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="373" max="32767" attributes="0"/>
+                              <EmptySpace pref="479" max="32767" attributes="0"/>
                               <Component id="deriveHelp2" linkSize="8" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Group type="102" alignment="1" attributes="0">
                               <Component id="jLabel20" min="-2" max="-2" attributes="0"/>
                               <EmptySpace min="-2" pref="9" max="-2" attributes="0"/>
-                              <Component id="alignmentCombo" pref="365" max="32767" attributes="0"/>
+                              <Component id="alignmentCombo" pref="471" max="32767" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="alignHelp" linkSize="8" min="-2" max="-2" attributes="0"/>
                           </Group>
@@ -768,7 +768,7 @@
                           <Component id="paddingHelp" linkSize="9" min="-2" max="-2" attributes="0"/>
                           <Component id="deriveHelp3" linkSize="9" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace min="-2" pref="61" max="-2" attributes="0"/>
+                      <EmptySpace min="-2" pref="167" max="-2" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -989,10 +989,10 @@
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="marginLeft" alignment="0" pref="103" max="32767" attributes="0"/>
-                                  <Component id="marginRight" alignment="0" pref="103" max="32767" attributes="0"/>
-                                  <Component id="marginTop" alignment="0" pref="103" max="32767" attributes="0"/>
-                                  <Component id="marginBottom" alignment="0" pref="103" max="32767" attributes="0"/>
+                                  <Component id="marginLeft" alignment="0" pref="209" max="32767" attributes="0"/>
+                                  <Component id="marginRight" alignment="0" pref="209" max="32767" attributes="0"/>
+                                  <Component id="marginTop" alignment="0" pref="209" max="32767" attributes="0"/>
+                                  <Component id="marginBottom" alignment="0" pref="209" max="32767" attributes="0"/>
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
@@ -1007,7 +1007,7 @@
                           <Group type="102" alignment="0" attributes="0">
                               <EmptySpace min="10" pref="10" max="10" attributes="0"/>
                               <Component id="deriveMargin" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="405" max="32767" attributes="0"/>
+                              <EmptySpace pref="511" max="32767" attributes="0"/>
                               <Component id="deriveHelp4" linkSize="10" min="-2" max="-2" attributes="0"/>
                           </Group>
                       </Group>
@@ -1242,16 +1242,16 @@
                   <Group type="102" alignment="0" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="jScrollPane1" alignment="0" pref="584" max="32767" attributes="0"/>
+                          <Component id="jScrollPane1" alignment="0" pref="690" max="32767" attributes="0"/>
                           <Component id="imageBorderWizard" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Group type="102" alignment="1" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="deriveBorder" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace pref="230" max="32767" attributes="0"/>
+                                      <EmptySpace pref="336" max="32767" attributes="0"/>
                                   </Group>
                                   <Group type="102" attributes="0">
-                                      <Component id="borderLabel" pref="302" max="32767" attributes="0"/>
+                                      <Component id="borderLabel" pref="408" max="32767" attributes="0"/>
                                       <EmptySpace min="-2" pref="23" max="-2" attributes="0"/>
                                   </Group>
                               </Group>
@@ -1404,11 +1404,11 @@
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" alignment="0" attributes="0">
                               <Component id="defineAttribute" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="328" max="32767" attributes="0"/>
+                              <EmptySpace pref="434" max="32767" attributes="0"/>
                               <Component id="deriveHelp6" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Group type="102" alignment="1" attributes="0">
-                              <Component id="baseStyle" pref="447" max="32767" attributes="0"/>
+                              <Component id="baseStyle" pref="553" max="32767" attributes="0"/>
                               <EmptySpace type="separate" max="-2" attributes="0"/>
                               <Component id="baseStyleType" min="-2" max="-2" attributes="0"/>
                           </Group>
@@ -1504,17 +1504,17 @@
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="jLabel7" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="textDecorationCombo" pref="358" max="32767" attributes="0"/>
+                                      <Component id="textDecorationCombo" pref="464" max="32767" attributes="0"/>
                                   </Group>
                                   <Group type="102" alignment="0" attributes="0">
-                                      <Component id="fontFace" pref="168" max="32767" attributes="0"/>
+                                      <Component id="fontFace" pref="203" max="32767" attributes="0"/>
                                       <EmptySpace min="-2" max="-2" attributes="0"/>
-                                      <Component id="fontStyle" pref="138" max="32767" attributes="0"/>
+                                      <Component id="fontStyle" pref="173" max="32767" attributes="0"/>
                                       <EmptySpace min="-2" pref="18" max="-2" attributes="0"/>
-                                      <Component id="fontSize" pref="138" max="32767" attributes="0"/>
+                                      <Component id="fontSize" pref="174" max="32767" attributes="0"/>
                                   </Group>
                                   <Group type="102" alignment="0" attributes="0">
-                                      <Component id="bitmapFontValue" pref="383" max="32767" attributes="1"/>
+                                      <Component id="bitmapFontValue" pref="489" max="32767" attributes="1"/>
                                       <EmptySpace max="-2" attributes="0"/>
                                       <Component id="addNewBitmapFont" min="-2" max="-2" attributes="0"/>
                                   </Group>

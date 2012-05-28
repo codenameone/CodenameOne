@@ -146,7 +146,7 @@ public class ResourceEditorView extends FrameView {
     private HelpAction helpAction = new HelpAction();
     private static final String IMAGE_DIR = "/com/codename1/designer/resources/";
         
-    private final EditableResources loadedResources = new EditableResources();
+    private static final EditableResources loadedResources = new EditableResources();
     private Properties projectGeneratorSettings;
     private static String manualIDESettings;
     private List<String> recentFiles = new ArrayList<String>();
@@ -197,6 +197,24 @@ public class ResourceEditorView extends FrameView {
     
     public static File getLoadedFile() {
         return loadedFile;
+    }
+
+    public static File getTemporarySaveOfCurrentFile() {
+        try {
+            File tmp = File.createTempFile("Temp", ".res");
+            tmp.deleteOnExit();
+
+            FileOutputStream tempOut = new FileOutputStream(tmp);
+            
+            loadedResources.save(tempOut);
+
+            tempOut.close();
+            
+            return tmp;
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return null;
+        }
     }
     
     public ResourceEditorView(SingleFrameApplication app, File fileToLoad) {
@@ -421,6 +439,10 @@ public class ResourceEditorView extends FrameView {
         platformOverrides.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
+                if(loadedFile == null && platformOverrides.getSelectedIndex() > 0) {
+                    JOptionPane.showMessageDialog(mainPanel, "You must use a resource file placed in the src folder of a Codename One project", "Override", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
                 if(loadedResources.isModified() && loadedResources.isOverrideMode()) {
                     int r = JOptionPane.showConfirmDialog(mainPanel, "Changing the overlay mode with unsaved changes might cause you to lose these changes.\n"
                             + "Do you want to save your changes?", "", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
@@ -516,15 +538,21 @@ public class ResourceEditorView extends FrameView {
 
     
     public File getPlatformOverrideFile() {
-        if(projectGeneratorSettings != null) {
+        if(loadedFile != null) {
             File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");        
-            overrideDir.mkdirs();
+            if(!overrideDir.exists()) {
+                int r = JOptionPane.showConfirmDialog(mainPanel, "The override directory doesn't exist, this feature will only work within a valid\nCodename One project, do you want to continue?", "No Override Folder",JOptionPane.YES_NO_OPTION, JOptionPane.ERROR_MESSAGE);
+                if(r != JOptionPane.YES_OPTION) {
+                    return null;
+                }
+                overrideDir.mkdirs();
+            }
             if(platformOverrides.getSelectedIndex() > 0) {
                 String name = loadedFile.getName();
                 name = name.substring(0, name.length() - 4);
                 return new File(overrideDir, name + "_" + OVERRIDE_NAMES[platformOverrides.getSelectedIndex()] + ".ovr");
             }
-        }
+        } 
         return null;
     }
     

@@ -1711,7 +1711,7 @@ private void simulatorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
         if(ui == null) {
             ui = resources.getUIResourceNames()[0];
         }
-        PreviewInSimulator.execute(this, themeName, view.getLoadedFile(), ui);
+        PreviewInSimulator.execute(this, themeName, view.getTemporarySaveOfCurrentFile(), ui);
     }
 }//GEN-LAST:event_simulatorActionPerformed
 
