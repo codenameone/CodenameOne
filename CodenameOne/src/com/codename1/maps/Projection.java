@@ -78,10 +78,22 @@ public abstract class Projection {
 
     /**
      * Converts a WGS84 bounding box to the projection system bounding box
+     * 
      * @param bbox bounding box too convert
      * @return a converted bounding box
      */
     public final BoundingBox fromWGS84(BoundingBox bbox) {
         return new BoundingBox(fromWGS84(bbox.getSouthWest()), fromWGS84(bbox.getNorthEast()));
     }
+    
+    /**
+     * Converts a projected bounding box to a WGS84 bounding box
+     * 
+     * @param bbox bounding box too convert
+     * @return a converted bounding box
+     */
+    public final BoundingBox toWGS84(BoundingBox bbox) {
+        return new BoundingBox(toWGS84(bbox.getSouthWest()), toWGS84(bbox.getNorthEast()));
+    }
+    
 }

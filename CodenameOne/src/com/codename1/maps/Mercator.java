@@ -60,7 +60,7 @@ public class Mercator extends Projection {
         double x = (longitude / SIZE) * 180;
         double y = (latitude / SIZE) * 180;
         y = 180.0 / Math.PI * (2 * MathUtil.atan(MathUtil.exp(y * Math.PI / 180)) - Math.PI / 2);
-        return new Coord(x, y, false);
+        return new Coord(y, x, false);
     }
 
     /**
@@ -69,6 +69,9 @@ public class Mercator extends Projection {
      * @return projected Mercator Coord
      */
     public Coord fromWGS84(Coord wgs84) {
+        if(wgs84.isProjected()){
+            return wgs84;
+        }
         return forwardMercator(wgs84.getLatitude(), wgs84.getLongitude());
     }
 
@@ -78,6 +81,9 @@ public class Mercator extends Projection {
      * @return unprojected Latitude, Longitude
      */
     public Coord toWGS84(Coord projection) {
+        if(!projection.isProjected()){
+            return projection;
+        }
         return inverseMercator(projection.getLatitude(), projection.getLongitude());
     }
 }

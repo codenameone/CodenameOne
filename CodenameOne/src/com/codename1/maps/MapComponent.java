@@ -42,6 +42,7 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.util.MathUtil;
 
 /**
  * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
@@ -233,7 +234,8 @@ public class MapComponent extends Container {
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
         Tile t = screenTile();
-        return t.position(x, t.dimension().getHeight() - y);
+        Coord c = t.position(x, t.dimension().getHeight() - y);
+        return _map.projection().toWGS84(c);
     }
 
     /**
@@ -489,16 +491,22 @@ public class MapComponent extends Container {
 
     /**
      * Zoom the map the the giving bounding box
+     * 
      * @param boundingBox to zoom to
+     * @throws IllegalArgumentException if the boundingBox is not wg84 format
      */
     public void zoomTo(BoundingBox boundingBox) {
+        if (boundingBox.projected()) {
+            throw new IllegalArgumentException("boundingBox should be wg84 format");
+        }
+
         Dimension dimension = null;
         if (getWidth() == 0 || getHeight() == 0) {
             dimension = getPreferredSize();
         } else {
             dimension = new Dimension(getWidth(), getHeight());
         }
-        final BoundingBox projectedBBOX = boundingBox.projected() ? boundingBox : _map.projection().fromWGS84(boundingBox);
+        final BoundingBox projectedBBOX = _map.projection().fromWGS84(boundingBox);
         Tile tile = new Tile(dimension, projectedBBOX, null);
         _zoom = _map.maxZoomFor(tile);
         _center = tile.position(tile.dimension().getWidth() / 2, tile.dimension().getHeight() / 2);
@@ -507,10 +515,15 @@ public class MapComponent extends Container {
 
     /**
      * Zoom map to the center of the given coordinate with the given zoom level
-     * @param coord center map to this coordinate
-     * @param zoomLevel zoom map to this leve;
+     * 
+     * @param coord center map to this coordinate, coord should be in wg84 format
+     * @param zoomLevel zoom map to this level;
+     * @throws IllegalArgumentException if the coord is not wg84 format
      */
     public void zoomTo(Coord coord, int zoomLevel) {
+        if (coord.isProjected()) {
+            throw new IllegalArgumentException("coord should be wg84 format");
+        }
         _center = _map.projection().fromWGS84(coord);
         _zoom = zoomLevel;
     }
@@ -535,6 +548,9 @@ public class MapComponent extends Container {
             }
         }
         if (bbox != null) {
+            if(bbox.projected()){
+                bbox = _map.projection().toWGS84(bbox);
+            }
             zoomTo(bbox);
         }
         _needTiles = true;
@@ -614,6 +630,26 @@ public class MapComponent extends Container {
     protected boolean isZoomToLayersKey(int keyCode) {
         return keyCode == '5';
     }
+    
+    /**
+     * Returns the distance between 2 points in meters
+     * 
+     * @param latitude1
+     * @param longitude1
+     * @param latitude2
+     * @param longitude2
+     * 
+     * @return distance in meters
+     */
+    public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
+        double latitudeSin = Math.sin(Math.toRadians(latitude2 - latitude1) / 2);
+        double longitudeSin = Math.sin(Math.toRadians(longitude2 - longitude1) / 2);
+        double a = latitudeSin * latitudeSin
+                + Math.cos(Math.toRadians(latitude1)) * Math.cos(Math.toRadians(latitude2)) * longitudeSin * longitudeSin;
+        double c = 2 * MathUtil.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return (long) (6378137 * c);
+    }    
+    
 }
 
 class LayerWithZoomLevels {
