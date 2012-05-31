@@ -34,7 +34,6 @@ import java.util.Hashtable;
 public class Album extends FBObject {
 
     private User from = new User();
-    private String name;
     private String description;
     private String location;
     private String link;
@@ -117,14 +116,6 @@ public class Album extends FBObject {
     }
 
     /**
-     * Gets the name
-     * @return name
-     */
-    public String getName() {
-        return name;
-    }
-
-    /**
      * Gets the privacy
      * @return privacy
      */
@@ -163,7 +154,6 @@ public class Album extends FBObject {
         if (f != null) {
             from.copy(f);
         }
-        name = (String) toCopy.get("name");
         description = (String) toCopy.get("description");
         location = (String) toCopy.get("location");
         link = (String) toCopy.get("link");

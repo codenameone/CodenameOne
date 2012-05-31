@@ -37,7 +37,6 @@ public class Post extends FBObject {
     private String type;
     private String attribution;
     private String message;
-    private String linkName;
     private String linkUrl;
     private String linkDescription;
     private String commentsCount;
@@ -129,9 +128,10 @@ public class Post extends FBObject {
      * Gets the Link Name
      *
      * @return the linkName
+     * @deprecated use getName() instead
      */
     public String getLinkName() {
-        return linkName;
+        return getName();
     }
 
     /**
@@ -180,7 +180,6 @@ public class Post extends FBObject {
         type = (String) toCopy.get("type");
         attribution = (String) toCopy.get("attribution");
         message = (String) toCopy.get("message");
-        linkName = (String) toCopy.get("name");
         linkUrl = (String) toCopy.get("link");
         linkDescription = (String) toCopy.get("description");
 

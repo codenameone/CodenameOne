@@ -33,6 +33,8 @@ import java.util.Hashtable;
 public class FBObject {
 
     private String id;
+    
+    private String name;
 
     /**
      * Empty Contructor
@@ -68,6 +70,16 @@ public class FBObject {
     }
 
     /**
+     * Simple getter
+     * 
+     * @return the FB Object name
+     */
+    public String getName() {
+        return name;
+    }
+
+    
+    /**
      * copies the relevant values from the given hashtable
      * @param props an hashtable to copy from
      */
@@ -77,6 +89,7 @@ public class FBObject {
   
     private void init(Hashtable props){
         id = (String) props.get("id");
+        name = (String) props.get("name");
     }
 
     /**

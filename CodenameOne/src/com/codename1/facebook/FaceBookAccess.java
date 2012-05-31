@@ -65,6 +65,7 @@ public class FaceBookAccess {
     private ConnectionRequest current;
     private Vector responseCodeListeners = new Vector();
     private static String token;
+    private static final String TEMP_STORAGE = "FaceBookAccesstmp";
 
     private FaceBookAccess() {
     }
@@ -325,15 +326,27 @@ public class FaceBookAccess {
      * By default this method will return last 13 news entries.
      * 
      * @param userId the userid we would like to query
-     * @param feed the response fo fill
+     * @param feed the response to fill
      * @param callback the callback that should be updated when the data arrives
      */
     public void getNewsFeed(String userId, final DefaultListModel feed, final ActionListener callback) throws IOException {
-        Hashtable params = new Hashtable();
-        params.put("limit", "13");
-        getFaceBookObjectItems(userId, FacebookRESTService.HOME, feed, params, callback);
+        getNewsFeed(userId, feed, 13, callback);
     }
 
+    /**
+     * Gets the user news feed, the data is being stored in the given DefaultListModel.
+     * 
+     * @param userId the userid we would like to query
+     * @param feed the response to fill
+     * @param limit the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getNewsFeed(String userId, final DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+        Hashtable params = new Hashtable();
+        params.put("limit", "" + limit);
+        getFaceBookObjectItems(userId, FacebookRESTService.HOME, feed, params, callback);
+    }
+    
     /**
      * Gets the user wall feed, the data is being stored in the given DefaultListModel.
      * By default this method will return last 13 news entries.
@@ -343,11 +356,23 @@ public class FaceBookAccess {
      * @param callback the callback that should be updated when the data arrives
      */
     public void getWallFeed(String userId, DefaultListModel feed, final ActionListener callback) throws IOException {
-        Hashtable params = new Hashtable();
-        params.put("limit", "13");
-        getFaceBookObjectItems(userId, FacebookRESTService.FEED, feed, params, callback);
+        getWallFeed(userId, feed, 13, callback);
     }
 
+    /**
+     * Gets the user wall feed, the data is being stored in the given DefaultListModel.
+     *
+     * @param userId the userid we would like to query
+     * @param feed the response to fill
+     * @param limit the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallFeed(String userId, DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+        Hashtable params = new Hashtable();
+        params.put("limit", "" + limit);
+        getFaceBookObjectItems(userId, FacebookRESTService.FEED, feed, params, callback);
+    }
+    
     /**
      * Gets the picture of the given facebook object id
      *
@@ -365,7 +390,7 @@ public class FaceBookAccess {
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
         if (tempStorage && !Storage.getInstance().exists(id)) {
-            cacheKey = "temp" + id;
+            cacheKey = TEMP_STORAGE + id;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);
     }
@@ -386,7 +411,7 @@ public class FaceBookAccess {
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
         if (tempStorage && !Storage.getInstance().exists(id)) {
-            cacheKey = "temp" + id;
+            cacheKey = TEMP_STORAGE + id;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);
     }
@@ -415,7 +440,7 @@ public class FaceBookAccess {
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
         if (tempStorage && !Storage.getInstance().exists(id)) {
-            cacheKey = "temp" + id;
+            cacheKey = TEMP_STORAGE + id;
         }
 
         ImageDownloadService.createImageToStorage(fb.requestURL(), targetList, targetOffset, targetKey, cacheKey, toScale);
@@ -437,7 +462,7 @@ public class FaceBookAccess {
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
         if (tempStorage && !Storage.getInstance().exists(photoId)) {
-            cacheKey = "temp" + photoId;
+            cacheKey = TEMP_STORAGE + photoId;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);
     }
@@ -458,7 +483,7 @@ public class FaceBookAccess {
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
         if (tempStorage && !Storage.getInstance().exists(photoId)) {
-            cacheKey = "temp" + photoId;
+            cacheKey = TEMP_STORAGE + photoId;
         }
         ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);
     }
@@ -752,6 +777,19 @@ public class FaceBookAccess {
             model.addItem(obj);
         }
         return model;
+    }
+
+    /**
+     * Deletes all temp storage.
+     */
+    public void cleanTempStorage() {
+        String[] entries = Storage.getInstance().listEntries();
+        for (int i = 0; i < entries.length; i++) {
+            String key = entries[i];
+            if (key.startsWith(TEMP_STORAGE)) {
+                Storage.getInstance().deleteStorageFile(key);
+            }
+        }
     }
 
     /**

@@ -35,7 +35,6 @@ import java.util.Vector;
 public class Photo extends FBObject {
 
     private User from = new User();
-    private String name;
     private String iconUrl;
     private String pictureUrl;
     private String sourceUrl;
@@ -100,14 +99,6 @@ public class Photo extends FBObject {
      */
     public String getLink() {
         return link;
-    }
-
-    /**
-     *  Get name
-     * @return name
-     */
-    public String getName() {
-        return name;
     }
 
     /**
@@ -182,8 +173,6 @@ public class Photo extends FBObject {
         if (f != null) {
             from.copy(f);
         }
-
-        name = (String) toCopy.get("name");
         iconUrl = (String) toCopy.get("icon");
         pictureUrl = (String) toCopy.get("picture");
         sourceUrl = (String) toCopy.get("source");
