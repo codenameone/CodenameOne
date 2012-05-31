@@ -129,6 +129,10 @@ import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
 import javax.swing.JFormattedTextField;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.MaskFormatter;
 import jmapps.ui.VideoPanel;
@@ -2765,7 +2769,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         con.setDoOutput(write);
         if(netMonitor != null) {
             NetworkRequestObject nr = new NetworkRequestObject();
-            nr.setUrl(url);
+            if(nr != null) {
+                nr.setUrl(url);
+            }
             netMonitor.addRequest(con, nr);
         }
         return con;
@@ -2790,12 +2796,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void updateRequestHeaders(HttpURLConnection con) {
         if(netMonitor != null) {
             NetworkRequestObject nr = netMonitor.getByConnection(con);
-            String requestHeaders = "";
-            Map<String, List<String>> props = con.getRequestProperties();
-            for(String header : props.keySet()) {
-                requestHeaders += header + "=" + props.get(header) + "\n";
+            if(nr != null) {
+                String requestHeaders = "";
+                Map<String, List<String>> props = con.getRequestProperties();
+                for(String header : props.keySet()) {
+                    requestHeaders += header + "=" + props.get(header) + "\n";
+                }
+                nr.setHeaders(requestHeaders);
             }
-            nr.setHeaders(requestHeaders);
         }
     }
     
@@ -2810,15 +2818,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         if(netMonitor != null) {
             final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            nr.setRequestBody("");
-            HttpURLConnection con = (HttpURLConnection) connection;
-            OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
-                public void write(byte b[], int off, int len) throws IOException {
-                    super.write(b, off, len);
-                    nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
-                }
-            };
-            return o;
+            if(nr != null) {
+                nr.setRequestBody("");
+                HttpURLConnection con = (HttpURLConnection) connection;
+                OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
+                    public void write(byte b[], int off, int len) throws IOException {
+                        super.write(b, off, len);
+                        nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
+                    }
+                };
+                return o;
+            }
         }
         return new BufferedOutputStream(((URLConnection) connection).getOutputStream());
     }
@@ -2846,25 +2856,27 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         if(netMonitor != null) {
             final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            HttpURLConnection con = (HttpURLConnection) connection;
-            String headers = "";
-            Map<String, List<String>> map = con.getHeaderFields();
-            for(String header : map.keySet()) {
-                headers += header + "=" + map.get(header) + "\n";
-            }
-            nr.setResponseHeaders(headers);
-            nr.setResponseBody("");
-            InputStream i = new BufferedInputStream(con.getInputStream()) {
-                public synchronized int read(byte b[], int off, int len)
-                    throws IOException {
-                    int s = super.read(b, off, len);
-                    if(s > -1) {
-                        nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
-                    }
-                    return s;
+            if(nr != null) {
+                HttpURLConnection con = (HttpURLConnection) connection;
+                String headers = "";
+                Map<String, List<String>> map = con.getHeaderFields();
+                for(String header : map.keySet()) {
+                    headers += header + "=" + map.get(header) + "\n";
                 }
-            };
-            return i;
+                nr.setResponseHeaders(headers);
+                nr.setResponseBody("");
+                InputStream i = new BufferedInputStream(con.getInputStream()) {
+                    public synchronized int read(byte b[], int off, int len)
+                        throws IOException {
+                        int s = super.read(b, off, len);
+                        if(s > -1) {
+                            nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
+                        }
+                        return s;
+                    }
+                };
+                return i;
+            }
         }
         return new BufferedInputStream(((URLConnection) connection).getInputStream());
     }
@@ -2882,7 +2894,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             if(netMonitor != null) {
                 NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-                nr.setMethod(mtd);
+                if(nr != null) {
+                    nr.setMethod(mtd);
+                }
             }
         } catch (IOException err) {
             // an exception here doesn't make sense
@@ -2897,7 +2911,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         int code = ((HttpURLConnection) connection).getResponseCode();
         if(netMonitor != null) {
             NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            nr.setResponseCode("" + code);
+            if(nr != null) {
+                nr.setResponseCode("" + code);
+            }
         }
         return code;
     }
@@ -2916,7 +2932,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         int contentLength = ((HttpURLConnection) connection).getContentLength();
         if(netMonitor != null) {
             NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            nr.setContentLength("" + contentLength);
+            if(nr != null) {
+                nr.setContentLength("" + contentLength);
+            }
         }
         return contentLength;
     }
@@ -3760,5 +3778,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             };
         }
         return imIO;
+    }
+
+    @Override
+    public void registerPush(String id, boolean noFallback) {
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        String user = p.get("user", null);
+        Display d = Display.getInstance();
+        if(user == null) {
+            JPanel pnl = new JPanel();
+            JTextField tf = new JTextField(20);
+            pnl.add(new JLabel("E-Mail For Push"));
+            pnl.add(tf);
+            JOptionPane.showMessageDialog(canvas, pnl, "Email For Push", JOptionPane.PLAIN_MESSAGE);
+            user = tf.getText();
+            p.put("user", user);
+        }
+        d.setProperty("built_by_user", user);
+        String mainClass = System.getProperty("MainClass");
+        if (mainClass != null) {
+            mainClass = mainClass.substring(0, mainClass.lastIndexOf('.'));
+            d.setProperty("package_name", mainClass);
+        }
+        super.registerPush(id, noFallback);
     }
 }

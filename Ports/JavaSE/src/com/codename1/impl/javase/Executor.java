@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.Display;
 import java.lang.reflect.Method;
 
@@ -45,16 +47,19 @@ public class Executor {
                 if (Display.isInitialized()) {
                     Display.deinitialize();
                 }
+                final Method m = c.getDeclaredMethod("init", Object.class);
+                final Object o = c.newInstance();
+                if(o instanceof PushCallback) {
+                    CodenameOneImplementation.setPushCallback((PushCallback)o);
+                }
                 Display.init(null);
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            Method m = c.getDeclaredMethod("init", Object.class);
-                            Object o = c.newInstance();
                             m.invoke(o, new Object[]{null});
-                            m = c.getDeclaredMethod("start", new Class[0]);
-                            m.invoke(o, new Object[0]);
+                            Method start = c.getDeclaredMethod("start", new Class[0]);
+                            start.invoke(o, new Object[0]);
                         } catch (NoSuchMethodException err) {
                             System.out.println("Couldn't find a main or a startup in " + argv[0]);
                         } catch (Exception err) {

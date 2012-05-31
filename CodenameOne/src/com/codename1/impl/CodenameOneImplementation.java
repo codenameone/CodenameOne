@@ -4066,6 +4066,9 @@ public abstract class CodenameOneImplementation {
      * Returns the package name for the application
      */
     protected String getPackageName() {
+        if(packageName == null) {
+            return Display.getInstance().getProperty("package_name", null);
+        }
         return packageName;
     }
     
@@ -4191,11 +4194,13 @@ public abstract class CodenameOneImplementation {
                     while(pollingThreadRunning) {
                         try {
                             try {
-                                Thread.sleep(50000);
+                                //Thread.sleep(50000);
+                                Thread.sleep(3000);
                             } catch(Throwable t) {
                                 t.printStackTrace();
                             }
                             ConnectionRequest cr = new ConnectionRequest();
+                            cr.setUrl("https://codename-one.appspot.com/pollManualPush");
                             cr.setPost(false);
                             cr.addArgument("i", pushId);
                             cr.addArgument("last", lastReq);
