@@ -45,6 +45,9 @@ public class FileTree extends Tree {
         if(s.equals("/")) {
             return "Root";
         }
+        if(s.endsWith("/")) {
+            s = s.substring(0, s.length() - 1);
+        }
         int l = s.lastIndexOf('/');
         return s.substring(l + 1);
     }
