@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.contacts.Contact;
+import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.ui.animations.Animation;
@@ -2676,4 +2677,38 @@ public final class Display {
     public String getMediaRecorderingMimeType() {
         return impl.getMediaRecorderingMimeType();
     }
+    
+    /**
+     * Opens a database or create one if not exists
+     * 
+     * @param databaseName the name of the database
+     * @return Database Object or null if not supported on the platform
+     * 
+     * @throws IOException if database cannot be created
+     */
+    public Database openOrCreate(String databaseName) throws IOException{
+        return impl.openOrCreateDB(databaseName);
+    }
+    
+    /**
+     * Deletes database
+     * 
+     * @param databaseName the name of the database
+     * @throws IOException if database cannot be deleted
+     */
+    public void delete(String databaseName) throws IOException{
+        impl.deleteDB(databaseName);
+    }
+    
+    /**
+     * Indicates weather a database exists
+     * 
+     * @param databaseName the name of the database
+     * @return true if database exists
+     */
+    public boolean exists(String databaseName){
+        return impl.existsDB(databaseName);
+    }
+    
+    
 }

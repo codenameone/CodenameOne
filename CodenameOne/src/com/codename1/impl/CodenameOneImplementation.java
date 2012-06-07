@@ -24,6 +24,7 @@
 package com.codename1.impl;
 
 import com.codename1.contacts.Contact;
+import com.codename1.db.Database;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -4287,4 +4288,36 @@ public abstract class CodenameOneImplementation {
     public String getMediaRecorderingMimeType() {
         return "audio/amr";
     }
+    
+    /**
+     * Opens a database or create one if not exists
+     * 
+     * @param databaseName the name of the database
+     * @return Database Object or null if not supported on the platform
+     * 
+     * @throws IOException if database cannot be created
+     */
+    public Database openOrCreateDB(String databaseName) throws IOException{
+        return null;
+    }
+    
+    /**
+     * Deletes database
+     * 
+     * @param databaseName the name of the database
+     * @throws IOException if database cannot be deleted
+     */
+    public void deleteDB(String databaseName) throws IOException{
+    }
+    
+    /**
+     * Indicates weather a database exists
+     * 
+     * @param databaseName the name of the database
+     * @return true if database exists
+     */
+    public boolean existsDB(String databaseName){
+        return false;
+    }
+    
 }
