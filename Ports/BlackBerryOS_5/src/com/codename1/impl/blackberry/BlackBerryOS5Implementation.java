@@ -24,6 +24,8 @@
  */
 package com.codename1.impl.blackberry;
 
+import com.codename1.db.Database;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -31,12 +33,15 @@ import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
+import net.rim.device.api.database.DatabaseIOException;
+import net.rim.device.api.database.DatabasePathException;
 import net.rim.device.api.script.ScriptEngine;
 import net.rim.device.api.system.Branding;
 import org.w3c.dom.Document;
@@ -44,6 +49,8 @@ import org.w3c.dom.Document;
 // requires signing
 import net.rim.device.api.browser.field2.BrowserField;
 import net.rim.device.api.browser.field2.BrowserFieldListener;
+import net.rim.device.api.database.DatabaseFactory;
+import net.rim.device.api.io.URI;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
@@ -285,7 +292,8 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
     }
 
     public void captureVideo(ActionListener response) {
-        this.camResponse = response;
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
 
         UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
 
@@ -322,8 +330,8 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
                                 //try to close the camera
                             }
 
-                            camResponse.actionPerformed(new ActionEvent("file://" + path));
-                            camResponse = null;
+                            captureCallback.fireActionEvent(new ActionEvent("file://" + path));
+                            captureCallback = null;
                             videoPath = null;
                             break;
                         }
@@ -384,5 +392,63 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return imIO;
     }
     
+    public Database openOrCreateDB(String databaseName) throws IOException {
+        try {
+            URI dbURI = URI.create(getDBDir() + databaseName);
+            net.rim.device.api.database.Database db = DatabaseFactory.openOrCreate(dbURI);
+            return new BBDatabase(db);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+
+    public void deleteDB(String databaseName) throws IOException {
+        try {
+            URI dbURI = URI.create(getDBDir() + databaseName);
+            DatabaseFactory.delete(dbURI);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+
+    public boolean existsDB(String databaseName) {
+        try {
+            URI dbURI = URI.create(getDBDir() + databaseName);
+            return DatabaseFactory.exists(dbURI);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return false;
+    }
     
+    private String getDBDir() {
+        String[] roots = listFilesystemRoots();
+        // iOS doesn't have an SD card
+        String file = null;
+        for (int i = 0; i < roots.length; i++) {
+            if (roots[i].indexOf("SDCard") > -1) {
+                file = roots[i];
+                break;
+            }
+        }
+        //no sd card try a different location
+        if (file == null) {
+            for (int i = 0; i < roots.length; i++) {
+                if (getRootType(roots[i]) == FileSystemStorage.ROOT_TYPE_SDCARD) {
+                    file = roots[i];
+                    break;
+                }
+            }
+        }
+        if(file == null){
+            file = roots[0];
+        }
+        file += "Databases/";
+        if (!exists(file)) {
+            mkdir(file);
+        }
+        return file;
+    }
 }
