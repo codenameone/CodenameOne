@@ -25,6 +25,7 @@ package com.codename1.impl.javase;
 
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
+import com.codename1.db.Database;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -79,6 +80,7 @@ import java.io.FilenameFilter;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
@@ -111,6 +113,7 @@ import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -3802,4 +3805,48 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         super.registerPush(id, noFallback);
     }
+    
+    @Override
+    public Database openOrCreateDB(String databaseName) throws IOException{
+        try {
+            // Load the HSQL Database Engine JDBC driver
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException ex) {
+        }
+        try {
+            // connect to the database.   This will load the db files and start the
+            // database if it is not alread running.
+            // db_file_name_prefix is used to open or create files that hold the state
+            // of the db.
+            // It can contain directory names relative to the
+            // current working directory
+            File dir = new File(getStorageDir() + "/database");
+            if(!dir.exists()){
+                dir.mkdir();
+            }
+            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" + 
+                    getStorageDir() + "/database/" + databaseName);
+            
+            return new SEDatabase(conn);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        File f = new File(getStorageDir() + "/database/" + databaseName);
+        if(f.exists()){
+            f.delete();
+        }
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        File f = new File(getStorageDir() + "/database/" + databaseName);
+        return f.exists();
+    }
+    
+    
 }
