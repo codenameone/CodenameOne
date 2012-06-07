@@ -85,6 +85,7 @@
     <target name="-post-compile">
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="lib/jmf.jar" dest="build/classes" /> 
+        <unjar src="lib/sqlitejdbc-v056.jar" dest="build/classes" /> 
         <unjar src="fobs_jmf/fobs4jmf.jar" dest="build/classes" />
     </target>    
 
