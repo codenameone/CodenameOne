@@ -67,6 +67,8 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Environment;
@@ -78,6 +80,7 @@ import android.view.WindowManager;
 import android.widget.MediaController;
 import android.widget.VideoView;
 import com.codename1.contacts.Contact;
+import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.ConnectionRequest;
@@ -3237,5 +3240,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return imIO;
     }
             
-    
+    @Override
+    public Database openOrCreateDB(String databaseName) throws IOException{
+        SQLiteDatabase db = activity.openOrCreateDatabase(databaseName, activity.MODE_PRIVATE, null);
+        return new AndroidDB(db);
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        activity.deleteDatabase(databaseName);
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        File db = new File(activity.getApplicationInfo().dataDir+"/databases/" + databaseName);
+        return db.exists();
+    }
 }
