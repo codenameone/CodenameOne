@@ -127,8 +127,10 @@ import net.rim.device.api.system.ApplicationManagerException;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.CodeModuleManager;
 import net.rim.device.api.system.EventInjector;
+import net.rim.device.api.system.GlobalEventListener;
 import net.rim.device.api.system.JPEGEncodedImage;
 import net.rim.device.api.system.RadioInfo;
+import net.rim.device.api.system.SystemListener2;
 
 /**
  * The implementation of the blackberry platform delegates the work to the underlying UI
@@ -174,7 +176,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     private Hashtable fat = new Hashtable();
     private short currentKey = 1;
-    protected ActionListener camResponse;
+    //protected ActionListener camResponse;
+    protected EventDispatcher captureCallback;
+
 
     BlackBerryCanvas createCanvas() {
         return new BlackBerryCanvas(this);
@@ -2653,7 +2657,10 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void capturePhoto(ActionListener response) {
-        this.camResponse = response;
+        EventLog.getInstance().logInformationEvent("capturePhoto");
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
+
         UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
 
             private long lastUSN;
@@ -2677,9 +2684,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                                 } catch (Exception e) {
                                     //try to close the camera
                                 }
-
-                                camResponse.actionPerformed(new ActionEvent("file://" + path));
-                                camResponse = null;
+                                EventLog.getInstance().logInformationEvent("path " + path);
+                                captureCallback.fireActionEvent(new ActionEvent("file://" + path));
+                                captureCallback = null;
                             }
                         }
                     }
@@ -2703,7 +2710,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             throw new RuntimeException("capture audio works only if Voice Notes is installed");
         }
 
-        this.camResponse = response;
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
 
         UiApplication.getUiApplication().addFileSystemJournalListener(new FileSystemJournalListener() {
 
@@ -2726,8 +2734,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                             } catch (Exception e) {
                                 //try to close the voicenotesrecorder
                             }
-                            camResponse.actionPerformed(new ActionEvent("file://" + path));
-                            camResponse = null;
+                            captureCallback.fireActionEvent(new ActionEvent("file://" + path));
+                            captureCallback = null;
                             break;
                         }
 

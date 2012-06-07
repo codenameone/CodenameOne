@@ -524,4 +524,18 @@ class BlackBerryCanvas extends FullScreen {
     protected void onUndisplay() {
         Display.getInstance().hideNotify();
     }
+
+    protected void onExposed() {
+        EventLog.getInstance().logAlwaysEvent("onExposed");
+        if(impl.captureCallback != null){
+            impl.captureCallback.fireActionEvent(null);
+            impl.captureCallback = null;
+        }
+    }
+
+    protected void onObscured() {
+        EventLog.getInstance().logAlwaysEvent("onObscured");
+    }
+    
+    
 }
