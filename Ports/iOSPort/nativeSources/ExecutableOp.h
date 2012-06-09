@@ -27,20 +27,20 @@ extern int nextPowerOf2(int val);
 
 #define GLErrorLog logGlErrorAt(__FILE__, __LINE__)
 
-#define GlColorFromRGB(rgbValue,alphaColor) glColor4f(((float)((rgbValue & 0xFF0000) >> 16))/255.0, \
-((float)(rgbValue & 0xff00 >> 8))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0); GLErrorLog;
+#define GlColorFromRGB(rgbValue,alphaColor) glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
+((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0); GLErrorLog;
 
-#define GlColorFromARGB(rgbValue) glColor4f(((float)((rgbValue & 0xFF0000) >> 16))/255.0, \
-((float)(rgbValue & 0xff00 >> 8))/255.0, ((float)(rgbValue & 0xff))/255.0, (((rgbValue & 0xff000000) >> 24) /255.0)); GLErrorLog;
+#define GlColorFromARGB(rgbValue) glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
+((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, (((rgbValue >> 24) & 0xff) /255.0)); GLErrorLog;
 
 
-#define UIColorFromRGB(rgbValue,alphaColor) [UIColor colorWithRed:((float)((rgbValue & 0xFF0000) >> 16))/255.0 \
-green:((float)(rgbValue & 0xff00 >> 8))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:alphaColor/255.0]
+#define UIColorFromRGB(rgbValue,alphaColor) [UIColor colorWithRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
+green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:alphaColor/255.0]
 
-#define CGColorFromRGB(context,rgbValue,alphaColor) CGContextSetRGBStrokeColor(context, ((float)((rgbValue & 0xFF0000) >> 16))/255.0, ((float)(rgbValue & 0xff00 >> 8))/255.0, ((float)(rgbValue & 0xff))/255.0, alphaColor/255.0);
+#define CGColorFromRGB(context,rgbValue,alphaColor) CGContextSetRGBStrokeColor(context, ((float)((rgbValue >> 16) & 0xFF))/255.0, ((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, alphaColor/255.0);
 
-#define UIColorFromARGB(rgbValue) [UIColor colorWithRed:((float)((rgbValue & 0xFF0000) >> 16))/255.0 \
-green:((float)(rgbValue & 0xff00 >> 8))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue & 0xff000000) >> 24) /255.0)]
+#define UIColorFromARGB(rgbValue) [UIColor colorWithRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
+green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue >> 24) & 0xff) /255.0)]
 
 @interface ExecutableOp : NSObject {
 

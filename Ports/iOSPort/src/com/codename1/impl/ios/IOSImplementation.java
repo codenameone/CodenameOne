@@ -37,15 +37,10 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
-import java.lang.ref.SoftReference;
 import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.NetworkManager;
-import com.codename1.io.Preferences;
-import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationListener;
@@ -60,7 +55,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -74,8 +68,6 @@ import java.util.Hashtable;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *

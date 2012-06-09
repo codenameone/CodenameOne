@@ -63,12 +63,12 @@
         
         UIGraphicsPushContext(context);
         CGFloat components[8] = { 
-            ((float)((startColor & 0xFF0000) >> 16))/255.0, 
-            ((float)(startColor & 0xff00 >> 8))/255.0,
+            ((float)((startColor >> 16) & 0xff))/255.0, 
+            ((float)((startColor >> 8) & 0xFF))/255.0,
             ((float)(startColor & 0xff))/255.0, 
             1.0, 
-            ((float)((endColor & 0xFF0000) >> 16))/255.0, 
-            ((float)(endColor & 0xff00 >> 8))/255.0,
+            ((float)((endColor >> 16) & 0xFF))/255.0, 
+            ((float)((endColor >> 8) & 0xFF))/255.0,
             ((float)(endColor & 0xff))/255.0, 
             1.0 };
         size_t num_locations = 2;
