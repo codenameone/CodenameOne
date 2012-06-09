@@ -4195,8 +4195,8 @@ public abstract class CodenameOneImplementation {
                     while(pollingThreadRunning) {
                         try {
                             try {
-                                //Thread.sleep(50000);
-                                Thread.sleep(3000);
+                                Thread.sleep(50000);
+                                //Thread.sleep(3000);
                             } catch(Throwable t) {
                                 t.printStackTrace();
                             }
@@ -4212,6 +4212,7 @@ public abstract class CodenameOneImplementation {
                                 String message = di.readUTF();
                                 lastReq = "" + di.readLong();
                                 Preferences.set("last_push_req", lastReq);
+                                callback.push(message);
                             }
                         } catch (IOException ex) {
                             ex.printStackTrace();

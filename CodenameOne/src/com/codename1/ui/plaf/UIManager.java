@@ -140,6 +140,33 @@ public class UIManager {
 
     /**
      * Allows a developer to programmatically install a style into the UI manager
+     * 
+     * @param id the component id matching the given style
+     * @param style the style object to install
+     * @param type press, dis or other custom type
+     */
+    public void setComponentStyle(String id, Style style, String type) {
+        if(type != null && type.length() > 0) {
+            if (id == null || id.length() == 0) {
+                //if no id return the default style
+                id = type + "#";
+            } else {
+                id = id + "." + type + "#";
+            }
+        } else {
+            if (id == null || id.length() == 0) {
+                //if no id return the default style
+                id = "";
+            } else {
+                id = id + ".";
+            }
+        }
+
+        styles.put(id, style);
+    }
+
+    /**
+     * Allows a developer to programmatically install a style into the UI manager
      *
      * @param id the component id matching the given style
      * @param style the style object to install
@@ -275,11 +302,13 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("Button.sel#derive")) {
             themeProps.put("Button.sel#border", Border.getDefaultBorder());
             themeProps.put("Button.sel#bgColor", "a0a0a0");
+            themeProps.put("Button.sel#padding", "4,4,4,4");
         }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.press#derive")) {
             themeProps.put("Button.press#border", Border.getDefaultBorder().createPressedVersion());
             themeProps.put("Button.press#derive", "Button");
+            themeProps.put("Button.press#padding", "4,4,4,4");
         }
         themeProps.put("Button.dis#derive", "Button");
 
@@ -516,16 +545,6 @@ public class UIManager {
             themeProps.put("TabsContainer.padding", "0,0,0,0");
             themeProps.put("TabsContainer.margin", "0,0,0,0");
             themeProps.put("TabsContainer.bgColor", "a0a0a0");
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("TabSelected.derive")) {
-            themeProps.put("TabSelected.bgColor", "a0a0a0");
-            themeProps.put("TabSelected.fgColor", "ffffff");
-            themeProps.put("TabSelected.margin", "1,1,1,1");
-        }
-        if(installedTheme == null || !installedTheme.containsKey("TabSelected.sel#derive")) {
-            themeProps.put("TabSelected.sel#derive", "TabSelected");
-            themeProps.put("TabSelected.sel#border", Border.createLineBorder(1));
         }
 
         if(installedTheme == null || !installedTheme.containsKey("TextArea.derive")) {

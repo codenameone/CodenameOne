@@ -1010,6 +1010,9 @@ public abstract class LookAndFeel {
         if(val == null) {
             return t;
         }
+        if(val.equalsIgnoreCase("empty")) {
+            return CommonTransitions.createEmpty();
+        }
         if(val.equalsIgnoreCase("slide")) {
             if(slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
