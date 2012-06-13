@@ -174,7 +174,7 @@ public class Style {
     /**
      * Indicates the background for the style would use an unscaled image with an alignment
      */
-    public static final byte BACKGROUND_IMAGE_ALIGNED = (byte)5;
+    private static final byte BACKGROUND_IMAGE_ALIGNED = (byte)5;
 
     /**
      * Indicates the background for the style would use an unscaled image with an alignment
@@ -270,23 +270,23 @@ public class Style {
     /**
      * Indicates the background alignment for use in tiling or aligned images
      */
-    public static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte)0xa1;
+    private static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte)0xa1;
     /**
      * Indicates the background alignment for use in tiling or aligned images
      */
-    public static final byte BACKGROUND_IMAGE_ALIGN_BOTTOM = (byte)0xa2;
+    private static final byte BACKGROUND_IMAGE_ALIGN_BOTTOM = (byte)0xa2;
     /**
      * Indicates the background alignment for use in tiling or aligned images
      */
-    public static final byte BACKGROUND_IMAGE_ALIGN_LEFT = (byte)0xa3;
+    private static final byte BACKGROUND_IMAGE_ALIGN_LEFT = (byte)0xa3;
     /**
      * Indicates the background alignment for use in tiling or aligned images
      */
-    public static final byte BACKGROUND_IMAGE_ALIGN_RIGHT = (byte)0xa4;
+    private static final byte BACKGROUND_IMAGE_ALIGN_RIGHT = (byte)0xa4;
     /**
      * Indicates the background alignment for use in tiling or aligned images
      */
-    public static final byte BACKGROUND_IMAGE_ALIGN_CENTER = (byte)0xa5;
+    private static final byte BACKGROUND_IMAGE_ALIGN_CENTER = (byte)0xa5;
 
     /**
      * Indicates no text decoration
@@ -651,7 +651,7 @@ public class Style {
      * BACKGROUND_IMAGE_ALIGN_CENTER
      * @deprecated the functionality of this method is now covered by background type
      */
-    public byte getBackgroundAlignment() {
+    private byte getBackgroundAlignment() {
         return backgroundAlignment;
     }
 
@@ -818,7 +818,7 @@ public class Style {
      * BACKGROUND_IMAGE_ALIGN_CENTER
      * @deprecated the functionality of this method is now covered by background type
      */
-    public void setBackgroundAlignment(byte backgroundAlignment) {
+    private void setBackgroundAlignment(byte backgroundAlignment) {
         setBackgroundAlignment(backgroundAlignment, false);
     }
 
@@ -1370,7 +1370,7 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      * @deprecated the functionality of this method is now covered by background type
      */
-    public void setBackgroundAlignment(byte backgroundAlignment, boolean override) {
+    private void setBackgroundAlignment(byte backgroundAlignment, boolean override) {
         if (this.backgroundAlignment != backgroundAlignment) {
             this.backgroundAlignment = backgroundAlignment;
             if(!override){

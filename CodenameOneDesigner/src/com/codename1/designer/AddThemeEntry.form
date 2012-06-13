@@ -732,29 +732,29 @@
           <Layout>
             <DimensionLayout dim="0">
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" attributes="0">
-                      <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" max="-2" attributes="0">
+                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
                           <Group type="102" alignment="0" attributes="0">
                               <EmptySpace min="10" pref="10" max="10" attributes="0"/>
                               <Component id="derivePadding" min="-2" max="-2" attributes="0"/>
                               <EmptySpace min="-2" pref="354" max="-2" attributes="0"/>
                           </Group>
-                          <Group type="102" alignment="0" attributes="0">
-                              <EmptySpace max="-2" attributes="0"/>
+                          <Group type="102" alignment="0" max="-2" attributes="0">
+                              <EmptySpace min="-2" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="jLabel8" alignment="0" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel9" alignment="0" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel10" alignment="0" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="paddingRight" alignment="0" pref="75" max="32767" attributes="0"/>
-                                  <Component id="paddingTop" alignment="0" pref="75" max="32767" attributes="0"/>
-                                  <Component id="paddingBottom" alignment="0" pref="75" max="32767" attributes="0"/>
-                                  <Component id="paddingLeft" alignment="0" min="-2" pref="75" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="paddingRight" linkSize="13" alignment="0" min="-2" pref="75" max="-2" attributes="0"/>
+                                  <Component id="paddingTop" linkSize="13" alignment="0" min="-2" pref="75" max="-2" attributes="0"/>
+                                  <Component id="paddingBottom" linkSize="13" alignment="0" min="-2" pref="75" max="-2" attributes="0"/>
+                                  <Component id="paddingLeft" linkSize="13" alignment="0" min="-2" pref="75" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace max="-2" attributes="0"/>
+                              <EmptySpace min="-2" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="paddingBottomUnit" min="-2" max="-2" attributes="0"/>
                                   <Component id="paddingTopUnit" min="-2" max="-2" attributes="0"/>

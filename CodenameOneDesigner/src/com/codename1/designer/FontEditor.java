@@ -53,7 +53,7 @@ import javax.swing.text.DocumentFilter;
  *
  * @author  Shai Almog
  */
-public class FontEditor extends javax.swing.JPanel {
+public class FontEditor extends BaseForm {
     //private EditFontAction editFontAction = new EditFontAction();
     private EditorFont font;
     private EditableResources resources;

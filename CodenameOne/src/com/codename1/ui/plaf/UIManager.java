@@ -882,7 +882,6 @@ public class UIManager {
             Integer textDecoration = (Integer) themeProps.get(id + Style.TEXT_DECORATION);
 
             Byte backgroundType = (Byte) themeProps.get(id + Style.BACKGROUND_TYPE);
-            Byte backgroundAlignment = (Byte) themeProps.get(id + Style.BACKGROUND_ALIGNMENT);
             Object[] backgroundGradient = (Object[]) themeProps.get(id + Style.BACKGROUND_GRADIENT);
             byte[] paddingUnit = (byte[])themeProps.get(id + Style.PADDING_UNIT);
             byte[] marginUnit = (byte[])themeProps.get(id + Style.MARGIN_UNIT);
@@ -925,9 +924,6 @@ public class UIManager {
             }
             if (backgroundType != null) {
                 style.setBackgroundType(backgroundType.byteValue());
-            }
-            if (backgroundAlignment != null) {
-                style.setBackgroundAlignment(backgroundAlignment.byteValue());
             }
             if (backgroundGradient != null) {
                 if (backgroundGradient.length < 5) {

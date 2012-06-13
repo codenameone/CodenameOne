@@ -1558,7 +1558,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel5Layout.createSequentialGroup()
-                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                     .add(jPanel5Layout.createSequentialGroup()
                         .add(10, 10, 10)
                         .add(derivePadding)
@@ -1571,10 +1571,10 @@ public class AddThemeEntry extends javax.swing.JPanel {
                             .add(jLabel10)
                             .add(jLabel11))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(paddingRight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 75, Short.MAX_VALUE)
-                            .add(paddingTop, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 75, Short.MAX_VALUE)
-                            .add(paddingBottom, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 75, Short.MAX_VALUE)
+                        .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(paddingRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 75, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(paddingTop, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 75, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(paddingBottom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 75, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(paddingLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 75, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -1590,6 +1590,8 @@ public class AddThemeEntry extends javax.swing.JPanel {
         );
 
         jPanel5Layout.linkSize(new java.awt.Component[] {deriveHelp3, paddingHelp}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
+
+        jPanel5Layout.linkSize(new java.awt.Component[] {paddingBottom, paddingLeft, paddingRight, paddingTop}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)

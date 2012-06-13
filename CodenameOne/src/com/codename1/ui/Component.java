@@ -3846,27 +3846,6 @@ public class Component implements Animation, StyleListener {
                                 g.drawImage(s.getBgImage(), x + width - iW, y + yPos);
                             }
                             return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            switch (s.getBackgroundAlignment()) {
-                                case Style.BACKGROUND_IMAGE_ALIGN_BOTTOM:
-                                    g.drawImage(s.getBgImage(), x + width - iW, y + (height - iH));
-                                    return;
-                                case Style.BACKGROUND_IMAGE_ALIGN_TOP:
-                                    g.drawImage(s.getBgImage(), x + width - iW, y);
-                                    return;
-                                case Style.BACKGROUND_IMAGE_ALIGN_LEFT:
-                                    g.drawImage(s.getBgImage(), x, y + (height / 2 - iH / 2));
-                                    return;
-                                case Style.BACKGROUND_IMAGE_ALIGN_RIGHT:
-                                    g.drawImage(s.getBgImage(), x + width - iW, y + (height / 2 - iH / 2));
-                                    return;
-                                case Style.BACKGROUND_IMAGE_ALIGN_CENTER:
-                                    g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
-                                    return;
-                            }
-                            return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
