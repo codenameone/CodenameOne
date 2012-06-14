@@ -40,6 +40,26 @@ public class JSONParser implements JSONParseCallback {
     private Hashtable state;
     private Vector parseStack;
     private String currentKey;
+    static class KeyStack extends Vector {
+		private static final long serialVersionUID = -9023393385663501542L;
+
+		protected String peek() {
+			return (String)elementAt(0);
+		}
+
+		protected void push(String key) {
+			insertElementAt(key, 0);
+		}
+		
+		protected String pop() {
+			if (isEmpty()) {
+				return null;
+			}
+			String key = peek();
+			removeElementAt(0);
+			return key;
+		}
+	};
 
     /**
      * Static method! Parses the given input stream and fires the data into the given callback.
@@ -51,7 +71,7 @@ public class JSONParser implements JSONParseCallback {
     public static void parse(Reader i, JSONParseCallback callback) throws IOException {
         boolean quoteMode = false;
         StringBuffer currentToken = new StringBuffer();
-        Vector blocks = new Vector();
+        KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;
         try {
@@ -154,9 +174,15 @@ public class JSONParser implements JSONParseCallback {
 
                             continue;
                         case '{':
-                            
-                            currentBlock = getCurrentBlock(lastKey, blocks);
-                            callback.startBlock(currentBlock);
+                            if (lastKey == null) {
+                            	if (blocks.size() == 0) {
+                            		lastKey = "root";
+                            	} else {
+                            		lastKey = blocks.peek();
+                            	}
+                            }
+                        	blocks.push(lastKey);
+                            callback.startBlock(lastKey);
                             lastKey = null;
                             continue;
                         case '}':
@@ -174,17 +200,14 @@ public class JSONParser implements JSONParseCallback {
                                     // this isn't a number!
                                 }
                             }
-                            if (blocks.size() > 0) {
-                                blocks.removeElementAt(blocks.size() - 1);
-                            }
+                            currentBlock = blocks.pop();
                             callback.endBlock(currentBlock);
                             lastKey = null;
                             continue;
                         case '[':
+                        	blocks.push(lastKey);
 
-                            currentBlock = getCurrentBlock(lastKey, blocks);
-
-                            callback.startArray(currentBlock);
+                            callback.startArray(lastKey);
                             lastKey = null;
                             continue;
                         case ']':
@@ -201,10 +224,7 @@ public class JSONParser implements JSONParseCallback {
                             }
                             currentToken.setLength(0);
 
-                            if (blocks.size() > 0) {
-                                blocks.removeElementAt(blocks.size() - 1);
-                            }
-
+                            currentBlock = blocks.pop();
                             callback.endArray(currentBlock);
                             lastKey = null;
                             continue;
@@ -265,20 +285,6 @@ public class JSONParser implements JSONParseCallback {
         }
     }
 
-    private static String getCurrentBlock(String lastKey, Vector blocks) {
-        String currentBlock = "";
-        
-        if (blocks.size() > 0) {
-            currentBlock = (String) blocks.elementAt(blocks.size() - 1);
-        }
-
-        if (lastKey != null && !lastKey.equals(currentBlock)) {
-            currentBlock = lastKey;
-            blocks.insertElementAt(currentBlock, blocks.size());
-        }
-        return currentBlock;
-    }
-    
     /**
      * Parses the given input stream into this object and returns the parse tree
      *
