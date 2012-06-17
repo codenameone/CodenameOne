@@ -40,13 +40,12 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class MultipartRequest extends ConnectionRequest {
-
     private String boundary;
     private Hashtable args = new Hashtable();
     private Hashtable filenames = new Hashtable();
+    private Hashtable filesizes = new Hashtable();
     private Hashtable mimeTypes = new Hashtable();
-    private static final String CRLF = "\r\n";
-    private byte [] body;
+    private static final String CRLF = "\r\n"; 
     
     /**
      * Initialize variables
@@ -54,25 +53,19 @@ public class MultipartRequest extends ConnectionRequest {
     public MultipartRequest() {
         setPost(true);
         setWriteRequest(true);
-
+        
         // Just generate some unique random value.
-        boundary = Long.toString(System.currentTimeMillis(), 16);
-
+        boundary = Long.toString(System.currentTimeMillis(), 16); 
+        
         // Line separator required by multipart/form-data.
-        setContentType("multipart/form-data;boundary=" + boundary);        
+        setContentType("multipart/form-data; boundary=" + boundary);
     }
 
     protected void initConnection(Object connection) {
-        try {
-            body = createBodyRequest();
-            addRequestHeader("Content-Length", String.valueOf(body.length));
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
+        addRequestHeader("Content-Length", String.valueOf(calculateContentLength()));
         super.initConnection(connection);
     }
 
-    
     
     /**
      * Adds a binary argument to the arguments
@@ -83,31 +76,45 @@ public class MultipartRequest extends ConnectionRequest {
     public void addData(String name, byte[] data, String mimeType) {
         args.put(name, data);
         mimeTypes.put(name, mimeType);
-        if (!filenames.containsKey(name)) {
+        if(!filenames.containsKey(name)) {
             filenames.put(name, name);
         }
+        filesizes.put(name, String.valueOf(data.length));
     }
 
     /**
      * Adds a binary argument to the arguments
+     * 
+     * @param name the name of the file data
+     * @param filePath the path of the file to upload
+     * @param mimeType the mime type for the content
+     * @throws IOException if the file cannot be opened
+     */
+    public void addData(String name, String filePath, String mimeType) throws IOException {
+        addData(name, FileSystemStorage.getInstance().openInputStream(filePath), 
+                FileSystemStorage.getInstance().getLength(filePath), mimeType);
+    }
+    
+    /**
+     * Adds a binary argument to the arguments, notice the input stream will be 
+     * read only during submission
+     * 
      * @param name the name of the data
      * @param data the data stream
+     * @param dataSize the byte size of the data stream, if the data stream is a file
+     * the file size can be obtained using the 
+     * FileSystemStorage.getInstance().getLength(file) method
      * @param mimeType the mime type for the content
      */
-    public void addData(String name, InputStream data, String mimeType) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        int s = data.read(buffer);
-        while (s > -1) {
-            out.write(buffer, 0, s);
-            s = data.read(buffer);
+    public void addData(String name, InputStream data, long dataSize, String mimeType) {
+        args.put(name, data);
+        if(!filenames.containsKey(name)) {
+            filenames.put(name, name);
         }
-        byte [] d = out.toByteArray();
-        Util.cleanup(data);
-        
-        addData(name, d, mimeType);        
+        filesizes.put(name, String.valueOf(dataSize));
+        mimeTypes.put(name, mimeType);
     }
-
+    
     /**
      * Sets the filename for the given argument
      * @param arg the argument name 
@@ -116,70 +123,102 @@ public class MultipartRequest extends ConnectionRequest {
     public void setFilename(String arg, String filename) {
         filenames.put(arg, filename);
     }
-
+    
     /**
      * @inheritDoc
      */
     public void addArgument(String name, String value) {
         args.put(name, value);
-        if (!filenames.containsKey(name)) {
+        if(!filenames.containsKey(name)) {
             filenames.put(name, name);
         }
     }
 
-    private byte [] createBodyRequest() throws IOException{
-        try {
-            ByteArrayOutputStream os = new ByteArrayOutputStream();
-            Writer writer = null;
-            writer = new OutputStreamWriter(os, "UTF-8");
-            Enumeration e = args.keys();
-            while (e.hasMoreElements()) {
-                String key = (String) e.nextElement();
-                Object value = args.get(key);
-
-                writer.write(CRLF);
-                writer.write("--" + boundary);
-                writer.write(CRLF);
-                if (value instanceof String) {
-                    writer.write("Content-Disposition: form-data; name=\"" + key + "\"");
-                    writer.write(CRLF);
-                    writer.write("Content-Type: text/plain; charset=UTF-8");
-                    writer.write(CRLF);
-                    writer.write(CRLF);
-                    writer.write(Util.encodeBody((String) value));
-                } else {
-                    writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) + "\"");
-                    writer.write(CRLF);
-                    writer.write("Content-Type: ");
-                    writer.write((String) mimeTypes.get(key));
-                    writer.write(CRLF);
-                    writer.write("Content-Transfer-Encoding: binary");
-                    writer.write(CRLF);
-                    writer.write(CRLF);
-                    writer.flush();
-                    os.write((byte[]) value);
-                    writer.flush();
-                }
-                writer.write(CRLF);
-                writer.flush();
+    protected long calculateContentLength() {
+        long length = 0L;
+        Enumeration e = args.keys();
+        
+        long dLength = "Content-Disposition: form-data; name=\"\"; filename=\"\"".length() + 2; // 2 = CRLF
+        long ctLength = "Content-Type: ".length() + 2; // 2 = CRLF
+        long cteLength = "Content-Transfer-Encoding: binary".length() + 4; // 4 = 2 * CRLF
+        long bLength = boundary.length() + 4; // -- + boundary + CRLF
+        long baseBinaryLength = dLength + ctLength + cteLength + bLength + 2; // 2 = CRLF at end of part 
+        dLength = "Content-Disposition: form-data; name=\"\"".length() + 2;  // 2 = CRLF
+        ctLength = "Content-Type: text/plain; charset=UTF-8".length() + 4; // 4 = 2 * CRLF
+        long baseTextLength = dLength + ctLength + bLength + 2;  // 2 = CRLF at end of part
+        
+        while(e.hasMoreElements()) {
+                String key = (String)e.nextElement();
+            Object value = args.get(key);
+            if(value instanceof String) {
+                length += baseTextLength;
+                length += key.length();
+                length += Util.encodeBody((String)value).length() + 2; // 2 = CRLF
+            } else {
+                length += baseBinaryLength;
+                length += key.length();
+                length += ((String)filenames.get(key)).length();
+                length += ((String)mimeTypes.get(key)).length();
+                length += Long.parseLong((String)filesizes.get(key));
             }
-
-            writer.write("--" + boundary + "--");
-            writer.write(CRLF);
-            writer.flush();
-            writer.close();
-            return os.toByteArray();
-            
-        } catch (UnsupportedEncodingException ex) {
-            ex.printStackTrace();
-            return null;
-        }        
+        }
+        length += bLength + 2; // same as part boundaries, suffixed with: --
+        return length;
     }
+    
     /**
      * @inheritDoc
      */
-    protected void buildRequestBody(OutputStream os) throws IOException {        
-        os.write(body);
-        os.flush();
+    protected void buildRequestBody(OutputStream os) throws IOException {
+        Writer writer = null;
+        writer = new OutputStreamWriter(os, "UTF-8"); 
+        Enumeration e = args.keys();
+        while(e.hasMoreElements()) {
+            String key = (String)e.nextElement();
+            Object value = args.get(key);
+            
+            writer.write("--" + boundary);
+            writer.write(CRLF);
+            if(value instanceof String) {
+                writer.write("Content-Disposition: form-data; name=\"" + key + "\"");
+                writer.write(CRLF);
+                writer.write("Content-Type: text/plain; charset=UTF-8");
+                writer.write(CRLF);
+                writer.write(CRLF);
+                writer.flush();
+                writer.write(Util.encodeBody((String)value));
+                writer.write(CRLF);
+                writer.flush();
+            } else {
+                writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) +"\"");
+                writer.write(CRLF);
+                writer.write("Content-Type: ");
+                writer.write((String)mimeTypes.get(key));
+                writer.write(CRLF);
+                writer.write("Content-Transfer-Encoding: binary");
+                writer.write(CRLF);
+                writer.write(CRLF);
+                writer.flush();
+                if(value instanceof InputStream) {
+                    InputStream i = (InputStream)value;
+                    byte[] buffer = new byte[8192];
+                    int s = i.read(buffer);
+                    while(s > -1) {
+                        os.write(buffer, 0, s);
+                        s = i.read(buffer);
+                    }
+                    Util.cleanup(i);
+                } else {
+                    os.write((byte[])value);
+                }
+                writer.flush();
+            }
+            writer.write(CRLF);
+            writer.flush();
+        }
+        
+        writer.write("--" + boundary + "--");
+        writer.write(CRLF);
+        writer.close();
     }
 }
