@@ -129,14 +129,6 @@ public class AddThemeEntry extends javax.swing.JPanel {
         "NONE"
     };
 
-    public static final byte[] IMAGE_ALIGNMENT_VALUES = {
-        Style.BACKGROUND_IMAGE_ALIGN_TOP,
-        Style.BACKGROUND_IMAGE_ALIGN_BOTTOM,
-        Style.BACKGROUND_IMAGE_ALIGN_LEFT,
-        Style.BACKGROUND_IMAGE_ALIGN_RIGHT,
-        Style.BACKGROUND_IMAGE_ALIGN_CENTER
-    };
-
     public static final String[] IMAGE_ALIGNMENT_STRINGS = {
         "ALIGN_TOP",
         "ALIGN_BOTTOM",

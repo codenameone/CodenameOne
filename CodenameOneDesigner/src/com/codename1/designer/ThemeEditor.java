@@ -729,21 +729,6 @@ public class ThemeEditor extends BaseForm {
         if(flashingProperty.indexOf("bgType") > -1) {
             return originalFlashingPropertyValue;
         }
-        if(flashingProperty.indexOf("bgAlign") > -1) {
-            switch(((Number)originalFlashingPropertyValue).byteValue()) {
-                case Style.BACKGROUND_IMAGE_ALIGN_TOP:
-                    return Style.BACKGROUND_IMAGE_ALIGN_BOTTOM;
-                case Style.BACKGROUND_IMAGE_ALIGN_BOTTOM:
-                    return Style.BACKGROUND_IMAGE_ALIGN_TOP;
-                case Style.BACKGROUND_IMAGE_ALIGN_LEFT:
-                    return Style.BACKGROUND_IMAGE_ALIGN_RIGHT;
-                case Style.BACKGROUND_IMAGE_ALIGN_RIGHT:
-                    return Style.BACKGROUND_IMAGE_ALIGN_LEFT;
-                case Style.BACKGROUND_IMAGE_ALIGN_CENTER:
-                    return Style.BACKGROUND_IMAGE_ALIGN_TOP;
-            }
-            return originalFlashingPropertyValue;
-        }
         if(flashingProperty.indexOf("bgGradient") > -1) {
             Object[] gradient = new Object[4];
             System.arraycopy(originalFlashingPropertyValue, 0, gradient, 0, 4);

@@ -136,11 +136,6 @@ public class ThemeTask extends ResourceTask implements ThemeTaskConstants {
                 continue;
             }
 
-            if(key.endsWith("bgAlign")) {
-                setBgAlign(value, e, key);
-                continue;
-            }
-
             if(key.endsWith("bgGradient")) {
                 StringTokenizer tok = new StringTokenizer(value, ",; ");
                 int a = Integer.valueOf(tok.nextToken(), 16);
@@ -274,16 +269,5 @@ public class ThemeTask extends ResourceTask implements ThemeTaskConstants {
             }
         }
         throw new BuildException("Illegal bgType value: " + value);
-    }
-
-
-    private void setBgAlign(String value, EditableResources e, String key) {
-        for (int i = 0; i < AddThemeEntry.IMAGE_ALIGNMENT_STRINGS.length; i++) {
-            if (AddThemeEntry.IMAGE_ALIGNMENT_STRINGS[i].equalsIgnoreCase(value)) {
-                e.setThemeProperty(getName(), key, AddThemeEntry.IMAGE_ALIGNMENT_VALUES[i]);
-                return;
-            }
-        }
-        throw new BuildException("Illegal bgAlign value: " + value);
     }
 }

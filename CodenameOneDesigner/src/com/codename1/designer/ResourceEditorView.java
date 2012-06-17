@@ -4267,15 +4267,6 @@ public static void openInIDE(File f, int lineNumber) {
                                 }
                                 continue;
                             }
-                            if(key.indexOf("bgAlign") > -1) {
-                                byte v = ((Number)value).byteValue();
-                                for(int i = 0 ; i < AddThemeEntry.IMAGE_ALIGNMENT_VALUES.length ; i++) {
-                                    if(AddThemeEntry.IMAGE_ALIGNMENT_VALUES[i] == v) {
-                                        p.setProperty(key, AddThemeEntry.IMAGE_ALIGNMENT_STRINGS[i]);
-                                    }
-                                }
-                                continue;
-                            }
                             if(key.indexOf("bgGradient") > -1) {
                                 Object[] v = (Object[])value;
                                 if(v.length < 3) {
