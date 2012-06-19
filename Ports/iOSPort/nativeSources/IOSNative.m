@@ -40,6 +40,7 @@
 #import <AddressBookUI/AddressBookUI.h>
 #import <MessageUI/MFMessageComposeViewController.h>
 #import "UIWebViewEventDelegate.h"
+#include <sqlite3.h>
 
 extern void initVMImpl();
 
@@ -2038,4 +2039,138 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___j
 {
     org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)n1;
     return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_double_1ARRAY;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(JAVA_OBJECT name) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsPath = [writablePaths lastObject];    
+    
+    const char* chrs = stringToUTF8(name);
+    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    
+    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
+    BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:foofile];
+    [pool release];    
+    return fileExists;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(JAVA_OBJECT name) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsPath = [writablePaths lastObject];    
+    
+    const char* chrs = stringToUTF8(name);
+    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    
+    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
+
+    sqlite3 *db;
+    int rc = sqlite3_open([foofile UTF8String], &db);
+    
+    [pool release];    
+    return db;
+}
+
+void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(JAVA_OBJECT name) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsPath = [writablePaths lastObject];    
+    
+    const char* chrs = stringToUTF8(name);
+    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    
+    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
+    [[NSFileManager defaultManager] removeItemAtPath:foofile error:nil];
+    [pool release];    
+}
+
+void com_codename1_impl_ios_IOSNative_sqlDbClose___long(JAVA_LONG db) {
+    sqlite3_free((sqlite3*)db);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lang_String_1ARRAY(JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    const char* chrs = stringToUTF8(sql);
+    if(args != nil) {
+        sqlite3_stmt *addStmt = nil;
+        sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
+        org_xmlvm_runtime_XMLVMArray* stringArray = args;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+
+        int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+        for(int iter = 0 ; iter < count ; iter++) {
+            java_lang_String* str = (java_lang_String*)data[iter];
+            const char* chrs = stringToUTF8(str);
+            sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
+        }
+        sqlite3_step(addStmt);
+        sqlite3_finalize(addStmt);
+    } else {
+        sqlite3_exec(db, chrs, 0, 0, 0);
+    }
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_String_java_lang_String_1ARRAY(JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    const char* chrs = stringToUTF8(sql);
+    sqlite3_stmt *addStmt = nil;
+    sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
+
+    if(args != nil) {
+        org_xmlvm_runtime_XMLVMArray* stringArray = args;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+        for(int iter = 0 ; iter < count ; iter++) {
+            java_lang_String* str = (java_lang_String*)data[iter];
+            const char* chrs = stringToUTF8(str);
+            sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
+        }
+    }
+    return addStmt;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(JAVA_LONG statementPeer) {
+    sqlite3_reset((sqlite3_stmt *)statementPeer);
+    return YES;
+}
+    
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(JAVA_LONG statementPeer) {
+    return sqlite3_step((sqlite3_stmt *)statementPeer) == SQLITE_ROW;    
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(JAVA_LONG statementPeer, JAVA_INT index) {
+    return xmlvm_create_java_string(sqlite3_column_name((sqlite3_stmt*)statementPeer, index));
+}
+
+void com_codename1_impl_ios_IOSNative_sqlCursorCloseStatement___long(JAVA_LONG statement) {
+    sqlite3_finalize((sqlite3_stmt*)statement);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnBlob___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return nil;
+}
+
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnDouble___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_double((sqlite3_stmt*)statement, col);
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnFloat___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_double((sqlite3_stmt*)statement, col);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnInteger___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_int((sqlite3_stmt*)statement, col);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_int64((sqlite3_stmt*)statement, col);
+}
+
+JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_int((sqlite3_stmt*)statement, col);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_LONG statement, JAVA_INT col) {
+    return xmlvm_create_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
 }

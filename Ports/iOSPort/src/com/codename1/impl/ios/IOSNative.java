@@ -294,4 +294,26 @@ public class IOSNative {
     public static native long createImageFile(long imagePeer, boolean jpeg, int width, int height, float quality);
     public static native int getNSDataSize(long nsData);
     public static native void nsDataToByteArray(long nsData, byte[] data);
+
+    public static native boolean sqlDbExists(String name);
+    public static native long sqlDbCreateAndOpen(String name);
+    public static native void sqlDbDelete(String name);
+    public static native void sqlDbClose(long db);
+
+    public static native void sqlDbExec(long dbPeer, String sql, String[] args);
+
+    public static native long sqlDbExecQuery(long dbPeer, String sql, String[] args);
+
+    public static native boolean sqlCursorFirst(long statementPeer);
+    public static native boolean sqlCursorNext(long statementPeer);
+    public static native String sqlGetColName(long statementPeer, int index);
+    public static native void sqlCursorCloseStatement(long statement);
+
+    public static native byte[] sqlCursorValueAtColumnBlob(long statement, int col);
+    public static native double sqlCursorValueAtColumnDouble(long statement, int col);
+    public static native float sqlCursorValueAtColumnFloat(long statement, int col);
+    public static native int sqlCursorValueAtColumnInteger(long statement, int col);
+    public static native long sqlCursorValueAtColumnLong(long statement, int col);
+    public static native short sqlCursorValueAtColumnShort(long statement, int col);
+    public static native String sqlCursorValueAtColumnString(long statement, int col);
 }

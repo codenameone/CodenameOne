@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
+import com.codename1.db.Database;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
@@ -2997,4 +2998,20 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Workaround for XMLVM bug
      */
     private static native boolean instanceofDoubleArrayI(Object o);
+
+    @Override
+    public Database openOrCreateDB(String databaseName) throws IOException{
+        return new DatabaseImpl(databaseName);
+    }
+    
+    @Override
+    public void deleteDB(String databaseName) throws IOException{
+        IOSNative.sqlDbDelete(databaseName);
+    }
+    
+    @Override
+    public boolean existsDB(String databaseName){
+        return IOSNative.sqlDbExists(databaseName);
+    }
+    
 }
