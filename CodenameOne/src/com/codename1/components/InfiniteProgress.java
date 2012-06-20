@@ -42,7 +42,7 @@ import com.codename1.ui.plaf.UIManager;
  */
 public class InfiniteProgress extends Component {
     private Image animation;
-    private Motion spin;
+    private int angle = 0;
     
     /**
      * Default constructor to define the UIID
@@ -76,8 +76,6 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
-        spin = Motion.createLinearMotion(0, Integer.MAX_VALUE, Integer.MAX_VALUE / 20);
-        spin.start();
         getComponentForm().registerAnimated(this);
     }
 
@@ -120,15 +118,9 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             return;
         }
-        int v = spin.getValue() % 360;
+        int v = angle+=20 % 360;
         Style s = getStyle();
-        /*if(g.isAffineSupported()) {
-            g.rotate(v, getWidth() / 2, getHeight() / 2);
-            g.drawImage(animation, getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
-            g.resetAffine();
-        } else {*/
-            g.drawImage(animation.rotate(v), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
-        //}
+        g.drawImage(animation.rotate(v), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
     }
     
     /**
