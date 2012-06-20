@@ -29,7 +29,6 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
-import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Vector;
 import com.codename1.maps.providers.MapProvider;
@@ -43,6 +42,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.util.MathUtil;
+
 
 /**
  * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
@@ -59,6 +59,9 @@ public class MapComponent extends Container {
     private int draggedx, draggedy;
     private Vector _tiles;
     private Point _delta = null;
+    private double latitude = Double.NaN;
+    private double longitude = Double.NaN;
+    
 
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last 
@@ -557,6 +560,51 @@ public class MapComponent extends Container {
     }
 
     /**
+     * Returns the current zoom level of the map.
+     * 
+     * @return zoom level
+     */
+    public int getZoomLevel(){
+        return _zoom;
+    }
+    
+    /**
+     * Sets the current zoom level of the map.
+     * 
+     * @return zoom level
+     */
+    public void setZoomLevel(int zoom){
+        if ( zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
+            _zoom = zoom;
+            _needTiles = true;
+            repaint();
+        }else{
+            System.out.println("zoom level must be bigger then the min zoom "
+                    + "level and smaller then the max zoom level");
+        }
+    }
+    
+    
+    /**
+     * Returns the max zoom level of the map
+     * 
+     * @return max zoom level
+     */
+    public int getMaxZoomLevel(){
+        return _map.maxZoomLevel();
+    }
+    
+    /**
+     * Returns the min zoom level of the map
+     * 
+     * @return min zoom level
+     */
+    public int getMinZoomLevel(){
+        return _map.minZoomLevel();
+    }
+    
+    
+    /**
      * Gets the center of the map.
      * @return Coord in WGS84
      */
@@ -650,8 +698,78 @@ public class MapComponent extends Container {
         return (long) (6378137 * c);
     }    
     
-}
+    
+    
+    private void setLatitude(double latitude) {
+        this.latitude = latitude;        
+        setCoord(latitude, longitude);
+    }
 
+    private void setLongitude(double longitude) {
+        this.longitude = longitude;
+        setCoord(latitude, longitude);
+    }
+
+    private void setCoord(double latitude, double longitude){
+        if(Double.isNaN(latitude) && Double.isNaN(longitude)){
+            _center =  _map.projection().fromWGS84(new Coord(latitude, longitude));
+            _needTiles = true;
+            repaint();
+        }
+    }
+        
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[]{"latitude", "longitude", "zoom"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+        return new Class[]{Double.class, Double.class, Integer.class};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if (name.equals("latitude")) {
+            return new Double(_center.getLatitude());
+        }
+        if (name.equals("longitude")) {
+            return new Double(_center.getLongitude());
+        }
+        if (name.equals("zoom")) {
+            return new Integer(getZoomLevel());
+        }
+        return null;
+    }
+        
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if (name.equals("latitude")) {
+            setLatitude(((Double) value).doubleValue());
+            return null;
+        }
+        if (name.equals("longitude")) {
+            setLongitude(((Double) value).doubleValue());
+            return null;
+        }
+        if (name.equals("zoom")) {
+            setZoomLevel(((Integer) value).intValue());
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
+    
+    
+}
 class LayerWithZoomLevels {
 
     public AbstractLayer layer;
