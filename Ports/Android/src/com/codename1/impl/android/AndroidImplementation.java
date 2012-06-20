@@ -2042,7 +2042,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         hasNativeTheme();
         if (nativeThemeAvailable) {
             try {
-                InputStream is = getResourceAsStream(getClass(), "/androidTheme.res");
+                InputStream is;
+                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet()) {
+                    is = getResourceAsStream(getClass(), "/androidTheme.res");
+                } else {
+                    is = getResourceAsStream(getClass(), "/android_holo_light.res");
+                }
                 Resources r = Resources.open(is);
                 UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
                 is.close();
