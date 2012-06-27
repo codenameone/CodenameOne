@@ -2711,4 +2711,12 @@ public final class Display {
     }
     
     
+    /**
+     * Sets the frequency for polling the server in case of polling based push notification
+     * 
+     * @param freq the frequency in milliseconds
+     */
+    public void setPollingFrequency(int freq) {
+        impl.setPollingFrequency(freq);
+    }
 }

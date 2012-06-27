@@ -91,6 +91,7 @@ public abstract class CodenameOneImplementation {
 
     private static boolean bidi;
     private String packageName;
+    private static int pollingMillis = 3 * 60 * 60000;
     
     /**
      * Useful since the content of a single element touch event is often recycled
@@ -4180,6 +4181,20 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Sets the frequency for polling the server in case of polling based push notification
+     * 
+     * @param freq the frequency in milliseconds
+     */
+    public void setPollingFrequency(int freq) {
+        pollingMillis = freq;
+        if(callback != null && pollingThreadRunning) {
+            synchronized(callback) {
+                callback.notify();
+            }
+        }
+    }
+    
+    /**
      * Registers a polling thread to simulate push notification
      */
     protected static void registerPollingFallback() {
@@ -4194,12 +4209,6 @@ public abstract class CodenameOneImplementation {
                     String lastReq = Preferences.get("last_push_req", "0");
                     while(pollingThreadRunning) {
                         try {
-                            try {
-                                Thread.sleep(50000);
-                                //Thread.sleep(3000);
-                            } catch(Throwable t) {
-                                t.printStackTrace();
-                            }
                             ConnectionRequest cr = new ConnectionRequest();
                             cr.setUrl("https://codename-one.appspot.com/pollManualPush");
                             cr.setPost(false);
@@ -4216,6 +4225,13 @@ public abstract class CodenameOneImplementation {
                             }
                         } catch (IOException ex) {
                             ex.printStackTrace();
+                        }
+                        try {
+                            synchronized(callback) {
+                                callback.wait(pollingMillis);
+                            }
+                        } catch(Throwable t) {
+                            t.printStackTrace();
                         }
                     }
                 }
