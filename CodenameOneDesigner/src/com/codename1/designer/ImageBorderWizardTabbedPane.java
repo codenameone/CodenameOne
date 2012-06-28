@@ -69,7 +69,7 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        generate = new javax.swing.JButton();
+        ok = new javax.swing.JButton();
         close = new javax.swing.JButton();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
@@ -77,14 +77,15 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
         jPanel3 = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
         help = new javax.swing.JTextPane();
+        apply = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
-        generate.setText("Generate");
-        generate.setName("generate"); // NOI18N
-        generate.addActionListener(formListener);
+        ok.setText("OK");
+        ok.setName("ok"); // NOI18N
+        ok.addActionListener(formListener);
 
-        close.setText("Close");
+        close.setText("Cancel");
         close.setName("close"); // NOI18N
         close.addActionListener(formListener);
 
@@ -111,6 +112,10 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
 
         jTabbedPane1.addTab("Help", jScrollPane1);
 
+        apply.setText("Apply");
+        apply.setName("apply"); // NOI18N
+        apply.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
@@ -119,14 +124,16 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jTabbedPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 380, Short.MAX_VALUE)
-                    .add(layout.createSequentialGroup()
-                        .add(generate)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(close)))
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                        .add(close)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(apply)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(ok)))
                 .addContainerGap())
         );
 
-        layout.linkSize(new java.awt.Component[] {close, generate}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
+        layout.linkSize(new java.awt.Component[] {close, ok}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -135,7 +142,8 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
                 .add(jTabbedPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 249, Short.MAX_VALUE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(generate)
+                    .add(ok)
+                    .add(apply)
                     .add(close))
                 .addContainerGap())
         );
@@ -146,40 +154,50 @@ public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
     private class FormListener implements java.awt.event.ActionListener {
         FormListener() {}
         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            if (evt.getSource() == generate) {
-                ImageBorderWizardTabbedPane.this.generateActionPerformed(evt);
+            if (evt.getSource() == ok) {
+                ImageBorderWizardTabbedPane.this.okActionPerformed(evt);
             }
             else if (evt.getSource() == close) {
                 ImageBorderWizardTabbedPane.this.closeActionPerformed(evt);
             }
+            else if (evt.getSource() == apply) {
+                ImageBorderWizardTabbedPane.this.applyActionPerformed(evt);
+            }
         }
     }// </editor-fold>//GEN-END:initComponents
 
-    private void generateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_generateActionPerformed
+    private void okActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_okActionPerformed
         generated = true;
         cutting.generate();
-    }//GEN-LAST:event_generateActionPerformed
+        SwingUtilities.windowForComponent(this).dispose();
+    }//GEN-LAST:event_okActionPerformed
 
     private void closeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeActionPerformed
-        if(!generated) {
+        /*if(!generated) {
             if(JOptionPane.showConfirmDialog(this, "Are you sure you want to close the window without generating?", "Are You Sure?", JOptionPane.YES_NO_OPTION) !=
                     JOptionPane.YES_OPTION) {
                 return;
             }
-        }
+        }*/
         SwingUtilities.windowForComponent(this).dispose();
     }//GEN-LAST:event_closeActionPerformed
 
+    private void applyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyActionPerformed
+        generated = true;
+        cutting.generate();
+    }//GEN-LAST:event_applyActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton apply;
     private javax.swing.JButton close;
-    private javax.swing.JButton generate;
     private javax.swing.JTextPane help;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTabbedPane jTabbedPane1;
+    private javax.swing.JButton ok;
     // End of variables declaration//GEN-END:variables
 
 }

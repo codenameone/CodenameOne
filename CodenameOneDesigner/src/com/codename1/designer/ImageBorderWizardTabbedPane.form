@@ -20,10 +20,12 @@
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
                   <Component id="jTabbedPane1" alignment="0" pref="380" max="32767" attributes="0"/>
-                  <Group type="102" alignment="0" attributes="0">
-                      <Component id="generate" linkSize="1" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
+                  <Group type="102" alignment="1" attributes="0">
                       <Component id="close" linkSize="1" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="apply" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="ok" linkSize="1" min="-2" max="-2" attributes="0"/>
                   </Group>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
@@ -37,7 +39,8 @@
               <Component id="jTabbedPane1" pref="249" max="32767" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="generate" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="ok" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="apply" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="close" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
@@ -46,18 +49,18 @@
     </DimensionLayout>
   </Layout>
   <SubComponents>
-    <Component class="javax.swing.JButton" name="generate">
+    <Component class="javax.swing.JButton" name="ok">
       <Properties>
-        <Property name="text" type="java.lang.String" value="Generate"/>
-        <Property name="name" type="java.lang.String" value="generate" noResource="true"/>
+        <Property name="text" type="java.lang.String" value="OK"/>
+        <Property name="name" type="java.lang.String" value="ok" noResource="true"/>
       </Properties>
       <Events>
-        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="generateActionPerformed"/>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="okActionPerformed"/>
       </Events>
     </Component>
     <Component class="javax.swing.JButton" name="close">
       <Properties>
-        <Property name="text" type="java.lang.String" value="Close"/>
+        <Property name="text" type="java.lang.String" value="Cancel"/>
         <Property name="name" type="java.lang.String" value="close" noResource="true"/>
       </Properties>
       <Events>
@@ -141,5 +144,14 @@
         </Container>
       </SubComponents>
     </Container>
+    <Component class="javax.swing.JButton" name="apply">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Apply"/>
+        <Property name="name" type="java.lang.String" value="apply" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="applyActionPerformed"/>
+      </Events>
+    </Component>
   </SubComponents>
 </Form>

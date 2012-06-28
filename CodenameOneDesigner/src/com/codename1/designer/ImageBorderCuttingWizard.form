@@ -318,12 +318,14 @@
     </Component>
     <Component class="javax.swing.JCheckBox" name="lowDPI">
       <Properties>
+        <Property name="selected" type="boolean" value="true"/>
         <Property name="text" type="java.lang.String" value="Low"/>
         <Property name="name" type="java.lang.String" value="lowDPI" noResource="true"/>
       </Properties>
     </Component>
     <Component class="javax.swing.JCheckBox" name="mediumDPI">
       <Properties>
+        <Property name="selected" type="boolean" value="true"/>
         <Property name="text" type="java.lang.String" value="Medium"/>
         <Property name="name" type="java.lang.String" value="mediumDPI" noResource="true"/>
       </Properties>

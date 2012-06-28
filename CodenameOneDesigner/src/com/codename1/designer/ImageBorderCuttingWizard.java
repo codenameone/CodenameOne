@@ -193,9 +193,11 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         jLabel11.setText("Auto Scale To DPI");
         jLabel11.setName("jLabel11"); // NOI18N
 
+        lowDPI.setSelected(true);
         lowDPI.setText("Low");
         lowDPI.setName("lowDPI"); // NOI18N
 
+        mediumDPI.setSelected(true);
         mediumDPI.setText("Medium");
         mediumDPI.setName("mediumDPI"); // NOI18N
 
@@ -261,7 +263,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                                     .add(hdDPI)
                                     .add(veryHighDPI)))))
-                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 563, Short.MAX_VALUE))
+                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 745, Short.MAX_VALUE))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
