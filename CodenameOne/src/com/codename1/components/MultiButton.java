@@ -195,6 +195,29 @@ public class MultiButton extends Container {
     }
     
     /**
+     * Returns true if the checkbox/radio button is selected
+     * @return true if the checkbox/radio button is selected
+     */
+    public boolean isSelected() {
+        return emblem.isSelected();
+    }
+    
+    /**
+     * Toggles the selected state for the radio button/check box modes
+     * @param b true for checked false for unchecked
+     */
+    public void setSelected(boolean b) {
+        if(emblem instanceof RadioButton) {
+            ((RadioButton)emblem).setSelected(b);
+            return;
+        }
+        if(emblem instanceof CheckBox) {
+            ((CheckBox)emblem).setSelected(b);
+            return;
+        }
+    }
+    
+    /**
      * Indicates the first two labels should be side by side
      * 
      * @param b true to place the first two labels side by side
@@ -627,7 +650,7 @@ public class MultiButton extends Container {
             "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4", 
             "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition",
             "emblem", "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
-            "invertFirstTwoEntries", "checkBox", "radioButton", "group"};
+            "invertFirstTwoEntries", "checkBox", "radioButton", "group", "selected"};
     }
 
     /**
@@ -660,6 +683,7 @@ public class MultiButton extends Container {
            Boolean.class,
            Boolean.class,
            String.class,// group
+           Boolean.class // selected
        };
     }
 
@@ -753,6 +777,12 @@ public class MultiButton extends Container {
         }
         if(name.equals("group")) {
             return getGroup();
+        }
+        if(name.equals("selected")) {
+            if(isSelected()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
         }
         return null;
     }
@@ -859,6 +889,10 @@ public class MultiButton extends Container {
         }
         if(name.equals("group")) {
             setGroup((String)value);
+            return null;
+        }
+        if(name.equals("selected")) {
+            setSelected(((Boolean)value).booleanValue());
             return null;
         }
         return super.setPropertyValue(name, value);
