@@ -178,61 +178,17 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     private short currentKey = 1;
     //protected ActionListener camResponse;
     protected EventDispatcher captureCallback;
-
+    private static boolean askForPermission = true;
 
     BlackBerryCanvas createCanvas() {
         return new BlackBerryCanvas(this);
     }
 
+    public static void setAskPermission(boolean ask) {
+        askForPermission = ask;
+    }
+    
     public void init(Object m) {
-
-        ApplicationPermissions permRequest = new ApplicationPermissions();
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_EMAIL);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_FILE_API);
-        permRequest.addPermission(ApplicationPermissions.PERMISSION_WIFI);
-        try {
-            //ApplicationPermissions.PERMISSION_CROSS_APPLICATION_COMMUNICATION
-            permRequest.addPermission(11);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_MEDIA
-            permRequest.addPermission(21);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_INPUT_SIMULATION
-            permRequest.addPermission(6);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_LOCATION_DATA
-            permRequest.addPermission(14);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_ORGANIZER_DATA
-            permRequest.addPermission(16);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_INTERNET
-            permRequest.addPermission(7);
-        } catch (Exception e) {
-        }
-        try {
-            //ApplicationPermissions.PERMISSION_RECORDING
-            permRequest.addPermission(17);
-        } catch (Exception e) {
-        }
-
-        ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
-        if (!apm.invokePermissionsRequest(permRequest)) {
-            exitApplication();
-            return;
-        }
-
-
         if (m instanceof UiApplication) {
             app = (UiApplication) m;
         } else {
@@ -244,6 +200,59 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
             app = UiApplication.getUiApplication();
         }
+
+        if(askForPermission) {
+            app.invokeAndWait(new Runnable() {
+                public void run() {
+                    ApplicationPermissions permRequest = new ApplicationPermissions();
+                    permRequest.addPermission(ApplicationPermissions.PERMISSION_EMAIL);
+                    permRequest.addPermission(ApplicationPermissions.PERMISSION_FILE_API);
+                    permRequest.addPermission(ApplicationPermissions.PERMISSION_WIFI);
+                    try {
+                        //ApplicationPermissions.PERMISSION_CROSS_APPLICATION_COMMUNICATION
+                        permRequest.addPermission(11);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_MEDIA
+                        permRequest.addPermission(21);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_INPUT_SIMULATION
+                        permRequest.addPermission(6);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_LOCATION_DATA
+                        permRequest.addPermission(14);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_ORGANIZER_DATA
+                        permRequest.addPermission(16);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_INTERNET
+                        permRequest.addPermission(7);
+                    } catch (Exception e) {
+                    }
+                    try {
+                        //ApplicationPermissions.PERMISSION_RECORDING
+                        permRequest.addPermission(17);
+                    } catch (Exception e) {
+                    }
+
+                    ApplicationPermissionsManager apm = ApplicationPermissionsManager.getInstance();
+                    if (!apm.invokePermissionsRequest(permRequest)) {
+                        exitApplication();
+                        return;
+                    }
+                }
+            });        
+        }
+        
         app.enableKeyUpEvents(true);
         if (!app.isHandlingEvents()) {
             new Thread() {
@@ -1160,7 +1169,32 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     static EventDispatcher getVolumeListener() {
         return volumeListener;
     }
+    
+    class FinishEditFocus implements FocusChangeListener {
+        public void focusChanged(Field field, int eventType) {
+            if (lightweightEdit != null) {
+                finishEdit(false);
+            }
+        }
+    }
 
+    class PeerFocus implements FocusChangeListener {
+        private Field fld;
+        private PeerComponent p;
+        PeerFocus(Field fld, PeerComponent p) {
+            this.fld = fld;
+            this.p = p;
+        }
+        public void focusChanged(Field field, int eventType) {
+            if (p.getNativePeer() == fld && eventType == FocusChangeListener.FOCUS_LOST) {
+                fld.setFocusListener(null);
+                nullFld.setFocus();
+                canvas.eventTarget = null;
+                canvas.repeatLastNavigation();
+            }
+        }
+    }
+    
     /**
      * @inheritDoc
      */
@@ -1168,14 +1202,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if (nativeComponent instanceof Field) {
             if (nullFld == null) {
                 nullFld = new NullField();
-                nullFld.setFocusListener(new FocusChangeListener() {
-
-                    public void focusChanged(Field field, int eventType) {
-                        if (lightweightEdit != null) {
-                            finishEdit(false);
-                        }
-                    }
-                });
+                nullFld.setFocusListener(new FinishEditFocus());
                 synchronized (UiApplication.getEventLock()) {
                     canvas.add(nullFld);
                 }
@@ -1196,16 +1223,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     }
                     if (b) {
                         canvas.eventTarget = fld;
-                        fld.setFocusListener(new FocusChangeListener() {
-                            public void focusChanged(Field field, int eventType) {
-                                if (getNativePeer() == fld && eventType == FocusChangeListener.FOCUS_LOST) {
-                                    fld.setFocusListener(null);
-                                    nullFld.setFocus();
-                                    canvas.eventTarget = null;
-                                    canvas.repeatLastNavigation();
-                                }
-                            }
-                        });
+                        fld.setFocusListener(new PeerFocus(fld, this));
                     } else {
                         fld.setFocusListener(null);
                         if (canvas.eventTarget == fld) {
