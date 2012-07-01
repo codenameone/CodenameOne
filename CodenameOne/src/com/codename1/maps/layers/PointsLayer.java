@@ -118,7 +118,7 @@ public class PointsLayer extends AbstractLayer {
             point.setLongitude(c.getLongitude());
             point.setProjected(true);
         }
-        points.remove(point);
+        points.removeElement(point);
     }
     
     
