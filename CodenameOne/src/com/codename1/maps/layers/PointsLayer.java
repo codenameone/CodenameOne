@@ -27,13 +27,10 @@ import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
 import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
-import com.codename1.ui.geom.Point;
-import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.Tile;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
-import java.util.Hashtable;
 
 /**
  * This is a Points Layer
@@ -91,9 +88,9 @@ public class PointsLayer extends AbstractLayer {
     }
 
     /**
-     * Adds a point to the Layer
+     * Adds a point to the PointsLayer
      * 
-     * @param position the position of the point
+     * @param point a point to add
      */
     public void addPoint(PointLayer point) {
         Image pointIcon = point.getIcon();
@@ -109,6 +106,22 @@ public class PointsLayer extends AbstractLayer {
         points.addElement(point);
     }
 
+    /**
+     * Removes a point from the PointsLayer
+     * 
+     * @param point to remove from the PointsLayer
+     */
+    public void removePoint(PointLayer point) {
+        if(!point.isProjected()){
+            Coord c = getProjection().fromWGS84(point);
+            point.setLatitude(c.getLatitude());
+            point.setLongitude(c.getLongitude());
+            point.setProjected(true);
+        }
+        points.remove(point);
+    }
+    
+    
     /**
      * @inheritDoc
      */
