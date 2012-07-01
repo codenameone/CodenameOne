@@ -57,6 +57,7 @@ public class MapComponent extends Container {
     protected boolean _debugInfo = false;
     protected boolean _needTiles = true;
     private int draggedx, draggedy;
+    private int pressedx, pressedy;
     private Vector _tiles;
     private Point _delta = null;
     private double latitude = Double.NaN;
@@ -202,14 +203,29 @@ public class MapComponent extends Container {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
-        super.pointerPressed(x, y);
+        super.pointerPressed(x, y);        
+        pressedx = x;
+        pressedy = y;
         draggedx = x;
         draggedy = y;
+    }
+
+    
+    /**
+     * @inheritDoc
+     */
+    public void pointerReleased(int x, int y) {
+        super.pointerReleased(x, y);
+        int deltax = Math.abs(pressedx - x);
+        int deltay = Math.abs(pressedy - y);
+        
+        if(deltax > 10 || deltay > 10){
+            return;
+        }
+        
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
-
         Tile t = screenTile();
-
         Coord southWest = t.position(x - 20, t.dimension().getHeight() - y - 20);
         Coord c = Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());
         Coord northEast = t.position(x + 20, t.dimension().getHeight() - y + 20);
@@ -225,7 +241,7 @@ public class MapComponent extends Container {
         }
 
     }
-
+    
     /**
      * Gets the Coord location on the map from a x, y position.
      * 
