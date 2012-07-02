@@ -84,8 +84,7 @@ public class InPlaceEditView extends FrameLayout {
         mResources = impl.activity.getResources();
         mResultReceiver = new DebugResultReceiver(getHandler());
         mInputManager = (InputMethodManager) impl.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-        // When the virtual keyboard is shown, do not resize the window
-        impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+        impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         // We place this view as an overlay that takes up the entire screen
         setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
         setFocusableInTouchMode(true);
