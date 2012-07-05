@@ -3847,6 +3847,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         File f = new File(getStorageDir() + "/database/" + databaseName);
         return f.exists();
     }
+
+    @Override
+    public void setCommandBehavior(int commandBehavior) {
+        //cannot show native menus on the simulator
+        if(commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE){
+            if(isTablet() && getPlatformName().equals("and")){
+                //simulate native ics with the lightweight ics
+                commandBehavior = Display.COMMAND_BEHAVIOR_ICS;
+            }else{
+                return;
+            }
+        }
+        super.setCommandBehavior(commandBehavior);
+    }
+    
     
     
 }

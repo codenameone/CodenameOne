@@ -71,6 +71,46 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target name="build-skins">
+        <copy file="../../Themes/androidTheme.res" todir="../../Skins/android" />
+        <copy file="../../Themes/androidTheme.res" todir="../../Skins/nexus" />
+        <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/ipad" />
+        <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone4" />
+        <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/ipad3" />
+        <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone3gs" />
+        <copy file="../../Themes/blackberry_theme.res" todir="../../Skins/torch" />
+        <copy file="../../Themes/android_holo_light.res" todir="../../Skins/xoom" />
+
+        
+        <zip basedir="../../Skins/nexus" destfile="../../Skins/nexus.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/torch" destfile="../../Skins/torch.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/android" destfile="../../Skins/android.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/feature_phone" destfile="../../Skins/feature_phone.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/ipad" destfile="../../Skins/ipad.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/ipad3" destfile="../../Skins/ipad3.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/iphone3gs" destfile="../../Skins/iphone3gs.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/iphone4" destfile="../../Skins/iphone4.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/xoom" destfile="../../Skins/xoom.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+    </target>    
+    
     <target name="-pre-compile">
         <copy file="../../Skins/torch.skin" todir="src" />
         <copy file="../../Skins/android.skin" todir="src" />
