@@ -65,21 +65,19 @@ import java.util.Vector;
  * @author Chen Fishbein
  */
 public class Form extends Container {
+
     private Painter glassPane;
     private Container contentPane = new Container(new FlowLayout());
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
-    
     Vector buttonsAwatingRelease;
-    
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
      */
     protected boolean focusScrolling;
-
     /**
      * Used by the combo box to block some default Codename One behaviors
      */
@@ -92,8 +90,6 @@ public class Form extends Container {
      * Contains a list of components that would like to animate their state
      */
     private Vector animatableComponents;
-
-    
     //private FormSwitcher formSwitcher;
     private Component focused;
     private Vector mediaComponents;
@@ -114,11 +110,9 @@ public class Form extends Container {
      * to be handled by a single block
      */
     private EventDispatcher commandListener;
-
     private EventDispatcher pointerPressedListeners;
     private EventDispatcher pointerReleasedListeners;
     private EventDispatcher pointerDraggedListeners;
-
     /**
      * Relevant for modal forms where the previous form should be rendered underneath
      */
@@ -131,7 +125,6 @@ public class Form extends Container {
      * Default color for the screen tint when a dialog or a menu is shown
      */
     private int tintColor;
-
     /**
      * Listeners for key release events 
      */
@@ -144,16 +137,11 @@ public class Form extends Container {
      * Indicates whether focus should cycle within the form
      */
     private boolean cyclicFocus = true;
-    
     private int tactileTouchDuration;
-
     private EventDispatcher showListener;
-
     int initialPressX;
     int initialPressY;
-
     private EventDispatcher orientationListener;
-    
     private UIManager uiManager;
 
     /**
@@ -178,14 +166,14 @@ public class Form extends Container {
         titleArea.setUIID("TitleArea");
         addComponentToForm(BorderLayout.NORTH, titleArea);
         addComponentToForm(BorderLayout.CENTER, contentPane);
-        
+
         contentPane.setUIID("ContentPane");
         contentPane.setScrollableY(true);
-        
-        if(title.getText() != null && title.shouldTickerStart()) {
+
+        if (title.getText() != null && title.shouldTickerStart()) {
             title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
         }
-        
+
         // hardcoded, anything else is just pointless...
         formStyle.setBgTransparency(0xFF);
     }
@@ -215,14 +203,14 @@ public class Form extends Container {
     }
 
     public UIManager getUIManager() {
-        if(uiManager != null){
+        if (uiManager != null) {
             return uiManager;
-        }else{
+        } else {
             return UIManager.getInstance();
         }
     }
-    
-    public void setUIManager(UIManager uiManager){
+
+    public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
         refreshTheme(false);
     }
@@ -233,7 +221,7 @@ public class Form extends Container {
      * @param l listener
      */
     public void addShowListener(ActionListener l) {
-        if(showListener == null) {
+        if (showListener == null) {
             showListener = new EventDispatcher();
         }
         showListener.addListener(l);
@@ -245,7 +233,7 @@ public class Form extends Container {
      * @param l the listener 
      */
     public void removeShowListener(ActionListener l) {
-        if(showListener == null) {
+        if (showListener == null) {
             return;
         }
         showListener.removeListener(l);
@@ -257,7 +245,7 @@ public class Form extends Container {
      * @param l listener
      */
     public void addOrientationListener(ActionListener l) {
-        if(orientationListener == null) {
+        if (orientationListener == null) {
             orientationListener = new EventDispatcher();
         }
         orientationListener.addListener(l);
@@ -269,7 +257,7 @@ public class Form extends Container {
      * @param l the listener
      */
     public void removeOrientationListener(ActionListener l) {
-        if(orientationListener == null) {
+        if (orientationListener == null) {
             return;
         }
         orientationListener.removeListener(l);
@@ -292,7 +280,6 @@ public class Form extends Container {
     protected void showNotify() {
         setVisible(true);
     }
-
 
     /**
      * This method is only invoked when the underlying canvas for the form gets
@@ -323,12 +310,12 @@ public class Form extends Container {
         setShouldCalcPreferredSize(true);
         doLayout();
         focused = getFocused();
-        if(focused != null){
+        if (focused != null) {
             Component.setDisableSmoothScrolling(true);
             scrollComponentToVisible(focused);
             Component.setDisableSmoothScrolling(false);
         }
-        if(orientationListener != null) {
+        if (orientationListener != null) {
             orientationListener.fireActionEvent(new ActionEvent(this));
         }
         repaint();
@@ -357,7 +344,7 @@ public class Form extends Container {
      * @param g the graphics context
      */
     void paintGlassImpl(Graphics g) {
-        if(getParent() != null) {
+        if (getParent() != null) {
             super.paintGlassImpl(g);
             return;
         }
@@ -369,7 +356,7 @@ public class Form extends Container {
             g.translate(tx, ty);
         }
         paintGlass(g);
-        if(dragged != null && dragged.isDragAndDropInitialized()) {
+        if (dragged != null && dragged.isDragAndDropInitialized()) {
             int[] c = g.getClip();
             g.setClip(0, 0, getWidth(), getHeight());
             dragged.drawDraggedImage(g);
@@ -576,7 +563,7 @@ public class Form extends Container {
         transitionOutAnimator = laf.getDefaultFormTransitionOut();
         transitionInAnimator = laf.getDefaultFormTransitionIn();
         focusScrolling = laf.isFocusScrolling();
-        if(menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass())){
+        if (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass())) {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {
@@ -597,7 +584,6 @@ public class Form extends Container {
         this.dragged = dragged;
     }
 
-
     /**
      * Returns the first scrollable ancestor for this component or null if no
      * such ancestor exists
@@ -609,7 +595,6 @@ public class Form extends Container {
         }
         return findScrollableAncestor(c);
     }
-
 
     /**
      * Returns true if the given dest component is in the column of the source component
@@ -628,7 +613,6 @@ public class Form extends Container {
                 Integer.MAX_VALUE, source.getHeight(), dest.getAbsoluteX(), dest.getAbsoluteY(),
                 dest.getWidth(), dest.getHeight());
     }
-
 
     /**
      * Default command is invoked when a user presses fire, this functionality works
@@ -698,7 +682,6 @@ public class Form extends Container {
         return menuBar.getBackCommand();
     }
 
-
     /**
      * Sets the title after invoking the constructor
      * 
@@ -706,7 +689,8 @@ public class Form extends Container {
      */
     public Form(String title) {
         this();
-        this.title.setText(title);
+        setTitle(title);
+//        this.title.setText(title);
     }
 
     /**
@@ -744,10 +728,10 @@ public class Form extends Container {
 
     void updateIcsIconCommandBehavior() {
         int b = Display.getInstance().getCommandBehavior();
-        if(b == Display.COMMAND_BEHAVIOR_ICS) {
-            if(getTitleComponent().getIcon() == null) {
+        if (b == Display.COMMAND_BEHAVIOR_ICS) {
+            if (getTitleComponent().getIcon() == null) {
                 Image i = Display.getInstance().getImplementation().getApplicationIconImage();
-                if(i != null) {
+                if (i != null) {
                     int h = getTitleComponent().getStyle().getFont().getHeight();
                     i = i.scaled(h, h);
                     getTitleComponent().setIcon(i);
@@ -755,7 +739,7 @@ public class Form extends Container {
             }
         }
     }
-    
+
     /**
      * Sets the Form title to the given text
      * 
@@ -763,21 +747,28 @@ public class Form extends Container {
      */
     public void setTitle(String title) {
         this.title.setText(title);
-        updateIcsIconCommandBehavior();
-        if(isInitialized() && this.title.isTickerEnabled()) {
-            int b = Display.getInstance().getCommandBehavior();
-            if(b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT || 
-                    b == Display.COMMAND_BEHAVIOR_ICS) {
-                titleArea.revalidate();
-            }
-            if(this.title.shouldTickerStart()) {
-                this.title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
-            } else {
-                if(this.title.isTickerRunning()) {
-                    this.title.stopTicker();
+
+        if (!Display.getInstance().isNativeTitle()) {
+            updateIcsIconCommandBehavior(); 
+            if (isInitialized() && this.title.isTickerEnabled()) {
+                int b = Display.getInstance().getCommandBehavior();
+                if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
+                        || b == Display.COMMAND_BEHAVIOR_ICS) {
+                    titleArea.revalidate();
+                }
+                if (this.title.shouldTickerStart()) {
+                    this.title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
+                } else {
+                    if (this.title.isTickerRunning()) {
+                        this.title.stopTicker();
+                    }
                 }
             }
-        } 
+        }else{
+            if(super.contains(titleArea)){
+                removeComponentFromForm(titleArea);
+            }
+        }
     }
 
     /**
@@ -851,7 +842,7 @@ public class Form extends Container {
     void removeComponentFromForm(Component cmp) {
         super.removeComponent(cmp);
     }
-    
+
     /**
      * Registering media component to this Form, that like to receive 
      * animation events
@@ -902,7 +893,6 @@ public class Form extends Container {
         Display.getInstance().notifyDisplay();
     }
 
-
     /**
      * Identical to the none-internal version, the difference between the internal/none-internal
      * is that it references a different vector that is unaffected by the user actions.
@@ -944,12 +934,12 @@ public class Form extends Container {
      * @inheritDoc
      */
     public boolean animate() {
-        if(getParent() != null) {
+        if (getParent() != null) {
             repaintAnimations();
         }
         return super.animate();
     }
-    
+
     /**
      * Makes sure all animations are repainted so they would be rendered in every
      * frame
@@ -968,7 +958,7 @@ public class Form extends Container {
         // the animation thus invalidating the size
         for (int iter = 0; iter < v.size(); iter++) {
             Animation c = (Animation) v.elementAt(iter);
-            if(c == null || notIn != null && notIn.contains(c)) {
+            if (c == null || notIn != null && notIn.contains(c)) {
                 continue;
             }
             if (c.animate()) {
@@ -976,10 +966,10 @@ public class Form extends Container {
                     Rectangle rect = ((Component) c).getDirtyRegion();
                     if (rect != null) {
                         Dimension d = rect.getSize();
-                        
+
                         // this probably can't happen but we got a really weird partial stack trace to this
                         // method and this check doesn't hurt
-                        if(d != null) {
+                        if (d != null) {
                             ((Component) c).repaint(rect.getX(), rect.getY(), d.getWidth(), d.getHeight());
                         }
                     } else {
@@ -1015,19 +1005,19 @@ public class Form extends Container {
             titleArea.refreshTheme(merge);
         }
         super.refreshTheme(merge);
-        
+
         // when  changing the theme the menu behavior might also change
         hideMenu();
         restoreMenu();
         Command[] cmds = new Command[getCommandCount()];
-        for(int iter = 0 ; iter < cmds.length ; iter++) {
+        for (int iter = 0; iter < cmds.length; iter++) {
             cmds[iter] = getCommand(iter);
         }
         removeAllCommands();
-        for(int iter = 0 ; iter < cmds.length ; iter++) {
+        for (int iter = 0; iter < cmds.length; iter++) {
             addCommand(cmds[iter], getCommandCount());
         }
-        if(getBackCommand() != null) {
+        if (getBackCommand() != null) {
             setBackCommand(getBackCommand());
         }
 
@@ -1094,7 +1084,7 @@ public class Form extends Container {
      * @param l the command action listener
      */
     public void addCommandListener(ActionListener l) {
-        if(commandListener == null) {
+        if (commandListener == null) {
             commandListener = new EventDispatcher();
         }
         commandListener.addListener(l);
@@ -1128,7 +1118,7 @@ public class Form extends Container {
      */
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
-        if(!ev.isConsumed()) {
+        if (!ev.isConsumed()) {
             actionCommandImpl(cmd, ev);
         }
     }
@@ -1150,8 +1140,8 @@ public class Form extends Container {
             return;
         }
 
-        if(comboLock) {
-            if(cmd == menuBar.getCancelMenuItem()) {
+        if (comboLock) {
+            if (cmd == menuBar.getCancelMenuItem()) {
                 actionCommand(cmd);
                 return;
             }
@@ -1164,7 +1154,7 @@ public class Form extends Container {
         if (cmd != menuBar.getSelectCommand()) {
             if (commandListener != null) {
                 commandListener.fireActionEvent(ev);
-                if(ev.isConsumed()) {
+                if (ev.isConsumed()) {
                     return;
                 }
             }
@@ -1180,7 +1170,7 @@ public class Form extends Container {
     void initFocused() {
         if (focused == null) {
             setFocused(contentPane.findFirstFocusable());
-            if(!Display.getInstance().shouldRenderSelection()) {
+            if (!Display.getInstance().shouldRenderSelection()) {
                 return;
             }
             layoutContainer();
@@ -1212,9 +1202,9 @@ public class Form extends Container {
         initFocused();
         onShow();
         tint = false;
-        if(getParent() == null){
+        if (getParent() == null) {
             com.codename1.ui.Display.getInstance().setCurrent(this, reverse);
-        }else{
+        } else {
             revalidate();
         }
     }
@@ -1224,10 +1214,10 @@ public class Form extends Container {
      */
     void initComponentImpl() {
         super.initComponentImpl();
-        if(Display.getInstance().isNativeCommands()) {
+        if (Display.getInstance().isNativeCommands()) {
             Display.getInstance().getImplementation().setNativeCommands(menuBar.getCommands());
         }
-        if(getParent() != null) {
+        if (getParent() != null) {
             getParent().getComponentForm().registerAnimated(this);
         }
     }
@@ -1283,7 +1273,7 @@ public class Form extends Container {
     void onShowCompletedImpl() {
         setLightweightMode(false);
         onShowCompleted();
-        if(showListener != null) {
+        if (showListener != null) {
             showListener.fireActionEvent(new ActionEvent(this));
         }
     }
@@ -1307,16 +1297,16 @@ public class Form extends Container {
      */
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         Display.getInstance().flushEdt();
-        if (previousForm == null){
+        if (previousForm == null) {
             previousForm = Display.getInstance().getCurrent();
             // special case for application opening with a dialog before any form is shown
             if (previousForm == null) {
                 previousForm = new Form();
                 previousForm.show();
             } else {
-                if(previousForm instanceof Dialog) {
-                    Dialog previousDialog = (Dialog)previousForm;
-                    if(previousDialog.isDisposed()) {
+                if (previousForm instanceof Dialog) {
+                    Dialog previousDialog = (Dialog) previousForm;
+                    if (previousDialog.isDisposed()) {
                         previousForm = Display.getInstance().getCurrentUpcoming();
                     }
                 }
@@ -1326,7 +1316,7 @@ public class Form extends Container {
         }
         Painter p = getStyle().getBgPainter();
         if (top > 0 || bottom > 0 || left > 0 || right > 0) {
-            if(!title.isVisible()) {
+            if (!title.isVisible()) {
                 includeTitle = false;
             }
             Style titleStyle = title.getStyle();
@@ -1366,7 +1356,7 @@ public class Form extends Container {
         if (getTransitionOutAnimator() == null && getTransitionInAnimator() == null) {
             initLaf(getUIManager());
         }
-        
+
         initComponentImpl();
         Display.getInstance().setCurrent(this, reverse);
         onShow();
@@ -1440,7 +1430,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     void repaint(Component cmp) {
-        if(getParent() != null){
+        if (getParent() != null) {
             super.repaint(cmp);
             return;
         }
@@ -1453,7 +1443,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     public final Form getComponentForm() {
-        if(getParent() != null) {
+        if (getParent() != null) {
             return super.getComponentForm();
         }
         return this;
@@ -1464,7 +1454,7 @@ public class Form extends Container {
      * 
      * @see restoreMenu
      */
-    void hideMenu() { 
+    void hideMenu() {
         menuBar.unInstallMenuBar();
     }
 
@@ -1480,7 +1470,7 @@ public class Form extends Container {
     void setFocusedInternal(Component focused) {
         this.focused = focused;
     }
-    
+
     /**
      * Sets the focused component and fires the appropriate events to make it so
      * 
@@ -1508,11 +1498,11 @@ public class Form extends Container {
             triggerRevalidate = changeFocusState(focused, true) || triggerRevalidate;
             //if we need to revalidate no need to repaint the Component, it will
             //be painted from the Form
-            if(!triggerRevalidate){
+            if (!triggerRevalidate) {
                 focused.repaint();
             }
         }
-        if(triggerRevalidate){
+        if (triggerRevalidate) {
             revalidate();
         }
     }
@@ -1526,31 +1516,31 @@ public class Form extends Container {
      * @return this method returns true if the state change needs to trigger a 
      * revalidate
      */
-    private boolean changeFocusState(Component cmp, boolean gained){
+    private boolean changeFocusState(Component cmp, boolean gained) {
         boolean trigger = false;
         Style selected = cmp.getSelectedStyle();
         Style unselected = cmp.getUnselectedStyle();
         //if selected style is different then unselected style there is a good 
         //chance we need to trigger a revalidate
-        if(!selected.getFont().equals(unselected.getFont()) || 
-                selected.getPadding(false, Component.TOP) != unselected.getPadding(false, Component.TOP) ||
-                selected.getPadding(false, Component.BOTTOM) != unselected.getPadding(false, Component.BOTTOM) ||
-                selected.getPadding(isRTL(), Component.RIGHT) != unselected.getPadding(isRTL(), Component.RIGHT) ||
-                selected.getPadding(isRTL(), Component.LEFT) != unselected.getPadding(isRTL(), Component.LEFT) ||
-                selected.getMargin(false, Component.TOP) != unselected.getMargin(false, Component.TOP) ||
-                selected.getMargin(false, Component.BOTTOM) != unselected.getMargin(false, Component.BOTTOM) ||
-                selected.getMargin(isRTL(), Component.RIGHT) != unselected.getMargin(isRTL(), Component.RIGHT) ||
-                selected.getMargin(isRTL(), Component.LEFT) != unselected.getMargin(isRTL(), Component.LEFT)){
-                trigger = true;
+        if (!selected.getFont().equals(unselected.getFont())
+                || selected.getPadding(false, Component.TOP) != unselected.getPadding(false, Component.TOP)
+                || selected.getPadding(false, Component.BOTTOM) != unselected.getPadding(false, Component.BOTTOM)
+                || selected.getPadding(isRTL(), Component.RIGHT) != unselected.getPadding(isRTL(), Component.RIGHT)
+                || selected.getPadding(isRTL(), Component.LEFT) != unselected.getPadding(isRTL(), Component.LEFT)
+                || selected.getMargin(false, Component.TOP) != unselected.getMargin(false, Component.TOP)
+                || selected.getMargin(false, Component.BOTTOM) != unselected.getMargin(false, Component.BOTTOM)
+                || selected.getMargin(isRTL(), Component.RIGHT) != unselected.getMargin(isRTL(), Component.RIGHT)
+                || selected.getMargin(isRTL(), Component.LEFT) != unselected.getMargin(isRTL(), Component.LEFT)) {
+            trigger = true;
         }
         int prefW = 0;
         int prefH = 0;
-        if(trigger){
+        if (trigger) {
             Dimension d = cmp.getPreferredSize();
             prefW = d.getWidth();
             prefH = d.getHeight();
-        }            
-        
+        }
+
         if (gained) {
             cmp.setFocus(true);
             cmp.fireFocusGained();
@@ -1564,19 +1554,18 @@ public class Form extends Container {
         //if the styles are different there is a chance the preffered size is 
         //still the same therefore make sure there is a real need to preform 
         //a revalidate
-        if(trigger){
+        if (trigger) {
             cmp.setShouldCalcPreferredSize(true);
             Dimension d = cmp.getPreferredSize();
-            if(prefW != d.getWidth() || prefH != d.getHeight()){
+            if (prefW != d.getWidth() || prefH != d.getHeight()) {
                 cmp.setShouldCalcPreferredSize(false);
                 trigger = false;
             }
-        }            
+        }
 
         return trigger;
     }
-    
-    
+
     /**
      * Returns the current focus component for this form
      * 
@@ -1600,7 +1589,7 @@ public class Form extends Container {
     /**
      * @inheritDoc
      */
-    protected void longPointerPress(int x, int y){
+    protected void longPointerPress(int x, int y) {
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 focused.longPointerPress(x, y);
@@ -1620,10 +1609,10 @@ public class Form extends Container {
 
         //Component focused = focusManager.getFocused();
         if (focused != null) {
-            if(focused.isEnabled()){
+            if (focused.isEnabled()) {
                 focused.keyPressed(keyCode);
             }
-            if(focused == null) {
+            if (focused == null) {
                 initFocused();
                 return;
             }
@@ -1638,7 +1627,7 @@ public class Form extends Container {
             }
         } else {
             initFocused();
-            if(focused == null) {
+            if (focused == null) {
                 getContentPane().moveScrollTowards(game, null);
                 return;
             }
@@ -1704,14 +1693,14 @@ public class Form extends Container {
      */
     public void keyRepeated(int keyCode) {
         if (focused != null) {
-            if(focused.isEnabled()){
+            if (focused.isEnabled()) {
                 focused.keyRepeated(keyCode);
             }
             int game = Display.getInstance().getGameAction(keyCode);
             // this has issues in the WTK
             // Fix for issue 433: the focus might be changed by the key repeated method in a way that can turn it to null
-            if (focused != null && !focused.handlesInput() &&
-                    (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
+            if (focused != null && !focused.handlesInput()
+                    && (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
                 keyPressed(keyCode);
                 keyReleased(keyCode);
             }
@@ -1722,7 +1711,7 @@ public class Form extends Container {
     }
 
     private void tactileTouchVibe(int x, int y, Component cmp) {
-        if(tactileTouchDuration > 0 && cmp.isTactileTouch(x, y)) {
+        if (tactileTouchDuration > 0 && cmp.isTactileTouch(x, y)) {
             Display.getInstance().vibrate(tactileTouchDuration);
         }
     }
@@ -1731,7 +1720,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
-        if(pointerPressedListeners != null) {
+        if (pointerPressedListeners != null) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
         //check if the click is relevant to the menu bar.
@@ -1746,12 +1735,12 @@ public class Form extends Container {
 
         if (y >= contentPane.getY()) {
             Component cmp = contentPane.getComponentAt(x, y);
-            if(cmp != null) {
+            if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
-                if(cmp.hasLead) {
+                if (cmp.hasLead) {
                     Container leadParent;
-                    if(cmp instanceof Container) {
-                        leadParent = ((Container)cmp).getLeadParent();
+                    if (cmp instanceof Container) {
+                        leadParent = ((Container) cmp).getLeadParent();
                     } else {
                         leadParent = cmp.getParent().getLeadParent();
                     }
@@ -1759,8 +1748,8 @@ public class Form extends Container {
                     setFocused(leadParent);
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
-                    if(cmp.isEnabled()) {
-                        if(cmp.isFocusable()) {
+                    if (cmp.isEnabled()) {
+                        if (cmp.isFocusable()) {
                             setFocused(cmp);
                         }
                         cmp.pointerPressed(x, y);
@@ -1785,7 +1774,7 @@ public class Form extends Container {
      * @param l callback to receive pointer events
      */
     public void addPointerPressedListener(ActionListener l) {
-        if(pointerPressedListeners == null) {
+        if (pointerPressedListeners == null) {
             pointerPressedListeners = new EventDispatcher();
         }
         pointerPressedListeners.addListener(l);
@@ -1797,7 +1786,7 @@ public class Form extends Container {
      * @param l callback to remove
      */
     public void removePointerPressedListener(ActionListener l) {
-        if(pointerPressedListeners != null) {
+        if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
         }
     }
@@ -1808,7 +1797,7 @@ public class Form extends Container {
      * @param l callback to receive pointer events
      */
     public void addPointerReleasedListener(ActionListener l) {
-        if(pointerReleasedListeners == null) {
+        if (pointerReleasedListeners == null) {
             pointerReleasedListeners = new EventDispatcher();
         }
         pointerReleasedListeners.addListener(l);
@@ -1820,7 +1809,7 @@ public class Form extends Container {
      * @param l callback to remove
      */
     public void removePointerReleasedListener(ActionListener l) {
-        if(pointerReleasedListeners != null) {
+        if (pointerReleasedListeners != null) {
             pointerReleasedListeners.removeListener(l);
         }
     }
@@ -1831,7 +1820,7 @@ public class Form extends Container {
      * @param l callback to receive pointer events
      */
     public void addPointerDraggedListener(ActionListener l) {
-        if(pointerDraggedListeners == null) {
+        if (pointerDraggedListeners == null) {
             pointerDraggedListeners = new EventDispatcher();
         }
         pointerDraggedListeners.addListener(l);
@@ -1843,7 +1832,7 @@ public class Form extends Container {
      * @param l callback to remove
      */
     public void removePointerDraggedListener(ActionListener l) {
-        if(pointerDraggedListeners != null) {
+        if (pointerDraggedListeners != null) {
             pointerDraggedListeners.removeListener(l);
         }
     }
@@ -1852,7 +1841,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
-        if(pointerDraggedListeners != null) {
+        if (pointerDraggedListeners != null) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
 
@@ -1875,13 +1864,13 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        
+
         if (dragged != null) {
             dragged.pointerHoverReleased(x, y);
             dragged = null;
             return;
-        } 
-        
+        }
+
         Component cmp = contentPane.getComponentAt(x[0], y[0]);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -1910,12 +1899,12 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerHover(int[] x, int[] y) {
-        
+
         if (dragged != null) {
             dragged.pointerHover(x, y);
             return;
         }
-        
+
         Component cmp = contentPane.getComponentAt(x[0], y[0]);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -1938,17 +1927,17 @@ public class Form extends Container {
 
     private int isSingleFocusMode(int b, Container c) {
         int t = c.getComponentCount();
-        for(int iter = 0 ; iter < t ; iter++) {
+        for (int iter = 0; iter < t; iter++) {
             Component cmp = c.getComponentAt(iter);
-            if(cmp.isFocusable()) {
-                if(b > 0) {
+            if (cmp.isFocusable()) {
+                if (b > 0) {
                     return 2;
                 }
                 b = 1;
             }
-            if(cmp instanceof Container) {
-                b = isSingleFocusMode(b, (Container)cmp);
-                if(b > 1) {
+            if (cmp instanceof Container) {
+                b = isSingleFocusMode(b, (Container) cmp);
+                if (b > 1) {
                     return b;
                 }
             }
@@ -1960,7 +1949,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
-        if(pointerReleasedListeners != null) {
+        if (pointerReleasedListeners != null) {
             pointerReleasedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
         if (dragged == null) {
@@ -1976,11 +1965,11 @@ public class Form extends Container {
 
             if (y >= contentPane.getY()) {
                 Component cmp = contentPane.getComponentAt(x, y);
-                if(cmp != null && cmp.isEnabled()) {
-                    if(cmp.hasLead) {
+                if (cmp != null && cmp.isEnabled()) {
+                    if (cmp.hasLead) {
                         Container leadParent;
-                        if(cmp instanceof Container) {
-                            leadParent = ((Container)cmp).getLeadParent();
+                        if (cmp instanceof Container) {
+                            leadParent = ((Container) cmp).getLeadParent();
                         } else {
                             leadParent = cmp.getParent().getLeadParent();
                         }
@@ -1988,7 +1977,7 @@ public class Form extends Container {
                         setFocused(leadParent);
                         cmp.getLeadComponent().pointerReleased(x, y);
                     } else {
-                        if(cmp.isEnabled()) {
+                        if (cmp.isEnabled()) {
                             if (cmp.isFocusable()) {
                                 setFocused(cmp);
                             }
@@ -2003,7 +1992,7 @@ public class Form extends Container {
                 }
             }
         } else {
-            if(dragged.isDragAndDropInitialized()) {
+            if (dragged.isDragAndDropInitialized()) {
                 dragged.dragFinished(x, y);
                 dragged = null;
             } else {
@@ -2011,9 +2000,9 @@ public class Form extends Container {
                 dragged = null;
             }
         }
-        if(buttonsAwatingRelease != null) {
-            for(int iter = 0 ; iter < buttonsAwatingRelease.size() ; iter++) {
-                Button b = (Button)buttonsAwatingRelease.elementAt(iter); 
+        if (buttonsAwatingRelease != null) {
+            for (int iter = 0; iter < buttonsAwatingRelease.size(); iter++) {
+                Button b = (Button) buttonsAwatingRelease.elementAt(iter);
                 b.setState(Button.STATE_DEFAULT);
                 b.repaint();
             }
@@ -2110,25 +2099,25 @@ public class Form extends Container {
 
     private Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
         int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component current = root.getComponentAt(iter);
-            if(current.isFocusable()) {
-                if(isInSameRow(focused, current)) {
+            if (current.isFocusable()) {
+                if (isInSameRow(focused, current)) {
                     int currentX = current.getAbsoluteX();
                     int focusedX = focused.getAbsoluteX();
-                    if(right) {
-                        if(focusedX < currentX) {
-                            if(bestCandidate != null) {
-                                if(bestCandidate.getAbsoluteX() < currentX) {
+                    if (right) {
+                        if (focusedX < currentX) {
+                            if (bestCandidate != null) {
+                                if (bestCandidate.getAbsoluteX() < currentX) {
                                     continue;
                                 }
                             }
                             bestCandidate = current;
                         }
                     } else {
-                        if(focusedX > currentX) {
-                            if(bestCandidate != null) {
-                                if(bestCandidate.getAbsoluteX() > currentX) {
+                        if (focusedX > currentX) {
+                            if (bestCandidate != null) {
+                                if (bestCandidate.getAbsoluteX() > currentX) {
                                     continue;
                                 }
                             }
@@ -2137,8 +2126,8 @@ public class Form extends Container {
                     }
                 }
             }
-            if(current instanceof Container && !(((Container)current).isBlockFocus())) {
-                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container)current, right);
+            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
+                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container) current, right);
             }
         }
         return bestCandidate;
@@ -2146,42 +2135,42 @@ public class Form extends Container {
 
     private Component findNextFocusVertical(Component focused, Component bestCandidate, Container root, boolean down) {
         int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component current = root.getComponentAt(iter);
-            if(current.isFocusable()) {
+            if (current.isFocusable()) {
                 int currentY = current.getAbsoluteY();
                 int focusedY = focused.getAbsoluteY();
-                if(down) {
-                    if(focusedY < currentY) {
-                        if(bestCandidate != null) {
+                if (down) {
+                    if (focusedY < currentY) {
+                        if (bestCandidate != null) {
                             boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if(bestCandidate.getAbsoluteY() < currentY) {
-                                if(exitingInSame) {
+                            if (bestCandidate.getAbsoluteY() < currentY) {
+                                if (exitingInSame) {
                                     continue;
                                 }
-                                if(isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
+                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
                                     continue;
                                 }
                             }
-                            if(exitingInSame && isInSameRow(current, bestCandidate)) {
+                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
                                 continue;
                             }
                         }
                         bestCandidate = current;
                     }
                 } else {
-                    if(focusedY > currentY) {
-                        if(bestCandidate != null) {
+                    if (focusedY > currentY) {
+                        if (bestCandidate != null) {
                             boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if(bestCandidate.getAbsoluteY() > currentY) {
-                                if(exitingInSame) {
+                            if (bestCandidate.getAbsoluteY() > currentY) {
+                                if (exitingInSame) {
                                     continue;
                                 }
-                                if(isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
+                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
                                     continue;
                                 }
                             }
-                            if(exitingInSame && isInSameRow(current, bestCandidate)) {
+                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
                                 continue;
                             }
                         }
@@ -2189,8 +2178,8 @@ public class Form extends Container {
                     }
                 }
             }
-            if(current instanceof Container && !(((Container)current).isBlockFocus())) {
-                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container)current, down);
+            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
+                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container) current, down);
             }
         }
         return bestCandidate;
@@ -2204,14 +2193,14 @@ public class Form extends Container {
      */
     public Component findNextFocusVertical(boolean down) {
         Component c = findNextFocusVertical(focused, null, contentPane, down);
-        if(c != null) {
+        if (c != null) {
             return c;
         }
-        if(cyclicFocus) {
+        if (cyclicFocus) {
             c = findNextFocusVertical(focused, null, contentPane, !down);
-            if(c != null) {
+            if (c != null) {
                 Component current = findNextFocusVertical(c, null, contentPane, !down);
-                while(current != null) {
+                while (current != null) {
                     c = current;
                     current = findNextFocusVertical(c, null, contentPane, !down);
                 }
@@ -2229,14 +2218,14 @@ public class Form extends Container {
      */
     public Component findNextFocusHorizontal(boolean right) {
         Component c = findNextFocusHorizontal(focused, null, contentPane, right);
-        if(c != null) {
+        if (c != null) {
             return c;
         }
-        if(cyclicFocus) {
+        if (cyclicFocus) {
             c = findNextFocusHorizontal(focused, null, contentPane, !right);
-            if(c != null) {
+            if (c != null) {
                 Component current = findNextFocusHorizontal(c, null, contentPane, !right);
-                while(current != null) {
+                while (current != null) {
                     c = current;
                     current = findNextFocusHorizontal(c, null, contentPane, !right);
                 }
@@ -2247,8 +2236,8 @@ public class Form extends Container {
     }
 
     Component findNextFocusDown() {
-        if(focused != null) {
-            if(focused.getNextFocusDown() != null) {
+        if (focused != null) {
+            if (focused.getNextFocusDown() != null) {
                 return focused.getNextFocusDown();
             }
             return findNextFocusVertical(true);
@@ -2257,8 +2246,8 @@ public class Form extends Container {
     }
 
     Component findNextFocusUp() {
-        if(focused != null) {
-            if(focused.getNextFocusUp() != null) {
+        if (focused != null) {
+            if (focused.getNextFocusUp() != null) {
                 return focused.getNextFocusUp();
             }
             return findNextFocusVertical(false);
@@ -2267,8 +2256,8 @@ public class Form extends Container {
     }
 
     Component findNextFocusRight() {
-        if(focused != null) {
-            if(focused.getNextFocusRight() != null) {
+        if (focused != null) {
+            if (focused.getNextFocusRight() != null) {
                 return focused.getNextFocusRight();
             }
             return findNextFocusHorizontal(true);
@@ -2277,8 +2266,8 @@ public class Form extends Container {
     }
 
     Component findNextFocusLeft() {
-        if(focused != null) {
-            if(focused.getNextFocusLeft() != null) {
+        if (focused != null) {
+            if (focused.getNextFocusLeft() != null) {
                 return focused.getNextFocusLeft();
             }
             return findNextFocusHorizontal(false);
@@ -2302,21 +2291,21 @@ public class Form extends Container {
                 Component down = findNextFocusDown();
                 if (down != null) {
                     focused = down;
-                } 
+                }
                 break;
             }
             case Display.GAME_UP: {
                 Component up = findNextFocusUp();
-                if(up != null) {
+                if (up != null) {
                     focused = up;
-                } 
+                }
                 break;
             }
             case Display.GAME_RIGHT: {
                 Component right = findNextFocusRight();
                 if (right != null) {
                     focused = right;
-                } 
+                }
                 break;
             }
             case Display.GAME_LEFT: {
@@ -2329,7 +2318,7 @@ public class Form extends Container {
             default:
                 return;
         }
-        
+
         //if focused is now visible we need to give it the focus.
         if (isFocusScrolling()) {
             setFocused(focused);
@@ -2338,11 +2327,11 @@ public class Form extends Container {
             }
         } else {
             if (moveScrollTowards(gameAction, focused)) {
-                setFocused(focused); 
+                setFocused(focused);
                 scrollComponentToVisible(focused);
             }
         }
-        
+
     }
 
     /**
@@ -2352,11 +2341,11 @@ public class Form extends Container {
         //if the current focus item is in a scrollable Container
         //try and move it first
         Component current = getFocused();
-        if(current != null){
+        if (current != null) {
             Container parent;
-            if(current instanceof Container){
+            if (current instanceof Container) {
                 parent = (Container) current;
-            }else{
+            } else {
                 parent = current.getParent();
             }
             while (parent != null) {
@@ -2417,7 +2406,6 @@ public class Form extends Container {
         }
     }
 
-
     /**
      * @inheritDoc
      */
@@ -2425,7 +2413,7 @@ public class Form extends Container {
         super.setRTL(r);
         contentPane.setRTL(r);
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -2477,8 +2465,6 @@ public class Form extends Container {
         this.tintColor = tintColor;
     }
 
-    
-
     /**
      * Sets the menu transitions for showing/hiding the menu, can be null...
      * 
@@ -2493,10 +2479,9 @@ public class Form extends Container {
      * @inheritDoc
      */
     protected String paramString() {
-        return super.paramString() + ", title = " + title +
-                ", visible = " + isVisible();
+        return super.paramString() + ", title = " + title
+                + ", visible = " + isVisible();
     }
-    
 
     /**
      * Returns the associated Menu Bar object
@@ -2512,10 +2497,10 @@ public class Form extends Container {
      * 
      * @param menuBar
      */
-    public void setMenuBar(MenuBar menuBar){
+    public void setMenuBar(MenuBar menuBar) {
         this.menuBar = menuBar;
     }
-    
+
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -2535,6 +2520,4 @@ public class Form extends Container {
     public void setFocusScrolling(boolean focusScrolling) {
         this.focusScrolling = focusScrolling;
     }
-    
-   
 }

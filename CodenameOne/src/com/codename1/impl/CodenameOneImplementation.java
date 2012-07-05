@@ -116,6 +116,7 @@ public abstract class CodenameOneImplementation {
     private ActionListener logger;
     private static boolean pollingThreadRunning;
     private static PushCallback callback;
+    private int commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
     
     /**
      * Invoked by the display init method allowing the implementation to "bind"
@@ -4336,5 +4337,41 @@ public abstract class CodenameOneImplementation {
     public boolean existsDB(String databaseName){
         return false;
     }
+    
+    /**
+     * Indicates if the title of the Form is native title(in android ICS devices
+     * if the command behavior is native the ActionBar is used to display the title
+     * and the menu)
+     * @return true if platform would like to show the Form title
+     */
+    public boolean isNativeTitle() {
+        return false;
+    }
+
+    /**
+     * Indicates the way commands should be added to a form as one of the ocmmand constants defined
+     * in this class
+     *
+     * @return the commandBehavior
+     */
+    public int getCommandBehavior() {
+        return commandBehavior;
+    }
+
+    /**
+     * Indicates the way commands should be added to a form as one of the ocmmand constants defined
+     * in this class
+     *
+     * @param commandBehavior the commandBehavior to set
+     */
+    public void setCommandBehavior(int commandBehavior) {
+        if(!isTouchDevice())
+            if(commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
+                commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
+            }
+        this.commandBehavior = commandBehavior;
+        notifyCommandBehavior(commandBehavior);
+    }
+    
     
 }

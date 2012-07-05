@@ -391,8 +391,6 @@ public final class Display {
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;
 
-    private int commandBehavior = COMMAND_BEHAVIOR_DEFAULT;
-
     private static String selectedVirtualKeyboard = VirtualKeyboard.NAME;
 
     private static Hashtable virtualKeyboards = new Hashtable();
@@ -445,7 +443,7 @@ public final class Display {
             MenuBar.backSK = INSTANCE.impl.getBackKeyCode();
             MenuBar.backspaceSK = INSTANCE.impl.getBackspaceKeyCode();
             MenuBar.clearSK = INSTANCE.impl.getClearKeyCode();
-
+            
             INSTANCE.PATHLENGTH = INSTANCE.impl.getDragPathLength();
             INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
@@ -456,7 +454,6 @@ public final class Display {
             // generally its probably a bug but we can let it slide...
             if(INSTANCE.edt == null) {
                 INSTANCE.touchScreen = INSTANCE.impl.isTouchDevice();
-
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
                 INSTANCE.edt = new Thread(new RunnableWrapper(null, 3), "EDT");
@@ -2232,7 +2229,7 @@ public final class Display {
      * @return the commandBehavior
      */
     public int getCommandBehavior() {
-        return commandBehavior;
+        return impl.getCommandBehavior();
     }
 
     /**
@@ -2242,12 +2239,7 @@ public final class Display {
      * @param commandBehavior the commandBehavior to set
      */
     public void setCommandBehavior(int commandBehavior) {
-        if(!isTouchScreenDevice())
-            if(commandBehavior == COMMAND_BEHAVIOR_BUTTON_BAR) {
-                commandBehavior = COMMAND_BEHAVIOR_SOFTKEY;
-            }
-        this.commandBehavior = commandBehavior;
-        impl.notifyCommandBehavior(commandBehavior);
+        impl.setCommandBehavior(commandBehavior);
     }
 
     /**
@@ -2719,4 +2711,14 @@ public final class Display {
     public void setPollingFrequency(int freq) {
         impl.setPollingFrequency(freq);
     }
+
+    /**
+     * Indicates if the title of the Form is native title(in android ICS devices
+     * if the command behavior is native the ActionBar is used to display the title
+     * and the menu)
+     * @return true if platform would like to show the Form title
+     */
+    public boolean isNativeTitle() {
+        return impl.isNativeTitle();
+    } 
 }
