@@ -116,6 +116,7 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -169,10 +170,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void init(Object m) {
         this.activity = (Activity) m;
 
-        try {
-            activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        } catch (Exception e) {
-            Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+        if(!hasActionBar()){
+            try {
+                activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            } catch (Exception e) {
+                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+            }
+        }else{
+            try {
+                activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
+            } catch (Exception e) {
+                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+            }        
         }
 
         if (m instanceof CodenameOneActivity) {
@@ -223,6 +232,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    private boolean hasActionBar(){
+        return android.os.Build.VERSION.SDK_INT >= 11;
+    }
+    
     public int translatePixelForDPI(int pixel) {
         return (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP, pixel,
@@ -1253,6 +1266,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 System.err.println("activity must extend CodenameOneActivity to use "
                         + "the native menu feature");
+            }
+        }else{
+            if(hasActionBar()){
+                activity.runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        activity.getActionBar().hide();
+                    }
+                });
             }
         }
     }
@@ -3261,4 +3284,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         File db = new File(activity.getApplicationInfo().dataDir+"/databases/" + databaseName);
         return db.exists();
     }
+    
+    public boolean isNativeTitle() {
+        return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
+    }
+    
+    public void setCurrentForm(final Form f) {
+        super.setCurrentForm(f);
+        if(isNativeTitle()){
+            activity.runOnUiThread(new Runnable() {
+
+                @Override
+                public void run() {
+                    activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
+                    activity.getActionBar().setTitle(f.getTitle());
+                }
+            });
+         }
+    }
+
 }

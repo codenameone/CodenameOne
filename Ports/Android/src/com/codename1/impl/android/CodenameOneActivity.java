@@ -93,7 +93,7 @@ public class CodenameOneActivity extends Activity {
         for (int n = 0; n < numCommands; n++) {
             Command command = currentForm.getCommand(n);
             MenuItem item = menu.add(Menu.NONE, n, Menu.NONE, command.getCommandName());
-
+            
             Image icon = command.getIcon();
             if (icon != null) {
                 Bitmap b = (Bitmap) icon.getImage();
@@ -102,7 +102,7 @@ public class CodenameOneActivity extends Activity {
                 item.setIcon(d);
             }
         }
-
+                
         return nativeMenu;
     }
 
@@ -114,9 +114,19 @@ public class CodenameOneActivity extends Activity {
         if (currentForm == null) {
             return false;
         }
-
+        Command cmd = null;
+        if(item.getItemId() == android.R.id.home){
+            cmd = currentForm.getBackCommand();
+            if(cmd == null){
+                return false;
+            }
+        }
+        
         int commandIndex = item.getItemId();
-        final Command command = currentForm.getCommand(commandIndex);
+        if(cmd == null){
+            cmd = currentForm.getCommand(commandIndex);
+        }
+        final Command command = cmd;
         final ActionEvent actionEvent = new ActionEvent(command);
 
         // Protect ourselves from commands that misbehave. A crash here will crash the entire application
