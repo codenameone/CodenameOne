@@ -34,6 +34,7 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
@@ -316,6 +317,14 @@ public class ContainerList extends Container {
         public void pointerReleased(int x, int y) {
             super.pointerReleased(x, y);
             if (!isDragActivated()) {
+                // fire the action event into the selected component
+                Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
+                if(cmp instanceof Container) {
+                    Component selectionCmp = ((Container)cmp).getComponentAt(x, y);
+                    selectionCmp.pointerPressed(x, y);
+                    selectionCmp.pointerReleased(x, y);
+                }
+
                 dispatcher.fireActionEvent(new ActionEvent(ContainerList.this, x, y));
             }
         }
