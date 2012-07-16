@@ -204,5 +204,11 @@ class DatabaseImpl extends Database {
         public String getString(int index) throws IOException {
             return IOSNative.sqlCursorValueAtColumnString(peer, index);
         }
+
+        @Override
+        public int getColumnCount() throws IOException {
+            //TODO - needs to be implemented
+            return -1;
+        }
     }
 }
