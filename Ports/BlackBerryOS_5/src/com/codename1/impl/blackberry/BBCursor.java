@@ -132,5 +132,16 @@ public class BBCursor implements Cursor{
         }
         
     }
+
+    public int getColumnCount() throws IOException {
+        net.rim.device.api.database.Row row;
+        try {
+            row = cursor.getRow();
+        } catch (DatabaseException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+        return row.getColumnNames().length;
+    }
     
 }
