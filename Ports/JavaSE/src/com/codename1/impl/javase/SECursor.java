@@ -95,7 +95,7 @@ public class SECursor implements Cursor, Row{
             for (int i = 0; i < colsCount; i++) {
                 String c = meta.getColumnLabel(i+1);                
                 if(c.equalsIgnoreCase(columnName)){
-                    return i+1;
+                    return i;
                 }
             }
             return -1;
@@ -218,6 +218,17 @@ public class SECursor implements Cursor, Row{
     public String getString(int index) throws IOException {
         try {
             return resultSet.getString(index+1);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+
+    @Override
+    public int getColumnCount() throws IOException {
+        try {
+            ResultSetMetaData meta = resultSet.getMetaData();
+            return meta.getColumnCount();
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
