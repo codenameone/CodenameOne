@@ -91,6 +91,13 @@ public interface Cursor {
     public String getColumnName(int columnIndex) throws IOException;
 
     /**
+     * Returns the column count
+     * @return the column count
+     * @throws IOException 
+     */
+    public int getColumnCount() throws IOException;
+    
+    /**
      * Returns the current Cursor position.
      * 
      * @return the cursor position
