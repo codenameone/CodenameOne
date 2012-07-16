@@ -88,7 +88,7 @@ public class FaceBookAccess {
             scope = scope.substring(0, scope.length() - 1);
         }
         Hashtable additionalParams = new Hashtable();
-        additionalParams.put("display", "wap");
+        additionalParams.put("display", "popup");
         return new Oauth2("https://www.facebook.com/dialog/oauth", clientId, redirectURI, scope, "https://graph.facebook.com/oauth/access_token", clientSecret, additionalParams);
     }
 
