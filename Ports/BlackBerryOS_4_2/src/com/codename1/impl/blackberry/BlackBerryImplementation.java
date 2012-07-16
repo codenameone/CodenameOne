@@ -333,9 +333,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int keyCode) {
         TextArea txtCmp = (TextArea) cmp;
-        if ((txtCmp.getConstraint() & TextArea.NON_PREDICTIVE) == 0) {
-            nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), keyCode);
-        }
+        nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), keyCode);
     }
 
     public void nativeEdit(final Component cmp, final int maxSize, final int constraint, String text, int keyCode) {
@@ -359,19 +357,18 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 int constraint = lightweightEditTmp.getConstraint();
                 if ((constraint & TextArea.DECIMAL) == TextArea.DECIMAL) {
                     type = BasicEditField.FILTER_REAL_NUMERIC;
-                } else {
-                    if ((constraint & TextArea.EMAILADDR) == TextArea.EMAILADDR) {
-                        type = BasicEditField.FILTER_EMAIL;
-                    } else {
-                        if ((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
-                            type = BasicEditField.FILTER_NUMERIC;
-                        } else {
-                            if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
-                                type = BasicEditField.FILTER_PHONE;
-                            }
-                        }
-                    }
+                } else if ((constraint & TextArea.EMAILADDR) == TextArea.EMAILADDR) {
+                    type = BasicEditField.FILTER_EMAIL;
+                } else if ((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
+                    type = BasicEditField.FILTER_NUMERIC;
+                } else if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
+                    type = BasicEditField.FILTER_PHONE;
+                } else if ((constraint & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE) {
+                    type = BasicEditField.NO_COMPLEX_INPUT;
                 }
+                        
+                    
+                
 
                 if (lightweightEditTmp.isSingleLineTextArea()) {
                     type |= BasicEditField.NO_NEWLINE;
@@ -1333,6 +1330,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     break;
                 case TextArea.PHONENUMBER:
                     type = BasicEditField.FILTER_PHONE;
+                    break;
+                case TextArea.NON_PREDICTIVE:
+                    type = BasicEditField.NO_COMPLEX_INPUT;
                     break;
             }
             if (password) {
