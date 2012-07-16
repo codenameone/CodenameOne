@@ -122,5 +122,10 @@ public class AndroidCursor implements Cursor, Row{
     public String getString(int index) throws IOException {
         return c.getString(index);
     }
+
+    @Override
+    public int getColumnCount() throws IOException {
+        return c.getColumnCount();
+    }
     
 }
