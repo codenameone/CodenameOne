@@ -91,9 +91,11 @@ public class SEDatabase extends Database{
         try {
             PreparedStatement s =  conn.prepareStatement(sql);  
             
-            for (int i = 0; i < params.length; i++) {
-                String param = params[i];              
-                s.setString(i+1, param);
+            if(params != null){
+                for (int i = 0; i < params.length; i++) {
+                    String param = params[i];              
+                    s.setString(i+1, param);
+                }
             }
             s.execute();
         } catch (SQLException ex) {
@@ -106,12 +108,13 @@ public class SEDatabase extends Database{
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         try {
             PreparedStatement s =  conn.prepareStatement(sql);  
-            
-            for (int i = 0; i < params.length; i++) {
-                String param = params[i];              
-                s.setString(i+1, param);
+
+            if(params != null){
+                for (int i = 0; i < params.length; i++) {
+                    String param = params[i];              
+                    s.setString(i+1, param);
+                }
             }
-            
             ResultSet resultSet =  s.executeQuery();
             return new SECursor(resultSet);
         } catch (SQLException ex) {
