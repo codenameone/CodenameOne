@@ -250,8 +250,17 @@ public class InPlaceEditView extends FrameLayout {
 
         int fgColor = taStyle.getFgColor();
         mEditText.setTextColor(Color.rgb(fgColor >> 16, (fgColor & 0x00ff00) >> 8, (fgColor & 0x0000ff)));
+        boolean password = false;
+        if((codenameOneInputType & TextArea.PASSWORD) == TextArea.PASSWORD){
+            codenameOneInputType = codenameOneInputType ^ TextArea.PASSWORD;
+            password = true;
+        }
+        
         if (mTextArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
+        }
+        if(password){
+            mEditText.setTransformationMethod(PasswordTransformationMethod.getInstance());
         }
         showVirtualKeyboard(true);
     }
