@@ -616,6 +616,29 @@ public class FaceBookAccess {
         current = con;
         NetworkManager.getInstance().addToQueueAndWait(con);
     }
+    
+    /**
+     * Post a note onto the users wall
+     *
+     * @param userId the userId
+     * @param message the message to post
+     */
+    public void createNote(String userId, String subject, String message) throws IOException {
+        checkAuthentication();
+        
+        FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.NOTES, true);
+        con.addArgument("subject","" + subject);
+        con.addArgument("message", "" + message);
+        if (slider != null) {
+            SliderBridge.bindProgress(con, slider);
+        }
+        for (int i = 0; i < responseCodeListeners.size(); i++) {
+            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
+        }
+        current = con;        
+        System.out.println(con.getUrl());
+        NetworkManager.getInstance().addToQueueAndWait(con);
+    }    
 
     /**
      * Gets the user notifications (this method uses the legacy rest api see http://developers.facebook.com/docs/reference/rest/)

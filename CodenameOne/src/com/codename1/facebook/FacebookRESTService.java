@@ -63,6 +63,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String INBOX = "inbox";
     public static String MESSAGES = "messages";
     public static String EVENTS = "events";
+    public static String NOTES = "notes";      
     
     private DefaultListModel responseDestination;
 
