@@ -162,7 +162,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
             setInputModeOrder(new String []{NUMBERS_MODE});
             return;
         }
-        if((inputType & TextArea.DECIMAL) == TextArea.NUMERIC) {
+        if((inputType & TextArea.DECIMAL) == TextArea.DECIMAL) {
             setInputModeOrder(new String []{NUMBERS_SYMBOLS_MODE});
             return;
         }
