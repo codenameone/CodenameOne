@@ -16,6 +16,9 @@ public interface IntentResultListener {
     public int CAPTURE_VIDEO = 2;
     public int CAPTURE_AUDIO = 3;
     
+    public int URI_SCHEME = 4;
+    
+    
     
     public void onActivityResult (int requestCode, int resultCode, Intent data);
 }

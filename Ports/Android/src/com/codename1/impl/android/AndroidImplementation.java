@@ -62,6 +62,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
+import java.net.URISyntaxException;
 import java.util.Vector;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -163,7 +164,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
     private Uri imageUri;
-    private EventDispatcher captureCallback;
+    private EventDispatcher callback;
 
 
     @Override
@@ -1370,16 +1371,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    public void execute(String url, ActionListener response) {
+        if(response != null){
+            callback = new EventDispatcher();
+            callback.addListener(response);
+        }
+
+        if (url.startsWith("intent:#")) {
+            int flags = Intent.URI_INTENT_SCHEME;
+            Intent intent;
+            try {
+                intent = Intent.parseUri(url, flags);
+            } catch (URISyntaxException ex) {
+                throw new RuntimeException(ex.getMessage());
+            }
+            activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME); //
+        } else {
+            try {
+                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
     /**
      * @inheritDoc
      */
     public void execute(String url) {
-        try {
-            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        execute(url, null);
     }
 
     /**
@@ -2999,7 +3019,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     picture.recycle();
                     picture = null;
                     new File(path).delete();
-                    captureCallback.fireActionEvent(new ActionEvent(f.getAbsolutePath()));
+                    callback.fireActionEvent(new ActionEvent(f.getAbsolutePath()));
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -3007,18 +3027,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (requestCode == CAPTURE_VIDEO || requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, activity);
-                captureCallback.fireActionEvent(new ActionEvent(path));
+                callback.fireActionEvent(new ActionEvent(path));
                 return;
+            }else {
+                callback.fireActionEvent(new ActionEvent("ok"));            
             }
         }
-        captureCallback.fireActionEvent(null);
+        callback.fireActionEvent(null);
 
     }
 
     @Override
     public void capturePhoto(ActionListener response) {
-        captureCallback = new EventDispatcher();
-        captureCallback.addListener(response);
+        callback = new EventDispatcher();
+        callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
         
         String fileName = "temp.jpg";
@@ -3033,16 +3055,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void captureVideo(ActionListener response) {
-        captureCallback = new EventDispatcher();
-        captureCallback.addListener(response);
+        callback = new EventDispatcher();
+        callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
         this.activity.startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
     @Override
     public void captureAudio(ActionListener response) {
-        captureCallback = new EventDispatcher();
-        captureCallback.addListener(response);
+        callback = new EventDispatcher();
+        callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
         this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
     }

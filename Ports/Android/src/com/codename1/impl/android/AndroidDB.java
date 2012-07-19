@@ -75,6 +75,7 @@ public class AndroidDB extends Database {
                 s.bindString(i + 1, p);
             }
             s.execute();
+            s.close();
         } catch (Exception e) {
             e.printStackTrace();
             throw new IOException(e.getMessage());
