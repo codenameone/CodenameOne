@@ -321,8 +321,12 @@ public class ContainerList extends Container {
                 Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
                 if(cmp instanceof Container) {
                     Component selectionCmp = ((Container)cmp).getComponentAt(x, y);
-                    selectionCmp.pointerPressed(x, y);
-                    selectionCmp.pointerReleased(x, y);
+                    selectionCmp.setX(0);
+                    selectionCmp.setY(0);
+                    if(selectionCmp != null) {
+                        selectionCmp.pointerPressed(x, y);
+                        selectionCmp.pointerReleased(x, y);
+                    }
                 }
 
                 dispatcher.fireActionEvent(new ActionEvent(ContainerList.this, x, y));
