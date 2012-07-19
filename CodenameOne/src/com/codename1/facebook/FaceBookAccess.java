@@ -851,4 +851,15 @@ public class FaceBookAccess {
     public static void setRedirectURI(String redirectURI) {
         FaceBookAccess.redirectURI = redirectURI;
     }
+    
+    /**
+     * Sets the token to the FaceBookAccess class, this is useful if the token 
+     * has not yet expired, get the expiration of the token with 
+     * Oauth2.getExpires()
+     * 
+     * @param tok the token of the 
+     */
+    public static void setToken(String tok){
+        token = tok;
+    }
 }

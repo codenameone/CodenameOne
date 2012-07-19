@@ -2293,7 +2293,22 @@ public final class Display {
     public void execute(String url) {
         impl.execute(url);
     }
+    
+    /**
+     * Executes the given URL on the native platform, this method is useful if
+     * the platform has the ability to send an event to the app when the execution
+     * has ended, currently this works only for Android platform to invoke other
+     * intents.
+     * 
+     * @param url the url to execute
+     * @param response a callback from the platform when this execution returned
+     * to the application
+     */
+    public void execute(String url, ActionListener response){
+        impl.execute(url, response);
+    }
 
+    
     /**
      * Returns one of the density variables appropriate for this device, notice that
      * density doesn't always correspond to resolution and an implementation might
