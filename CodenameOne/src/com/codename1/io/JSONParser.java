@@ -41,8 +41,6 @@ public class JSONParser implements JSONParseCallback {
     private Vector parseStack;
     private String currentKey;
     static class KeyStack extends Vector {
-		private static final long serialVersionUID = -9023393385663501542L;
-
 		protected String peek() {
 			return (String)elementAt(0);
 		}

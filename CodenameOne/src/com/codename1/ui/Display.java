@@ -35,11 +35,13 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.system.CrashReport;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
@@ -68,6 +70,7 @@ import java.util.Vector;
  * @author Chen Fishbein, Shai Almog
  */
 public final class Display {
+    private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
 
@@ -456,7 +459,7 @@ public final class Display {
                 INSTANCE.touchScreen = INSTANCE.impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
-                INSTANCE.edt = new Thread(new RunnableWrapper(null, 3), "EDT");
+                INSTANCE.edt = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
                 INSTANCE.impl.setThreadPriority(INSTANCE.edt, Thread.NORM_PRIORITY + 1);
                 INSTANCE.edt.start();
             }
@@ -641,7 +644,7 @@ public final class Display {
             }
             backgroundTasks.addElement(r);
             if(backgroundThread == null) {
-                backgroundThread = new Thread() {
+                backgroundThread = new CodenameOneThread(new Runnable() {
                     public void run() {
                         // using while true to avoid double lock optimization with synchronized block
                         while(true) {
@@ -662,7 +665,7 @@ public final class Display {
                             }
                         }
                     }
-                };
+                }, "Task Thread");
                 backgroundThread.setPriority(Thread.MIN_PRIORITY + 1);
                 backgroundThread.start();
             }
@@ -815,6 +818,9 @@ public final class Display {
             }
         } catch(Throwable err) {
             err.printStackTrace();
+            if(crashReporter != null) {
+                crashReporter.exception(err);
+            }
             if(!impl.handleEDTException(err)) {
                 if(errorHandler != null) {
                     errorHandler.fireActionEvent(new ActionEvent(err));
@@ -839,6 +845,9 @@ public final class Display {
                 edtLoopImpl();
             } catch(Throwable err) {
                 err.printStackTrace();
+                if(crashReporter != null) {
+                    CodenameOneThread.handleException(err);
+                }
                 if(!impl.handleEDTException(err)) {
                     if(errorHandler != null) {
                         errorHandler.fireActionEvent(new ActionEvent(err));
@@ -2726,6 +2735,16 @@ public final class Display {
     public void setPollingFrequency(int freq) {
         impl.setPollingFrequency(freq);
     }
+    
+    /**
+     * Start a Codename One thread that supports crash protection and similar Codename One features.
+     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     * @param name the name for the thread
+     * @return a thread instance which must be explicitly started!
+     */
+    public Thread startThread(Runnable r, String name) {
+        return new CodenameOneThread(r, name);
+    }
 
     /**
      * Indicates if the title of the Form is native title(in android ICS devices
@@ -2735,5 +2754,21 @@ public final class Display {
      */
     public boolean isNativeTitle() {
         return impl.isNativeTitle();
-    } 
+    }
+
+    /**
+     * The crash reporter gets invoked when an uncaught exception is intercepted
+     * @return the crashReporter
+     */
+    public CrashReport getCrashReporter() {
+        return crashReporter;
+    }
+
+    /**
+     * The crash reporter gets invoked when an uncaught exception is intercepted
+     * @param crashReporter the crashReporter to set
+     */
+    public void setCrashReporter(CrashReport crashReporter) {
+        this.crashReporter = crashReporter;
+    }
 }

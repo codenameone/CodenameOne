@@ -75,7 +75,9 @@ import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.telephony.SmsManager;
+import android.telephony.gsm.GsmCellLocation;
 import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.widget.MediaController;
@@ -1287,6 +1289,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String getProperty(String key, String defaultValue) {
         if ("OS".equals(key)) {
             return "Android";
+        }
+        if ("androidId".equals(key)) {
+            return Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID);
+        }
+        if("cellId".equals(key)) {
+            try {
+                String serviceName = Context.TELEPHONY_SERVICE;
+                TelephonyManager telephonyManager = (TelephonyManager) activity.getSystemService(serviceName);
+                int cellId=((GsmCellLocation)telephonyManager.getCellLocation()).getCid();
+                return "" + cellId;
+            } catch(Throwable t) {
+                return null;
+            }
         }
         if ("AppName".equals(key)) {
             return activity.getApplicationInfo().name;
@@ -2719,9 +2734,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
-    public void startThread(String name, Runnable r) {
+    /*public void startThread(String name, Runnable r) {
         new Thread(Thread.currentThread().getThreadGroup(), r, name, 64 * 1024).start();
-    }
+    }*/
 
     /**
      * @inheritDoc

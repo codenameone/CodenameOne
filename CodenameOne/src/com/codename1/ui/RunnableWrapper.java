@@ -147,7 +147,7 @@ class RunnableWrapper implements Runnable {
     static void pushToThreadPool(Runnable r) {
         if(availableThreads == 0 && threadCount < maxThreadCount) {
             threadCount++;
-            Thread poolThread = new Thread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
+            Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
             poolThread.start();
         }
         synchronized(THREADPOOL_LOCK) {

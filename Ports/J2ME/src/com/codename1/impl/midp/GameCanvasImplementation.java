@@ -1742,7 +1742,32 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         if("OS".equals(key)) {
             return "J2ME";
         }
-
+        if("cellId".equals(key)) {
+            String s = System.getProperty("wireless.messaging.sms.smsc");
+            if(s != null) {
+                return s;
+            }
+            s = System.getProperty("com.nokia.mid.cellid");
+            if(s != null) {
+                return s;
+            }
+            s = System.getProperty("com.sonyericsson.net.cellid");
+            if(s != null) {
+                return s;
+            }
+            s = System.getProperty("com.samsung.cellid");
+            if(s != null) {
+                return s;
+            }
+            s = System.getProperty("com.siemens.cellid");
+            if(s != null) {
+                return s;
+            }
+            s = System.getProperty("com.lge.net.cellid");
+            if(s != null) {
+                return s;
+            }
+        }
         if ("IMEI".equals(key)) {
             String imei = null;
             imei = System.getProperty("phone.imei");

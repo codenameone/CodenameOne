@@ -34,12 +34,13 @@ import com.codename1.ui.animations.Animation;
  * 
  * @author Shai Almog
  */
-public class UITimer implements Runnable, Animation {
+public class UITimer {
     private Runnable internalRunnable;
     private Form bound;
     private long lastEllapse;
     private int ms;
     private boolean repeat;
+    private Internal i = new Internal();
     
     /**
      * This constructor is useful when deriving this class to implement a timer.
@@ -70,47 +71,51 @@ public class UITimer implements Runnable, Animation {
         ms = timeMillis;
         this.repeat = repeat;
         this.bound = bound;
-        bound.registerAnimated(this);
+        bound.registerAnimated(i);
     }
     
     /**
      * Stops executing the timer
      */
     public void cancel() {
-        bound.deregisterAnimated(this);
+        bound.deregisterAnimated(i);
     }
     
-    /**
-     * Invoked when the timer elapses
-     */
-    public void run() {
-        if(internalRunnable != null) {
-            internalRunnable.run();
-        }
-    }
 
     void testEllapse() {
         long t = System.currentTimeMillis();
         if(t - lastEllapse >= ms) {
             if(!repeat) {
-                Display.getInstance().getCurrent().deregisterAnimated(this);
+                Display.getInstance().getCurrent().deregisterAnimated(i);
             }
             lastEllapse = t;
-            run();
+            i.run();
         }
     }
 
-    /**
-     * @inheritDoc
-     */
-    public boolean animate() {
-        testEllapse();
-        return false;
-    }
+    
+    class Internal implements Runnable, Animation {
+        /**
+         * @inheritDoc
+         */
+        public boolean animate() {
+            testEllapse();
+            return false;
+        }
 
-    /**
-     * @inheritDoc
-     */
-    public void paint(Graphics g) {
+        /**
+         * @inheritDoc
+         */
+        public void paint(Graphics g) {
+        }
+        
+        /**
+         * Invoked when the timer elapses
+         */
+        public void run() {
+            if(internalRunnable != null) {
+                internalRunnable.run();
+            }
+        }
     }
 }

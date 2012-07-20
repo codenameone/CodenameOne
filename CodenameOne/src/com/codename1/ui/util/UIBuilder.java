@@ -2332,7 +2332,7 @@ public class UIBuilder {
                 if(evt.getSource() instanceof Form) {
                     // prevent a dialog from triggerring the background processing again
                     ((Form)evt.getSource()).removeShowListener(this);
-                    new Thread(this).start();
+                    Display.getInstance().startThread(this, "UIBuilder Async").start();
                     return;
                 }
 
@@ -2380,7 +2380,7 @@ public class UIBuilder {
                         f.show();
                     }
                     postShowImpl(f);
-                    new Thread(new FormListener(f, nextScreen)).start();
+                    Display.getInstance().startThread(new FormListener(f, nextScreen), "UIBuilder Next Form").start();
                     return;
                 }
 
@@ -2398,7 +2398,7 @@ public class UIBuilder {
                         f.show();
                     }
                     postShowImpl(f);
-                    new Thread(new FormListener(cmd, evt, f)).start();
+                    Display.getInstance().startThread(new FormListener(cmd, evt, f), "UIBuilder @").start();
                     return;
                 }
 

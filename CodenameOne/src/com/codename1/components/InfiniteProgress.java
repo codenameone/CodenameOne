@@ -56,6 +56,10 @@ public class InfiniteProgress extends Component {
      */
     public Dialog showInifiniteBlocking() {
         Form f = Display.getInstance().getCurrent();
+        if(f == null) {
+            f = new Form();
+            f.show();
+        }
         int i = f.getTintColor();
         f.setTintColor(0x90000000);
         Dialog d = new Dialog();

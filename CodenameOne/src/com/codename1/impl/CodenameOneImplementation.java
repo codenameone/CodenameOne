@@ -3750,7 +3750,7 @@ public abstract class CodenameOneImplementation {
      * @param r the runnable
      */
     public void startThread(String name, Runnable r) {
-        new Thread(r, name).start();
+        new CodenameOneThread(r, name).start();
     }
 
     /**
@@ -4219,7 +4219,7 @@ public abstract class CodenameOneImplementation {
         pollingThreadRunning = true;
         final String pushId = Preferences.get("push_id", null);
         if(pushId != null) {
-            new Thread() {
+            new CodenameOneThread(new Runnable() {
                 public void run() {
                     String lastReq = Preferences.get("last_push_req", "0");
                     while(pollingThreadRunning) {
@@ -4250,7 +4250,7 @@ public abstract class CodenameOneImplementation {
                         }
                     }
                 }
-            }.start();
+            }, "Polling Thread").start();
         }
     }
 

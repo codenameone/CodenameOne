@@ -120,6 +120,7 @@ public class ConnectionRequest implements IOProgressListener {
     private byte[] data;
 
     private int silentRetryCount = 0;
+    private boolean failSilently;
 
     /**
      * This method will return a valid value for only some of the responses and only after the response was processed
@@ -472,7 +473,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @param err the exception thrown
      */
     protected void handleException(Exception err) {
-        if(killed) {
+        if(killed || failSilently) {
             return;
         }
         err.printStackTrace();
@@ -494,6 +495,9 @@ public class ConnectionRequest implements IOProgressListener {
      * @param message the response message from the server
      */
     protected void handleErrorResponseCode(int code, String message) {
+        if(failSilently) {
+            return;
+        }
         if(responseCodeListeners != null) {
             NetworkEvent n = new NetworkEvent(this, code, message);
             responseCodeListeners.fireActionEvent(n);
@@ -1184,5 +1188,21 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void setSilentRetryCount(int silentRetryCount) {
         this.silentRetryCount = silentRetryCount;
+    }
+
+    /**
+     * Indicates that we are uninterested in error handling
+     * @return the failSilently
+     */
+    public boolean isFailSilently() {
+        return failSilently;
+    }
+
+    /**
+     * Indicates that we are uninterested in error handling
+     * @param failSilently the failSilently to set
+     */
+    public void setFailSilently(boolean failSilently) {
+        this.failSilently = failSilently;
     }
 }

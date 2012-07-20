@@ -773,12 +773,12 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
         }
         final InputStreamReader isReader=isr;
 
-        new Thread() {
+        Display.getInstance().startThread(new Runnable() {
             public void run() {
                 HTMLElement doc = parser.parseHTML(isReader);
                 documentReady(null, doc);
             }
-        }.start();
+        }, "setHTML").start();
 
         return success;
     }
@@ -970,14 +970,14 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
                setPageStatus(HTMLCallback.STATUS_REQUESTED);
                ((AsyncDocumentRequestHandler)handler).resourceRequestedAsync(docInfo,HTMLComponent.this);
         } else {
-            new Thread() {
+            Display.getInstance().startThread(new Runnable() {
 
                 public void run() {
                        setPageStatus(HTMLCallback.STATUS_REQUESTED);
                        InputStream is=handler.resourceRequested(docInfo);
                        streamReady(is,docInfo);
                 }
-            }.start();
+            }, "setPage").start();
         }
     }
 
@@ -1813,7 +1813,7 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
                         try {
                             redirectTime=Integer.parseInt(content);
                             redirectThread=new RedirectThread(this, redirectTime, redirectURL);
-                            new Thread(redirectThread).start();
+                            Display.getInstance().startThread(redirectThread, "HTML checkRedirect").start();
                         } catch (NumberFormatException nfe) {
                             //Wasn't a number - ignore tag
                         }
@@ -3887,12 +3887,12 @@ public class HTMLComponent extends Container implements ActionListener,AsyncDocu
      */
     public void layoutContainer() {
         if ((FIXED_WIDTH) && (displayWidth!=0) && (Display.getInstance().getDisplayWidth()!=displayWidth)) {
-            new Thread() {
+            Display.getInstance().startThread(new Runnable() {
                 public void run() {
                     cleanup();
                     rebuildPage(); //screen form factor changed - landscape/portrait
                 }
-            }.start();
+            }, "HTML layout").start();
         }
         super.layoutContainer();
     }

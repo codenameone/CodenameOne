@@ -316,4 +316,6 @@ public class IOSNative {
     public static native long sqlCursorValueAtColumnLong(long statement, int col);
     public static native short sqlCursorValueAtColumnShort(long statement, int col);
     public static native String sqlCursorValueAtColumnString(long statement, int col);
+    
+    public static native int sqlCursorGetColumnCount(long statementPeer);
 }

@@ -62,7 +62,7 @@ public class SMSShare extends ShareService {
         contactsForm.setLayout(new BorderLayout());
         contactsForm.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
         contactsForm.show();
-        new Thread(new Runnable() {
+        Display.getInstance().startThread(new Runnable() {
 
             public void run() {
                 String[] ids = ContactsManager.getAllContactsWithNumbers();
@@ -110,7 +110,7 @@ public class SMSShare extends ShareService {
                     }
                 });
             }
-        }).start();
+        }, "SMS Thread").start();
     }
     
     private MultiButton createRendererMultiButton() {

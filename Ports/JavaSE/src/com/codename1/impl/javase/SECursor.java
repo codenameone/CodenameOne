@@ -87,7 +87,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public int getColumnIndex(String columnName) throws IOException {
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
@@ -105,7 +104,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public String getColumnName(int columnIndex) throws IOException {
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
@@ -116,7 +114,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public int getPosition() throws IOException {
         try {
             return resultSet.getRow();
@@ -126,12 +123,10 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public Row getRow() throws IOException {
         return this;
     }
 
-    @Override
     public boolean position(int row) throws IOException {
         try {
             return resultSet.absolute(row);
@@ -141,7 +136,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public void close() throws IOException {
         try {
             resultSet.close();
@@ -151,7 +145,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public byte[] getBlob(int index) throws IOException {
         try {
             Blob b = resultSet.getBlob(index+1);
@@ -164,7 +157,6 @@ public class SECursor implements Cursor, Row{
 
     }
 
-    @Override
     public double getDouble(int index) throws IOException {
         try {
             return resultSet.getDouble(index+1);
@@ -174,7 +166,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public float getFloat(int index) throws IOException {
         try {
             return resultSet.getFloat(index+1);
@@ -184,7 +175,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public int getInteger(int index) throws IOException {
         try {
             return resultSet.getInt(index+1);
@@ -194,7 +184,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public long getLong(int index) throws IOException {
         try {
             return resultSet.getLong(index+1);
@@ -204,7 +193,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public short getShort(int index) throws IOException {
         try {
             return resultSet.getShort(index+1);
@@ -214,7 +202,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public String getString(int index) throws IOException {
         try {
             return resultSet.getString(index+1);
@@ -224,7 +211,6 @@ public class SECursor implements Cursor, Row{
         }
     }
 
-    @Override
     public int getColumnCount() throws IOException {
         try {
             ResultSetMetaData meta = resultSet.getMetaData();

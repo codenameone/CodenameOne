@@ -427,7 +427,7 @@ class ResourceThreadQueue {
                 DocumentInfo docInfo=cssDocInfo!=null?cssDocInfo:new DocumentInfo(imageUrl,DocumentInfo.TYPE_IMAGE);
                     ((AsyncDocumentRequestHandler)handler).resourceRequestedAsync(docInfo, this);
                 } else {
-                    new Thread(this).start();
+                    Display.getInstance().startThread(this, "HTML Resources").start();
                 }
         }
 

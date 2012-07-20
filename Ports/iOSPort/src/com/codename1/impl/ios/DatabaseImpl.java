@@ -207,8 +207,7 @@ class DatabaseImpl extends Database {
 
         @Override
         public int getColumnCount() throws IOException {
-            //TODO - needs to be implemented
-            return -1;
+            return IOSNative.sqlCursorGetColumnCount(peer);
         }
     }
 }

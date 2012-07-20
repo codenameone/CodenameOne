@@ -23,6 +23,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.impl.CodenameOneThread;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -77,8 +78,81 @@ public class Log {
     private static Log instance = new Log();
     private long zeroTime = System.currentTimeMillis();
     private Writer output;
-    private boolean fileWriteEnabled = false;//System.getProperty("microedition.io.file.FileConnection.version") != null;
+    private boolean fileWriteEnabled = false;
     private String fileURL = null;
+    private boolean logDirty;
+    
+    /**
+     * Indicates that log reporting to the cloud should be disabled
+     */
+    public static int REPORTING_NONE = 0; 
+
+    /**
+     * Indicates that log reporting to the cloud should occur regardless of whether an error occurred
+     */
+    public static int REPORTING_DEBUG = 1; 
+
+    /**
+     * Indicates that log reporting to the cloud should occur only if an error occurred
+     */
+    public static int REPORTING_PRODUCTION = 3; 
+    
+    private int reporting = REPORTING_NONE;
+    
+    /**
+     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
+     * thus tracking crashes or functionality in the device.
+     * @param level one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
+     */
+    public static void setReportingLevel(int level) {
+        instance.reporting = level;
+    }
+    
+    /**
+     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
+     * thus tracking crashes or functionality in the device.
+     * @return one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
+     */
+    public static int getReportingLevel() {
+        return instance.reporting;
+    }
+    
+    /**
+     * Sends the current log to the cloud regardless of the reporting level
+     */
+    public static void sendLog() {
+        try {
+            // this can cause a crash
+            if(!Display.isInitialized()) {
+                return;
+            }
+            if(!instance.logDirty) {
+                return;
+            }
+            instance.logDirty = false;
+            long devId = Preferences.get("DeviceId__$", (long)-1);
+            if(devId < 0) {
+                System.out.println("Device not registered cannot send log");
+                return;
+            }
+            ConnectionRequest r = new ConnectionRequest();
+            r.setPost(false);
+            r.setUrl("https://codename-one.appspot.com/uploadLogRequest");
+            r.setFailSilently(true);
+            NetworkManager.getInstance().addToQueueAndWait(r);
+            String url = new String(r.getResponseData());
+            
+            MultipartRequest m = new MultipartRequest();
+            m.setUrl(url);
+            byte[] read = Util.readInputStream(Storage.getInstance().createInputStream("CN1Log__$"));
+            m.addArgument("i", "" + devId);
+            m.addData("log", read, "text/plain");
+            m.setFailSilently(true);
+            NetworkManager.getInstance().addToQueueAndWait(m);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
     
     /**
      * Installs a log subclass that can replace the logging destination/behavior
@@ -125,6 +199,10 @@ public class Log {
      */
     protected void logThrowable(Throwable t) {
         print("Exception: " + t.getClass().getName() + " - " + t.getMessage(), ERROR);
+        Thread thr = Thread.currentThread();
+        if(thr instanceof CodenameOneThread && ((CodenameOneThread)thr).hasStackFrame()) {
+            print(((CodenameOneThread)thr).getStack(t), ERROR);
+        }
         t.printStackTrace();
         try {
             synchronized(this) {
@@ -148,6 +226,7 @@ public class Log {
         if(this.level > level) {
             return;
         }
+        logDirty = true;
         text = getThreadAndTimeStamp() + " - " + text;
         System.out.println(text);
         try {
@@ -171,7 +250,7 @@ public class Log {
     protected Writer createWriter() throws IOException {
         try {
             if(getFileURL() == null) {
-                setFileURL("file:///" + FileSystemStorage.getInstance().getRoots()[0] + "/codenameOne.log");
+                return new OutputStreamWriter(Storage.getInstance().createOutputStream("CN1Log__$"));
             }
             if(FileSystemStorage.getInstance().exists(getFileURL())) {
                 return new OutputStreamWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL(),

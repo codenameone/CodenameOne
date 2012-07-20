@@ -160,7 +160,7 @@ public class MediaPlayer extends Container {
             return;
         }
         if(dataSource == null || !dataSource.equals(uri)) {
-            new Thread() {
+            Display.getInstance().startThread(new Runnable() {
                 public void run() {
                     try {
                         setDataSource(uri, null);
@@ -168,7 +168,7 @@ public class MediaPlayer extends Container {
                         t.printStackTrace();
                     }
                 }
-            }.start();
+            }, "Media Thread").start();
         }
     }
     

@@ -63,7 +63,7 @@ public class EmailShare extends ShareService {
         contactsForm.setScrollable(false);
         contactsForm.addComponent(BorderLayout.CENTER, new Label("Please wait..."));
         contactsForm.show();
-        new Thread(new Runnable() {
+        Display.getInstance().startThread(new Runnable() {
 
             public void run() {
                 String[] ids = ContactsManager.getAllContacts();
@@ -109,7 +109,7 @@ public class EmailShare extends ShareService {
                     }
                 });
             }
-        }).start();
+        }, "Email Thread").start();
     }
     
     
