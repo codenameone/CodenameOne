@@ -71,6 +71,33 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target depends="init" if="have.sources" name="-javadoc-build">
+        <mkdir dir="${dist.javadoc.dir}"/>
+        <javadoc additionalparam="${javadoc.additionalparam}" author="${javadoc.author}" charset="UTF-8" destdir="${dist.javadoc.dir}" docencoding="UTF-8" encoding="${javadoc.encoding.used}" failonerror="true" noindex="${javadoc.noindex}" nonavbar="${javadoc.nonavbar}" notree="${javadoc.notree}" private="${javadoc.private}" source="${javac.source}" splitindex="${javadoc.splitindex}" use="${javadoc.use}" useexternalfile="true" version="${javadoc.version}" windowtitle="${javadoc.windowtitle}">
+            <classpath>
+                <path path="${javac.classpath}"/>
+            </classpath>
+            <fileset dir="${src.dir}" excludes="*.java,${excludes}" includes="${includes}">
+                <filename name="**/*.java"/>
+            </fileset>
+            <fileset dir="../../CodenameOne/CLDC11/src" excludes="*.java,${excludes}" includes="${includes}">
+                <filename name="**/*.java"/>
+            </fileset>
+            <fileset dir="${build.generated.sources.dir}" erroronmissingdir="false">
+                <include name="**/*.java"/>
+                <exclude name="*.java"/>
+            </fileset>
+        </javadoc>
+        <copy todir="${dist.javadoc.dir}">
+            <fileset dir="${src.dir}" excludes="${excludes}" includes="${includes}">
+                <filename name="**/doc-files/**"/>
+            </fileset>
+            <fileset dir="${build.generated.sources.dir}" erroronmissingdir="false">
+                <include name="**/doc-files/**"/>
+            </fileset>
+        </copy>
+    </target>
+
     <target depends="init,-javadoc-build" description="Build Javadoc." name="javadoc">
         <copydir src="dist/javadoc" dest="javadoc" />
     </target>
@@ -108,6 +135,10 @@
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Tipster" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/ZXing" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
         <mkdir dir="../nightly_builds" />
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
@@ -125,6 +156,7 @@
 
         <copy file="../LICENSE" todir="build/CodenameOneDist/CodenameOne" />
         <copy file="../Docs/release-notes.html" todir="build/CodenameOneDist/CodenameOne" />
+        <copy file="../Docs/CodenameOneDevelopersGuide.pdf" todir="build/CodenameOneDist/CodenameOne" />
         <copydir src="../Docs/docs" dest="build/CodenameOneDist/CodenameOne/docs" />
         <copydir src="../Docs/docs/.css" dest="build/CodenameOneDist/CodenameOne/docs/.css" />
         <ant inheritall="false" antfile="build.xml" target="javadoc" />
@@ -134,11 +166,20 @@
         <copydir src="../Demos/CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
         <copydir src="../Demos/Tipster" dest="build/CodenameOneDist/CodenameOne/demos/Tipster" />
         <copydir src="../Demos/KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
+        <copydir src="../Demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
+        <copydir src="../Demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
+        <copydir src="../Demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
+        <copydir src="../Demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
+        
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/TZoneFriends" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/NativeDemo/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/CameraDemo/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Tipster/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/KitchenSink/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/MapsDemo/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/ZXing/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/SQLSample/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/FacebookDemo/lib" />
         <zip basedir="src" destfile="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
@@ -151,13 +192,20 @@
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Tipster/lib" />
         <copy file="dist/CodenameOne.jar" todir="../Demos/KitchenSink/lib" />
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/KitchenSink/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/MapsDemo/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/MapsDemo/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/ZXing/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/ZXing/lib" />
+        <copy file="dist/CodenameOne.jar" todir="../Demos/SQLSample/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/SQLSample/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/FacebookDemo/lib" />
 
         <deltree dir="build/tmp"/>
         <mkdir dir="build/tmp"/>
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
-        <zip basedir="build/tmp" compress="true" file="../../java/eclipse/workspace/LiveEditPreview/war/updatedLibs.zip" />
+        <zip basedir="build/tmp" compress="true" file="/Users/user2/Dropbox/updatedLibs.zip" />
         <deltree dir="build/tmp"/>
 
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        
@@ -170,6 +218,14 @@
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/Tipster/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/KitchenSink/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/KitchenSink/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/MapsDemo/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/MapsDemo/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/ZXing/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/ZXing/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/SQLSample/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/SQLSample/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/FacebookDemo/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/FacebookDemo/dist" />        
         
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
@@ -181,7 +237,7 @@
         <zip basedir="../../CodenameOne/NBPlugin/CodenameOnePlugin/build/" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
                 
         <!-- Windows Version -->
-        <zip basedir="../CodenameOneDesigner/" includes="designer.exe" file="../nightly_builds/CodenameOneDesignerWindows_${tstamp}.zip" />
+        <!-- zip basedir="../CodenameOneDesigner/" includes="designer.exe" file="../nightly_builds/CodenameOneDesignerWindows_${tstamp}.zip" / -->
 
         <!-- Copy loses Unix permissions which are essential for this tool hence we need to use cp -->
         <!-- copydir src="../CodenameOneDesigner/Designer.app" dest="build/CodenameOneDist/Designer.app" / -->

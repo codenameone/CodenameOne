@@ -76,8 +76,12 @@
         <copy file="../../Themes/android_holo_light.res" todir="src" />
     </target>
 
+    <target name="-pre-clean">
+        <delete dir="build/tmp" />
+    </target>
+
     <target name="-post-jar">
-        <delete file="${dist.jar}.old" />
+        <!-- delete file="${dist.jar}.old" />
         <move file="${dist.jar}" tofile="${dist.jar}.old" />
         <jar jarfile="${dist.jar}">
             <zipfileset src="${dist.jar}.old" excludes="META-INF/*" />
@@ -85,6 +89,17 @@
             <manifest>
             </manifest>
         </jar>
-        <delete file="${dist.jar}.old" />
+        <delete file="${dist.jar}.old" / -->
+        <delete file="${dist.jar}" />
+        <mkdir dir="build/tmp"/>
+        <javac destdir="build/tmp"
+            classpath="${javac.classpath}:${build.classes.dir}">
+            <src path="${src.dir}" />
+            <src path="../../CodenameOne/src" />
+        </javac>        
+        <jar jarfile="${dist.jar}" basedir="build/tmp">
+            <fileset dir="src" includes="*.res" />
+            <fileset dir="../../CodenameOne/src" includes="*.res" />
+        </jar>
     </target>    
 </project>

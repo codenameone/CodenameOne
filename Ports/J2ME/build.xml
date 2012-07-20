@@ -92,4 +92,6 @@
         <delete file="${dist.jar}.old" />
     </target>    
 
+    <target name="do-preverify" if="cldc-platform.trigger">
+    </target>
 </project>
