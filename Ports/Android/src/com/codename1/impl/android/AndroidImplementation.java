@@ -8,6 +8,8 @@ import com.codename1.ui.geom.Dimension;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.DialogInterface;
@@ -2824,7 +2826,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ArrayList<String> parts = sms.divideMessage(message);
         sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
     }
+    
+    public void notifyStatusBar(String tickerText, String contentTitle, 
+            String contentBody, boolean vibrate, boolean flashLights) {
+        int id = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
+        
+        NotificationManager notificationManager = (NotificationManager)activity.getSystemService(Activity.NOTIFICATION_SERVICE);
+        Notification notification = new Notification(id, tickerText, System.currentTimeMillis());
+        
+        if(flashLights){
+            notification.defaults |= Notification.DEFAULT_LIGHTS;
+            notification.flags |= Notification.FLAG_SHOW_LIGHTS;
+        }
+        if(vibrate){
+            notification.defaults |= Notification.DEFAULT_VIBRATE;
+        }
+        Intent notificationIntent = new Intent();
+        notificationIntent.setComponent(activity.getComponentName());
+        PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, notificationIntent, 0);
 
+        notification.setLatestEventInfo(activity, contentTitle, contentBody, contentIntent);
+        notificationManager.notify(10001, notification);        
+    }
+    
     @Override
     public String[] getAllContacts(boolean withNumbers) {
         return AndroidContactsManager.getInstance().getContacts(activity, withNumbers);
