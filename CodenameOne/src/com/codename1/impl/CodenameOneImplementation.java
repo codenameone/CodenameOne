@@ -4386,6 +4386,21 @@ public abstract class CodenameOneImplementation {
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);
     }
-    
+
+    /**
+     * Place a notification on the device status bar (if device has this 
+     * functionality).
+     * The notification will re-start the Application.
+     * 
+     * @param tickerText the ticker text of the Notification
+     * @param contentTitle the title of the Notification
+     * @param contentBody the content of the Notification
+     * @param vibrate enable/disable notification alert
+     * @param flashLights enable/disable notification flashing
+     */
+    public void notifyStatusBar(String tickerText, String contentTitle,
+            String contentBody, boolean vibrate, boolean flashLights) {
+    }
+
     
 }
