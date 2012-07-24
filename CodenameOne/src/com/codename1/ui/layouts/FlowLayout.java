@@ -62,9 +62,9 @@ public class FlowLayout extends Layout{
      * @inheritDoc
      */
     public void layoutContainer(Container parent) {
-        int x = parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
+        int x = 0;//parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
         int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(parent.isRTL(), Component.RIGHT) - x;
-
+        
         boolean rtl = parent.isRTL();
         if(rtl) {
         	x += parent.getSideGap();
@@ -96,10 +96,10 @@ public class FlowLayout extends Layout{
 
                 cmp.setY(y + cmp.getStyle().getMargin(cmp.isRTL(), Component.TOP));
 
-                x += cmp.getPreferredW() + cmp.getStyle().getMargin(false, Component.RIGHT);
-                rowH = Math.max(rowH, cmp.getPreferredH() + cmp.getStyle().getMargin(false, Component.TOP)+ cmp.getStyle().getMargin(false, Component.BOTTOM));
+                x += cmp.getWidth() + cmp.getStyle().getMargin(false, Component.RIGHT);
+                rowH = Math.max(rowH, cmp.getHeight() + cmp.getStyle().getMargin(false, Component.TOP)+ cmp.getStyle().getMargin(false, Component.BOTTOM));
             } else {
-                moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - x, rowH, start, i);
+                moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, i);
                 fillRow(parent, width, start, i);
                 x = initX+cmp.getStyle().getMargin(false, Component.LEFT);
                 y += rowH;
@@ -117,7 +117,7 @@ public class FlowLayout extends Layout{
 
             }
         }
-        moveComponents(parent, parent.getStyle().getPadding(parent.isRTL(), Component.LEFT), y, width - x, rowH, start, numOfcomponents);
+        moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, numOfcomponents);
         fillRow(parent, width, start, numOfcomponents);
     }
 

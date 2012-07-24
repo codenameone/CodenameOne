@@ -1320,7 +1320,11 @@ public class Form extends Container {
                 includeTitle = false;
             }
             Style titleStyle = title.getStyle();
+            titleStyle.removeListeners();
+            
             Style contentStyle = contentPane.getUnselectedStyle();
+            contentStyle.removeListeners();
+            
             if (includeTitle) {
                 titleStyle.setMargin(Component.TOP, top, false);
                 titleStyle.setMargin(Component.BOTTOM, 0, false);

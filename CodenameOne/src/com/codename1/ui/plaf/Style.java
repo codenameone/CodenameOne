@@ -1629,7 +1629,15 @@ public class Style {
             listeners.removeListener(l);
         }
     }
-
+    
+    /**
+     * This method removes all Listeners from the Style
+     */
+    public void removeListeners(){
+        listeners.getListenerVector().removeAllElements();
+        listeners = null;
+    }
+    
     void resetModifiedFlag() {
         modifiedFlag = 0;
     }
