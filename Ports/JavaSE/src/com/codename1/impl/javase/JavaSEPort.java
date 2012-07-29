@@ -58,6 +58,7 @@ import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.AdjustmentEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.HierarchyBoundsListener;
@@ -101,6 +102,8 @@ import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
 import java.awt.MediaTracker;
+import java.awt.Scrollbar;
+import java.awt.event.AdjustmentListener;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -158,6 +161,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
+    private static boolean scrollableSkin = true;
+    private Scrollbar hSelector = new Scrollbar (Scrollbar.HORIZONTAL);
+    private Scrollbar vSelector = new Scrollbar (Scrollbar.VERTICAL);   
+    
     static final int GAME_KEY_CODE_FIRE = -90;
     static final int GAME_KEY_CODE_UP = -91;
     static final int GAME_KEY_CODE_DOWN = -92;
@@ -332,13 +339,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
-    private class C extends java.awt.Container implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener {
+    private class C extends java.awt.Container implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener {
 
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
         private java.awt.Dimension forcedSize;
         private boolean releaseLock;
+        private int x, y;
 
         C() {
             addKeyListener(this);
@@ -347,6 +355,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             addHierarchyBoundsListener(this);
             setFocusable(true);
             requestFocus();
+            
         }
 
         public void setForcedSize(Dimension d) {
@@ -404,13 +413,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void drawScreenBuffer(java.awt.Graphics g) {
             if (getScreenCoordinates() != null) {
                 g.setColor(Color.WHITE);
-                g.fillRect((int) (getSkin().getWidth() * zoomLevel), 0, getWidth(), getHeight());
-                g.fillRect(0, (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
-                g.drawImage(buffer, (int) (getScreenCoordinates().getX() * zoomLevel), (int) (getScreenCoordinates().getY() * zoomLevel), this);
+                g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
+                g.fillRect(x, y + (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
+                g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 updateGraphicsScale(g);
-                g.drawImage(getSkin(), 0, 0, this);
+                g.drawImage(getSkin(), x, y, this);
             } else {
-                g.drawImage(buffer, 0, 0, this);
+                g.drawImage(buffer, x, y, this);
             }
         }
 
@@ -528,14 +537,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - getScreenCoordinates().x);
+                return (int) (coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
             return coordinate;
         }
 
         private int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - getScreenCoordinates().y);
+                return (int) (coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
             return coordinate;
         }
@@ -656,17 +665,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void ancestorResized(HierarchyEvent e) {
 
             if (getSkin() != null) {
-                float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
-                float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
-                zoomLevel = Math.min(h1, w1);
-                Form f = Display.getInstance().getCurrent();
-                if (f != null) {
-                    f.repaint();
+                if(!scrollableSkin){
+                    float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
+                    float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
+                    zoomLevel = Math.min(h1, w1);
+                    Form f = Display.getInstance().getCurrent();
+                    if (f != null) {
+                        f.repaint();
+                    }
                 }
                 getParent().repaint();
             } else {
                 JavaSEPort.this.sizeChanged(getWidth(), getHeight());
             }
+        }
+
+        @Override
+        public void adjustmentValueChanged(AdjustmentEvent e) {
+            Scrollbar s = (Scrollbar)e.getSource();
+            int val = s.getValue();
+            if(s.getOrientation() == Scrollbar.HORIZONTAL){
+                x = -(int)((float)(val/100f) * getWidth());
+            }else{
+                y = -(int)((float)(val/100f) * getHeight());
+            }
+            repaint();
+            
         }
     }
     private C canvas;
@@ -1109,6 +1133,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             final CheckboxMenuItem nativeInputFlag = new CheckboxMenuItem("Native Input", useNativeInput);
             simulatorMenu.add(nativeInputFlag);
 
+            final CheckboxMenuItem scrollFlag = new CheckboxMenuItem("Scrollable", scrollableSkin);
+            simulatorMenu.add(scrollFlag);
+            
             simulatorMenu.addSeparator();
             MenuItem exit = new MenuItem("Exit");
             simulatorMenu.add(exit);
@@ -1178,6 +1205,33 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
+            
+            scrollFlag.addItemListener(new ItemListener() {
+
+                public void itemStateChanged(ItemEvent ie) {
+                    scrollableSkin = !scrollableSkin;
+                    
+                    
+                    if(scrollableSkin){
+                        frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+                        frm.add(java.awt.BorderLayout.EAST, vSelector);                    
+                    }else{
+                        frm.remove(hSelector);
+                        frm.remove(vSelector);                    
+                    }
+                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    canvas.x = 0;
+                    canvas.y = 0;
+                    zoomLevel = 1;
+                    frm.invalidate();
+                    frm.pack();
+                    Display.getInstance().getCurrent().repaint();
+                    frm.repaint();
+                }
+            });
+            
+            
+            
             exit.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
@@ -1349,8 +1403,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             frm.setLocationByPlatform(true);
             frm.setLayout(new java.awt.BorderLayout());
+            hSelector = new Scrollbar (Scrollbar.HORIZONTAL);
+            vSelector = new Scrollbar (Scrollbar.VERTICAL);   
+            hSelector.addAdjustmentListener(canvas);
+            vSelector.addAdjustmentListener(canvas);
+            
             frm.add(java.awt.BorderLayout.CENTER, canvas);
-            frm.add(canvas);
+            frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+            frm.add(java.awt.BorderLayout.EAST, vSelector);
+            
+//            frm.add(canvas);
+            //frm.setResizable(false);
             if (hasSkins()) {
                 String f = System.getProperty("skin");
                 if (f != null) {
@@ -1366,7 +1429,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 frm.setExtendedState(Frame.MAXIMIZED_BOTH);
             }
             frm.pack();
-            if (getSkin() != null) {
+            if (getSkin() != null && !scrollableSkin) {
                 float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
                 float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
@@ -1561,8 +1624,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         canvas.add(tf);
         if (getSkin() != null) {
-            tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x) * zoomLevel),
-                    (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y) * zoomLevel),
+            tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
+                    (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
                     (int) (cmp.getWidth() * zoomLevel), (int) (cmp.getHeight() * zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
@@ -2789,6 +2852,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         //a patch go get a readable login page for facebook
         if(key.equals("User-Agent") && url.contains("facebook.com")){
             //blackberry user-agent gets an html without javascript.
+            
+            //con.setRequestProperty("User-Agent", "Profile/MIDP-2.1 Configuration/CLDC-1.1");        
+                    
             con.setRequestProperty("User-Agent", "Mozilla/5.0 (BlackBerry; U; BlackBerry 9860; en-GB) AppleWebKit/534.11+ (KHTML, like Gecko) Version/7.0.0.296 Mobile Safari/534.11+");        
         }else{
             con.setRequestProperty(key, val);
@@ -3655,8 +3721,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             int w = getWidth();
             int h = getHeight();
 
-            vid.setBounds((int) ((x + getScreenCoordinates().x) * zoomLevel),
-                    (int) ((y + getScreenCoordinates().y) * zoomLevel),
+            vid.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
+                    (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
                     (int) (w * zoomLevel),
                     (int) (h * zoomLevel));
         }
