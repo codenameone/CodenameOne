@@ -174,7 +174,17 @@ public class RSSReader extends List {
         return url;
     }
 
-    private void updateComponentValues(Container root, Hashtable h) {
+    class Listener implements ActionListener {
+        private String url;
+        public Listener(String url) {
+            this.url = url;
+        }
+        public void actionPerformed(ActionEvent evt) {
+            Display.getInstance().execute(url);
+        }
+    }
+    
+    void updateComponentValues(Container root, Hashtable h) {
         int c = root.getComponentCount();
         for(int iter = 0 ; iter < c ; iter++) {
             Component current = root.getComponentAt(iter);
@@ -193,11 +203,7 @@ public class RSSReader extends List {
                 if(val != null) {
                     if(current instanceof Button) {
                         final String url = (String)val;
-                        ((Button)current).addActionListener(new ActionListener() {
-                            public void actionPerformed(ActionEvent evt) {
-                                Display.getInstance().execute(url);
-                            }
-                        });
+                        ((Button)current).addActionListener(new Listener(url));
                         continue;
                     }
                     if(current instanceof Label) {
@@ -217,6 +223,17 @@ public class RSSReader extends List {
         }
     }
 
+    class BackCommand extends Command {
+        private Form sourceForm;
+        public BackCommand(Form sourceForm) {
+            super("Back");
+            this.sourceForm = sourceForm;
+        }
+        public void actionPerformed(ActionEvent ev) {
+            sourceForm.showBack();
+        }        
+    }
+    
     /**
      * Shows a form containing the RSS entry
      *
@@ -244,11 +261,7 @@ public class RSSReader extends List {
         }
         if(addBackToTaget) {
             final Form sourceForm = Display.getInstance().getCurrent();
-            Command back = new Command("Back") {
-                public void actionPerformed(ActionEvent ev) {
-                    sourceForm.showBack();
-                }
-            };
+            Command back = new BackCommand(sourceForm);
             newForm.addCommand(back);
             newForm.setBackCommand(back);
         }

@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.ads;
+package com.codename1.impl;
 
 import com.codename1.components.WebBrowser;
 import com.codename1.io.ConnectionRequest;
@@ -42,7 +42,7 @@ import java.util.Vector;
  * 
  * @author Shai Almog
  */
-class VServAds extends FullScreenAdService {
+public class VServAds extends FullScreenAdService {
     boolean failed;
     private static final String URL = "http://a.vserv.mobi/delivery/adapi.php";
     private String zoneId = "6216";
@@ -75,6 +75,8 @@ class VServAds extends FullScreenAdService {
     private String imageURL;
     private String contentType;
     private int backgroundColor;
+    private String renderNotify;
+    private String actionNotify;
     
     /**
      * @inheritDoc
@@ -90,6 +92,17 @@ class VServAds extends FullScreenAdService {
                 Log.e(err);
             }
 
+            private String getString(Hashtable h, String n) {
+                Object v = h.get(n);
+                if(v == null) {
+                    return null;
+                }
+                if(v instanceof Vector) {
+                    return (String)((Vector)v).elementAt(0);
+                }
+                return (String)v;
+            }
+            
             protected void readResponse(InputStream input) throws IOException {
                 JSONParser parser = new JSONParser();
                 Hashtable h = parser.parse(new InputStreamReader(input, "UTF-8"));
@@ -98,13 +111,20 @@ class VServAds extends FullScreenAdService {
                 }
                 backgroundColor = Integer.parseInt( (String)((Hashtable)((Vector)h.get("style")).elementAt(0)).get("background-color"), 16);
                 Hashtable actionHash = ((Hashtable)((Vector)h.get("action")).elementAt(0));
-                String notifyAction = (String)((Vector)actionHash.get("notify")).elementAt(0);
+                actionNotify = getString(actionHash, "notify");
+                if(actionNotify == null) {
+                    actionNotify = getString(actionHash, "notify-once");
+                }
+                
                 destination = (String)actionHash.get("data");
                 
                 Hashtable renderHash = ((Hashtable)((Vector)h.get("render")).elementAt(0));
-                contentType = (String)actionHash.get("type");
-                String notifyRender = (String)((Vector)actionHash.get("notify")).elementAt(0);
-                imageURL = (String)actionHash.get("data");
+                contentType = (String)renderHash.get("type");
+                renderNotify = getString(actionHash, "notify");
+                if(renderNotify == null) {
+                    renderNotify = getString(actionHash, "notify-once");
+                }
+                imageURL = (String)renderHash.get("data");
             }
         };
         con.setUrl(URL);
@@ -133,12 +153,32 @@ class VServAds extends FullScreenAdService {
         return con;
     }
 
+    protected boolean hasPendingAd() {
+        return imageURL != null;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    protected void clearPendingAd() {
+        imageURL = null;
+        renderNotify = null;
+        
+    }
+    
     /**
      * @inheritDoc
      */
     protected Component getPendingAd() {
         if(imageURL == null) {
             return null;
+        }
+        if(renderNotify != null && renderNotify.length() > 0) {
+            ConnectionRequest c = new ConnectionRequest();
+            c.setFailSilently(true);
+            c.setUrl(renderNotify);
+            c.setPost(false);
+            NetworkManager.getInstance().addToQueue(c);
         }
         if("image".equalsIgnoreCase(contentType)) {
             Label adComponent = new Label();
@@ -157,6 +197,13 @@ class VServAds extends FullScreenAdService {
      * @inheritDoc
      */
     protected String getAdDestination() {
+        if(actionNotify != null && actionNotify.length() > 0) {
+            ConnectionRequest c = new ConnectionRequest();
+            c.setFailSilently(true);
+            c.setUrl(actionNotify);
+            c.setPost(false);
+            NetworkManager.getInstance().addToQueue(c);
+        }
         return destination;
     }
 
@@ -165,20 +212,6 @@ class VServAds extends FullScreenAdService {
      */
     protected boolean failed() {
         return failed;
-    }
-
-    /**
-     * @return the zoneId
-     */
-    public String getZoneId() {
-        return zoneId;
-    }
-
-    /**
-     * @param zoneId the zoneId to set
-     */
-    public void setZoneId(String zoneId) {
-        this.zoneId = zoneId;
     }
 
     /**
@@ -236,6 +269,4 @@ class VServAds extends FullScreenAdService {
     public void setCategory(int category) {
         this.category = category;
     }
-
-    
 }

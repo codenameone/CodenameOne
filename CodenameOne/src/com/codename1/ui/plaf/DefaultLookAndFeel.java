@@ -682,7 +682,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             prefW += (style.getPadding(l.isRTL(), Component.RIGHT) + style.getPadding(l.isRTL(), Component.LEFT));
         }
 
-        if(style.getBorder() != null && l.isVisible()) {
+        if(style.getBorder() != null) {
             prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);
             prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);
         }

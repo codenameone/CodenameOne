@@ -182,6 +182,23 @@ public class FaceBookAccess {
         NetworkManager.getInstance().addToQueue(con);
     }
 
+    class Listener implements ActionListener {
+        private FacebookRESTService con;
+        private ActionListener callback;
+        Listener(FacebookRESTService con, ActionListener callback) {
+            this.con = con;
+            this.callback = callback;
+        }
+        public void actionPerformed(ActionEvent evt) {
+            if (!con.isAlive()) {
+                return;
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+    
     /**
      * Get a list of FaceBook objects for a given id
      * 
@@ -197,17 +214,7 @@ public class FaceBookAccess {
 
         final FacebookRESTService con = new FacebookRESTService(token, faceBookId, itemsConnection, false);
         con.setResponseDestination(feed);
-        con.addResponseListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!con.isAlive()) {
-                    return;
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        con.addResponseListener(new Listener(con, callback));
         if (params != null) {
             Enumeration keys = params.keys();
             while (keys.hasMoreElements()) {

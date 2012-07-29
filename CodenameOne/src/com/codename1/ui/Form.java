@@ -1181,6 +1181,7 @@ public class Form extends Container {
      * Displays the current form on the screen
      */
     public void show() {
+        Display.getInstance().getImplementation().onShow(this);
         show(false);
     }
 

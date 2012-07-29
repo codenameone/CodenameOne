@@ -2201,7 +2201,7 @@ public final class Display {
      */
     public void exitApplication() {
         codenameOneExited = true;
-        impl.exitApplication();
+        impl.exit();
     }
 
     /**
@@ -2786,5 +2786,22 @@ public final class Display {
      */
     public void setCrashReporter(CrashReport crashReporter) {
         this.crashReporter = crashReporter;
+    }
+    
+    /**
+     * Returns the UDID for devices that support it
+     * 
+     * @return the UDID or null
+     */
+    public String getUdid() {
+        return impl.getUdid();
+    }
+    
+    /**
+     * Returns the MSISDN for devices that expose it
+     * @return the msisdn or null
+     */
+    public String getMsisdn() {
+        return impl.getMsisdn();
     }
 }

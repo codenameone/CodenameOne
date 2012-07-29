@@ -117,6 +117,16 @@ public abstract class CodenameOneImplementation {
     private static boolean pollingThreadRunning;
     private static PushCallback callback;
     private int commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
+    private static Runnable onCurrentFormChange;
+    private static Runnable onExit;
+    
+    static void setOnCurrentFormChange(Runnable on) {
+        onCurrentFormChange = on;
+    }
+    
+    static void setOnExit(Runnable on) {
+        onExit = on;
+    }
     
     /**
      * Invoked by the display init method allowing the implementation to "bind"
@@ -660,6 +670,16 @@ public abstract class CodenameOneImplementation {
      */
     public abstract boolean isTouchDevice();
 
+    /**
+     * Callback before showing a specific form
+     * @param f the form shown
+     */
+    public void onShow(Form f) {
+        if(onCurrentFormChange != null) {
+            onCurrentFormChange.run();
+        }
+    }
+    
     /**
      * This method is used internally to determine the actual current form
      * it doesn't perform the logic of transitions etc. and shouldn't be invoked
@@ -2687,6 +2707,17 @@ public abstract class CodenameOneImplementation {
     public void exitApplication() {
     }
 
+    
+    /**
+     * Exits the application...
+     */
+    public void exit() {
+        if(onExit != null) {
+            onExit.run();
+        }
+        exitApplication();
+    }
+    
     /**
      * Returns the property from the underlying platform deployment or the default
      * value if no deployment values are supported. This is equivalent to the
@@ -4403,4 +4434,20 @@ public abstract class CodenameOneImplementation {
     }
 
     
+    /**
+     * Returns the UDID for devices that support it
+     * 
+     * @return the UDID or null
+     */
+    public String getUdid() {
+        return getProperty("UDID", null);
+    }
+    
+    /**
+     * Returns the MSISDN for devices that expose it
+     * @return the msisdn or null
+     */
+    public String getMsisdn() {
+        return getProperty("MSISDN", null);
+    }    
 }

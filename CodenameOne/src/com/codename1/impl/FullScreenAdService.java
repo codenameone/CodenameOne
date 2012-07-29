@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.ads;
+package com.codename1.impl;
 
 import com.codename1.components.InfiniteProgress;
 import com.codename1.io.ConnectionRequest;
@@ -36,6 +36,8 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Abstract class for fullscreen ads that appear before and possibly after application
@@ -43,10 +45,11 @@ import com.codename1.ui.layouts.GridLayout;
  *
  * @author Shai Almog
  */
-abstract class FullScreenAdService {    
+public abstract class FullScreenAdService {    
     private boolean allowWithoutNetwork = true;
     private int timeout = 10000;
-    private int adDisplayTime = 5000;
+    private int adDisplayTime = 6000;
+    private int timeForNext = -1;
     
     /**
      * Creates a new request for an ad
@@ -59,6 +62,17 @@ abstract class FullScreenAdService {
      * @return the ad that is currently pending
      */
     protected abstract Component getPendingAd();
+    
+    /**
+     * Just checks if an ad is already fetched
+     * @return returns true if an ad is already waiting in the queue
+     */
+    protected abstract boolean hasPendingAd();
+    
+    /**
+     * Removes the pending ad data so we can fetch a new ad
+     */
+    protected abstract void clearPendingAd();
     
     /**
      * Returns the URL for the ad
@@ -74,7 +88,7 @@ abstract class FullScreenAdService {
     /**
      * Invoked on application startup, this code will download an ad or timeout 
      */
-    public void showWelcomeAd(final Form nextForm) {
+    public void showWelcomeAd() {
         ConnectionRequest r = createAdRequest();
         r.setPriority(ConnectionRequest.PRIORITY_HIGH);
         r.setTimeout(timeout);
@@ -88,24 +102,47 @@ abstract class FullScreenAdService {
         }
         Component c = getPendingAd();
         if(c != null) {
-            Command skip = new Command("Skip") {
-                public void actionPerformed(ActionEvent ev) {
-                    nextForm.show();
-                }
-            };
-            Form adForm = new AdForm(nextForm, c, skip);
+            Form adForm = new AdForm(c);
             adForm.setTransitionInAnimator(CommonTransitions.createEmpty());
             adForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
             adForm.show();
         }
     }
-    
+        
     /**
      * Binds an ad to appear periodically after a given timeout
-     * @param timeout the timeout in which an ad should be shown in milliseconds
+     * @param timeForNext the timeout in which an ad should be shown in milliseconds
      */
-    public void bindTransitionAd(int timeout) {
-        
+    public void bindTransitionAd(final int timeForNext) {
+        Runnable onTransitionAndExit = new Runnable() {
+            private long lastTime = System.currentTimeMillis();
+            public void run() {
+                long t = System.currentTimeMillis();
+                if(t - lastTime > timeForNext) {
+                    lastTime = t;
+                    Component c = getPendingAd();
+                    if(c != null) {
+                        Form adForm = new AdForm(c);
+                        adForm.show();
+                    }
+                }
+            }
+        };
+        CodenameOneImplementation.setOnCurrentFormChange(onTransitionAndExit);
+        CodenameOneImplementation.setOnExit(onTransitionAndExit);
+        Timer t = new Timer();
+        int tm = Math.max(5000, timeForNext - 600);
+        t.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if(!hasPendingAd()) {
+                    ConnectionRequest r = createAdRequest();
+                    r.setPriority(ConnectionRequest.PRIORITY_LOW);
+                    r.setTimeout(timeout);
+                    NetworkManager.getInstance().addToQueue(r);
+                }
+            }
+        }, tm, tm);
     }
 
     /**
@@ -155,14 +192,19 @@ abstract class FullScreenAdService {
     }
     
     class AdForm extends Form {
+        boolean blocked = true;
         private long shown = -1;
-        private Form nextForm;
-        public AdForm(Form nextForm, Component ad, Command skip) {
+        public AdForm(Component ad) {
             setLayout(new BorderLayout());
             addComponent(BorderLayout.CENTER, ad);
             Command open = new Command("Open") {
                 public void actionPerformed(ActionEvent ev) {
                     Display.getInstance().execute(getAdDestination());
+                }
+            };
+            Command skip = new Command("Skip") {
+                public void actionPerformed(ActionEvent ev) {
+                    blocked = false;
                 }
             };
             if(Display.getInstance().isTouchScreenDevice()) {
@@ -174,18 +216,34 @@ abstract class FullScreenAdService {
                 addCommand(open);
                 addCommand(skip);
             }
+            registerAnimated(this);
         }
         
         protected void onShow() {
             shown = System.currentTimeMillis();
         }
+
+        public void show() {
+            super.show();
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    try {
+                        while(blocked) {
+                            Thread.currentThread().sleep(100);
+                        }
+                    } catch(Exception err) {
+                        err.printStackTrace();
+                    }
+                }
+            });
+            clearPendingAd();
+        }
         
         public boolean animate() {
-            if(shown > -1 && shown >= adDisplayTime) {
-                nextForm.show();
-                return false;
+            if(shown > -1 && System.currentTimeMillis() - shown >= adDisplayTime) {
+                blocked = false;
             }
-            return super.animate();
+            return false;
         }
     }
 }
