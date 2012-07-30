@@ -133,7 +133,6 @@ public abstract class FullScreenAdService {
         Timer t = new Timer();
         int tm = Math.max(5000, timeForNext - 600);
         t.schedule(new TimerTask() {
-            @Override
             public void run() {
                 if(!hasPendingAd()) {
                     ConnectionRequest r = createAdRequest();
