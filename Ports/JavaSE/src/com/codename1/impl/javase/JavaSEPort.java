@@ -562,7 +562,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } else {
                     if (getSkin() != null) {
-                        java.awt.Point p = new java.awt.Point((int) (e.getX() / zoomLevel), (int) (e.getY() / zoomLevel));
+                        java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x)/ zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                         Integer keyCode;
                         keyCode = getSkinHotspots().get(p);
 
@@ -643,7 +643,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void mouseMoved(MouseEvent e) {
             e.consume();
             if (getSkinHotspots() != null) {
-                java.awt.Point p = new java.awt.Point((int) (e.getX() / zoomLevel), (int) (e.getY() / zoomLevel));
+                java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x)/ zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                 if (getSkinHotspots().containsKey(p)) {
                     setCursor(handCursor);
                 } else {
