@@ -1592,6 +1592,8 @@ public final class Display {
             }
     }
 
+    private Form eventForm;
+    
     /**
      * Invoked on the EDT to propagate the event
      */
@@ -1606,19 +1608,31 @@ public final class Display {
         switch(ev[0]) {
         case KEY_PRESSED:
             f.keyPressed(ev[1]);
+            eventForm = f;
             break;
         case KEY_RELEASED:
-            f.keyReleased(ev[1]);
+            //make sure the released event is sent to the same Form who got a
+            //pressed event
+            if(eventForm == f){
+                f.keyReleased(ev[1]);                
+            }
+            eventForm = null;
             break;
         case POINTER_PRESSED:
             dragOccured = false;
             dragPathLength = 0;
             pointerPressedAndNotReleasedOrDragged = true;
             f.pointerPressed(pointerEvent(1, ev), pointerEvent(2, ev));
+            eventForm = f;
             break;
         case POINTER_RELEASED:
             pointerPressedAndNotReleasedOrDragged = false;
-            f.pointerReleased(pointerEvent(1, ev), pointerEvent(2, ev));
+            //make sure the released event is sent to the same Form who got a
+            //pressed event
+            if(eventForm == f){
+                f.pointerReleased(pointerEvent(1, ev), pointerEvent(2, ev));
+            }
+            eventForm = null;
             break;
         case POINTER_DRAGGED:
             dragOccured = true;

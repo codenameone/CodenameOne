@@ -1113,6 +1113,9 @@ public class Dialog extends Form {
         }
 
         Rectangle componentPos = c.getSelectedRect();
+        componentPos.setX(componentPos.getX() - c.getScrollX());
+        componentPos.setY(componentPos.getY() - c.getScrollY());
+        
         int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
         int width = Math.min(availableWidth, prefWidth);
