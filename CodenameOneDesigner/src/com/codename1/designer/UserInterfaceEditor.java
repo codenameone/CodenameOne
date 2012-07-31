@@ -728,6 +728,9 @@ public class UserInterfaceEditor extends BaseForm {
                                     cnt = cmp.getParent();
                                 } else {
                                     cnt = (com.codename1.ui.Container)cmp;
+                                    if(cnt.getLeadComponent() != null) {
+                                        cnt = cnt.getLeadParent().getParent();
+                                    }
                                 }
                                 for(com.codename1.ui.Component clip : clipboard) {
                                     com.codename1.ui.Component copiedValue = copyComponent(clip);
