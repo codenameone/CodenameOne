@@ -25,8 +25,6 @@ package com.codename1.io;
 
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
-import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
-import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
@@ -35,17 +33,11 @@ import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
-import com.codename1.ui.html.DocumentInfo;
-import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.util.Enumeration;
 import java.util.Hashtable;
-import java.util.Vector;
 
 /**
  * This is a utility class that allows Oauth2 authentication
@@ -283,13 +275,16 @@ public class Oauth2 {
 
                         NetworkManager.getInstance().addToQueue(req);
                     } else if (url.indexOf("error_reason=") > -1) {
-                        Hashtable table = getParamsFromURL(url);
-                        
-                        String error = (String) table.get("error_reason");
-                        String description = (String) table.get("error_description");
-                        Dialog.show(error, description, "OK", "");
+                        Hashtable table = getParamsFromURL(url);                        
+                        String error = (String) table.get("error_reason");                        
                         if(login != null) {
                             login.dispose();
+                        }
+                        if(backToForm != null) {
+                            backToForm.showBack();
+                        }
+                        if(al != null) {
+                            al.actionPerformed(new ActionEvent(new IOException(error)));
                         }
                     } else {
                         boolean success = url.indexOf("#") > -1;

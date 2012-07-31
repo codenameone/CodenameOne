@@ -32,6 +32,7 @@ import com.codename1.io.Oauth2;
 import com.codename1.io.Storage;
 import com.codename1.io.services.ImageDownloadService;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.Slider;
@@ -88,7 +89,14 @@ public class FaceBookAccess {
             scope = scope.substring(0, scope.length() - 1);
         }
         Hashtable additionalParams = new Hashtable();
-        additionalParams.put("display", "popup");
+        String p = Display.getInstance().getPlatformName();
+        //on simulator BB and J2ME use the popup display (no need for javascript)
+        if(Display.getInstance().getProperty("OS", "SE").equals("SE") || 
+                p.equals("rim") || p.equals("me")){
+            additionalParams.put("display", "popup");
+        }else{
+            additionalParams.put("display", "touch");        
+        }
         return new Oauth2("https://www.facebook.com/dialog/oauth", clientId, redirectURI, scope, "https://graph.facebook.com/oauth/access_token", clientSecret, additionalParams);
     }
 
