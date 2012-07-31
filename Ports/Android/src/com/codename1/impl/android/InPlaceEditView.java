@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.text.Editable;
+import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
@@ -204,7 +205,7 @@ public class InPlaceEditView extends FrameLayout {
 
         mLastEditText = initialText;
         mEditText = new EditView(activity, this);
-
+        
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);
         // Set the appropriate gravity so that the left and top margins will be
@@ -262,6 +263,12 @@ public class InPlaceEditView extends FrameLayout {
         if(password){
             mEditText.setTransformationMethod(PasswordTransformationMethod.getInstance());
         }
+        
+        int maxLength = mTextArea.getMaxSize();
+        InputFilter[] FilterArray = new InputFilter[1];
+        FilterArray[0] = new InputFilter.LengthFilter(maxLength);
+        mEditText.setFilters(FilterArray);
+        
         showVirtualKeyboard(true);
     }
 
