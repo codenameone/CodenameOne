@@ -82,7 +82,6 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -101,9 +100,10 @@ import com.codename1.media.Media;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import java.awt.Container;
-import java.awt.MediaTracker;
 import java.awt.Scrollbar;
 import java.awt.event.AdjustmentListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -134,13 +134,15 @@ import javax.media.ControllerListener;
 import javax.media.RealizeCompleteEvent;
 import javax.media.Time;
 import javax.media.bean.playerbean.MediaPlayer;
-import javax.swing.JFormattedTextField;
+import javax.swing.ImageIcon;
+import javax.swing.JComponent;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.filechooser.FileFilter;
 import javax.swing.text.JTextComponent;
-import javax.swing.text.MaskFormatter;
 import jmapps.ui.VideoPanel;
 
 /**
@@ -3438,24 +3440,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param response callback for the resulting image
      */
     public void capturePhoto(com.codename1.ui.events.ActionListener response) {
-        try {
-            long t = System.currentTimeMillis();
-            int num = (int) (t % 5);
-            BufferedImage i = new BufferedImage(2048, 1280, BufferedImage.TYPE_INT_ARGB);
-            java.awt.Graphics g = i.getGraphics();
-            g.setColor(Color.BLUE);
-            g.fillRect(0, 0, 2048, 1280);
-            g.setColor(Color.RED);
-            g.setFont(new java.awt.Font("Arial", Font.STYLE_PLAIN, 100));
-            g.drawString("Image number " + num + " created", 100, 640);
-            File temp = File.createTempFile("img", ".jpg");
-            ImageIO.write(i, "jpg", temp);
-            response.actionPerformed(new com.codename1.ui.events.ActionEvent(temp.getAbsolutePath()));
-        } catch (IOException ex) {
-            Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+        JFileChooser fc = createImagesFileChooser();
+
+        if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            File selected = fc.getSelectedFile();
+            response.actionPerformed(new com.codename1.ui.events.ActionEvent(selected.getAbsolutePath()));
+        } else {
+            response.actionPerformed(null);
         }
-
-
     }
 
     class CodenameOneMediaPlayer implements Media, ControllerListener {
@@ -3927,7 +3919,127 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         super.setCommandBehavior(commandBehavior);
     }
+        
+    private static JFileChooser createImagesFileChooser() {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Camera simulation - pick an image");
+        fc.addChoosableFileFilter(new ImageFilter());
+        fc.setAcceptAllFileFilterUsed(false);
+        fc.setAccessory(new ImagePreview(fc));
+        return fc;
+    }
     
+    public static class ImageFilter extends FileFilter {
+
+        public boolean accept(File f) {
+            if (f.isDirectory()) {
+                return true;
+            }
+            String extension = getExtension(f);
+            if (extension != null) {
+                if (extension.equals("png")
+                        || extension.equals("jpg")
+                        || extension.equals("jpeg")) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        public String getDescription() {
+            return "Images";
+        }
+
+        private String getExtension(File f) {
+            String ext = null;
+            String s = f.getName();
+            int i = s.lastIndexOf('.');
+
+            if (i > 0 && i < s.length() - 1) {
+                ext = s.substring(i + 1).toLowerCase();
+            }
+            return ext;
+        }
+    }
     
+    public static class ImagePreview extends JComponent
+            implements PropertyChangeListener {
+
+        ImageIcon thumbnail = null;
+        File file = null;
+
+        public ImagePreview(JFileChooser fc) {
+            setPreferredSize(new Dimension(100, 50));
+            fc.addPropertyChangeListener(this);
+        }
+
+        public void loadImage() {
+            if (file == null) {
+                thumbnail = null;
+                return;
+            }
+
+            //Don't use createImageIcon (which is a wrapper for getResource)
+            //because the image we're trying to load is probably not one
+            //of this program's own resources.
+            ImageIcon tmpIcon = new ImageIcon(file.getPath());
+            if (tmpIcon != null) {
+                if (tmpIcon.getIconWidth() > 90) {
+                    thumbnail = new ImageIcon(tmpIcon.getImage().
+                            getScaledInstance(90, -1,
+                            java.awt.Image.SCALE_DEFAULT));
+                } else { //no need to miniaturize
+                    thumbnail = tmpIcon;
+                }
+            }
+        }
+
+        public void propertyChange(PropertyChangeEvent e) {
+            boolean update = false;
+            String prop = e.getPropertyName();
+
+            //If the directory changed, don't show an image.
+            if (JFileChooser.DIRECTORY_CHANGED_PROPERTY.equals(prop)) {
+                file = null;
+                update = true;
+
+                //If a file became selected, find out which one.
+            } else if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
+                file = (File) e.getNewValue();
+                update = true;
+            }
+
+            //Update the preview accordingly.
+            if (update) {
+                thumbnail = null;
+                if (isShowing()) {
+                    loadImage();
+                    repaint();
+                }
+            }
+        }
+
+        protected void paintComponent(java.awt.Graphics g) {
+            if (thumbnail == null) {
+                loadImage();
+            }
+            if (thumbnail != null) {
+                int x = getWidth() / 2 - thumbnail.getIconWidth() / 2;
+                int y = getHeight() / 2 - thumbnail.getIconHeight() / 2;
+
+                if (y < 0) {
+                    y = 0;
+                }
+
+                if (x < 5) {
+                    x = 5;
+                }
+                thumbnail.paintIcon(this, g, x, y);
+            }
+        }
+    }
     
 }
