@@ -3069,7 +3069,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String path = convertImageUriToFilePath(data, activity);
                 callback.fireActionEvent(new ActionEvent(path));
                 return;
-            }else {
+            } else if(requestCode == OPEN_GALLERY){
+                Uri selectedImage = intent.getData();
+                String[] filePathColumn = {MediaStore.Images.Media.DATA};
+
+                Cursor cursor = activity.getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+                cursor.moveToFirst();
+                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                String filePath = cursor.getString(columnIndex);
+                cursor.close();            
+                callback.fireActionEvent(new ActionEvent(filePath));                                
+            } else {
                 callback.fireActionEvent(new ActionEvent("ok"));            
             }
         }
@@ -3109,6 +3119,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
     }
 
+    /**
+     * Opens the device image gallery
+     * @param response callback for the resulting image
+     */
+    public void openImageGallery(ActionListener response){    
+        callback = new EventDispatcher();
+        callback.addListener(response);
+        Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+        this.activity.startActivityForResult(galleryIntent, OPEN_GALLERY);
+    }
+    
+    
     class NativeImage extends Image {
 
         public NativeImage(Bitmap nativeImage) {
