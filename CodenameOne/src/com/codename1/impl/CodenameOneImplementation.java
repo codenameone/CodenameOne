@@ -23,6 +23,8 @@
  */
 package com.codename1.impl;
 
+import com.codename1.components.FileTree;
+import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.io.ConnectionRequest;
@@ -42,6 +44,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -3942,6 +3945,77 @@ public abstract class CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+    }
+
+    /**
+     * Opens the device image gallery
+     * @param response callback for the resulting image
+     */
+    public void openImageGallery(final ActionListener response){    
+        final Dialog d = new Dialog("Select a picture");
+        d.setLayout(new BorderLayout());
+        FileTreeModel model = new FileTreeModel(true);
+        model.addExtensionFilter("jpg");
+        model.addExtensionFilter("png");
+        FileTree t = new FileTree(model){
+
+            protected Button createNodeComponent(final Object node, int depth) {
+                if (node == null || !getModel().isLeaf(node)) {
+                    return super.createNodeComponent(node, depth);
+                }
+                Hashtable t = (Hashtable) Storage.getInstance().readObject("thumbnails");
+                if (t == null) {
+                    t = new Hashtable();
+                }
+                final Hashtable thumbs = t;
+                final Button b = super.createNodeComponent(node, depth);
+                b.addActionListener(new ActionListener() {
+
+                    public void actionPerformed(ActionEvent evt) {
+                        response.actionPerformed(new ActionEvent(node));
+                        d.dispose();
+                    }
+                });
+                final ImageIO imageio = ImageIO.getImageIO();
+                if (imageio != null) {
+
+                    Display.getInstance().scheduleBackgroundTask(new Runnable() {
+
+                        public void run() {
+                            byte[] data = (byte[]) thumbs.get(node);
+                            if (data == null) {
+                                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                                try {
+                                    imageio.save(FileSystemStorage.getInstance().openInputStream((String) node),
+                                            out,
+                                            ImageIO.FORMAT_JPEG,
+                                            b.getIcon().getWidth(), b.getIcon().getHeight(), 1);
+                                    data = out.toByteArray();
+                                    thumbs.put(node, data);
+                                    Storage.getInstance().writeObject("thumbnails", thumbs);
+                                } catch (IOException ex) {
+                                    ex.printStackTrace();
+                                }
+                            }
+                            Image im = Image.createImage(data, 0, data.length);
+                            b.setIcon(im);
+                        }
+                    });
+
+                }
+                return b;
+            }
+        
+        };
+        
+        d.addComponent(BorderLayout.CENTER, t);
+        
+        d.placeButtonCommands(new Command[]{new Command("Cancel")});
+        Command c = d.showAtPosition(2, 2, 2, 2, true);
+        if(c != null){
+            response.actionPerformed(null);   
+        }
+        
     }
 
     /**

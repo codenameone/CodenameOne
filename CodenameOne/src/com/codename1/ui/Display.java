@@ -2543,16 +2543,69 @@ public final class Display {
         return impl.getLocationManager();
     }
 
+    /**
+     * This method tries to invoke the device native camera to capture images.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The image is saved as a jpeg to a file on the device.
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * if evt returns null the image capture was cancelled by the user.
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
     public void capturePhoto(ActionListener response){    
         impl.capturePhoto(response);
     }
 
+    /**
+     * This method tries to invoke the device native hardware to capture audio.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The audio is saved to a file on the device.
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
     public void captureAudio(ActionListener response) {
         impl.captureAudio(response);
     }
 
+    /**
+     * This method tries to invoke the device native camera to capture video.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The video is saved to a file on the device.
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
     public void captureVideo(ActionListener response) {
         impl.captureVideo(response);
+    }
+    
+    /**
+     * Opens the device image gallery
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
+    public void openImageGallery(ActionListener response){
+        impl.openImageGallery(response);
     }
 
     /**

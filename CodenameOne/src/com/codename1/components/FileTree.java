@@ -32,6 +32,7 @@ import com.codename1.ui.tree.Tree;
  * @author Shai Almog
  */
 public class FileTree extends Tree {
+    
     /**
      * Default constructor
      */
@@ -40,6 +41,14 @@ public class FileTree extends Tree {
         setUIID("FileTree");
     }
 
+    /**
+     * Constructor with a model
+     */
+    public FileTree(FileTreeModel model) {
+        super(model);
+        setUIID("FileTree");
+    }
+    
     protected String childToDisplayLabel(Object child) {
         String s = child.toString();
         if(s.equals("/")) {

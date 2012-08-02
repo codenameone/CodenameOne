@@ -46,8 +46,11 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class FileTreeModel implements TreeModel {
+    
     private boolean showFiles;
 
+    private Vector ext;
+    
     /**
      * Construct a filesystem tree model
      *
@@ -57,7 +60,19 @@ public class FileTreeModel implements TreeModel {
         this.showFiles = showFiles;
     }
 
-
+    /**
+     * Shows only files with the given extension
+     * 
+     * @param extension the file extension to display
+     */
+    public void addExtensionFilter(String extension){
+        if(ext == null){
+            ext = new Vector();
+        }
+        ext.addElement(extension);
+    }
+    
+    
     /**
      * @inheritDoc
      */
@@ -75,14 +90,27 @@ public class FileTreeModel implements TreeModel {
                     name += "/";
                 }
                 String[] res = FileSystemStorage.getInstance().listFiles(name);
-                if(showFiles) {
-                    for(int iter = 0 ; iter < res.length ; iter++) {
-                        response.addElement(name + res[iter]);
-                    }
-                } else {
-                    for(int iter = 0 ; iter < res.length ; iter++) {
-                        if(FileSystemStorage.getInstance().isDirectory(name + res[iter])) {
-                            response.addElement(name + res[iter]);
+                if(res != null){
+                    if(showFiles) {
+                        for(int iter = 0 ; iter < res.length ; iter++) {
+                            String f = res[iter];
+                            if(!FileSystemStorage.getInstance().isDirectory(name + f) && ext != null){
+                                int i = f.lastIndexOf('.');
+                                if(i > 0){
+                                    String e = f.substring(i + 1, f.length());
+                                    if(ext.contains(e)){
+                                        response.addElement(name + f);                                                                
+                                    }
+                                }
+                            }else{
+                                response.addElement(name + f);                            
+                            }
+                        }
+                    } else {
+                        for(int iter = 0 ; iter < res.length ; iter++) {
+                            if(FileSystemStorage.getInstance().isDirectory(name + res[iter])) {
+                                response.addElement(name + res[iter]);
+                            }
                         }
                     }
                 }
