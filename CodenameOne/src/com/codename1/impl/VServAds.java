@@ -120,9 +120,9 @@ public class VServAds extends FullScreenAdService {
                 
                 Hashtable renderHash = ((Hashtable)((Vector)h.get("render")).elementAt(0));
                 contentType = (String)renderHash.get("type");
-                renderNotify = getString(actionHash, "notify");
+                renderNotify = getString(renderHash, "notify");
                 if(renderNotify == null) {
-                    renderNotify = getString(actionHash, "notify-once");
+                    renderNotify = getString(renderHash, "notify-once");
                 }
                 imageURL = (String)renderHash.get("data");
             }
