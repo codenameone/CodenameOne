@@ -685,6 +685,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if(style.getBorder() != null) {
             prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);
             prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);
+        } 
+        if(isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            prefW = Math.max(style.getBgImage().getWidth(), prefW);
+            prefH = Math.max(style.getBgImage().getHeight(), prefH);
         }
 
         return new Dimension(prefW, prefH);
@@ -851,6 +855,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if(style.getBorder() != null) {
             prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);
             prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);
+        }
+        if(isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            prefW = Math.max(style.getBgImage().getWidth(), prefW);
+            prefH = Math.max(style.getBgImage().getHeight(), prefH);
         }
 
         return new Dimension(prefW, prefH);

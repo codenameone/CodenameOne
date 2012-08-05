@@ -119,17 +119,33 @@ public class Tabs extends Container {
         drag = new SwipeListener(SwipeListener.DRAG);
         release = new SwipeListener(SwipeListener.RELEASE);
         setUIID("Tabs");
+        BorderLayout bd = (BorderLayout)super.getLayout();
+        if(bd != null) {
+            if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
+            } else {
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+            }
+        }
     }
 
     /**
      * @inheritDoc
      */
-   protected void initLaf(UIManager manager) {
+    protected void initLaf(UIManager manager) {
         super.initLaf(manager);
         int tabPlace = manager.getThemeConstant("tabPlacementInt", -1);
         tabsFillRows = manager.isThemeConstant("tabsFillRowsBool", false);
         tabsGridLayout = manager.isThemeConstant("tabsGridBool", false);
         changeTabOnFocus = manager.isThemeConstant("changeTabOnFocusBool", false);
+        BorderLayout bd = (BorderLayout)super.getLayout();
+        if(bd != null) {
+            if(manager.isThemeConstant("tabsOnTopBool", false)) {
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
+            } else {
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+            }
+        }
         changeTabContainerStyleOnFocus =  manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
         if(tabPlace != -1){
             tabPlacement = tabPlace;

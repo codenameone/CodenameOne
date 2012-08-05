@@ -112,6 +112,8 @@ public abstract class LookAndFeel {
     private int fadeScrollEdgeEndAlpha = 0;
     private int textFieldCursorColor;
 
+    private boolean backgroundImageDetermineSize;
+    
     /**
      * Indicates whether softbuttons should be reversed from their default orientation
      */
@@ -962,6 +964,7 @@ public abstract class LookAndFeel {
                 defaultTensileHighlight = false;
             }
         }
+        backgroundImageDetermineSize = manager.isThemeConstant("bgImageSizeBool", false);
     }
 
     private void initCommandBehaviorConstant(String c, boolean complete) {
@@ -1317,5 +1320,21 @@ public abstract class LookAndFeel {
      */
     public void setFadeScrollBarSpeed(int fadeScrollBarSpeed) {
         this.fadeScrollBarSpeed = fadeScrollBarSpeed;
+    }
+
+    /**
+     * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+     * @return the backgroundImageDetermineSize
+     */
+    public boolean isBackgroundImageDetermineSize() {
+        return backgroundImageDetermineSize;
+    }
+
+    /**
+     * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+     * @param backgroundImageDetermineSize the backgroundImageDetermineSize to set
+     */
+    public void setBackgroundImageDetermineSize(boolean backgroundImageDetermineSize) {
+        this.backgroundImageDetermineSize = backgroundImageDetermineSize;
     }
 }

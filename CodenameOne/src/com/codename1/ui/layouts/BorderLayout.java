@@ -60,6 +60,12 @@ public class BorderLayout extends Layout {
      */
     public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
 
+    /**
+     * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
+     * a layered effect
+     */
+    public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
+    
     private Component portraitNorth;
     private Component portraitSouth;
     private Component portraitCenter;
@@ -266,6 +272,13 @@ public class BorderLayout extends Layout {
                         y += h / 2 - d.getHeight() / 2;
                         h = d.getHeight();
                     }
+                    break;
+                }
+                case CENTER_BEHAVIOR_TOTAL_BELLOW: {
+                    w = targetWidth;
+                    h = targetHeight;
+                    x = left;
+                    y = top;
                 }
             } 
             c.setWidth(w);
@@ -505,5 +518,12 @@ public class BorderLayout extends Layout {
      */
     public void setCenterBehavior(int centerBehavior) {
         this.centerBehavior = centerBehavior;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean isOverlapSupported(){
+        return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELLOW;
     }
 }

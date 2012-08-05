@@ -32,6 +32,7 @@ import com.codename1.ui.RadioButton;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * A powerful button like component that allows multiple rows/and an icon to be added
@@ -86,6 +87,10 @@ public class MultiButton extends Container {
         emblem.setUIID("Emblem");
         setLeadComponent(emblem);
         setUIID("MultiButton");
+        Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
+        if(i != null) {
+            emblem.setIcon(i);
+        }
     }
     
     /**
@@ -104,8 +109,10 @@ public class MultiButton extends Container {
             }
             emblem.setUIID(old.getUIID());
             if(old.getCommand() != null) {
+                Image img = old.getIcon();
                 emblem.setCommand(old.getCommand());
                 emblem.setText("");
+                emblem.setIcon(img);
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
@@ -136,7 +143,9 @@ public class MultiButton extends Container {
      * @param c the command
      */
     public void setCommand(Command c) {
+        Image img = emblem.getIcon();
         emblem.setCommand(c);
+        emblem.setIcon(img);
         emblem.setText("");
     }
 
@@ -177,8 +186,10 @@ public class MultiButton extends Container {
             }
             emblem.setUIID(old.getUIID());
             if(old.getCommand() != null) {
+                Image img = old.getIcon();
                 emblem.setCommand(old.getCommand());
                 emblem.setText("");
+                emblem.setIcon(img);
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
@@ -199,7 +210,7 @@ public class MultiButton extends Container {
      * @return true if the checkbox/radio button is selected
      */
     public boolean isSelected() {
-        return emblem.isSelected();
+        return (emblem instanceof RadioButton || emblem instanceof CheckBox) && emblem.isSelected();
     }
     
     /**

@@ -1193,6 +1193,10 @@ public class Container extends Component {
             d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
         }
+        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
         return d;
     }
 
