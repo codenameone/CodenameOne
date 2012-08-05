@@ -25,7 +25,11 @@ package com.codename1.impl.javase;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.Display;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Properties;
 
 /**
  *
@@ -58,6 +62,29 @@ public class Executor {
                     public void run() {
                         try {
                             m.invoke(o, new Object[]{null});
+                            String currentDir = System.getProperty("user.dir");
+                            File props = new File(currentDir, "codenameone_settings.properties");
+                            if(props.exists()) {
+                                FileInputStream f = null;
+                                try {
+                                    Properties p = new Properties();
+                                    f = new FileInputStream(props);
+                                    p.load(f);
+                                    f.close();
+                                    String zone = p.getProperty("codename1.arg.vserv.zone", null);
+                                    if(zone != null && zone.length() > 0) {
+                                        com.codename1.impl.VServAds v = new com.codename1.impl.VServAds();
+                                        v.showWelcomeAd(); 
+                                        v.bindTransitionAd(Integer.parseInt(p.getProperty("codename1.arg.vserv.transition", "300000")));
+                                    }
+                                } catch (Exception ex) {
+                                } finally {
+                                    try {
+                                        f.close();
+                                    } catch (IOException ex) {
+                                    }
+                                }
+                            }
                             Method start = c.getDeclaredMethod("start", new Class[0]);
                             start.invoke(o, new Object[0]);
                         } catch (NoSuchMethodException err) {
