@@ -1213,6 +1213,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void itemStateChanged(ItemEvent ie) {
                     scrollableSkin = !scrollableSkin;
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("Scrollable", scrollableSkin);
                     
                     
                     if(scrollableSkin){
@@ -1412,11 +1414,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             vSelector.addAdjustmentListener(canvas);
             
             frm.add(java.awt.BorderLayout.CENTER, canvas);
-            frm.add(java.awt.BorderLayout.SOUTH, hSelector);
-            frm.add(java.awt.BorderLayout.EAST, vSelector);
             
-//            frm.add(canvas);
-            //frm.setResizable(false);
+            scrollableSkin = pref.getBoolean("Scrollable", true);
+            if(scrollableSkin){
+                frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+                frm.add(java.awt.BorderLayout.EAST, vSelector);
+            }
             if (hasSkins()) {
                 String f = System.getProperty("skin");
                 if (f != null) {
