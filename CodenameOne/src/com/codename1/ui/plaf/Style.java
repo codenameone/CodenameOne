@@ -1634,8 +1634,10 @@ public class Style {
      * This method removes all Listeners from the Style
      */
     public void removeListeners(){
-        listeners.getListenerVector().removeAllElements();
-        listeners = null;
+        if (listeners != null) {
+            listeners.getListenerVector().removeAllElements();
+            listeners = null;
+        }
     }
     
     void resetModifiedFlag() {
