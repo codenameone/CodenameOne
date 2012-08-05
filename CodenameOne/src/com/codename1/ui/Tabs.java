@@ -124,7 +124,7 @@ public class Tabs extends Container {
             if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
             } else {
-                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
     }
@@ -143,7 +143,7 @@ public class Tabs extends Container {
             if(manager.isThemeConstant("tabsOnTopBool", false)) {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
             } else {
-                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
         changeTabContainerStyleOnFocus =  manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
