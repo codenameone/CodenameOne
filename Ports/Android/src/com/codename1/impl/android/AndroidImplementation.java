@@ -120,6 +120,7 @@ import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -2560,22 +2561,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
         List r = new ArrayList();
-        String ck = c.getHeaderFieldKey(0);
-        for (int iter = 0; ck != null; iter++) {
-            if (ck.equalsIgnoreCase(name)) {
-                r.add(c.getHeaderField(iter));
-            }
-            ck = c.getHeaderFieldKey(iter);
+        List<String> headers = c.getHeaderFields().get(name);
+        if (headers != null && headers.size() > 0) {
+            Vector v = new Vector<String>();
+            v.addAll(headers);
+            Collections.reverse(v);
+            String[] s = new String[v.size()];
+            v.toArray(s);
+            return s;
         }
-
-        if (r.size() == 0) {
-            return null;
-        }
-        String[] response = new String[r.size()];
-        for (int iter = 0; iter < response.length; iter++) {
-            response[iter] = (String) r.get(iter);
-        }
-        return response;
+        return null;
+        
+        
+        
     }
 
     /**
