@@ -1619,6 +1619,7 @@ public class List extends Component {
         if(s > -1) {
             model.setSelectedIndex(s);
         }
+        pointerReleasedImpl(x, y, false, true);
     }
 
     /**
@@ -1825,11 +1826,11 @@ public class List extends Component {
      * @inheritDoc
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleasedImpl(x[0], y[0], true);
+        pointerReleasedImpl(x[0], y[0], true, false);
     }
 
     
-    private void pointerReleasedImpl(int x, int y, boolean isHover) {
+    private void pointerReleasedImpl(int x, int y, boolean isHover, boolean longPress) {
         if (isDragActivated()) {
             if(fixedSelection < FIXED_NONE_BOUNDRY) {
                 super.pointerReleased(x, y);
@@ -1877,9 +1878,12 @@ public class List extends Component {
                         selectionCmp = tmp;
                     }
                 }
-                selectionCmp.pointerPressed(newX, newY);
-                selectionCmp.pointerReleased(newX, newY);
-
+                if(longPress){
+                    selectionCmp.longPointerPress(newX, newY);
+                }else{
+                    selectionCmp.pointerPressed(newX, newY);
+                    selectionCmp.pointerReleased(newX, newY);
+                }
                 // propogate the action event in the usual way
                 fireActionEvent();
             }
@@ -1890,7 +1894,7 @@ public class List extends Component {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
-        pointerReleasedImpl(x, y, false);
+        pointerReleasedImpl(x, y, false, false);
     }
 
     /**
