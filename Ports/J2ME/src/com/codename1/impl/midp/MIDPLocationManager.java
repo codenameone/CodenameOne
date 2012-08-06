@@ -110,7 +110,11 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
     }
     
     public Location getLastKnownLocation(){        
-        return convert(LocationProvider.getLastKnownLocation());
+        javax.microedition.location.Location loc = LocationProvider.getLastKnownLocation();
+        if(loc != null){
+            return convert(loc);
+        }
+        return null;
     }
     
 }
