@@ -22,6 +22,8 @@
  */
 package com.codename1.contacts;
 
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.DefaultListModel;
@@ -39,6 +41,8 @@ public class ContactsModel extends DefaultListModel {
 
     private Hashtable contactsCache = new Hashtable();
 
+    private Image placeHolder;
+    
     /**
      * Constructor with contacts ids
      * @param ids the contact ids we would like this model to handle
@@ -46,17 +50,35 @@ public class ContactsModel extends DefaultListModel {
     public ContactsModel(String[] ids) {
         super(ids);
     }
-
+    
+    /**
+     * Sets the Contacts place holder image.
+     * 
+     * @param placeHolder image place holder for the contacts
+     */
+    public void setPlaceHolderImage(Image placeHolder){
+        this.placeHolder = placeHolder;
+    }
+    
     /**
      * @inheritDoc
      */
-    public Object getItemAt(int index) {
-        String id = (String) super.getItemAt(index);
+    public Object getItemAt(final int index) {
+        final String id = (String) super.getItemAt(index);
         Hashtable contact = (Hashtable) contactsCache.get(id);
         if (contact == null) {
-            Contact c = ContactsManager.getContactById(id);
-            contact = getContactAsHashtable(c);
-            contactsCache.put(id, contact);
+            
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                
+                public void run() {
+                    Contact c = ContactsManager.getContactById(id);
+                    Hashtable contact = getContactAsHashtable(c);
+                    contactsCache.put(id, contact);
+                    //this will trigger the data changed listener
+                    setItem(index, id);
+                }
+            });
+            return getContactAsHashtable(null);
         }
         return contact;
     }
@@ -89,17 +111,46 @@ public class ContactsModel extends DefaultListModel {
 
     private Hashtable getContactAsHashtable(Contact c) {
         Hashtable table = new Hashtable();
-        addAttribute(table, "id", c.getId());
-        addAttribute(table, "fname", c.getFirstName());
-        addAttribute(table, "lname", c.getFamilyName());
-        addAttribute(table, "displayName", c.getDisplayName());
-        addAttribute(table, "icon", c.getPhoto());
-        addAttribute(table, "phone", getContactPhoneNumber(c));
-        addAttribute(table, "email", getContactEmail(c));
+        String id = null;
+        String fname;
+        String lname;
+        String displayName;
+        Image image;
+        String phone;
+        String email;
+        
+        if(c == null){
+            fname = "Loading...";
+            lname = "Loading...";
+            displayName = "Loading...";
+            image = placeHolder;
+            phone = "Loading...";
+            email = "Loading...";            
+        }else{
+            id = c.getId();
+            fname = c.getFirstName();
+            lname = c.getFamilyName();
+            displayName = c.getDisplayName();
+            image = c.getPhoto();
+            if(image == null){
+                image = placeHolder;
+            }
+            phone = getContactPhoneNumber(c);
+            email = getContactEmail(c);                    
+        }
+        addAttribute(table, "id", id);
+        addAttribute(table, "fname", fname);
+        addAttribute(table, "lname", lname);
+        addAttribute(table, "displayName", displayName);
+        addAttribute(table, "icon", image);
+        addAttribute(table, "phone", phone);
+        addAttribute(table, "email", email);
         
         //the keys in the Hashtable should be enough for most use-cases, in case
         //something is missing there is the ability to get the Contact.
-        table.put("contact", c);
+        if(c != null){
+            table.put("contact", c);
+        }
         return table;
     }
     
