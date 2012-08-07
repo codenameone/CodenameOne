@@ -2048,7 +2048,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(t == null) {
                 t = "work";
             }
-            h.put(t, IOSNative.getPersonPhone(person, iter));
+            String phone = IOSNative.getPersonPhone(person, iter);
+            if(phone != null) {
+                h.put(t, phone);
+            }
         }
         c.setPhoneNumbers(h);
         
