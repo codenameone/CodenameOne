@@ -311,21 +311,39 @@ public class ContainerList extends Container {
             cmp.paintComponent(g);
         }
 
+        public void longPointerPress(int x, int y) {
+            super.longPointerPress(x, y);
+            pointerReleasedImpl(x, y, true);
+        }
+
+        public void pointerReleased(int x, int y) {
+            super.pointerReleased(x, y);
+            pointerReleasedImpl(x, y, false);
+        }
+
+        
         /**
          * @inheritDoc
          */
-        public void pointerReleased(int x, int y) {
-            super.pointerReleased(x, y);
+        public void pointerReleasedImpl(int x, int y, boolean longPress) {
             if (!isDragActivated()) {
                 // fire the action event into the selected component
                 Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
                 if(cmp instanceof Container) {
-                    Component selectionCmp = ((Container)cmp).getComponentAt(x, y);
-                    //selectionCmp.setX(0);
-                    //selectionCmp.setY(0);
+                    int absX = getAbsoluteX();
+                    int absY = getAbsoluteY();
+                    int newX = x - absX + cmp.getX();
+                    int newY = y - absY + cmp.getY();
+                    Component selectionCmp = ((Container) cmp).getComponentAt(newX, newY);
                     if(selectionCmp != null) {
-                        selectionCmp.pointerPressed(x, y);
-                        selectionCmp.pointerReleased(x, y);
+                        selectionCmp.setX(0);
+                        selectionCmp.setY(0);
+                        if(longPress){
+                            selectionCmp.longPointerPress(newX, newY);
+                        }else{
+                            selectionCmp.pointerPressed(newX, newY);
+                            selectionCmp.pointerReleased(newX, newY);
+                        }
                     }
                 }
 

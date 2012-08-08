@@ -2168,7 +2168,7 @@ public class Component implements Animation, StyleListener {
      * and holds the pointer on the Component
      * 
      */
-    protected void longPointerPress(int x, int y) {
+    public void longPointerPress(int x, int y) {
     }
 
     /**

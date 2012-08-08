@@ -1594,7 +1594,7 @@ public class Form extends Container {
     /**
      * @inheritDoc
      */
-    protected void longPointerPress(int x, int y) {
+    public void longPointerPress(int x, int y) {
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 focused.longPointerPress(x, y);

@@ -1614,7 +1614,7 @@ public class List extends Component {
     /**
      * @inheritDoc
      */
-    protected void longPointerPress(int x, int y) {
+    public void longPointerPress(int x, int y) {
         int s = pointerSelect(x, y);
         if(s > -1) {
             model.setSelectedIndex(s);
