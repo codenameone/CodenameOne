@@ -61,7 +61,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.table.TableLayout;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -234,7 +233,7 @@ public class UIBuilder {
         if(componentRegistry == null) {
             componentRegistry = new Hashtable();
             componentRegistry.put("Button", Button.class);
-            componentRegistry.put("Calendar", Calendar.class);
+            componentRegistry.put("Calendar", com.codename1.ui.Calendar.class);
             componentRegistry.put("CheckBox", CheckBox.class);
             componentRegistry.put("ComboBox", ComboBox.class);
             componentRegistry.put("Container", Container.class);

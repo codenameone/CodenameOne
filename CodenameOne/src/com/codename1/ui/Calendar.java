@@ -23,6 +23,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
@@ -55,6 +57,7 @@ public class Calendar extends Container {
     private ComboBox month;
     private ComboBox year;
     private MonthView mv;
+    private Label dateLabel;
     private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     private static final String[] DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final String[] LABELS = {"Su", "M", "Tu", "W", "Th", "F", "Sa"};
@@ -95,47 +98,113 @@ public class Calendar extends Container {
     public Calendar(long time, TimeZone tmz) {
         super(new BorderLayout());
         this.tmz = tmz;
-        setUIID("Calendar");
-        Container upper = new Container(new FlowLayout(Component.CENTER));
-        month = new ComboBox();
-        year = new ComboBox();
+        setUIID("Calendar");        
         mv = new MonthView(time);
 
-        Vector months = new Vector();
-        for (int i = 0; i < MONTHS.length; i++) {
-            months.addElement("" + getLocalizedMonth(i));
+        Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
+        if(leftArrow != null) {
+            Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+            final Button left = new Button(leftArrow);
+            final Button right = new Button(rightArrow);
+            ActionListener progress = new ActionListener() {
+                private boolean lock = false;
+                public void actionPerformed(ActionEvent evt) {
+                    if(lock) {
+                        return;
+                    }
+                    lock = true;
+                    int month = mv.getMonth();
+                    int year = mv.getYear();
+                    if(evt.getSource() == left) {
+                        month--;
+                        if(month < java.util.Calendar.JANUARY) {
+                            month = java.util.Calendar.DECEMBER;
+                            year--;
+                        } 
+                    } else {
+                        month++;
+                        if(month > java.util.Calendar.DECEMBER) {
+                            month = java.util.Calendar.JANUARY;
+                            year++;
+                        } 
+                    }
+                    boolean tran = UIManager.getInstance().isThemeConstant("calTransitionBool", true);
+                    if(tran) {
+                        Transition cm;
+                        if(UIManager.getInstance().isThemeConstant("calTransitionVertBool", false)) {
+                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, evt.getSource() == left, 300);
+                        } else {
+                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, evt.getSource() == left, 300);
+                        }
+                        MonthView newMv = new MonthView(mv.currentDay);
+                        newMv.setMonth(year, month);
+                        replaceAndWait(mv, newMv, cm);
+                        mv = newMv;
+                    } else {
+                        mv.setMonth(year, month);
+                        componentChanged();
+                    }
+                    dateLabel.setText(getLocalizedMonth(month) + " " + year);
+                    lock = false;
+                }
+            };
+            left.addActionListener(progress);
+            right.addActionListener(progress);
+            left.setUIID("CalendarLeft");
+            right.setUIID("CalendarRight");
+            
+            Container dateCnt = new Container(new BorderLayout());
+            dateCnt.setUIID("CalendarDate");
+            dateLabel = new Label();
+            dateLabel.setUIID("CalendarDateLabel");
+            dateLabel.setText(getLocalizedMonth(mv.getMonth()) + " " + mv.getYear());
+
+            dateCnt.addComponent(BorderLayout.CENTER, dateLabel);
+            dateCnt.addComponent(BorderLayout.EAST, right);
+            dateCnt.addComponent(BorderLayout.WEST, left);
+            
+            addComponent(BorderLayout.NORTH, dateCnt);            
+        } else {
+            month = new ComboBox();
+            year = new ComboBox();
+            Vector months = new Vector();
+            for (int i = 0; i < MONTHS.length; i++) {
+                months.addElement("" + getLocalizedMonth(i));
+            }
+            ListModel monthsModel = new DefaultListModel(months);
+            int selected = months.indexOf(getLocalizedMonth(mv.getMonth()));
+            month.setModel(monthsModel);
+            month.setSelectedIndex(selected);
+            month.addActionListener(mv);
+
+            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+            cal.setTime(new java.util.Date(time));
+            month.getStyle().setBgTransparency(0);
+            int y = cal.get(java.util.Calendar.YEAR);
+            Vector years = new Vector();
+            for (int i = 2100; i > 1900; i--) {
+                years.addElement("" + i);
+            }
+            ListModel yearModel = new DefaultListModel(years);
+            selected = years.indexOf("" + y);
+            year.setModel(yearModel);
+            year.setSelectedIndex(selected);
+            year.getStyle().setBgTransparency(0);
+            year.addActionListener(mv);
+            Container cnt = new Container(new BoxLayout(BoxLayout.X_AXIS));
+            cnt.setRTL(false);
+
+            Container dateCnt = new Container(new BoxLayout(BoxLayout.X_AXIS));
+            dateCnt.setUIID("CalendarDate");
+            dateCnt.addComponent(month);
+            dateCnt.addComponent(year);
+            cnt.addComponent(dateCnt);
+
+            Container upper = new Container(new FlowLayout(Component.CENTER));
+            upper.addComponent(cnt);
+
+            addComponent(BorderLayout.NORTH, upper);
         }
-        ListModel monthsModel = new DefaultListModel(months);
-        int selected = months.indexOf(getLocalizedMonth(mv.getMonth()));
-        month.setModel(monthsModel);
-        month.setSelectedIndex(selected);
-        month.addActionListener(mv);
-
-        java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
-        cal.setTime(new java.util.Date(time));
-        month.getStyle().setBgTransparency(0);
-        int y = cal.get(java.util.Calendar.YEAR);
-        Vector years = new Vector();
-        for (int i = 2100; i > 1900; i--) {
-            years.addElement("" + i);
-        }
-        ListModel yearModel = new DefaultListModel(years);
-        selected = years.indexOf("" + y);
-        year.setModel(yearModel);
-        year.setSelectedIndex(selected);
-        year.getStyle().setBgTransparency(0);
-        year.addActionListener(mv);
-        Container cnt = new Container(new BoxLayout(BoxLayout.X_AXIS));
-        cnt.setRTL(false);
-
-        Container dateCnt = new Container(new BoxLayout(BoxLayout.X_AXIS));
-        dateCnt.setUIID("CalendarDate");
-        dateCnt.addComponent(month);
-        dateCnt.addComponent(year);
-        cnt.addComponent(dateCnt);
-        upper.addComponent(cnt);
-
-        addComponent(BorderLayout.NORTH, upper);
         addComponent(BorderLayout.CENTER, mv);
     }
 
@@ -165,7 +234,9 @@ public class Calendar extends Container {
         cal.set(java.util.Calendar.YEAR, mv.getYear());
         cal.set(java.util.Calendar.MONTH, mv.getMonth());
         cal.set(java.util.Calendar.DAY_OF_MONTH, mv.getDayOfMonth());
-        month.getParent().revalidate();
+        if(month != null) {
+            month.getParent().revalidate();
+        }
     }
 
     /**
@@ -356,22 +427,32 @@ public class Calendar extends Container {
         dayButton.setText("" + day);
     }
 
-        class MonthView extends Container implements ActionListener{
+    class MonthView extends Container implements ActionListener{
 
-        private long currentDay;
+        long currentDay;
         private Button[] buttons = new Button[42];
         private Button selected;
         private long selectedDay = -1;
+        private Container titles;
+        private Container days;
 
         public MonthView(long time) {
-            super(new GridLayout(7, 7));
+            super(new BoxLayout(BoxLayout.Y_AXIS));
             setUIID("MonthView");
+            titles = new Container(new GridLayout(1, 7));
+            days = new Container(new GridLayout(6, 7));
+            addComponent(titles);
+            addComponent(days);
+            if(UIManager.getInstance().isThemeConstant("calTitleDayStyleBool", false)) {
+                titles.setUIID("CalendarTitleArea");
+                days.setUIID("CalendarDayArea");
+            }
             for (int iter = 0; iter < DAYS.length; iter++) {
-                addComponent(createDayTitle(iter));
+                titles.addComponent(createDayTitle(iter));
             }
             for (int iter = 0; iter < buttons.length; iter++) {
                 buttons[iter] = createDay();
-                addComponent(buttons[iter]);
+                days.addComponent(buttons[iter]);
                 if (iter <= 7) {
                     buttons[iter].setNextFocusUp(year);
                 }
@@ -398,8 +479,8 @@ public class Calendar extends Container {
             int yearOld = cal.get(java.util.Calendar.YEAR);
             int monthOld = cal.get(java.util.Calendar.MONTH);
             int dayOld = cal.get(java.util.Calendar.DAY_OF_MONTH);
-
-            cal.setTime(new Date(day));
+            Date dateObject = new Date(day);
+            cal.setTime(dateObject);
             cal.set(java.util.Calendar.HOUR, 1);
             cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
             cal.set(java.util.Calendar.MINUTE, 0);
@@ -408,8 +489,14 @@ public class Calendar extends Container {
             int yearNew = cal.get(java.util.Calendar.YEAR);
             int monthNew = cal.get(java.util.Calendar.MONTH);
             int dayNew = cal.get(java.util.Calendar.DAY_OF_MONTH);
-            year.setSelectedItem("" + yearNew);
-            month.setSelectedIndex(monthNew);
+            if(month != null) {
+                year.setSelectedItem("" + yearNew);
+                month.setSelectedIndex(monthNew);
+            } else {
+                if(dateLabel != null) {
+                    dateLabel.setText(getLocalizedMonth(monthNew) + " " + yearNew);
+                }
+            }
 
             if (yearNew != yearOld || monthNew != monthOld || dayNew != dayOld || force) {
                 currentDay = cal.getTime().getTime();
@@ -597,6 +684,7 @@ public class Calendar extends Container {
                         if (!getComponentForm().isSingleFocusMode()) {
                             setHandlesInput(false);
                         }
+                        revalidate();
                         return;
                     }
                 }

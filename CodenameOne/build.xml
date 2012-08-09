@@ -139,6 +139,7 @@
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/ZXing" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <mkdir dir="../nightly_builds" />
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
@@ -169,7 +170,8 @@
         <copydir src="../Demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
         <copydir src="../Demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
         <copydir src="../Demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
-        <copydir src="../Demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
+        <copydir src="../Demos/FacebookDemo" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
+        <copydir src="../Demos/Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/TZoneFriends" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/NativeDemo/lib" />
@@ -180,6 +182,7 @@
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/ZXing/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/SQLSample/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/FacebookDemo/lib" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Chrome/lib" />
         <zip basedir="src" destfile="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
@@ -199,6 +202,7 @@
         <copy file="dist/CodenameOne.jar" todir="../Demos/SQLSample/lib" />
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/SQLSample/lib" />
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/FacebookDemo/lib" />
+        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Chrome/lib" />
 
         <deltree dir="build/tmp"/>
         <mkdir dir="build/tmp"/>
@@ -206,6 +210,7 @@
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
         <zip basedir="build/tmp" compress="true" file="/Users/user2/Dropbox/updatedLibs.zip" />
+        <copy file="/Users/user2/Dropbox/updatedLibs.zip" todir="/Users/user2/dev/cn1/CodenameOne/repo" overwrite="true"/>
         <deltree dir="build/tmp"/>
 
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        
@@ -226,6 +231,8 @@
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/SQLSample/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/FacebookDemo/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/FacebookDemo/dist" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/Chrome/build" />        
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/Chrome/dist" />        
         
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
