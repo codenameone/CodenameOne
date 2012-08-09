@@ -523,7 +523,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     textDecorationCombo.setSelectedIndex(3);
                     break;
                 case com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_LOWERED:
-                    textDecorationCombo.setSelectedIndex(3);
+                    textDecorationCombo.setSelectedIndex(4);
                     break;
                 default:
                     textDecorationCombo.setSelectedIndex(0);

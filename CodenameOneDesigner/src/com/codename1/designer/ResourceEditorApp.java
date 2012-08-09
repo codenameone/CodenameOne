@@ -27,14 +27,18 @@ package com.codename1.designer;
 import com.codename1.ui.Display;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.resource.util.QuitAction;
+import com.codename1.ui.util.EditableResources;
 import java.awt.Image;
 import java.awt.Toolkit;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
+import java.util.Hashtable;
 import java.util.Properties;
 import javax.swing.JPanel;
 import org.jdesktop.application.Application;
@@ -148,7 +152,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
     /**
      * Main method launching the application.
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         if(args.length > 0) {
             if(args[0].equalsIgnoreCase("-buildVersion")) {
                 Properties p = new Properties();
@@ -161,10 +165,110 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 System.exit(0);
                 return;
             }
+            if(args[0].equalsIgnoreCase("gen")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                File output = new File(args[1]);
+                generateResourceFile(output, args[2], args[3]);
+                System.exit(0);
+                return;
+            }
         }
         JavaSEPortWithSVGSupport.blockMonitors();
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
         launch(ResourceEditorApp.class, args);
+    }
+    
+    private static void generateResourceFile(File f, String themeName, String ui) throws Exception {        
+        System.out.println("Generating resource file " + f + " theme " + themeName + " template " + ui);
+        EditableResources res = new EditableResources();
+        
+        //"native", "leather", "tzone", "tipster", "blank"
+        String template = "Native_Theme";
+        if(themeName.equalsIgnoreCase("leather")) {
+            template = "Leather";
+        }
+        if(themeName.equalsIgnoreCase("tzone")) {
+            template = "tzone_theme";
+        }
+        if(themeName.equalsIgnoreCase("tipster")) {
+            template = "tipster_theme";
+        }
+        
+        res.setTheme("Theme", importRes(res, template));
+        
+        if("HiWorld".equalsIgnoreCase(ui)) {
+            importRes(res, "HiWorldTemplate");
+            generate(res, f);
+        } else {
+            if("Tabs".equalsIgnoreCase(ui)) {
+                importRes(res, "Tabs");
+                generate(res, f);
+            } else {
+                if("List".equalsIgnoreCase(ui)) {
+                    importRes(res, "ListOfItems");
+                    generate(res, f);
+                }
+            }
+        }
+        
+        FileOutputStream os = new FileOutputStream(f);
+        res.save(os);
+        os.close();
+    }
+    
+    private static void generate(EditableResources res, File f) {
+        ResourceEditorView.generateStateMachineCodeEx("Main", 
+                new File(f.getParent() + File.separator + "generated" + File.separator + "StateMachineBase.java"), 
+                false, res, null);
+    }
+    
+    private static Hashtable importRes(EditableResources res, String file) {
+        InputStream is = ResourceEditorApp.class.getResourceAsStream("/templates/" + file + ".res");
+        Hashtable theme = new Hashtable();
+        if(is != null) {
+            try {
+                EditableResources r = new EditableResources();
+                r.openFile(is);
+                is.close();
+                if(r.getThemeResourceNames().length > 0) {
+                    theme = r.getTheme(r.getThemeResourceNames()[0]);
+                }
+                ResourceEditorView.checkDuplicateResourcesLoop(r, res.getImageResourceNames(),
+                        r.getImageResourceNames(), "Rename Image", "Image ", true, null);
+                ResourceEditorView.checkDuplicateResourcesLoop(r, res.getL10NResourceNames(),
+                        r.getL10NResourceNames(), "Rename Localization", "Localization ", true, null);
+                ResourceEditorView.checkDuplicateResourcesLoop(r, res.getDataResourceNames(),
+                        r.getDataResourceNames(), "Rename Data", "Data ", true, null);
+                ResourceEditorView.checkDuplicateResourcesLoop(r, res.getUIResourceNames(),
+                        r.getUIResourceNames(), "Rename GUI", "GUI ", true, null);
+                ResourceEditorView.checkDuplicateResourcesLoop(r, res.getFontResourceNames(),
+                        r.getFontResourceNames(), "Rename Font", "Font ", true, null);
+
+                for (String s : r.getImageResourceNames()) {
+                    if(r.isMultiImage(s)) {
+                        res.setMultiImage(s, (EditableResources.MultiImage)r.getResourceObject(s));
+                    } else {
+                        res.setImage(s, r.getImage(s));
+                    }
+                }
+                for (String s : r.getL10NResourceNames()) {
+                    res.setL10N(s, (Hashtable)r.getResourceObject(s));
+                }
+                for (String s : r.getDataResourceNames()) {
+                    res.setData(s, (byte[])r.getResourceObject(s));
+                }
+                for (String s : r.getUIResourceNames()) {
+                    res.setUi(s, (byte[])r.getResourceObject(s));
+                }
+                for (String s : r.getFontResourceNames()) {
+                    res.setFont(s, r.getFont(s));
+                }
+            } catch(IOException err) {
+                err.printStackTrace();
+            }
+        }
+        return theme;
     }
 }

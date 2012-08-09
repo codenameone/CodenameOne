@@ -39,6 +39,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.animations.Timeline;
 import com.codename1.impl.javase.SVG;
+import com.codename1.ui.Display;
 import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilder;
@@ -146,7 +147,7 @@ public class ResourceEditorView extends FrameView {
     private HelpAction helpAction = new HelpAction();
     private static final String IMAGE_DIR = "/com/codename1/designer/resources/";
         
-    private static final EditableResources loadedResources = new EditableResources();
+    private static EditableResources loadedResources = new EditableResources();
     private Properties projectGeneratorSettings;
     private static String manualIDESettings;
     private List<String> recentFiles = new ArrayList<String>();
@@ -795,6 +796,7 @@ public class ResourceEditorView extends FrameView {
         customNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu4 = new javax.swing.JMenu();
         addMultiImages = new javax.swing.JMenuItem();
+        quickMultiImages = new javax.swing.JMenuItem();
         addImages = new javax.swing.JMenuItem();
         addSVGImages = new javax.swing.JMenuItem();
         deleteUnusedImages = new javax.swing.JMenuItem();
@@ -806,6 +808,13 @@ public class ResourceEditorView extends FrameView {
         findMultiImages = new javax.swing.JMenuItem();
         launchOptiPng = new javax.swing.JMenuItem();
         import9Patch = new javax.swing.JMenuItem();
+        jMenu7 = new javax.swing.JMenu();
+        removeDPIHD = new javax.swing.JMenuItem();
+        removeDPIVeryHigh = new javax.swing.JMenuItem();
+        removeDPIHigh = new javax.swing.JMenuItem();
+        removeDPIMedium = new javax.swing.JMenuItem();
+        removeDPILow = new javax.swing.JMenuItem();
+        removeDPIVeryLow = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
         jSeparator8 = new javax.swing.JSeparator();
         about = new javax.swing.JMenuItem();
@@ -1408,6 +1417,11 @@ public class ResourceEditorView extends FrameView {
         addMultiImages.addActionListener(formListener);
         jMenu4.add(addMultiImages);
 
+        quickMultiImages.setText("Quick Add Multi Images");
+        quickMultiImages.setName("quickMultiImages"); // NOI18N
+        quickMultiImages.addActionListener(formListener);
+        jMenu4.add(quickMultiImages);
+
         addImages.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ADD, java.awt.event.InputEvent.CTRL_MASK));
         addImages.setMnemonic('A');
         addImages.setText("Add Images");
@@ -1462,6 +1476,41 @@ public class ResourceEditorView extends FrameView {
         import9Patch.setName("import9Patch"); // NOI18N
         import9Patch.addActionListener(formListener);
         jMenu2.add(import9Patch);
+
+        jMenu7.setText("Remove DPI");
+        jMenu7.setName("jMenu7"); // NOI18N
+
+        removeDPIHD.setText("HD");
+        removeDPIHD.setName("removeDPIHD"); // NOI18N
+        removeDPIHD.addActionListener(formListener);
+        jMenu7.add(removeDPIHD);
+
+        removeDPIVeryHigh.setText("Very High DPI");
+        removeDPIVeryHigh.setName("removeDPIVeryHigh"); // NOI18N
+        removeDPIVeryHigh.addActionListener(formListener);
+        jMenu7.add(removeDPIVeryHigh);
+
+        removeDPIHigh.setText("High");
+        removeDPIHigh.setName("removeDPIHigh"); // NOI18N
+        removeDPIHigh.addActionListener(formListener);
+        jMenu7.add(removeDPIHigh);
+
+        removeDPIMedium.setText("Medium");
+        removeDPIMedium.setName("removeDPIMedium"); // NOI18N
+        removeDPIMedium.addActionListener(formListener);
+        jMenu7.add(removeDPIMedium);
+
+        removeDPILow.setText("Low");
+        removeDPILow.setName("removeDPILow"); // NOI18N
+        removeDPILow.addActionListener(formListener);
+        jMenu7.add(removeDPILow);
+
+        removeDPIVeryLow.setText("Very Low");
+        removeDPIVeryLow.setName("removeDPIVeryLow"); // NOI18N
+        removeDPIVeryLow.addActionListener(formListener);
+        jMenu7.add(removeDPIVeryLow);
+
+        jMenu2.add(jMenu7);
 
         jMenu4.add(jMenu2);
 
@@ -1608,8 +1657,29 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == import9Patch) {
                 ResourceEditorView.this.import9PatchActionPerformed(evt);
             }
+            else if (evt.getSource() == removeDPIHD) {
+                ResourceEditorView.this.removeDPIHDActionPerformed(evt);
+            }
+            else if (evt.getSource() == removeDPIVeryHigh) {
+                ResourceEditorView.this.removeDPIVeryHighActionPerformed(evt);
+            }
+            else if (evt.getSource() == removeDPIHigh) {
+                ResourceEditorView.this.removeDPIHighActionPerformed(evt);
+            }
+            else if (evt.getSource() == removeDPIMedium) {
+                ResourceEditorView.this.removeDPIMediumActionPerformed(evt);
+            }
+            else if (evt.getSource() == removeDPILow) {
+                ResourceEditorView.this.removeDPILowActionPerformed(evt);
+            }
+            else if (evt.getSource() == removeDPIVeryLow) {
+                ResourceEditorView.this.removeDPIVeryLowActionPerformed(evt);
+            }
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
+            }
+            else if (evt.getSource() == quickMultiImages) {
+                ResourceEditorView.this.quickMultiImagesActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -1817,18 +1887,23 @@ private void addUserInterfaceActionPerformed(java.awt.event.ActionEvent evt) {//
 }//GEN-LAST:event_addUserInterfaceActionPerformed
 
 private void checkDuplicateResourcesLoop(EditableResources r, String[] loadedResourcesArray, String[] rArray, String dialogTitle, String resourceTypeName) {
-    checkDuplicateResourcesLoop(r, loadedResourcesArray, rArray, dialogTitle, resourceTypeName, true);
+    checkDuplicateResourcesLoop(r, loadedResourcesArray, rArray, dialogTitle, resourceTypeName, true, mainPanel);
 }
 
 public void checkDuplicateResourcesLoop(EditableResources r, String[] loadedResourcesArray, String[] rArray, String dialogTitle, String resourceTypeName, boolean forceRename) {
+    checkDuplicateResourcesLoop(r, loadedResourcesArray, rArray, dialogTitle, resourceTypeName, forceRename, mainPanel);
+}
+
+public static void checkDuplicateResourcesLoop(EditableResources r, String[] loadedResourcesArray, String[] rArray, String dialogTitle, String resourceTypeName, boolean forceRename, java.awt.Component cmp) {
     for(String e : rArray) {
-        checkDuplicateResources(r, loadedResourcesArray, rArray, dialogTitle, resourceTypeName, e, forceRename);
+        checkDuplicateResources(r, loadedResourcesArray, rArray, dialogTitle, resourceTypeName, e, forceRename, cmp);
     }
 }
-private void checkDuplicateResources(EditableResources r, String[] loadedResourcesArray, String[] rArray, String dialogTitle, String resourceTypeName, String entryName, boolean forceRename) {
+
+private static void checkDuplicateResources(EditableResources r, String[] loadedResourcesArray, String[] rArray, String dialogTitle, String resourceTypeName, String entryName, boolean forceRename, java.awt.Component cmp) {
     if(hasStringInArray(loadedResourcesArray, entryName)) {
         if(!forceRename) {
-            int val = JOptionPane.showConfirmDialog(mainPanel, resourceTypeName + entryName + " already defined in resources.\nDo you want to \"auto rename\"?", dialogTitle,
+            int val = JOptionPane.showConfirmDialog(cmp, resourceTypeName + entryName + " already defined in resources.\nDo you want to \"auto rename\"?", dialogTitle,
                     JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if(val != JOptionPane.YES_OPTION) {
                 return;
@@ -1912,7 +1987,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     }
 }//GEN-LAST:event_importResActionPerformed
 
-    private void removeCommandDups(final Map<String, Integer> commandMap, int commandId) {
+    private static void removeCommandDups(final Map<String, Integer> commandMap, int commandId) {
         for(String currentKey : commandMap.keySet()) {
             int c = commandMap.get(currentKey);
             if(c == commandId) {
@@ -1925,7 +2000,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
         }
     }
 
-    private void initCommandMapAndNameToClassLookup(final Map<String, String> nameToClassLookup,
+    private static void initCommandMapAndNameToClassLookup(final Map<String, String> nameToClassLookup,
         final Map<String, Integer> commandMap, final List<Integer> unhandledCommands,
         final List<String[]> actionComponentNames, final Map<String, String> allComponents) {
         // register the proper handlers for the component types used
@@ -2113,6 +2188,15 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     }
 
     String generateStateMachineCode(String uiResourceName, File destFile, boolean promptUserForPackageName) {
+        return generateStateMachineCodeImpl(uiResourceName, destFile, promptUserForPackageName, loadedResources, mainPanel);
+    }
+    
+    public static String generateStateMachineCodeEx(String uiResourceName, File destFile, boolean promptUserForPackageName, EditableResources load, java.awt.Component errorParent) {
+        loadedResources = load;
+        return generateStateMachineCodeImpl(uiResourceName, destFile, promptUserForPackageName, load, errorParent);
+    }
+    
+    private static String generateStateMachineCodeImpl(String uiResourceName, File destFile, boolean promptUserForPackageName, EditableResources loadResources, java.awt.Component errorParent) {
         String packageString = "";
         File currentFile = destFile;
         while(currentFile.getParent() != null) {
@@ -2151,7 +2235,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
 
         if(promptUserForPackageName) {
             JTextField packageName = new JTextField(packageString);
-            JOptionPane.showMessageDialog(mainPanel, packageName, "Please Pick The Package Name", JOptionPane.PLAIN_MESSAGE);
+            JOptionPane.showMessageDialog(errorParent, packageName, "Please Pick The Package Name", JOptionPane.PLAIN_MESSAGE);
             packageString = packageName.getText();
         }
         List<String> createdMethodNames = new ArrayList<String>();
@@ -2405,12 +2489,12 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.close();
         } catch(IOException ioErr) {
             ioErr.printStackTrace();
-            JOptionPane.showMessageDialog(mainPanel, "IO Error: " + ioErr, "IO Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(errorParent, "IO Error: " + ioErr, "IO Error", JOptionPane.ERROR_MESSAGE);
         }
         return packageString;
     }
 
-    private void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition) throws IOException {
+    private static void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition) throws IOException {
         w.write(methodSig);
         for(String ui : loadedResources.getUIResourceNames()) {
             w.write("        if(\"");
@@ -2460,47 +2544,6 @@ private void deleteUnusedImagesActionPerformed(java.awt.event.ActionEvent evt) {
         }
     }
 }//GEN-LAST:event_deleteUnusedImagesActionPerformed
-
-private void generatePreviewMIDlet(File selection, boolean blackberry) {
-    try {
-        /*String uiResourceName = pickMainScreenForm();
-        if(uiResourceName == null) {
-            return;
-        }*/
-
-        String previewJarLocal = "/PreviewMIDlet.jar";
-        String previewJadLocal = "/PreviewMIDlet.jad";
-        if(blackberry) {
-            previewJarLocal = "/bb/PreviewMIDlet.jar";
-            previewJadLocal = "/bb/PreviewMIDlet.jad";
-        }
-
-        InputStream previewMIDLetJar = getClass().getResourceAsStream(previewJarLocal);
-        File destJarFile = new File(selection, "PreviewMIDlet.jar");
-        File destJadFile = new File(selection, "PreviewMIDlet.jad");
-        ByteArrayOutputStream bout = new ByteArrayOutputStream();
-        loadedResources.save(bout);
-        bout.close();
-        createMIDletZip(previewMIDLetJar, destJarFile, new ByteArrayInputStream(bout.toByteArray()), "r.res");
-
-        BufferedWriter outputJad = new BufferedWriter(new FileWriter(destJadFile));
-        BufferedReader previewJad = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(previewJadLocal)));
-        String l = previewJad.readLine();
-        while(l != null) {
-            if(l.startsWith("MIDlet-Jar-Size")) {
-                l = "MIDlet-Jar-Size: " + destJarFile.length();
-            }
-            outputJad.write(l + "\n");
-            l = previewJad.readLine();
-        }
-        //outputJad.write("mainScreen: " + uiResourceName + "\n");
-        outputJad.close();
-        previewJad.close();
-    } catch(IOException err) {
-        err.printStackTrace();
-        JOptionPane.showMessageDialog(mainPanel, "Error when generating MIDlet " + err, "IO Error", JOptionPane.ERROR_MESSAGE);
-    }
-}
 
 private void duplicateItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_duplicateItemActionPerformed
     if(selectedResource != null && loadedResources.containsResource(selectedResource)) {
@@ -2851,8 +2894,10 @@ private boolean configureOptiPNG() {
             FileOutputStream f = new FileOutputStream(tmp);
             f.write(img.getImageData());
             f.close();
-            Process p = new ProcessBuilder(exe, "-o7", tmp.getAbsolutePath()).redirectErrorStream(true).start();
+            final Process p = new ProcessBuilder(exe, "-o7", tmp.getAbsolutePath()).redirectErrorStream(true).start();
             final InputStream stream = p.getInputStream();
+            final boolean[] running = new boolean[] {true};
+            final boolean[] destroyed = new boolean[] {false};
             new Thread() {
                 public void run() {
                     try {
@@ -2866,7 +2911,27 @@ private boolean configureOptiPNG() {
                     }
                 }
             }.start();
+            // timeout
+            new Thread() {
+                public void run() {
+                    long t = System.currentTimeMillis();
+                    while(running[0]) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
+                        }
+                        if(System.currentTimeMillis() - t > 4000) {
+                            destroyed[0] = true;
+                            p.destroy();
+                        }
+                    }
+                }
+            }.start();
             p.waitFor();
+            running[0] = false;
+            if(destroyed[0]) {
+                return null;
+            }
             DataInputStream input = new DataInputStream(new FileInputStream(tmp));
             byte[] data = new byte[(int)tmp.length()];
             input.read(data);
@@ -3080,6 +3145,72 @@ private void livePreviewUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN
     Preferences.userNodeForPackage(getClass()).putBoolean("LivePreview", livePreviewUI.isSelected());
 }//GEN-LAST:event_livePreviewUIActionPerformed
 
+    private void removeDPIHDActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPIHDActionPerformed
+        removeDPI(Display.DENSITY_HD);
+    }//GEN-LAST:event_removeDPIHDActionPerformed
+
+    private void removeDPIVeryHighActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPIVeryHighActionPerformed
+        removeDPI(Display.DENSITY_VERY_HIGH);
+    }//GEN-LAST:event_removeDPIVeryHighActionPerformed
+
+    private void removeDPIHighActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPIHighActionPerformed
+        removeDPI(Display.DENSITY_HIGH);
+    }//GEN-LAST:event_removeDPIHighActionPerformed
+
+    private void removeDPIMediumActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPIMediumActionPerformed
+        removeDPI(Display.DENSITY_MEDIUM);
+    }//GEN-LAST:event_removeDPIMediumActionPerformed
+
+    private void removeDPILowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPILowActionPerformed
+        removeDPI(Display.DENSITY_LOW);
+    }//GEN-LAST:event_removeDPILowActionPerformed
+
+    private void removeDPIVeryLowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeDPIVeryLowActionPerformed
+        removeDPI(Display.DENSITY_VERY_LOW);
+    }//GEN-LAST:event_removeDPIVeryLowActionPerformed
+
+    private void quickMultiImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_quickMultiImagesActionPerformed
+        new AddAndScaleMultiImage().selectFilesSimpleMode(mainPanel, loadedResources);
+    }//GEN-LAST:event_quickMultiImagesActionPerformed
+
+    private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
+        int[] dpis = multi.getDpi();
+        com.codename1.ui.EncodedImage[] imgs = multi.getInternalImages();
+        for(int iter = 0 ; iter < dpis.length ; iter++) {
+            if(dpis[iter] == dpi) {
+                com.codename1.ui.EncodedImage[] newImages = new com.codename1.ui.EncodedImage[imgs.length - 1];
+                int[] newDpis = new int[dpis.length - 1];
+                int originalOffset = 0;
+                for(int x = 0 ; x < newImages.length ; x++) {
+                    if(originalOffset == iter) {
+                        originalOffset++;
+                    }
+                    newImages[x] = imgs[originalOffset];
+                    newDpis[x] = dpis[originalOffset];
+                    originalOffset++;
+                }
+
+                multi = new EditableResources.MultiImage();
+                multi.setDpi(newDpis);
+                multi.setInternalImages(newImages);
+                loadedResources.setMultiImage(name, multi);
+                return;
+            }
+        }        
+    }
+    
+    private void removeDPI(int dpi) {
+        if(loadedResources == null) {
+            return;
+        }
+        for(String s : loadedResources.getImageResourceNames()) {
+            Object potentialMultiImage = loadedResources.getResourceObject(s);
+            if(potentialMultiImage instanceof EditableResources.MultiImage) {
+                EditableResources.MultiImage multi = (EditableResources.MultiImage)potentialMultiImage;
+                removeMultiEntry(s, multi, dpi);
+            }
+        }
+    }
     private void buildFilenameMap(File baseDir, Map<String, List<File>> map) {
         File[] f = baseDir.listFiles();
         for(File current : f) {
@@ -3491,7 +3622,7 @@ public static void openInIDE(File f, int lineNumber) {
         }
     }
 
-    private boolean hasStringInArray(String[] s, String val) {
+    private static boolean hasStringInArray(String[] s, String val) {
         for(String current : s) {
             if(current.equalsIgnoreCase(val)) {
                 return true;
@@ -4546,6 +4677,7 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenu jMenu4;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenu jMenu6;
+    private javax.swing.JMenu jMenu7;
     private javax.swing.JMenu jMenu8;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
@@ -4580,8 +4712,15 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem newMenuItem;
     private javax.swing.JMenuItem openMenuItem;
     private javax.swing.JMenuItem pulsateEffect;
+    private javax.swing.JMenuItem quickMultiImages;
     private javax.swing.JMenu recentMenu;
     private javax.swing.JMenuItem redoItem;
+    private javax.swing.JMenuItem removeDPIHD;
+    private javax.swing.JMenuItem removeDPIHigh;
+    private javax.swing.JMenuItem removeDPILow;
+    private javax.swing.JMenuItem removeDPIMedium;
+    private javax.swing.JMenuItem removeDPIVeryHigh;
+    private javax.swing.JMenuItem removeDPIVeryLow;
     private javax.swing.JMenuItem renameItem;
     private javax.swing.JMenuItem resPassword;
     private javax.swing.JMenuItem resetNetbeansSettings;

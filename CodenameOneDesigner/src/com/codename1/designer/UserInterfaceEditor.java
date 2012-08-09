@@ -1728,7 +1728,9 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
         makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
+        makeDraggable(codenameOneCalendar, com.codename1.ui.Calendar.class, "Calendar", null);
 
+        makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
                 createCustomComponentButton(currentCmp);
@@ -4114,6 +4116,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneContainer = new javax.swing.JButton();
         codenameOneTabs = new javax.swing.JButton();
         embedContainer = new javax.swing.JButton();
+        codenameOneCalendar = new javax.swing.JButton();
         jPanel6 = new javax.swing.JPanel();
         codenameOneExtraComponents = new javax.swing.JPanel();
         codenameOneTable = new javax.swing.JButton();
@@ -4196,7 +4199,7 @@ public class UserInterfaceEditor extends BaseForm {
         jPanel1.setLayout(new java.awt.BorderLayout());
 
         coreComponents.setName("coreComponents"); // NOI18N
-        coreComponents.setLayout(new java.awt.GridLayout(7, 2));
+        coreComponents.setLayout(new java.awt.GridLayout(8, 2));
 
         codenameOneLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXLabel32.png"))); // NOI18N
         codenameOneLabel.setText("Label");
@@ -4323,6 +4326,15 @@ public class UserInterfaceEditor extends BaseForm {
         embedContainer.setName("embedContainer"); // NOI18N
         embedContainer.addActionListener(formListener);
         coreComponents.add(embedContainer);
+
+        codenameOneCalendar.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneCalendar.setText("Calendar");
+        codenameOneCalendar.setToolTipText("<html><body><b>Tabs</b><br> \n<p>\nTabs is a type of container that arranges the components/containers within it in named tabs<br>\nallowing the user to page or swipe between them. \n</p> </body> </html>"); // NOI18N
+        codenameOneCalendar.setBorder(null);
+        codenameOneCalendar.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneCalendar.setName("codenameOneCalendar"); // NOI18N
+        codenameOneCalendar.addActionListener(formListener);
+        coreComponents.add(codenameOneCalendar);
 
         jPanel1.add(coreComponents, java.awt.BorderLayout.NORTH);
 
@@ -4800,6 +4812,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneMap) {
                 UserInterfaceEditor.this.codenameOneMapActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneShare) {
+                UserInterfaceEditor.this.codenameOneShareActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
@@ -4836,8 +4851,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneShare) {
-                UserInterfaceEditor.this.codenameOneShareActionPerformed(evt);
+            else if (evt.getSource() == codenameOneCalendar) {
+                UserInterfaceEditor.this.codenameOneCalendarActionPerformed(evt);
             }
         }
 
@@ -5113,6 +5128,14 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
 
+    private int getLanguageLevel() {
+        try {
+            return Integer.parseInt(view.getProjectGeneratorSettings().getProperty("codename1.languageLevel", "1"));
+        } catch(Throwable t) {
+            return 1;
+        }
+    }
+    
     private void bindActionEventActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bindActionEventActionPerformed
         try {
             File destFile = new File(projectGeneratorSettings.getProperty("userClassAbs"));
@@ -5143,13 +5166,22 @@ public class UserInterfaceEditor extends BaseForm {
                     pos = fileContent.lastIndexOf('}');
 
                     line = charIndexToFileLine(pos, fileContent) + 4;
-                    fileContent = fileContent.substring(0, pos) +
-                            "\n    protected void " + methodName + "(Component c, ActionEvent event) {\n" +
-                            "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
-                            "        super." + methodName +"(c, event);\n" +
-                            "    \n" +
-                            "    }\n" +
-                            fileContent.substring(pos);
+                    if(getLanguageLevel() > 4) {
+                        fileContent = fileContent.substring(0, pos) +
+                                "\n    @Override\n" +
+                                "    protected void " + methodName + "(Component c, ActionEvent event) {\n\n" +
+                                "    \n" +
+                                "    }\n" +
+                                fileContent.substring(pos);
+                    } else {
+                        fileContent = fileContent.substring(0, pos) +
+                                "\n    protected void " + methodName + "(Component c, ActionEvent event) {\n" +
+                                "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
+                                "        super." + methodName +"(c, event);\n" +
+                                "    \n" +
+                                "    }\n" +
+                                fileContent.substring(pos);
+                    }
                 }
                 if(modified) {
                     Writer output = new FileWriter(destFile);
@@ -5186,13 +5218,22 @@ public class UserInterfaceEditor extends BaseForm {
                 pos = fileContent.lastIndexOf('}');
 
                 line = charIndexToFileLine(pos, fileContent) + 4;
-                fileContent = fileContent.substring(0, pos) +
-                        "\n    protected void " + methodName + "(" + argsDefinition + ") {\n" +
-                        "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
-                        "        super." + methodName +"(" + args + ");\n" +
-                        "    \n" +
-                        "    }\n" +
-                        fileContent.substring(pos);
+                if(getLanguageLevel() > 4) {
+                    fileContent = fileContent.substring(0, pos) +
+                            "\n    @Override\n" +
+                            "    protected void " + methodName + "(" + argsDefinition + ") {\n" +
+                            "    \n" +
+                            "    }\n" +
+                            fileContent.substring(pos);
+                } else {
+                    fileContent = fileContent.substring(0, pos) +
+                            "\n    protected void " + methodName + "(" + argsDefinition + ") {\n" +
+                            "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
+                            "        super." + methodName +"(" + args + ");\n" +
+                            "    \n" +
+                            "    }\n" +
+                            fileContent.substring(pos);
+                }
                 Writer output = new FileWriter(destFile);
                 output.write(fileContent);
                 output.close();
@@ -5291,14 +5332,24 @@ public class UserInterfaceEditor extends BaseForm {
                     pos = fileContent.lastIndexOf('}');
 
                     line = charIndexToFileLine(pos, fileContent) + 4;
-                    fileContent = fileContent.substring(0, pos) +
-                            "\n    protected boolean " + methodName + "(List cmp) {\n" +
-                            "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
-                            "        super." + methodName +"(cmp);\n" +
-                            "        cmp.setModel(new DefaultListModel(YourDataHere));\n" +
-                            "        return true;\n" +
-                            "    }\n" +
-                            fileContent.substring(pos);
+                    if(getLanguageLevel() > 4) {
+                        fileContent = fileContent.substring(0, pos) +
+                                "\n    @Override\n" +
+                                "    protected boolean " + methodName + "(List cmp) {\n" +
+                                "        cmp.setModel(new DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
+                                "        return true;\n" +
+                                "    }\n" +
+                                fileContent.substring(pos);
+                    } else {
+                        fileContent = fileContent.substring(0, pos) +
+                                "\n    protected boolean " + methodName + "(List cmp) {\n" +
+                                "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
+                                "        super." + methodName +"(cmp);\n" +
+                                "        cmp.setModel(new DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
+                                "        return true;\n" +
+                                "    }\n" +
+                                fileContent.substring(pos);
+                    }
                 }
                 if(modified) {
                     Writer output = new FileWriter(destFile);
@@ -5456,6 +5507,14 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.components.ShareButton(), "ShareButton");
     }//GEN-LAST:event_codenameOneShareActionPerformed
 
+    private void codenameOneCalendarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneCalendarActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.Calendar(), "Calendar");
+    }//GEN-LAST:event_codenameOneCalendarActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5554,6 +5613,7 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton bindPostShow;
     private javax.swing.JButton codenameOneAds;
     private javax.swing.JButton codenameOneButton;
+    private javax.swing.JButton codenameOneCalendar;
     private javax.swing.JButton codenameOneCheckBox;
     private javax.swing.JButton codenameOneComboBox;
     private javax.swing.JButton codenameOneComponentGroup;

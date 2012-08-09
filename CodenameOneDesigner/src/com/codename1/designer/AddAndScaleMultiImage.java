@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JSpinner;
@@ -80,6 +81,68 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             return EncodedImage.create(scale(bi, w, h));
         }
         return null;
+    }
+
+    public void generate(File[] files, EditableResources res, int sourceResolution) {
+        for(File f : files) {
+            try {
+                BufferedImage bi = ImageIO.read(f);
+                EditableResources.MultiImage newImage = new EditableResources.MultiImage();
+                
+                int[] DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
+                    com.codename1.ui.Display.DENSITY_LOW,
+                    com.codename1.ui.Display.DENSITY_MEDIUM,
+                    com.codename1.ui.Display.DENSITY_HIGH,
+                    com.codename1.ui.Display.DENSITY_VERY_HIGH,
+                    com.codename1.ui.Display.DENSITY_HD};
+                float[] WIDTHS = {
+                    176, 240, 360, 480, 768, 1024
+                };
+                float[] HEIGHTS = {
+                    220, 320, 480, 854, 1024, 1920
+                };
+                EncodedImage[] images = new EncodedImage[6];
+                int imageCount = 6;
+                
+                for(int iter = 0 ; iter < DPIS.length ; iter++) {
+                    if(iter == sourceResolution) {
+                        images[iter] = EncodedImage.create(scale(bi, bi.getWidth(), bi.getHeight()));
+                    } else {
+                        float sourceWidth = WIDTHS[sourceResolution];
+                        float sourceHeight = HEIGHTS[sourceResolution];
+                        float destWidth = WIDTHS[iter];
+                        float destHeight = HEIGHTS[iter];
+                        int h = (int)(((float)bi.getHeight()) * destHeight / sourceHeight);
+                        int w = (int)(((float)bi.getWidth()) * destWidth / sourceWidth);
+                        images[iter] = EncodedImage.create(scale(bi, w, h));
+                    }
+                }
+
+                if(imageCount > 0) {
+                    int offset = 0;
+                    EncodedImage[] result = new EncodedImage[imageCount];
+                    int[] resultDPI = new int[imageCount];
+                    for(int iter = 0 ; iter < images.length ; iter++) {
+                        if(images[iter] != null) {
+                            result[offset] = images[iter];
+                            resultDPI[offset] = DPIS[iter];
+                            offset++;
+                        }
+                    }
+                    newImage.setDpi(resultDPI);
+                    newImage.setInternalImages(result);
+                    String destName = f.getName();
+                    int count = 1;
+                    while(res.containsResource(destName)) {
+                        destName = f.getName() + " " + count;
+                    }
+                    res.setMultiImage(destName, newImage);
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error reading file: " + f, "IO Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     public void generate(File[] files, EditableResources res) {
@@ -171,6 +234,20 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             return;
         }
         generate(selection, res);
+    }
+    
+    public void selectFilesSimpleMode(JComponent parent, EditableResources res) {
+        File[] selection = ResourceEditorView.showOpenFileChooser(true, "Images", ".gif", ".png", ".jpg");
+        if (selection == null) {
+            return;
+        }
+        JComboBox sourceResolution = new JComboBox(new String[] {"Very Low", "Low", "Medium", "High", "Very High", "HD"});
+        sourceResolution.setSelectedIndex(4);
+        int result = JOptionPane.showConfirmDialog(parent, sourceResolution, "Select Source Resolutions", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(result != JOptionPane.OK_OPTION) {
+            return;
+        }
+        generate(selection, res, sourceResolution.getSelectedIndex());
     }
 
     /** This method is called from within the constructor to

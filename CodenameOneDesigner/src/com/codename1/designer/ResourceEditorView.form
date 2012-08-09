@@ -1144,6 +1144,15 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="addMultiImagesActionPerformed"/>
               </Events>
             </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="quickMultiImages">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Quick Add Multi Images"/>
+                <Property name="name" type="java.lang.String" value="quickMultiImages" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="quickMultiImagesActionPerformed"/>
+              </Events>
+            </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="addImages">
               <Properties>
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
@@ -1243,6 +1252,68 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="import9PatchActionPerformed"/>
                   </Events>
                 </MenuItem>
+                <Menu class="javax.swing.JMenu" name="jMenu7">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Remove DPI"/>
+                    <Property name="name" type="java.lang.String" value="jMenu7" noResource="true"/>
+                  </Properties>
+                  <SubComponents>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPIHD">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="HD"/>
+                        <Property name="name" type="java.lang.String" value="removeDPIHD" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPIHDActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPIVeryHigh">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="Very High DPI"/>
+                        <Property name="name" type="java.lang.String" value="removeDPIVeryHigh" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPIVeryHighActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPIHigh">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="High"/>
+                        <Property name="name" type="java.lang.String" value="removeDPIHigh" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPIHighActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPIMedium">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="Medium"/>
+                        <Property name="name" type="java.lang.String" value="removeDPIMedium" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPIMediumActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPILow">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="Low"/>
+                        <Property name="name" type="java.lang.String" value="removeDPILow" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPILowActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                    <MenuItem class="javax.swing.JMenuItem" name="removeDPIVeryLow">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="Very Low"/>
+                        <Property name="name" type="java.lang.String" value="removeDPIVeryLow" noResource="true"/>
+                      </Properties>
+                      <Events>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="removeDPIVeryLowActionPerformed"/>
+                      </Events>
+                    </MenuItem>
+                  </SubComponents>
+                </Menu>
               </SubComponents>
             </Menu>
           </SubComponents>

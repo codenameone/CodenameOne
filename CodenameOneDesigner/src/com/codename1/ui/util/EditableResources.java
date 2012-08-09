@@ -1669,8 +1669,12 @@ public class EditableResources extends Resources implements TreeModel {
      */
     public void setThemeProperties(final String themeName, final String[] keys, final Object[] values) {
         final Object[] oldValues = new Object[keys.length];
+        Hashtable th = getTheme(themeName);
+        if(th == null) {
+            return;
+        }
         for(int iter = 0 ; iter < keys.length ; iter++) {
-            oldValues[iter] = getTheme(themeName).get(keys[iter]);
+            oldValues[iter] = th.get(keys[iter]);
         }
         pushUndoable(new UndoableEdit() {
             @Override
