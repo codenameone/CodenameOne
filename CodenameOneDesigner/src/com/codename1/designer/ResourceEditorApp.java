@@ -189,6 +189,9 @@ public class ResourceEditorApp extends SingleFrameApplication {
         if(themeName.equalsIgnoreCase("leather")) {
             template = "Leather";
         }
+        if(themeName.equalsIgnoreCase("chrome")) {
+            template = "Chrome";
+        }
         if(themeName.equalsIgnoreCase("tzone")) {
             template = "tzone_theme";
         }

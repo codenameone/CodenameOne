@@ -88,20 +88,21 @@
     <Component class="javax.swing.JComboBox" name="template">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="13">
+          <StringArray count="14">
             <StringItem index="0" value="Native_Theme"/>
             <StringItem index="1" value="Blank"/>
             <StringItem index="2" value="Leather"/>
-            <StringItem index="3" value="CodenameOne_Touch"/>
-            <StringItem index="4" value="CodenameOne_Feature"/>
-            <StringItem index="5" value="tzone_theme"/>
-            <StringItem index="6" value="tipster_theme"/>
-            <StringItem index="7" value="Blackberry"/>
-            <StringItem index="8" value="Wood"/>
-            <StringItem index="9" value="Accessability_Big_Theme"/>
-            <StringItem index="10" value="Accessability_Black_Theme"/>
-            <StringItem index="11" value="Accessability_White_Theme"/>
-            <StringItem index="12" value="Accessability_Yellow_Theme"/>
+            <StringItem index="3" value="Chrome"/>
+            <StringItem index="4" value="CodenameOne_Touch"/>
+            <StringItem index="5" value="CodenameOne_Feature"/>
+            <StringItem index="6" value="tzone_theme"/>
+            <StringItem index="7" value="tipster_theme"/>
+            <StringItem index="8" value="Blackberry"/>
+            <StringItem index="9" value="Wood"/>
+            <StringItem index="10" value="Accessability_Big_Theme"/>
+            <StringItem index="11" value="Accessability_Black_Theme"/>
+            <StringItem index="12" value="Accessability_White_Theme"/>
+            <StringItem index="13" value="Accessability_Yellow_Theme"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="template" noResource="true"/>
