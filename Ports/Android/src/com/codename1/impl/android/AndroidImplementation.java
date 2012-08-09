@@ -236,6 +236,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peers[i].release();
             }
         }
+        
+        HttpURLConnection.setFollowRedirects(false);
     }
 
     private boolean hasActionBar(){
@@ -2436,6 +2438,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             HttpURLConnection c = (HttpURLConnection) con;
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
+            c.setInstanceFollowRedirects(false);
         }
         con.setDoInput(read);
         con.setDoOutput(write);
