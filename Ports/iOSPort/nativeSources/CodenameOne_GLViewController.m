@@ -43,7 +43,7 @@
 #import <MobileCoreServices/UTCoreTypes.h>
 
 //int lastWindowSize = -1;
-extern void stringEdit(int finished, int cursorPos, const char* text);
+extern void stringEdit(int finished, int cursorPos, NSString* text);
 
 int nextPowerOf2(int val) {
     int i;
@@ -121,6 +121,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
  int constraint, const char* str, int len) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     dispatch_sync(dispatch_get_main_queue(), ^{
+        if(editingComponent != nil) {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+            repaintUI();
+        }
         float scale = [UIScreen mainScreen].scale;
         editCompoentX = x / scale;
         editCompoentY = y / scale;
@@ -1324,10 +1331,10 @@ static BOOL skipNextTouch = NO;
              editCompoentY + editCompoentH >= point.y)) {
             if([editingComponent isKindOfClass:[UITextView class]]) {
                 UITextView* v = (UITextView*)editingComponent;
-                stringEdit(YES, -1, v.text.UTF8String);
+                stringEdit(YES, -1, v.text);
             } else {
                 UITextField* v = (UITextView*)editingComponent;
-                stringEdit(YES, -1, v.text.UTF8String);                
+                stringEdit(YES, -1, v.text);                
             }
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
@@ -1438,5 +1445,4 @@ extern int popoverSupported();
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
 	[self dismissModalViewControllerAnimated:YES];
 }
-
 @end

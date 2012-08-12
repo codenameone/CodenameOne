@@ -41,6 +41,7 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
+#include "OpenUDID.h"
 
 extern void initVMImpl();
 
@@ -657,9 +658,9 @@ void screenSizeChanged(int width, int height) {
     com_codename1_impl_ios_IOSImplementation_sizeChangedImpl___int_int(width, height);
 }
 
-void stringEdit(int finished, int cursorPos, const char* text) {
+void stringEdit(int finished, int cursorPos, NSString* text) {
     com_codename1_impl_ios_IOSImplementation_editingUpdate___java_lang_String_int_boolean(
-                                                                                          xmlvm_create_java_string(text), cursorPos, finished != 0
+                                                                                          fromNSString(text), cursorPos, finished != 0
                                                                                           );
 }
 
@@ -1680,7 +1681,7 @@ int popoverSupported()
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__() {
-    return fromNSString([[UIDevice currentDevice] uniqueIdentifier]);
+    return fromNSString([OpenUDID value]);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_LONG peer) {
@@ -1714,9 +1715,18 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_LONG peer
     [l stopUpdatingLocation];    
 }
 
+ABAddressBookRef globalAddressBook = nil;
+ABAddressBookRef getAddressBook() {
+    if(globalAddressBook == nil) {
+        globalAddressBook = ABAddressBookCreate();
+    }
+    return globalAddressBook;
+}
+
+
 JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_BOOLEAN includeNumbers) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    ABAddressBookRef addressBook = ABAddressBookCreate();
+    ABAddressBookRef addressBook = getAddressBook();
     CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
     [pool release];
     return nPeople;
@@ -1727,7 +1737,7 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
     org_xmlvm_runtime_XMLVMArray* iArray = intArray;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     int size = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-    ABAddressBookRef addressBook = ABAddressBookCreate();
+    ABAddressBookRef addressBook = getAddressBook();
     CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
     for(int iter = 0 ; iter < size ; iter++) {
         ABRecordRef ref = CFArrayGetValueAtIndex(allPeople, iter);
@@ -1760,20 +1770,30 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(JAVA_LONG p
     return 1;
 }
 
+JAVA_OBJECT copyValueAsString(ABMultiValueRef r) {
+    JAVA_OBJECT ret = JAVA_NULL;
+    if(ABMultiValueGetCount(r) > 0) {
+        NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(r, 0);
+        ret = fromNSString(k);
+    }
+    return ret;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneProperty);    
-    JAVA_OBJECT ret = fromNSString(k);
+    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    JAVA_OBJECT ret = copyValueAsString(k);
     [pool release];
     return ret;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneMainLabel);    
-    JAVA_OBJECT ret = fromNSString(k);
+    //ABRecordRef i = (ABRecordRef)peer;
+    //ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneMainLabel);    
+    //JAVA_OBJECT ret = copyValueAsString(k);
+    JAVA_OBJECT ret = fromNSString(@"work");
     [pool release];
     return ret;
 }
@@ -1781,8 +1801,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonPhoneProperty);    
-    JAVA_OBJECT ret = fromNSString(k);
+    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    JAVA_OBJECT ret = copyValueAsString(k);
     [pool release];
     return ret;
 }
@@ -1790,8 +1810,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_L
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonEmailProperty);    
-    JAVA_OBJECT ret = fromNSString(k);
+    ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);    
+    JAVA_OBJECT ret = copyValueAsString(emails);
     [pool release];
     return ret;
 }
@@ -1819,7 +1839,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_LO
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_INT recId) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    ABRecordRef i = ABAddressBookGetPersonWithRecordID(recId, ABAddressBookCreate());
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
     [i retain];
     [pool release];
     return i;
@@ -2173,4 +2193,9 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_LONG statement, JAVA_INT col) {
     return xmlvm_create_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_LONG statement) {
+    sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
+    return sqlite3_column_count(stmt);
 }

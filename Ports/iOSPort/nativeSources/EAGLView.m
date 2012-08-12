@@ -194,6 +194,16 @@ extern UITextView *editingComponent;
     stringEdit(NO, -1, editingComponent.text.UTF8String);    
 }
 
+- (BOOL)textFieldShouldReturn:(UITextField *)theTextField {
+    if(editingComponent != nil) {
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+        [editingComponent release];
+        editingComponent = nil;
+        repaintUI();
+    }
+    return YES;
+}
 
 - (BOOL)presentFramebuffer
 {
