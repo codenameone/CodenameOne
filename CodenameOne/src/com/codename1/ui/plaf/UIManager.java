@@ -787,6 +787,26 @@ public class UIManager {
         return (Image) themeConstants.get(constantName);
     }
 
+    /**
+     * Returns a theme mask constant
+     *
+     * @param constantName the name of the constant
+     * @return the mask if defined
+     */
+    public Object getThemeMaskConstant(String constantName) {
+        Object o = themeConstants.get(constantName + "Mask");
+        if(o != null) {
+            return o;
+        }
+        Image i = (Image) themeConstants.get(constantName);
+        if(i == null) {
+            return null;
+        }
+        o = i.createMask();
+        themeConstants.put(constantName + "Mask", o);
+        return o;
+    }
+
     void setThemePropsImpl(Hashtable themeProps) {
         resetThemeProps(themeProps);
         styles.clear();

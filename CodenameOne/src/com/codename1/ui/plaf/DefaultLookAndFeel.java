@@ -357,7 +357,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * @inheritDoc
      */
     public void drawLabel(Graphics g, Label l) {
-        drawComponent(g, l, l.getIcon(), null, 0);
+        drawComponent(g, l, l.getMaskedIcon(), null, 0);
     }
 
     /**
@@ -585,7 +585,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * @inheritDoc
      */
     public Dimension getButtonPreferredSize(Button b) {
-        return getPreferredSize(b, new Image[]{b.getIcon(), b.getRolloverIcon(), b.getPressedIcon()}, null);
+        return getPreferredSize(b, new Image[]{b.getMaskedIcon(), b.getRolloverIcon(), b.getPressedIcon()}, null);
     }
 
     /**
@@ -596,9 +596,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             return getButtonPreferredSize(cb);
         }
         if (chkBoxImages != null) {
-            return getPreferredSize(cb, new Image[]{cb.getIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, chkBoxImages[0]);
+            return getPreferredSize(cb, new Image[]{cb.getMaskedIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, chkBoxImages[0]);
         }
-        Dimension d = getPreferredSize(cb, new Image[]{cb.getIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, null);
+        Dimension d = getPreferredSize(cb, new Image[]{cb.getMaskedIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, null);
 
         // checkbox square needs to be the height and width of the font height even
         // when no text is in the check box this is a good indication of phone DPI
@@ -615,7 +615,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * @inheritDoc
      */
     public Dimension getLabelPreferredSize(Label l) {
-        return getPreferredSize(l, new Image[]{l.getIcon()}, null);
+        return getPreferredSize(l, new Image[]{l.getMaskedIcon()}, null);
     }
 
     /**
@@ -803,9 +803,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             return getButtonPreferredSize(rb);
         }
         if (rButtonImages != null) {
-            return getPreferredSize(rb, new Image[]{rb.getIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, rButtonImages[0]);
+            return getPreferredSize(rb, new Image[]{rb.getMaskedIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, rButtonImages[0]);
         }
-        Dimension d = getPreferredSize(rb, new Image[]{rb.getIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, null);
+        Dimension d = getPreferredSize(rb, new Image[]{rb.getMaskedIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, null);
 
         // radio button radius needs to be of the size of the font height even
         // when no text is in the radio button this is a good indication of phone DPI

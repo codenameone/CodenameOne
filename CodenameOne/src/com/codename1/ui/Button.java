@@ -311,7 +311,7 @@ public class Button extends Label {
      * @return the button icon based on its current state
      */
     public Image getIconFromState() {
-        Image icon = getIcon();
+        Image icon = getMaskedIcon();
         if(!isEnabled() && getDisabledIcon() != null) {
             return getDisabledIcon();
         }
@@ -320,7 +320,7 @@ public class Button extends Label {
             if(icon == null) {
                 icon = getPressedIcon();
                 if (icon == null) {
-                    icon = getIcon();
+                    icon = getMaskedIcon();
                 }
             }
             return icon;
@@ -331,14 +331,14 @@ public class Button extends Label {
             case Button.STATE_PRESSED:
                 icon = getPressedIcon();
                 if (icon == null) {
-                    icon = getIcon();
+                    icon = getMaskedIcon();
                 }
                 break;
             case Button.STATE_ROLLOVER:
                 if(Display.getInstance().shouldRenderSelection(this)) {
                     icon = getRolloverIcon();
                     if (icon == null) {
-                        icon = getIcon();
+                        icon = getMaskedIcon();
                     }
                 }
                 break;

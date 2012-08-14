@@ -1216,6 +1216,28 @@ public class Dialog extends Form {
      * @return the command selected if the dialog is modal and disposed via a command
      */
     public Command showPacked(String position, boolean modal) {
+        return showPackedImpl(position, modal, false);
+    }
+
+    /**
+     * Convenience method to show a dialog stretched to one of the sides
+     * 
+     * @param position one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+     * @param modal whether the dialog should be modal or modaless
+     * @return the command selected if the dialog is modal and disposed via a command
+     */
+    public Command showStetched(String position, boolean modal) {
+        return showPackedImpl(position, modal, true);
+    }
+
+    /**
+     * Convenience method to show a dialog sized to match its content.
+     * 
+     * @param position one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.
+     * @param modal whether the dialog should be modal or modaless
+     * @return the command selected if the dialog is modal and disposed via a command
+     */
+    private Command showPackedImpl(String position, boolean modal, boolean stretch) {
         this.position = position;
         int height = Display.getInstance().getDisplayHeight();
         int width = Display.getInstance().getDisplayWidth();
@@ -1255,19 +1277,35 @@ public class Dialog extends Form {
             return lastCommandPressed;
         } 
         if(position.equals(BorderLayout.EAST)) {
-            show(topBottom, topBottom, Math.max(0, width - prefWidth), 0, true, modal);
+            if(stretch) {
+                show(0, 0, Math.max(0, width - prefWidth), 0, true, modal);
+            } else {
+                show(topBottom, topBottom, Math.max(0, width - prefWidth), 0, true, modal);
+            }
             return lastCommandPressed;
         } 
         if(position.equals(BorderLayout.WEST)) {
-            show(topBottom, topBottom, 0, Math.max(0, width - prefWidth), true, modal);
+            if(stretch) {
+                show(0, 0, 0, Math.max(0, width - prefWidth), true, modal);
+            } else {
+                show(topBottom, topBottom, 0, Math.max(0, width - prefWidth), true, modal);
+            }
             return lastCommandPressed;
         } 
         if(position.equals(BorderLayout.NORTH)) {
-            show(0, Math.max(0, height - prefHeight), leftRight, leftRight, true, modal);
+            if(stretch) {
+                show(0, Math.max(0, height - prefHeight), 0, 0, true, modal);
+            } else {
+                show(0, Math.max(0, height - prefHeight), leftRight, leftRight, true, modal);
+            }
             return lastCommandPressed;
         } 
         if(position.equals(BorderLayout.SOUTH)) {
-            show(Math.max(0, height - prefHeight), 0, leftRight, leftRight, true, modal);
+            if(stretch) {
+                show(Math.max(0, height - prefHeight), 0, 0, 0, true, modal);
+            } else {
+                show(Math.max(0, height - prefHeight), 0, leftRight, leftRight, true, modal);
+            }
             return lastCommandPressed;
         } 
         throw new IllegalArgumentException("Unknown position: " + position);

@@ -304,7 +304,10 @@ public class MenuBar extends Container implements ActionListener {
                 }
             } else {
                 if (current instanceof Container) {
-                    findCommandComponent(c, (Container) current);
+                    Button b = findCommandComponent(c, (Container) current);
+                    if(b != null) {
+                        return b;
+                    }
                 }
             }
         }
@@ -1057,8 +1060,8 @@ public class MenuBar extends Container implements ActionListener {
             if (i > -1) {
                 commands.removeElementAt(i);
                 Button b = findCommandComponent(cmd);
-                if (b != null) {
-                    removeComponent(b);
+                if (b != null && b.getParent() != null) {
+                    b.getParent().removeComponent(b);
                 }
                 if (getCommandCount() > 0) {
                     setLayout(new GridLayout(1, getCommandCount()));

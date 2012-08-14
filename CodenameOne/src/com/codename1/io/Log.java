@@ -118,6 +118,11 @@ public class Log {
     }
     
     /**
+     * Prevent new Log() syntax. Use getInstance()
+     */
+    protected Log() {}
+    
+    /**
      * Sends the current log to the cloud regardless of the reporting level
      */
     public static void sendLog() {

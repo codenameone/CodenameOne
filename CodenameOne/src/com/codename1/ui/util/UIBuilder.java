@@ -390,11 +390,11 @@ public class UIBuilder {
         }
         int commandId = in.readInt();
         String commandAction = in.readUTF();
-        boolean isBack = in.readBoolean();
         String commandArgument = "";
         if(commandAction.equals("$Execute")) {
             commandArgument = in.readUTF();
         }
+        boolean isBack = in.readBoolean();
         Command cmd = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandAction, isBack, commandArgument);
         if(rollover != null && rollover.length() > 0) {
             cmd.setRolloverIcon(res.getImage(rollover));
@@ -2020,6 +2020,7 @@ public class UIBuilder {
             Form f = new Form();
             f.setLayout(new BorderLayout());
             f.addComponent(BorderLayout.CENTER, cnt);
+            f.setName("Form" + cnt.getName());
             showForm(f, sourceCommand, sourceComponent);
         }
         return cnt;
@@ -2354,7 +2355,7 @@ public class UIBuilder {
                     return;
                 }
                 if(action.equals("$Execute")) {
-                    Display.getInstance().execute(action);
+                    Display.getInstance().execute((String)cmd.getClientProperty(COMMAND_ARGUMENTS));
                     return;
                 }
                 if(action.equals("$Back")) {

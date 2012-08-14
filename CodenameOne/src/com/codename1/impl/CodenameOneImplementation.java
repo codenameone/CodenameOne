@@ -1097,7 +1097,7 @@ public abstract class CodenameOneImplementation {
         int iW = getImageWidth(img);
         int iH = getImageHeight(img);
         for (int xPos = 0; xPos <= w; xPos += iW) {
-            for (int yPos = 0; yPos <= h; yPos += iH) {
+            for (int yPos = 0; yPos < h; yPos += iH) {
                 drawImage(graphics, img, x + xPos, y + yPos);
             }
         }

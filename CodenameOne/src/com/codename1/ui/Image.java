@@ -257,6 +257,23 @@ public class Image {
     }
 
     /**
+     * Applies the given alpha mask onto this image and returns the resulting image
+     * see the createMask method for indication on how to convert an image into an alpha
+     * mask. If the image is of a different size it will be scaled to mask size.
+     *
+     * @param mask mask object created by the createMask() method.
+     * @return image masked based on the given object
+     */
+    public Image applyMaskAutoScale(Object mask) {
+        int mWidth = ((IndexedImage)mask).getWidth();
+        int mHeight = ((IndexedImage)mask).getHeight();
+        if(mWidth != getWidth() || mHeight != getHeight()) {
+            return scaled(mWidth, mHeight).applyMask(mask);
+        }
+        return applyMask(mask);
+    }
+
+    /**
      * Extracts a subimage from the given image allowing us to breakdown a single large image
      * into multiple smaller images in RAM, this actually creates a standalone version
      * of the image for use. 

@@ -28,7 +28,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 import java.util.Hashtable;
 
 /**
@@ -42,6 +41,8 @@ import java.util.Hashtable;
  * @author Nir Shabi
  */
 public class BorderLayout extends Layout {
+    private boolean scaleEdges = true;
+    
     /**
      * Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
      */
@@ -292,15 +293,41 @@ public class BorderLayout extends Layout {
      * Position the east/west component variables
      */
     private void positionLeftRight(Component c, int targetWidth, int bottom, int top) {
+        int y = top + c.getStyle().getMargin(false, Component.TOP);
+        int h = bottom - top - c.getStyle().getMargin(false, Component.TOP) - c.getStyle().getMargin(false, Component.BOTTOM);
+        if(scaleEdges) {
+            c.setY(y);
+            c.setHeight(h); 
+        } else { 
+            int ph = c.getPreferredH();
+            if(ph < h) {
+                c.setHeight(ph);
+                c.setY(y + (h - ph) / 2);
+            } else {
+                c.setY(y);
+                c.setHeight(h); 
+            }
+        }
         c.setWidth(Math.min(targetWidth, c.getPreferredW()));
-        c.setHeight(bottom - top - c.getStyle().getMargin(false, Component.TOP) - c.getStyle().getMargin(false, Component.BOTTOM)); //verify I want to use tge prefered size
-        c.setY(top + c.getStyle().getMargin(false, Component.TOP));
     }
     
     private void positionTopBottom(Component target, Component c, int right, int left, int targetHeight) {
-        c.setWidth(right - left - c.getStyle().getMargin(false, Component.LEFT) - c.getStyle().getMargin(false, Component.RIGHT));
+        int w = right - left - c.getStyle().getMargin(false, Component.LEFT) - c.getStyle().getMargin(false, Component.RIGHT);
+        int x = left + c.getStyle().getMargin(target.isRTL(), Component.LEFT);
+        if(scaleEdges) {
+            c.setWidth(w);
+            c.setX(x);
+        } else {
+            int pw = c.getPreferredW();
+            if(pw < w) {
+                c.setWidth(pw);
+                c.setX(x + (w - pw) / 2);
+            } else {
+                c.setWidth(w);
+                c.setX(x);
+            }
+        }
         c.setHeight(Math.min(targetHeight, c.getPreferredH())); //verify I want to use tge prefered size
-        c.setX(left + c.getStyle().getMargin(target.isRTL(), Component.LEFT));
     }
     
     /**
@@ -525,5 +552,21 @@ public class BorderLayout extends Layout {
      */
     public boolean isOverlapSupported(){
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELLOW;
+    }
+
+    /**
+     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+     * @return the scaleEdges
+     */
+    public boolean isScaleEdges() {
+        return scaleEdges;
+    }
+
+    /**
+     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+     * @param scaleEdges the scaleEdges to set
+     */
+    public void setScaleEdges(boolean scaleEdges) {
+        this.scaleEdges = scaleEdges;
     }
 }

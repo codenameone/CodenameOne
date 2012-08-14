@@ -28,7 +28,6 @@ import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import java.util.Hashtable;
 
 /**
  * Allows displaying labels and images with different alignment options, this class
@@ -42,6 +41,7 @@ public class Label extends Component {
     private String text = "";
     
     private Image icon;
+    private Image maskedIcon;
     
     private int valign = BOTTOM;
 
@@ -62,6 +62,10 @@ public class Label extends Component {
     private boolean rightToLeft;
     
     private boolean endsWith3Points = true;
+
+    private Object mask;
+    
+    private String maskName;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -160,6 +164,9 @@ public class Label extends Component {
         if(isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
             getComponentForm().registerAnimatedInternal(this);
         }
+        if(maskName != null && mask == null) {
+            setMask(UIManager.getInstance().getThemeMaskConstant(maskName));
+        }
     }
     
     /**
@@ -179,6 +186,9 @@ public class Label extends Component {
     public void setIcon(Image icon){
         if(this.icon == icon) {
             return;
+        }
+        if(icon != null && mask != null) {
+            maskedIcon = icon.applyMaskAutoScale(mask);
         }
         this.icon = icon;
         setShouldCalcPreferredSize(true);
@@ -516,4 +526,93 @@ public class Label extends Component {
         defaultTickerEnabled = aDefaultTickerEnabled;
     }
 
+    
+    /**
+     * A mask image can be applied to the label (see the image mask method for details)
+     * which allows for things like rounded image appearance etc.
+     * 
+     * @param mask the mask returned from the image object
+     */
+    public void setMask(Object mask) {
+        this.mask = mask;
+    }
+    
+    /**
+     * Returns the mask matching the given image
+     * 
+     * @return the mask for the given label
+     */
+    public Object getMask() {
+        return mask;
+    }
+
+    /**
+     * Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+     * @return the maskName
+     */
+    public String getMaskName() {
+        return maskName;
+    }
+
+    /**
+     * Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+     * @param maskName the maskName to set
+     */
+    public void setMaskName(String maskName) {
+        this.maskName = maskName;
+        setMask(UIManager.getInstance().getThemeMaskConstant(maskName));
+        repaint();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"maskName"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] { String.class };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("maskName")) {
+            return getMaskName();
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("maskName")) {
+            setMaskName((String)value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
+    /**
+     * If a mask is applied returns the icon with a mask, otherwise returns the icon
+     * @return the icon masked or otherwise
+     */
+    public Image getMaskedIcon() {
+        if(maskedIcon != null) {
+            return maskedIcon;
+        }
+        if(mask != null) {
+            if(icon != null) {
+                maskedIcon = icon.applyMaskAutoScale(mask);
+                return maskedIcon;
+            }
+        }
+        return icon;
+    }
 }

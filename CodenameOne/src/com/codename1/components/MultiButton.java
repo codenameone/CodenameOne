@@ -32,6 +32,7 @@ import com.codename1.ui.RadioButton;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
 
 /**
@@ -49,7 +50,7 @@ public class MultiButton extends Container {
     private Label icon = new Label();
     private Button emblem = new Button();
     private boolean invert;
-    private String group;    
+    private String group;  
     
     /**
      * Default constructor allowing the designer to create an instance of this class
@@ -235,10 +236,15 @@ public class MultiButton extends Container {
      */
     public void setHorizontalLayout(boolean b) {
         if(isHorizontalLayout() != b) {
+            if(isHorizontalLayout()) {
+                secondRow.getParent().getParent().removeComponent(secondRow.getParent());
+            }
             secondRow.getParent().removeComponent(secondRow);
             if(b) {
+                Container wrapper = new Container();
                 Container c = firstRow.getParent();
-                c.addComponent(BorderLayout.EAST, secondRow);
+                wrapper.addComponent(secondRow);
+                c.addComponent(BorderLayout.EAST, wrapper);
             } else {
                 Container c = thirdRow.getParent();
                 c.addComponent(0, secondRow);
@@ -252,7 +258,7 @@ public class MultiButton extends Container {
      * @return true if the first two labels are side by side
      */
     public boolean isHorizontalLayout() {
-        return secondRow.getParent().getLayout() instanceof BorderLayout;
+        return secondRow.getParent().getLayout() instanceof FlowLayout;
     }
     
     /**
@@ -661,7 +667,9 @@ public class MultiButton extends Container {
             "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4", 
             "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition",
             "emblem", "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
-            "invertFirstTwoEntries", "checkBox", "radioButton", "group", "selected"};
+            "invertFirstTwoEntries", "checkBox", "radioButton", "group", "selected",
+            "maskName"
+        };
     }
 
     /**
@@ -694,7 +702,8 @@ public class MultiButton extends Container {
            Boolean.class,
            Boolean.class,
            String.class,// group
-           Boolean.class // selected
+           Boolean.class, // selected
+           String.class
        };
     }
 
@@ -794,6 +803,9 @@ public class MultiButton extends Container {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
+        }
+        if(name.equals("maskName")) {
+            return getMaskName();
         }
         return null;
     }
@@ -906,6 +918,10 @@ public class MultiButton extends Container {
             setSelected(((Boolean)value).booleanValue());
             return null;
         }
+        if(name.equals("maskName")) {
+            setMaskName((String)value);
+            return null;
+        }
         return super.setPropertyValue(name, value);
     }
 
@@ -926,5 +942,21 @@ public class MultiButton extends Container {
         if(emblem instanceof RadioButton) {
             ((RadioButton)emblem).setGroup(group);
         }
+    }
+
+    /**
+     * Set the mask name for the icon
+     * @return the maskName
+     */
+    public String getMaskName() {
+        return icon.getMaskName();
+    }
+
+    /**
+     * The mask name for the icon
+     * @param maskName the maskName to set
+     */
+    public void setMaskName(String maskName) {
+        icon.setMaskName(maskName);
     }
 }

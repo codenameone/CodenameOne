@@ -186,7 +186,7 @@ public class Slider extends Label {
         if(sliderFull != null) {
             deinitializeCustomStyle(sliderFull);
             deinitializeCustomStyle(sliderFullSelected);
-            initStyles("SliderFull");
+            initStyles("Slider");
         }
     }
 
