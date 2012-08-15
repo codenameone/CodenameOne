@@ -687,13 +687,25 @@ public class Container extends Component {
                 parentForm.deregisterAnimatedInternal(cmp);
             }
         }
-        Display.getInstance().getImplementation().cancelRepaint(cmp);
+        cmp.cancelRepaints();
         if(cmp instanceof Form) {
             cmp.setVisible(false);
         }
         setShouldCalcPreferredSize(true);
     }
 
+    
+    /**
+     * remove this component and it's children from the painting queue
+     */
+    protected void cancelRepaints() {
+        super.cancelRepaints();
+        for (int i = 0; i < getComponentCount(); i++) {
+            Component c = getComponentAt(i);
+            c.cancelRepaints();
+        }
+    }
+    
     /**
      * Cleansup the initialization flags in the hierachy
      */

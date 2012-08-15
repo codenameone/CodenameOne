@@ -233,7 +233,7 @@ public class Log {
         }
         logDirty = true;
         text = getThreadAndTimeStamp() + " - " + text;
-        System.out.println(text);
+        Util.getImplementation().systemOut(text);
         try {
             synchronized(this) {
                 Writer w = getWriter();

@@ -2276,7 +2276,7 @@ public class Component implements Animation, StyleListener {
                     return;
                 } else {
                     if(scroll > getScrollDimension().getWidth() - getWidth()) {
-                        startTensile(scroll, getScrollDimension().getWidth() - getWidth());
+                        startTensile(scroll, Math.max(getScrollDimension().getWidth() - getWidth(), 0));
                         return;
                     }
                 }
@@ -2286,7 +2286,7 @@ public class Component implements Animation, StyleListener {
                     return;
                 } else {
                     if(scroll > getScrollDimension().getHeight() - getHeight()) {
-                        startTensile(scroll, getScrollDimension().getHeight() - getHeight());
+                        startTensile(scroll, Math.max(getScrollDimension().getHeight() - getHeight(), 0));
                         return;
                     }
                 }
@@ -3685,6 +3685,13 @@ public class Component implements Animation, StyleListener {
      */
     public void setHideInPortrait(boolean hideInPortrait) {
         this.hideInPortrait = hideInPortrait;
+    }
+    
+    /**
+     * remove this component from the painting queue
+     */
+    protected void cancelRepaints() {
+        Display.getInstance().getImplementation().cancelRepaint(this);
     }
 
     class BGPainter implements Painter, Animation {

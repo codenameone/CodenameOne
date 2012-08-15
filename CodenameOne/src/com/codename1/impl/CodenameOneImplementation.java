@@ -440,6 +440,7 @@ public abstract class CodenameOneImplementation {
                     return;
                 }
             }
+
         }
     }
 
@@ -3833,6 +3834,15 @@ public abstract class CodenameOneImplementation {
         logger.actionPerformed(new ActionEvent(content));
     }
 
+    /**
+     * System print
+     * 
+     * @param content 
+     */
+    public void systemOut(String content){
+        System.out.println(content);
+    }
+    
     /**
      * Logs the creation of a stream
      *
