@@ -2960,11 +2960,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         return l10n;
     }
 
-    protected void log(String content) {
-        super.log(content);
+    public void systemOut(String content){
         EventLog.getInstance().logInformationEvent(content);
     }
-    
     
        
 }
