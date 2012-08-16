@@ -1144,10 +1144,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(exit);
             bar.add(simulatorMenu);
             bar.add(skinMenu);
+            
             rotate.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
                     portrait = !portrait;
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("Portrait", portrait);
+                    
                     float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
                     float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
                     zoomLevel = Math.min(h1, w1);
@@ -1440,7 +1444,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
             }
-            //frm.setSize(getSkin().getWidth(), getSkin().getHeight());
+            
+            portrait = pref.getBoolean("Portrait", true);                    
+            if(!portrait){
+                canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                frm.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+            }
             frm.setVisible(true);
         }
         if (useNativeInput) {
