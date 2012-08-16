@@ -79,7 +79,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     GLErrorLog;
 
     for (int xPos = 0; xPos <= width; xPos += imageWidth) {
-        for (int yPos = 0; yPos <= height; yPos += imageHeight) {
+        for (int yPos = 0; yPos < height; yPos += imageHeight) {
             GLfloat* vertexes = createVertexArray(x + xPos, y + yPos, imageWidth, imageHeight);
             glVertexPointer(2, GL_FLOAT, 0, vertexes);
             GLErrorLog;

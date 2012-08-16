@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 #import <QuartzCore/QuartzCore.h>
@@ -42,6 +42,8 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #import <MobileCoreServices/UTCoreTypes.h>
 
+extern void repaintUI();
+
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 
@@ -56,13 +58,16 @@ int displayHeight = -1;
 UIView *editingComponent;
 int editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 BOOL firstTime = YES;
+BOOL retinaBug;
+float scaleValue = 1;
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
 
+
 NSAutoreleasePool *globalCodenameOnePool;
 void initVMImpl() {
-    // initialize an auto release pool for the CodenameOne main thread 
+    // initialize an auto release pool for the CodenameOne main thread
 	globalCodenameOnePool = [[NSAutoreleasePool alloc] init];
 }
 
@@ -117,18 +122,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
-(int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize, 
+(int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
+    if(editingComponent != nil) {
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+        [editingComponent release];
+        editingComponent = nil;
+        repaintUI();
+    }
     dispatch_sync(dispatch_get_main_queue(), ^{
-        if(editingComponent != nil) {
-            [editingComponent resignFirstResponder];
-            [editingComponent removeFromSuperview];
-            [editingComponent release];
-            editingComponent = nil;
-            repaintUI();
-        }
-        float scale = [UIScreen mainScreen].scale;
+        float scale = scaleValue;
         editCompoentX = x / scale;
         editCompoentY = y / scale;
         editCompoentW = w / scale;
@@ -146,11 +151,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             // EMAILADDR
             if((constraint & 1) == 1) {
                 utf.keyboardType = UIKeyboardTypeEmailAddress;
-            } else {         
+            } else {
                 // NUMERIC
                 if((constraint & 2) == 2) {
                     utf.keyboardType = UIKeyboardTypeNumberPad;
-                } else {                    
+                } else {
                     // PHONENUMBER
                     if((constraint & 3) == 3) {
                         utf.keyboardType = UIKeyboardTypePhonePad;
@@ -161,15 +166,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                         } else {
                             // DECIMAL
                             if((constraint & 5) == 5) {
-                                utf.keyboardType = UIKeyboardTypeNumbersAndPunctuation;
-                            } 
+                                utf.keyboardType = UIKeyboardTypeDecimalPad;
+                            }
                         }
                     }
                 }
             }
             if(scale != 1) {
                 float s = ((UIFont*)font).pointSize / scale;
-                utf.font = [((UIFont*)font) fontWithSize:s]; 
+                utf.font = [((UIFont*)font) fontWithSize:s];
             } else {
                 utf.font = (UIFont*)font;
             }
@@ -178,12 +183,17 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.backgroundColor = [UIColor whiteColor];
             utf.returnKeyType = UIReturnKeyDone;
             utf.borderStyle = UITextBorderStyleRoundedRect;
+            [[NSNotificationCenter defaultCenter]
+             addObserver:utf.delegate
+             selector:@selector(textFieldDidChange)
+             name:UITextFieldTextDidChangeNotification
+             object:utf];
         } else {
             UITextView* utv = [[UITextView alloc] initWithFrame:rect];
-            editingComponent = utv;            
+            editingComponent = utv;
             if(scale != 1) {
                 float s = ((UIFont*)font).pointSize / scale;
-                utv.font = [((UIFont*)font) fontWithSize:s]; 
+                utv.font = [((UIFont*)font) fontWithSize:s];
             } else {
                 utv.font = (UIFont*)font;
             }
@@ -194,7 +204,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
         [editingComponent becomeFirstResponder];
         [[CodenameOne_GLViewController instance].view resignFirstResponder];
-        [editingComponent setNeedsDisplay]; 
+        [editingComponent setNeedsDisplay];
         
     });
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl finished");
@@ -204,34 +214,106 @@ int isIPad() {
     return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
 }
 
+
+#define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+
+BOOL isRetinaBug() {
+    return isIPad() && [[UIScreen mainScreen] scale] == 2 && SYSTEM_VERSION_LESS_THAN(@"6.0");
+}
+
+BOOL isRetina() {
+    if([[UIScreen mainScreen] scale] == 2) {
+        return !isRetinaBug();
+    }
+    return NO;
+}
+
+
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
-(int* arr, int width, int height) {
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+(int* buffer, int width, int height) {
+    size_t bufferLength = width * height * 4;
+    size_t bitsPerComponent = 8;
+    size_t bitsPerPixel = 32;
+    size_t bytesPerRow = 4 * width;
     
-    CGDataProviderRef prov1 = CGDataProviderCreateWithData(NULL, arr, width * height * 4, NULL);
-    CFDataRef dataRef = CGDataProviderCopyData(prov1);
-    CGDataProviderRef provider = CGDataProviderCreateWithCFData(dataRef);
-    CGImageRef ref = CGImageCreate(width, height, 8, 32, width * 4, colorSpace, 
-                                   kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
-                                   provider, 
-                                   NULL, NO, kCGRenderingIntentDefault);
-    //[colorSpace release];
-    UIImage* img = [UIImage imageWithCGImage:ref];
-    CGDataProviderRelease(dataRef);
+    
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
+    
+    CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB();
+    if(colorSpaceRef == NULL) {
+        NSLog(@"Error allocating color space");
+        CGDataProviderRelease(provider);
+        return nil;
+    }
+    
+    CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaFirst;
+    CGColorRenderingIntent renderingIntent = kCGRenderingIntentDefault;
+    
+    CGImageRef iref = CGImageCreate(width,
+                                    height,
+                                    bitsPerComponent,
+                                    bitsPerPixel,
+                                    bytesPerRow,
+                                    colorSpaceRef,
+                                    bitmapInfo,
+                                    provider,	// data provider
+                                    NULL,	// decode
+                                    NO,	// should interpolate
+                                    renderingIntent);
+    
+    uint32_t* pixels = (uint32_t*)malloc(bufferLength);
+    
+    if(pixels == NULL) {
+        NSLog(@"Error: Memory not allocated for bitmap");
+        CGDataProviderRelease(provider);
+        CGColorSpaceRelease(colorSpaceRef);
+        CGImageRelease(iref);
+        return nil;
+    }
+    memset(pixels, 0, bufferLength);
+    
+    CGContextRef context = CGBitmapContextCreate(pixels,
+                                                 width,
+                                                 height,
+                                                 bitsPerComponent,
+                                                 bytesPerRow,
+                                                 colorSpaceRef,
+                                                 kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+    
+    if(context == NULL) {
+        NSLog(@"Error context not created");
+        free(pixels);
+        return NULL;
+    }
+    
+    UIImage *image = nil;
+    if(context) {
+        
+        CGContextDrawImage(context, CGRectMake(0.0f, 0.0f, width, height), iref);
+        
+        CGImageRef imageRef = CGBitmapContextCreateImage(context);
+        
+        // Support both iPad 3.2 and iPhone 4 Retina displays with the correct scale
+        if([UIImage respondsToSelector:@selector(imageWithCGImage:scale:orientation:)]) {
+            float scale = [[UIScreen mainScreen] scale];
+            image = [UIImage imageWithCGImage:imageRef scale:scale orientation:UIImageOrientationUp];
+        } else {
+            image = [UIImage imageWithCGImage:imageRef];
+        }
+        
+        CGImageRelease(imageRef);
+        CGContextRelease(context);
+    }
+    
+    CGColorSpaceRelease(colorSpaceRef);
+    CGImageRelease(iref);
     CGDataProviderRelease(provider);
-    CGDataProviderRelease(prov1);
-    CGImageRelease(ref);
-    return [[GLUIImage alloc] initWithImage:img];
     
-    /*UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), YES, 1.0);
-     [[UIColor blueColor] set];
-     UIRectFill(CGRectMake(0, 0, width, height));
-     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-     UIGraphicsEndImageContext();
-     //[img retain];
-     //NSLog(@"createNativeMutableImageImpl finished");
-     return img;*/
-    //return 0;
+    if(pixels) {
+        free(pixels);
+    }
+    
+    return [[GLUIImage alloc] initWithImage:image];
 }
 
 
@@ -253,16 +335,16 @@ CGContextRef roundRect(int color, int alpha, int x, int y, int width, int height
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     
-    CGRect rrect = CGRectMake(x, y, width, height); 
-    CGFloat radius = MAX(arcWidth, arcHeight); 
-    CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect); 
-    CGFloat miny = CGRectGetMinY(rrect), midy = CGRectGetMidY(rrect), maxy = CGRectGetMaxY(rrect); 
-    CGContextMoveToPoint(context, minx, midy); 
-    CGContextAddArcToPoint(context, minx, miny, midx, miny, radius); 
-    CGContextAddArcToPoint(context, maxx, miny, maxx, midy, radius); 
-    CGContextAddArcToPoint(context, maxx, maxy, midx, maxy, radius); 
-    CGContextAddArcToPoint(context, minx, maxy, minx, midy, radius); 
-    CGContextClosePath(context); 
+    CGRect rrect = CGRectMake(x, y, width, height);
+    CGFloat radius = MAX(arcWidth, arcHeight);
+    CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
+    CGFloat miny = CGRectGetMinY(rrect), midy = CGRectGetMidY(rrect), maxy = CGRectGetMaxY(rrect);
+    CGContextMoveToPoint(context, minx, midy);
+    CGContextAddArcToPoint(context, minx, miny, midx, miny, radius);
+    CGContextAddArcToPoint(context, maxx, miny, maxx, midy, radius);
+    CGContextAddArcToPoint(context, maxx, maxy, midx, maxy, radius);
+    CGContextAddArcToPoint(context, minx, maxy, minx, midy, radius);
+    CGContextClosePath(context);
     return context;
 }
 
@@ -294,7 +376,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-
+    
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl(glu, 255, x, y, width, height);
     [glu release];
@@ -325,21 +407,21 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
     CGContextRef context = UIGraphicsGetCurrentContext();
     int radius = MIN(width, height) / 2;
     CGContextAddArc (context,
-                    x + radius, y + radius,
-                    radius,
-                    startAngle * PI / 180,
-                    (startAngle + angle) * PI / 180,
-                    1);
+                     x + radius, y + radius,
+                     radius,
+                     startAngle * PI / 180,
+                     (startAngle + angle) * PI / 180,
+                     1);
     return context;
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {    
+(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {    
+(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
 }
 
@@ -356,7 +438,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {    
+(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl(color, alpha, 0, 0, width, height, startAngle, angle);
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
@@ -405,7 +487,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl
 }
 
 void vibrateDevice() {
-    AudioServicesPlayAlertSound(kSystemSoundID_Vibrate);    
+    AudioServicesPlayAlertSound(kSystemSoundID_Vibrate);
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
@@ -424,7 +506,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
         }
     }
     
-    pSize *= [UIScreen mainScreen].scale;
+    pSize *= scaleValue;
     
     UIFont* fnt;
     // bold
@@ -437,7 +519,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
         } else {
             fnt = [UIFont systemFontOfSize:pSize];
         }
-    } 
+    }
     [fnt retain];
     [pool release];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl finished %i", (int)fnt);
@@ -452,7 +534,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
     if(displayWidth <= 0) {
-        displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * [UIScreen mainScreen].scale;
+        displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
     }
     //NSLog(@"Display width %i", displayWidth);
     return displayWidth;
@@ -466,7 +548,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
     if(displayHeight <= 0) {
-        displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * [UIScreen mainScreen].scale;
+        displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     }
     return displayHeight;
 }
@@ -610,7 +692,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     }
     
     CGContextRef context = UIGraphicsGetCurrentContext();
-    CGContextSaveGState(context); 
+    CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (GLUIImage*)peer;
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl finished");
 }
@@ -632,8 +714,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     }
     UIImage* img = [(GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4, 
-                                                 coloSpaceRgb, 
+    CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
+                                                 coloSpaceRgb,
                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
     CGRect r = CGRectMake(-x, -(img.size.height - y - height), img.size.width, img.size.height);
     CGImageRef cgImg = [img CGImage];
@@ -743,6 +825,12 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (void)awakeFromNib
 {
+    retinaBug = isRetinaBug();
+    if(retinaBug) {
+        scaleValue = 1;
+    } else {
+        scaleValue = [UIScreen mainScreen].scale;
+    }
     sharedSingleton = self;
     [self initVars];
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
@@ -776,23 +864,36 @@ static CodenameOne_GLViewController *sharedSingleton;
     //NSLog(@"Draw texture extension %i", (int)drawTextureSupported);
     
     // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self 
-                                             selector:@selector(keyboardWillShow:) 
-                                                 name:UIKeyboardWillShowNotification 
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillShow:)
+                                                 name:UIKeyboardWillShowNotification
                                                object:self.view.window];
     // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self 
-                                             selector:@selector(keyboardWillHide:) 
-                                                 name:UIKeyboardWillHideNotification 
-                                               object:self.view.window];    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillHide:)
+                                                 name:UIKeyboardWillHideNotification
+                                               object:self.view.window];
     
     UIImage *img = nil;
     if(isIPad()) {
-        if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() > 
-                Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()) {
-            img = [UIImage imageNamed:@"Default-Landscape.png"];
+        if(scaleValue > 1) {
+            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() >
+               Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()) {
+                img = [UIImage imageNamed:@"Default-Landscape@2x.png"];
+            } else {
+                img = [UIImage imageNamed:@"Default-Portrait@2x.png"];
+            }
         } else {
-            img = [UIImage imageNamed:@"Default-Portrait.png"];
+            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() >
+               Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()) {
+                NSString* str = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Default-Landscape.png"];
+                NSData* iData = [NSData dataWithContentsOfFile:str];
+                img = [[UIImage alloc] initWithData:iData];
+            } else {
+                NSString* str = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Default-Portrait.png"];
+                NSData* iData = [NSData dataWithContentsOfFile:str];
+                img = [[UIImage alloc] initWithData:iData];
+            }
         }
     } else {
         if([UIScreen mainScreen].scale > 1) {
@@ -802,31 +903,42 @@ static CodenameOne_GLViewController *sharedSingleton;
         }
     }
     if(img != nil) {
-        float scale = [UIScreen mainScreen].scale;
+        float scale = scaleValue;
+        DrawImage* dr;
+        GLUIImage* gl;
+        /*if(isRetinaBug()) {
+         CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, img.size.width * 2, img.size.height * 2 - 20 * scale));
+         img = [UIImage imageWithCGImage:imageRef];
+         CGImageRelease(imageRef);
+         
+         gl = [[GLUIImage alloc] initWithImage:img];
+         dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width / 2 h:img.size.height / 2];
+         } else {*/
         CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, img.size.width, img.size.height - 20 * scale));
-        img = [UIImage imageWithCGImage:imageRef]; 
+        img = [UIImage imageWithCGImage:imageRef];
         CGImageRelease(imageRef);
-
-        GLUIImage* gl = [[GLUIImage alloc] initWithImage:img];
-        DrawImage* dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
-
+        
+        gl = [[GLUIImage alloc] initWithImage:img];
+        dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
+        //}
+        
         [(EAGLView *)self.view setFramebuffer];
         GLErrorLog;
-
+        
         glScalef(1, -1, 1);
         GLErrorLog;
         glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
         GLErrorLog;
-
+        
         [dr execute];
         [gl release];
-
+        
         glTranslatef(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
         GLErrorLog;
-
+        
         glScalef(1, -1, 1);
         GLErrorLog;
-
+        
         [(EAGLView *)self.view presentFramebuffer];
         GLErrorLog;
     }
@@ -848,15 +960,15 @@ static CodenameOne_GLViewController *sharedSingleton;
     // resize the scrollview
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-
+    
     if(displayHeight > displayWidth) {
         viewFrame.origin.y += keyboardSize.height;
     } else {
-        viewFrame.origin.x -= keyboardSize.height;        
+        viewFrame.origin.x -= keyboardSize.height;
     }
     /*float y = editingComponent.frame.origin.y;
-    y += keyboardSize.height;
-    editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
+     y += keyboardSize.height;
+     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
     
     [UIView beginAnimations:nil context:NULL];
     [UIView setAnimationBeginsFromCurrentState:YES];
@@ -880,8 +992,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     // resize the noteView
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-
-    if(editCompoentY + (editCompoentH / 2) < displayHeight / [UIScreen mainScreen].scale - keyboardSize.height) {
+    
+    if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
         modifiedViewHeight = NO;
         return;
     }
@@ -890,12 +1002,12 @@ static CodenameOne_GLViewController *sharedSingleton;
     if(displayHeight > displayWidth) {
         viewFrame.origin.y -= keyboardSize.height;
     } else {
-        viewFrame.origin.x += keyboardSize.height;        
+        viewFrame.origin.x += keyboardSize.height;
     }
     
     /*float y = editingComponent.frame.origin.y;
-    y -= keyboardSize.height;
-    editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
+     y -= keyboardSize.height;
+     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
     
     [UIView beginAnimations:nil context:NULL];
     [UIView setAnimationBeginsFromCurrentState:YES];
@@ -953,11 +1065,11 @@ static CodenameOne_GLViewController *sharedSingleton;
         glDeleteProgram(program);
         program = 0;
     }
-
+    
     // Tear down context.
     if ([EAGLContext currentContext] == context)
         [EAGLContext setCurrentContext:nil];
-	self.context = nil;	
+	self.context = nil;
 }
 
 - (NSInteger)animationFrameInterval
@@ -980,13 +1092,13 @@ static CodenameOne_GLViewController *sharedSingleton;
 - (void)startAnimation
 {
     /*if (!animating) {
-        CADisplayLink *aDisplayLink = [[UIScreen mainScreen] displayLinkWithTarget:self selector:@selector(drawScreen)];
-        [aDisplayLink setFrameInterval:animationFrameInterval];
-        [aDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-        self.displayLink = aDisplayLink;
-        
-        animating = TRUE;
-    }*/
+     CADisplayLink *aDisplayLink = [[UIScreen mainScreen] displayLinkWithTarget:self selector:@selector(drawScreen)];
+     [aDisplayLink setFrameInterval:animationFrameInterval];
+     [aDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+     self.displayLink = aDisplayLink;
+     
+     animating = TRUE;
+     }*/
 }
 
 - (void)stopAnimation
@@ -1024,16 +1136,16 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-    displayWidth = (int)self.view.bounds.size.width * [UIScreen mainScreen].scale;
-    displayHeight = (int)self.view.bounds.size.height * [UIScreen mainScreen].scale;
-    screenSizeChanged(displayWidth, displayHeight);    
+    displayWidth = (int)self.view.bounds.size.width * scaleValue;
+    displayHeight = (int)self.view.bounds.size.height * scaleValue;
+    screenSizeChanged(displayWidth, displayHeight);
 }
 
 //static UIImage *img = nil;
 //static GLUIImage* glut = nil;
 
 - (void)drawFrame:(CGRect)rect
-{        
+{
     [(EAGLView *)self.view setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {
@@ -1046,17 +1158,17 @@ static CodenameOne_GLViewController *sharedSingleton;
             GLErrorLog;
             
             /*if(((int)rect.size.width) != displayWidth || ((int)rect.size.height) != displayHeight) {
-                glScissor(rect.origin.x, displayHeight - rect.origin.y - rect.size.height, rect.size.width, rect.size.height);
-                glEnable(GL_SCISSOR_TEST);
-                glClearColor(1, 1, 1, 1);
-                glClear(GL_COLOR_BUFFER_BIT);
-            }*/
+             glScissor(rect.origin.x, displayHeight - rect.origin.y - rect.size.height, rect.size.width, rect.size.height);
+             glEnable(GL_SCISSOR_TEST);
+             glClearColor(1, 1, 1, 1);
+             glClear(GL_COLOR_BUFFER_BIT);
+             }*/
             
             //NSLog(@"self.view.bounds.size.height %i displayHeight %i", (int)self.view.bounds.size.height, displayHeight);
             NSMutableArray* cp = nil;
             @synchronized([CodenameOne_GLViewController instance]) {
                 cp = [currentTarget copy];
-                [currentTarget removeAllObjects];                
+                [currentTarget removeAllObjects];
             }
             GLErrorLog;
             for(ExecutableOp* ex in cp) {
@@ -1078,7 +1190,7 @@ static CodenameOne_GLViewController *sharedSingleton;
                 firstTime = NO;
             }
         }
-    } 
+    }
     GLErrorLog;
     
     [(EAGLView *)self.view presentFramebuffer];
@@ -1247,12 +1359,12 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 -(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
     /*if(editingComponent != nil) {
-        return;
-    }*/
+     return;
+     }*/
     //currentBackBuffer = buff;
     CGRect rect = CGRectMake(x, y, width, height);
     painted = NO;
-	//[self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:0 waitUntilDone:NO];    
+	//[self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:0 waitUntilDone:NO];
     dispatch_sync(dispatch_get_main_queue(), ^{
         @synchronized([CodenameOne_GLViewController instance]) {
             if([currentTarget count] > 0) {
@@ -1265,7 +1377,7 @@ static CodenameOne_GLViewController *sharedSingleton;
             }
             //[layerDelegate updateArray:currentTarget];
         }
-        //[self setNeedsDisplayInRect:rect]; 
+        //[self setNeedsDisplayInRect:rect];
         [self drawFrame:rect];
     });
     /*int timeout = 5;
@@ -1280,7 +1392,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     UIColor* col = UIColorFromRGB(color,alpha);
     [col set];
 	NSString* str = [NSString stringWithUTF8String:text];
-	[str drawAtPoint:CGPointMake(x, y) withFont:font];    
+	[str drawAtPoint:CGPointMake(x, y) withFont:font];
     //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
 	[pool release];
 }
@@ -1316,16 +1428,14 @@ static CodenameOne_GLViewController *sharedSingleton;
     }
 }
 
-extern void repaintUI();
-
 static BOOL skipNextTouch = NO;
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * [UIScreen mainScreen].scale;
-    yArray[0] = (int)point.y * [UIScreen mainScreen].scale;
+    xArray[0] = (int)point.x * scaleValue;
+    yArray[0] = (int)point.y * scaleValue;
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
              editCompoentY + editCompoentH >= point.y)) {
@@ -1334,15 +1444,15 @@ static BOOL skipNextTouch = NO;
                 stringEdit(YES, -1, v.text);
             } else {
                 UITextField* v = (UITextView*)editingComponent;
-                stringEdit(YES, -1, v.text);                
+                stringEdit(YES, -1, v.text);
             }
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
             [editingComponent release];
             editingComponent = nil;
-            displayWidth = (int)self.view.bounds.size.width * [UIScreen mainScreen].scale;
-            displayHeight = (int)self.view.bounds.size.height * [UIScreen mainScreen].scale;
-            //screenSizeChanged(displayWidth, displayHeight);    
+            displayWidth = (int)self.view.bounds.size.width * scaleValue;
+            displayHeight = (int)self.view.bounds.size.height * scaleValue;
+            //screenSizeChanged(displayWidth, displayHeight);
             repaintUI();
             skipNextTouch = YES;
             return;
@@ -1360,8 +1470,8 @@ static BOOL skipNextTouch = NO;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * [UIScreen mainScreen].scale;
-    yArray[0] = (int)point.y * [UIScreen mainScreen].scale;
+    xArray[0] = (int)point.x * scaleValue;
+    yArray[0] = (int)point.y * scaleValue;
     pointerReleasedC(xArray, yArray, 1);
 }
 
@@ -1374,8 +1484,8 @@ static BOOL skipNextTouch = NO;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * [UIScreen mainScreen].scale;
-    yArray[0] = (int)point.y * [UIScreen mainScreen].scale;
+    xArray[0] = (int)point.x * scaleValue;
+    yArray[0] = (int)point.y * scaleValue;
     pointerReleasedC(xArray, yArray, 1);
 }
 
@@ -1387,8 +1497,8 @@ static BOOL skipNextTouch = NO;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * [UIScreen mainScreen].scale;
-    yArray[0] = (int)point.y * [UIScreen mainScreen].scale;
+    xArray[0] = (int)point.x * scaleValue;
+    yArray[0] = (int)point.y * scaleValue;
     pointerDraggedC(xArray, yArray, 1);
 }
 
@@ -1404,9 +1514,9 @@ extern UIPopoverController* popoverController;
 extern int popoverSupported();
 
 -(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
-        //[self dismissModalViewControllerAnimated:YES];
-    com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(nil);            
-    [picker dismissModalViewControllerAnimated:YES]; 
+    //[self dismissModalViewControllerAnimated:YES];
+    com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(nil);
+    [picker dismissModalViewControllerAnimated:YES];
 }
 
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
@@ -1415,14 +1525,14 @@ extern int popoverSupported();
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
 		UIImage* image = [info objectForKey:UIImagePickerControllerOriginalImage];
-
+        
         NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-			
+        
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         NSString *documentsDirectory = [paths objectAtIndex:0];
         NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
         [data writeToFile:path atomically:YES];
-        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));        
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));
 	} else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
@@ -1430,11 +1540,11 @@ extern int popoverSupported();
     }
 	
 	if(popoverSupported() && popoverController != nil) {
-		[popoverController dismissPopoverAnimated:YES]; 
+		[popoverController dismissPopoverAnimated:YES];
         popoverController.delegate = nil;
         popoverController = nil;
 	} else {
-		[picker dismissModalViewControllerAnimated:YES]; 
+		[picker dismissModalViewControllerAnimated:YES];
 	}
     
 	picker.delegate = nil;

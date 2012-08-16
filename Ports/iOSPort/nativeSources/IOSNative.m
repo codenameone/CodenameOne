@@ -1041,11 +1041,13 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
     });
 }
 
+extern float scaleValue;
+
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
-        float scale = [UIScreen mainScreen].scale;
+        float scale = scaleValue;
         float xpos = x / scale;
         float ypos = y / scale;
         float wpos = w / scale;
@@ -1081,7 +1083,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAV
             [[CodenameOne_GLViewController instance].view addSubview:v];
         }
         if(w > 0 && h > 0) {
-            float scale = [UIScreen mainScreen].scale;
+            float scale = scaleValue;
             float xpos = x / scale;
             float ypos = y / scale;
             float wpos = w / scale;
@@ -1113,15 +1115,15 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_LONG peer) {
     });
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration___long(JAVA_LONG peer) {
-    __block JAVA_INT dur = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
-        dur = [pl getAudioDuration];
+        com_codename1_impl_ios_IOSNative_getAudioDuration = [pl getAudioDuration];
         [pool release];
     });
-    return dur;
+    return com_codename1_impl_ios_IOSNative_getAudioDuration;
 }
 
 void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_LONG peer) {
@@ -1133,26 +1135,26 @@ void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_LONG peer) {
     });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying___long(JAVA_LONG peer) {
-    __block JAVA_BOOLEAN result = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
-        result = [pl isPlaying];
+        com_codename1_impl_ios_IOSNative_isAudioPlaying = [pl isPlaying];
         [pool release];
     });
-    return result;
+    return com_codename1_impl_ios_IOSNative_isAudioPlaying;
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime___long(JAVA_LONG peer) {
-    __block JAVA_INT dur = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
-        dur = [pl getAudioTime];
+        com_codename1_impl_ios_IOSNative_getAudioTime = [pl getAudioTime];
         [pool release];
     });
-    return dur;
+    return com_codename1_impl_ios_IOSNative_getAudioTime;
 }
 
 void com_codename1_impl_ios_IOSNative_pauseAudio___long(JAVA_LONG peer) {
@@ -1182,29 +1184,28 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_LONG peer) {
     });
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
-    __block JAVA_LONG p = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         const char* chrs = stringToUTF8(uri);
         NSString* ns = [NSString stringWithUTF8String:chrs];
-        p = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
+        com_codename1_impl_ios_IOSNative_createAudio = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
         [pool release];
     });
-    return p;
+    return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_Runnable(JAVA_OBJECT b, JAVA_OBJECT onCompletion) {
-    __block JAVA_LONG p = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         org_xmlvm_runtime_XMLVMArray* byteArray = b;
         JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
         NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
-        p = [[AudioPlayer alloc] initWithNSData:d callback:onCompletion];
+        com_codename1_impl_ios_IOSNative_createAudio = [[AudioPlayer alloc] initWithNSData:d callback:onCompletion];
         [pool release];
     });
-    return p;
+    return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__() {
@@ -1303,19 +1304,21 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(JAVA_LONG peer) {
     });
 }
 
+UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(JAVA_OBJECT obj) {
-    __block UIWebView* response = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        response = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
-        response.backgroundColor = [UIColor whiteColor];
-        response.autoresizesSubviews = YES;
+        com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor whiteColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizesSubviews = YES;
         UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
-        response.delegate = del;
-        response.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
-        [response setAllowsInlineMediaPlayback:YES];
-        [response retain];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
+        [com_codename1_impl_ios_IOSNative_createBrowserComponent setAllowsInlineMediaPlayback:YES];
+        [com_codename1_impl_ios_IOSNative_createBrowserComponent retain];
     });
-    return response;
+    UIWebView* r = com_codename1_impl_ios_IOSNative_createBrowserComponent;
+    com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
+    return r;
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
@@ -1381,8 +1384,8 @@ void com_codename1_impl_ios_IOSNative_browserForward___long(JAVA_LONG peer) {
     });
 }
 
+JAVA_BOOLEAN booleanResponse = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(JAVA_LONG peer) {
-    __block JAVA_BOOLEAN booleanResponse = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1393,7 +1396,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(JAVA_LONG pe
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(JAVA_LONG peer) {
-    __block JAVA_BOOLEAN booleanResponse = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1436,20 +1438,20 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_LONG peer
     return returnString;
 }
 
-
+MPMoviePlayerController* moviePlayerInstance;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(JAVA_OBJECT str) {
-    __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSURL* u = [NSURL URLWithString:toNSString(str)];
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         [pool release];
     });
-    return moviePlayerInstance;
+    MPMoviePlayerController* mp = moviePlayerInstance;
+    moviePlayerInstance = nil;
+    return mp;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JAVA_OBJECT dataObject) {
-    __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
@@ -1464,9 +1466,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JA
         NSURL *u = [NSURL fileURLWithPath:path];        
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        moviePlayerInstance.useApplicationAudioSession = NO;
+        [moviePlayerInstance retain];
+        [moviePlayerInstance prepareToPlay];
+        [moviePlayerInstance play];
         [pool release];
     });
-    return moviePlayerInstance;
+    MPMoviePlayerController* mp = moviePlayerInstance;
+    moviePlayerInstance = nil;
+    return mp;
 }
 
 
@@ -1475,6 +1483,9 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
+        if(picker == nil) {
+            return;
+        }
         picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
         
         // Recipient.
@@ -1523,26 +1534,26 @@ JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(JAVA_LONG pe
     return 0;
 }
 
+int responseGetMediaDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(JAVA_LONG peer) {
-    __block int response = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
-        response = (int)m.duration * 1000;
+        responseGetMediaDuration = (int)m.duration * 1000;
         [pool release];
     });
-    return response;
+    return responseGetMediaDuration;
 }
 
+JAVA_BOOLEAN responseIsVideoPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(JAVA_LONG peer) {
-    __block JAVA_BOOLEAN response = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
-        response = m.playbackState == MPMoviePlaybackStatePlaying;
+        responseIsVideoPlaying = m.playbackState == MPMoviePlaybackStatePlaying;
         [pool release];
     });
-    return response;
+    return responseIsVideoPlaying;
 }
 
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
@@ -1554,15 +1565,16 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(JAVA_LON
     });
 }
 
+JAVA_BOOLEAN responseIsVideoFullScreen = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(JAVA_LONG peer) {
-    __block JAVA_BOOLEAN response = 0;
+    responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
-        response = [m isFullscreen];
+        responseIsVideoFullScreen = [m isFullscreen];
         [pool release];
     });
-    return response;
+    return responseIsVideoFullScreen;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(JAVA_LONG peer) {
@@ -1580,24 +1592,27 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_LON
 }
 
 
+CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__() {
-    __block CLLocationManager* loc = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        loc = [[CLLocationManager alloc] init];
+        com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
     });
-    return loc;
+    CLLocationManager* c = com_codename1_impl_ios_IOSNative_createCLLocation;
+    com_codename1_impl_ios_IOSNative_createCLLocation = nil;
+    return c;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(JAVA_LONG peer) {
-    __block CLLocation* loc;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         CLLocationManager* l = (CLLocationManager*)peer;
-        loc = l.location;
-        [loc retain];
+        com_codename1_impl_ios_IOSNative_createCLLocation = l.location;
+        [com_codename1_impl_ios_IOSNative_createCLLocation retain];
         [pool release];
     });
-    return loc;
+    CLLocationManager* c = com_codename1_impl_ios_IOSNative_createCLLocation;
+    com_codename1_impl_ios_IOSNative_createCLLocation = nil;
+    return c;
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLatitude___long(JAVA_LONG peer) {
@@ -1961,10 +1976,9 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_
 }
 
 
-
+AVAudioRecorder* recorder = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(
     JAVA_OBJECT  destinationFile) {
-    __block AVAudioRecorder* recorder = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSString * filePath = toNSString(destinationFile);
@@ -1983,7 +1997,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         }
         [pool release];
     });
-    return recorder;
+    AVAudioRecorder* r = recorder;
+    recorder = nil;
+    return r;
 }
 
 void com_codename1_impl_ios_IOSNative_startAudioRecord___long(

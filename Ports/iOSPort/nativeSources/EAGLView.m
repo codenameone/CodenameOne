@@ -45,14 +45,20 @@ extern UITextView *editingComponent;
     return [CAEAGLLayer class];
 }
 
+extern BOOL isRetina();
+
 //The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
 - (id)initWithCoder:(NSCoder*)coder
 {
     self = [super initWithCoder:coder];
 	if (self) {
         self.clearsContextBeforeDrawing = YES;
-        if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && [[UIScreen mainScreen] scale] == 2) {
-            self.contentScaleFactor = 2.0;
+        if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
+            if(isRetinaBug()) {
+                self.contentScaleFactor = 1.0;
+            } else {
+                self.contentScaleFactor = 2.0;
+            }
         }
         CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
         
@@ -191,11 +197,16 @@ extern UITextView *editingComponent;
 }
 
 -(void)textViewDidChange:(UITextView *)textView {
-    stringEdit(NO, -1, editingComponent.text.UTF8String);    
+    stringEdit(NO, -1, editingComponent.text);    
+}
+
+-(void)textFieldDidChange {
+    stringEdit(NO, -1, editingComponent.text);
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)theTextField {
     if(editingComponent != nil) {
+        stringEdit(YES, -1, editingComponent.text);
         [editingComponent resignFirstResponder];
         [editingComponent removeFromSuperview];
         [editingComponent release];

@@ -49,4 +49,5 @@
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
+-(void)textFieldDidChange;
 @end

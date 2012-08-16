@@ -27,6 +27,7 @@ static int clipX, clipY, clipW, clipH;
 static BOOL clipApplied = NO;
 extern float currentScaleX;
 extern float currentScaleY;
+extern float scaleValue;
 
 @implementation ClipRect
 static CGRect drawingRect;
@@ -77,7 +78,7 @@ static CGRect drawingRect;
     if(width > 0 && height > 0) {
         [super clipBlock:NO];
         // full screen access, no need for this
-        int scale = [UIScreen mainScreen].scale;
+        int scale = scaleValue;
         int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scale;
         if(width == [CodenameOne_GLViewController instance].view.bounds.size.width * scale && height == displayHeight) {
             glDisable(GL_SCISSOR_TEST);
@@ -102,7 +103,7 @@ static CGRect drawingRect;
 
 
 +(void)updateClipToScale {
-    int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * [UIScreen mainScreen].scale;
+    int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     if(currentScaleX != 1 || currentScaleY != 1) {
         int x = round(clipX * currentScaleX);
         int y = round(clipY * currentScaleY);
