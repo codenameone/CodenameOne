@@ -98,9 +98,6 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                 float[] WIDTHS = {
                     176, 240, 360, 480, 768, 1024
                 };
-                float[] HEIGHTS = {
-                    220, 320, 480, 854, 1024, 1920
-                };
                 EncodedImage[] images = new EncodedImage[6];
                 int imageCount = 6;
                 
@@ -109,10 +106,8 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                         images[iter] = EncodedImage.create(scale(bi, bi.getWidth(), bi.getHeight()));
                     } else {
                         float sourceWidth = WIDTHS[sourceResolution];
-                        float sourceHeight = HEIGHTS[sourceResolution];
                         float destWidth = WIDTHS[iter];
-                        float destHeight = HEIGHTS[iter];
-                        int h = (int)(((float)bi.getHeight()) * destHeight / sourceHeight);
+                        int h = (int)(((float)bi.getHeight()) * destWidth / sourceWidth);
                         int w = (int)(((float)bi.getWidth()) * destWidth / sourceWidth);
                         images[iter] = EncodedImage.create(scale(bi, w, h));
                     }
@@ -135,6 +130,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     int count = 1;
                     while(res.containsResource(destName)) {
                         destName = f.getName() + " " + count;
+                        count++;
                     }
                     res.setMultiImage(destName, newImage);
                 }

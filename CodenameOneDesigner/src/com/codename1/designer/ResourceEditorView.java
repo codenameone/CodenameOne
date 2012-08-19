@@ -2370,6 +2370,9 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                     w.write("    public " + componentType + methodName + "(Container root) {\n");
                     w.write("        return (" + componentType + ")" + "findByName(\"" + componentName + "\", root);\n");
                     w.write("    }\n\n");
+                    w.write("    public " + componentType + methodName + "() {\n");
+                    w.write("        return (" + componentType + ")" + "findByName(\"" + componentName + "\", Display.getInstance().getCurrent());\n");
+                    w.write("    }\n\n");
                 }
             }
 
