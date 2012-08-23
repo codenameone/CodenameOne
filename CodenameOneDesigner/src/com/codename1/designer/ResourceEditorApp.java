@@ -201,6 +201,9 @@ public class ResourceEditorApp extends SingleFrameApplication {
         if(themeName.equalsIgnoreCase("socialboo")) {
             template = "socialboo";
         }
+        if(themeName.equalsIgnoreCase("mapper")) {
+            template = "mapper";
+        }
         
         res.setTheme("Theme", importRes(res, template));
         
