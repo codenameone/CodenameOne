@@ -33,6 +33,7 @@ import java.util.Enumeration;
 import java.util.Vector;
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.layers.AbstractLayer;
+import com.codename1.maps.layers.Layer;
 import com.codename1.maps.layers.PointsLayer;
 import com.codename1.maps.providers.OpenStreetMapProvider;
 import com.codename1.ui.Button;
@@ -41,6 +42,7 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.MathUtil;
 
 
@@ -50,19 +52,19 @@ import com.codename1.util.MathUtil;
  */
 public class MapComponent extends Container {
 
-    protected Coord _center;
-    protected int _zoom;
-    protected MapProvider _map;
-    protected Vector _layers;
-    protected boolean _debugInfo = false;
-    protected boolean _needTiles = true;
+    private Coord _center;
+    private int _zoom;
+    private MapProvider _map;
+    private Vector _layers;
+    private boolean _debugInfo = false;
+    private boolean _needTiles = true;
     private int draggedx, draggedy;
     private int pressedx, pressedy;
     private Vector _tiles;
     private Point _delta = null;
     private double latitude = Double.NaN;
     private double longitude = Double.NaN;
-    
+    private boolean drawMapPointer = false;
 
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last 
@@ -87,6 +89,7 @@ public class MapComponent extends Container {
         getSelectedStyle().setBgTransparency(255);
         getUnselectedStyle().setBgPainter(bg);
         getSelectedStyle().setBgPainter(bg);
+        drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);
     }
 
     /**
@@ -388,11 +391,13 @@ public class MapComponent extends Container {
     }
 
     private void drawPointer(Graphics g) {
-        g.setColor(0xFF0000);
-        int centerX = getWidth() / 2;
-        int centerY = getHeight() / 2;
-        int halfSize = 5;
-        g.drawRoundRect(centerX - halfSize, centerY - halfSize, 2 * halfSize, 2 * halfSize, halfSize, halfSize);
+        if(drawMapPointer) {
+            g.setColor(0xFF0000);
+            int centerX = getWidth() / 2;
+            int centerY = getHeight() / 2;
+            int halfSize = 5;
+            g.drawRoundRect(centerX - halfSize, centerY - halfSize, 2 * halfSize, 2 * halfSize, halfSize, halfSize);
+        }
     }
 
     private void drawDebug(Graphics g) {
@@ -410,7 +415,7 @@ public class MapComponent extends Container {
      * Adds a layer to the map
      * @param layer to add
      */
-    public void addLayer(AbstractLayer layer) {
+    public void addLayer(Layer layer) {
         addLayer(layer, 0, _map.maxZoomLevel());
     }
 
@@ -420,7 +425,7 @@ public class MapComponent extends Container {
      * @param minZoomLevel min zoom level of this Layer
      * @param maxZoomLevel max zoom level of this Layer
      */
-    public void addLayer(AbstractLayer layer, int minZoomLevel, int maxZoomLevel) {
+    public void addLayer(Layer layer, int minZoomLevel, int maxZoomLevel) {
         _layers.addElement(new LayerWithZoomLevels(layer, minZoomLevel, maxZoomLevel));
         repaint();
     }
@@ -429,7 +434,7 @@ public class MapComponent extends Container {
      * Removes a Layer from the map
      * @param layer to remove
      */
-    public void removeLayer(AbstractLayer layer) {
+    public void removeLayer(Layer layer) {
         int length = _layers.size();
         int no;
         for (no = 0; no < length; no++) {
@@ -545,6 +550,8 @@ public class MapComponent extends Container {
         }
         _center = _map.projection().fromWGS84(coord);
         _zoom = zoomLevel;
+        _needTiles = true;
+        repaint();
     }
 
     /**
@@ -788,11 +795,11 @@ public class MapComponent extends Container {
 }
 class LayerWithZoomLevels {
 
-    public AbstractLayer layer;
+    public Layer layer;
     public int minZoomLevel;
     public int maxZoomLevel;
 
-    public LayerWithZoomLevels(AbstractLayer l, int min, int max) {
+    public LayerWithZoomLevels(Layer l, int min, int max) {
         layer = l;
         minZoomLevel = min;
         maxZoomLevel = max;

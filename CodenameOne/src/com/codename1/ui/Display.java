@@ -414,10 +414,11 @@ public final class Display {
     }
 
     /**
-     * This is the Display initialization method.
+     * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
      *
      * @param m the main running MIDlet
+     * @deprecated this method is invoked internally do not invoke it!
      */
     public static void init(Object m) {
         if(!INSTANCE.codenameOneRunning) {

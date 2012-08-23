@@ -22,6 +22,7 @@
  */
 package com.codename1.maps.layers;
 
+import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Tile;
 import com.codename1.ui.Graphics;
 
@@ -40,4 +41,16 @@ public interface Layer {
      * @param screenTile the screen tile
      */
     public void paint(Graphics g, Tile screenTile);
+
+    /**
+     * The bounding box of this Layer
+     * @return the Layer bounding box
+     */
+    public abstract BoundingBox boundingBox();
+
+    /**
+     * Gets the name of this Layer
+     * @return the name of this Layer
+     */
+    public String getName();
 }

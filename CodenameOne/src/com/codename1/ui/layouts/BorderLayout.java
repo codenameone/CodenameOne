@@ -278,8 +278,8 @@ public class BorderLayout extends Layout {
                 case CENTER_BEHAVIOR_TOTAL_BELLOW: {
                     w = targetWidth;
                     h = targetHeight;
-                    x = left;
-                    y = top;
+                    x = s.getPadding(target.isRTL(), Component.LEFT);
+                    y = s.getPadding(false, Component.TOP);;
                 }
             } 
             c.setWidth(w);

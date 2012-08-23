@@ -27,6 +27,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * This class represents a single tile on a map.
@@ -54,6 +55,8 @@ public class Tile {
         this.dimension = dimension;
         bbox = boundingBox;
         tileImage = image;
+        tileLoadingImage = UIManager.getInstance().getThemeImageConstant("mapTileLoadingImage");
+        tileLoadingText = UIManager.getInstance().getThemeConstant("mapTileLoadingText", "Loading...");
     }
     
     /**

@@ -19,6 +19,7 @@
  */
 package com.codename1.maps.layers;
 
+import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
 import com.codename1.ui.geom.Point;
 import com.codename1.maps.Tile;
@@ -26,7 +27,8 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
 /**
- * This is a Point Layer.
+ * Do not use this layer directly, you need to add this layer into a PointsLayer class
+ * instance in order for it to work as expected!
  * 
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
@@ -111,6 +113,13 @@ public class PointLayer extends Coord implements Layer{
      */
     public String toString() {
         return super.toString() + " " + name;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public BoundingBox boundingBox() {
+        return null;
     }
     
     
