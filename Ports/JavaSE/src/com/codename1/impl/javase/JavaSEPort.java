@@ -46,12 +46,12 @@ import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.FontFormatException;
-import java.awt.Frame;
+import javax.swing.JFrame;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
-import java.awt.Menu;
-import java.awt.MenuBar;
-import java.awt.MenuItem;
+//import java.awt.Menu;
+//import java.awt.MenuBar;
+//import java.awt.MenuItem;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -98,8 +98,10 @@ import com.codename1.io.NetworkManager;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Scrollbar;
 import java.awt.event.AdjustmentListener;
@@ -114,8 +116,10 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
+import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.sql.DriverManager;
 import java.text.DateFormat;
@@ -130,21 +134,31 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.media.ControllerEvent;
-import javax.media.ControllerListener;
-import javax.media.RealizeCompleteEvent;
-import javax.media.Time;
-import javax.media.bean.playerbean.MediaPlayer;
+import javafx.application.Platform;
+import javafx.scene.Group;
+import javafx.scene.Scene;
+import javafx.scene.layout.StackPane;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+import javafx.scene.web.WebView;
+import javafx.util.Duration;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.text.JTextComponent;
-import jmapps.ui.VideoPanel;
 
 /**
  * An implementation of Codename One based on Java SE
@@ -152,6 +166,7 @@ import jmapps.ui.VideoPanel;
  * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
+
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin";
     private boolean touchDevice = true;
@@ -165,9 +180,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
     private static boolean scrollableSkin = true;
-    private Scrollbar hSelector = new Scrollbar (Scrollbar.HORIZONTAL);
-    private Scrollbar vSelector = new Scrollbar (Scrollbar.VERTICAL);   
-    
+    private JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
+    private JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
     static final int GAME_KEY_CODE_FIRE = -90;
     static final int GAME_KEY_CODE_UP = -91;
     static final int GAME_KEY_CODE_DOWN = -92;
@@ -181,7 +195,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static EventDispatcher formChangeListener;
     private static boolean autoAdjustFontSize = true;
     private static Object defaultInitTarget;
-    private float zoomLevel = 1;
+    float zoomLevel = 1;
     private File storageDir;
     // skin related variables
     private boolean portrait = true;
@@ -199,23 +213,25 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static NetworkMonitor netMonitor;
     private static PerformanceMonitor perfMonitor;
     private static boolean blockMonitors;
-        
+    private static boolean fxExists = false;
+    private JFrame window;
+
     public static void blockMonitors() {
         blockMonitors = true;
     }
-    
+
     static void disableNetworkMonitor() {
         netMonitor = null;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("NetworkMonitor", false);
     }
-    
+
     static void disablePerformanceMonitor() {
         perfMonitor = null;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("PerformanceMonitor", false);
     }
-    
+
     public static void setBaseResourceDir(File f) {
         baseResourceDir = f;
     }
@@ -239,7 +255,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return landscapeSkinHotspots;
     }
 
-    private java.awt.Rectangle getScreenCoordinates() {
+    java.awt.Rectangle getScreenCoordinates() {
         if (portrait) {
             return portraitScreenCoordinates;
         }
@@ -342,14 +358,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
-    private class C extends java.awt.Container implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener {
+    class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener {
 
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
         private java.awt.Dimension forcedSize;
         private boolean releaseLock;
-        private int x, y;
+        int x, y;
 
         C() {
             addKeyListener(this);
@@ -357,8 +373,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             addMouseMotionListener(this);
             addHierarchyBoundsListener(this);
             setFocusable(true);
-            requestFocus();
-            
+            requestFocus();           
         }
 
         public void setForcedSize(Dimension d) {
@@ -373,20 +388,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return true;
         }
 
-        public void update(java.awt.Graphics g) {
-            paint(g);
+        public void update(java.awt.Graphics g) {            
+            paint(g);           
         }
 
-        public void blit() {
-            if (buffer != null) {
-                java.awt.Graphics g = getGraphics();
-                if (g == null) {
-                    return;
-                }
-                drawScreenBuffer(g);
-                updateBufferSize();
-            }
-        }
 
         private void updateBufferSize() {
             if (getScreenCoordinates() == null) {
@@ -402,7 +407,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        public void blit(int x, int y, int w, int h) {
+        public void blit() {            
             if (buffer != null) {
                 java.awt.Graphics g = getGraphics();
                 if (g == null) {
@@ -410,7 +415,48 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 drawScreenBuffer(g);
                 updateBufferSize();
+                if(window != null){
+                    
+                    if (zoomLevel != 1) {
+                        Graphics2D g2d = (Graphics2D) g;
+                        g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
+                    }
+                    
+                    int count = window.getContentPane().getComponentCount();
+                    boolean nativeCmp = false;
+                    if(scrollableSkin){
+                        if(count > 3){
+                            nativeCmp = true;
+                        }
+                    }else{
+                        if(count > 1){
+                            nativeCmp = true;
+                        }                    
+                    }
+                    if(nativeCmp){
+                        java.awt.Component c = window.getContentPane().getComponent(0);
+                        g.translate(c.getX(), c.getY());
+                        c.update(g);
+                        g.translate(-c.getX(), -c.getY());
+                    }
+                    
+                    
+                    for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
+                        JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
+                        if(m.isPopupMenuVisible()){
+                            JPopupMenu pop = m.getPopupMenu();
+                            pop.getInvoker().getX();
+                            g.translate(pop.getInvoker().getX(), 0);
+                            pop.update(g);
+                            g.translate(-pop.getInvoker().getX(), 0);
+                        }                        
+                    }
+                }
             }
+        }
+        
+        public void blit(int x, int y, int w, int h) {
+            blit();
         }
 
         private void drawScreenBuffer(java.awt.Graphics g) {
@@ -427,6 +473,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void paint(java.awt.Graphics g) {
+            super.paint(g);            
             if (buffer != null) {
                 //g = getGraphics();
                 drawScreenBuffer(g);
@@ -484,10 +531,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void validate() {
             super.validate();
-            java.awt.Dimension d = getPreferredSize();
-            if (buffer == null || d.width != buffer.getWidth() || d.height != buffer.getHeight()) {
-                buffer = createBufferedImage();
-            }
+            buffer = createBufferedImage();
             Form current = getCurrentForm();
             if (current == null) {
                 return;
@@ -565,7 +609,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } else {
                     if (getSkin() != null) {
-                        java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x)/ zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
+                        java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                         Integer keyCode;
                         keyCode = getSkinHotspots().get(p);
 
@@ -646,7 +690,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void mouseMoved(MouseEvent e) {
             e.consume();
             if (getSkinHotspots() != null) {
-                java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x)/ zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
+                java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                 if (getSkinHotspots().containsKey(p)) {
                     setCursor(handCursor);
                 } else {
@@ -668,7 +712,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void ancestorResized(HierarchyEvent e) {
 
             if (getSkin() != null) {
-                if(!scrollableSkin){
+                if (!scrollableSkin) {
                     float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
                     float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
                     zoomLevel = Math.min(h1, w1);
@@ -685,18 +729,18 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void adjustmentValueChanged(AdjustmentEvent e) {
-            Scrollbar s = (Scrollbar)e.getSource();
+            JScrollBar s = (JScrollBar) e.getSource();
             int val = s.getValue();
-            if(s.getOrientation() == Scrollbar.HORIZONTAL){
-                x = -(int)((float)(val/100f) * getWidth());
-            }else{
-                y = -(int)((float)(val/100f) * getHeight());
+            if (s.getOrientation() == Scrollbar.HORIZONTAL) {
+                x = -(int) ((float) (val / 100f) * getWidth());
+            } else {
+                y = -(int) ((float) (val / 100f) * getHeight());
             }
             repaint();
-            
+
         }
     }
-    private C canvas;
+    C canvas;
 
     protected java.awt.Container getCanvas() {
         return canvas;
@@ -720,7 +764,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
-     * Subclasses of this implementation might override this to return builtin skins for a specific implementation
+     * Subclasses of this implementation might override this to return builtin
+     * skins for a specific implementation
+     *
      * @return true if skins are used
      */
     public boolean hasSkins() {
@@ -796,7 +842,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private void loadSkinFile(InputStream skin, final Frame frm) {
+    private void loadSkinFile(InputStream skin, final JFrame frm) {
         try {
             ZipInputStream z = new ZipInputStream(skin);
             ZipEntry e = z.getNextEntry();
@@ -943,23 +989,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
 
-            MenuBar bar = new MenuBar();
-            frm.setMenuBar(bar);
-            Menu simulatorMenu = new Menu("Simulate");
-            MenuItem rotate = new MenuItem("Rotate");
+            JMenuBar bar = new JMenuBar();
+            frm.setJMenuBar(bar);
+            JMenu simulatorMenu = new JMenu("Simulate");
+            simulatorMenu.setDoubleBuffered(true);
+            
+            JMenuItem rotate = new JMenuItem("Rotate");
             simulatorMenu.add(rotate);
-            Menu zoomMenu = new Menu("Zoom");
+            JMenu zoomMenu = new JMenu("Zoom");
             simulatorMenu.add(zoomMenu);
-            MenuItem zoom50 = new MenuItem("50%");
+            JMenuItem zoom50 = new JMenuItem("50%");
             zoomMenu.add(zoom50);
-            MenuItem zoom100 = new MenuItem("100%");
+            JMenuItem zoom100 = new JMenuItem("100%");
             zoomMenu.add(zoom100);
-            MenuItem zoom200 = new MenuItem("200%");
+            JMenuItem zoom200 = new JMenuItem("200%");
             zoomMenu.add(zoom200);
-            MenuItem screenshot = new MenuItem("Screenshot");
+            JMenuItem screenshot = new JMenuItem("Screenshot");
             simulatorMenu.add(screenshot);
             screenshot.addActionListener(new ActionListener() {
-
                 private File findScreenshotFile() {
                     int counter = 1;
                     File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
@@ -1017,11 +1064,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
-            MenuItem networkMonitor = new MenuItem("Network Monitor");
+            JMenuItem networkMonitor = new JMenuItem("Network Monitor");
             networkMonitor.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    if(netMonitor == null) {
+                    if (netMonitor == null) {
                         showNetworkMonitor();
                         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                         pref.putBoolean("NetworkMonitor", true);
@@ -1030,11 +1077,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             simulatorMenu.add(networkMonitor);
 
-            MenuItem performanceMonitor = new MenuItem("Performance Monitor");
+            JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
             performanceMonitor.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    if(perfMonitor == null) {
+                    if (perfMonitor == null) {
                         showPerformanceMonitor();
                         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                         pref.putBoolean("PerformanceMonitor", true);
@@ -1042,8 +1089,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(performanceMonitor);
-            
-            Menu skinMenu = new Menu("Skins");
+
+            JMenu skinMenu = new JMenu("Skins");
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
@@ -1062,15 +1109,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         name = f.getName();
                     }
-                    MenuItem i = new MenuItem(name);
+                    JMenuItem i = new JMenuItem(name);
                     i.addActionListener(new ActionListener() {
-
                         public void actionPerformed(ActionEvent ae) {
-                            if(netMonitor != null) {
+                            if (netMonitor != null) {
                                 netMonitor.dispose();
                                 netMonitor = null;
                             }
-                            if(perfMonitor != null) {
+                            if (perfMonitor != null) {
                                 perfMonitor.dispose();
                                 perfMonitor = null;
                             }
@@ -1091,15 +1137,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             skinMenu.addSeparator();
-            MenuItem addSkin = new MenuItem("Add");
+            JMenuItem addSkin = new JMenuItem("Add");
             skinMenu.add(addSkin);
             addSkin.addActionListener(new ActionListener() {
-
                 public void actionPerformed(ActionEvent ae) {
                     FileDialog picker = new FileDialog(frm, "Add Skin");
                     picker.setMode(FileDialog.LOAD);
                     picker.setFilenameFilter(new FilenameFilter() {
-
                         public boolean accept(File file, String string) {
                             return string.endsWith(".skin");
                         }
@@ -1108,11 +1152,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     picker.setVisible(true);
                     String file = picker.getFile();
                     if (file != null) {
-                        if(netMonitor != null) {
+                        if (netMonitor != null) {
                             netMonitor.dispose();
                             netMonitor = null;
                         }
-                        if(perfMonitor != null) {
+                        if (perfMonitor != null) {
                             perfMonitor.dispose();
                             perfMonitor = null;
                         }
@@ -1131,42 +1175,43 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
-            final CheckboxMenuItem touchFlag = new CheckboxMenuItem("Touch", touchDevice);
+            final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
             simulatorMenu.add(touchFlag);
-            final CheckboxMenuItem nativeInputFlag = new CheckboxMenuItem("Native Input", useNativeInput);
+            final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
             simulatorMenu.add(nativeInputFlag);
 
-            final CheckboxMenuItem scrollFlag = new CheckboxMenuItem("Scrollable", scrollableSkin);
+            final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
             simulatorMenu.add(scrollFlag);
-            
+
             simulatorMenu.addSeparator();
-            MenuItem exit = new MenuItem("Exit");
+            JMenuItem exit = new JMenuItem("Exit");
             simulatorMenu.add(exit);
             bar.add(simulatorMenu);
             bar.add(skinMenu);
-            
-            rotate.addActionListener(new ActionListener() {
 
+            rotate.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
                     portrait = !portrait;
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("Portrait", portrait);
-                    
+
                     float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
                     float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
                     zoomLevel = Math.min(h1, w1);
+                    frm.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                    frm.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                    frm.repaint();
+                    frm.add(BorderLayout.CENTER, canvas);
+                    frm.pack();
 
                     zoomLevel = 1;
                     JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 }
             });
             zoom100.addActionListener(new ActionListener() {
-
                 public void actionPerformed(ActionEvent ae) {
+                    frm.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 1;
                     Display.getInstance().getCurrent().repaint();
@@ -1174,9 +1219,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             zoom50.addActionListener(new ActionListener() {
-
                 public void actionPerformed(ActionEvent ae) {
+                    frm.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
+                    frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.5f;
                     Display.getInstance().getCurrent().repaint();
@@ -1184,9 +1230,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             zoom200.addActionListener(new ActionListener() {
-
                 public void actionPerformed(ActionEvent ae) {
+                    frm.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() * 2, getSkin().getHeight() * 2));
+                    frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 2;
                     Display.getInstance().getCurrent().repaint();
@@ -1194,7 +1241,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             touchFlag.addItemListener(new ItemListener() {
-
                 public void itemStateChanged(ItemEvent ie) {
                     touchDevice = !touchDevice;
                     Display.getInstance().setTouchScreenDevice(touchDevice);
@@ -1202,7 +1248,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             nativeInputFlag.addItemListener(new ItemListener() {
-
                 public void itemStateChanged(ItemEvent ie) {
                     useNativeInput = !useNativeInput;
                     if (useNativeInput) {
@@ -1212,23 +1257,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            
-            scrollFlag.addItemListener(new ItemListener() {
 
+            scrollFlag.addItemListener(new ItemListener() {
                 public void itemStateChanged(ItemEvent ie) {
                     scrollableSkin = !scrollableSkin;
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("Scrollable", scrollableSkin);
-                    
-                    
-                    if(scrollableSkin){
+
+                    if (scrollableSkin) {
                         frm.add(java.awt.BorderLayout.SOUTH, hSelector);
-                        frm.add(java.awt.BorderLayout.EAST, vSelector);                    
-                    }else{
+                        frm.add(java.awt.BorderLayout.EAST, vSelector);
+                    } else {
                         frm.remove(hSelector);
-                        frm.remove(vSelector);                    
+                        frm.remove(vSelector);
                     }
+                    frm.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    frm.add(BorderLayout.CENTER, canvas);
+                    
                     canvas.x = 0;
                     canvas.y = 0;
                     zoomLevel = 1;
@@ -1238,11 +1284,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     frm.repaint();
                 }
             });
-            
-            
-            
-            exit.addActionListener(new ActionListener() {
 
+
+
+            exit.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
                     exitApplication();
                 }
@@ -1251,9 +1296,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
         }
     }
-    
+
     private void showNetworkMonitor() {
-        if(netMonitor == null) {
+        if (netMonitor == null) {
             netMonitor = new NetworkMonitor();
             netMonitor.pack();
             netMonitor.setLocationByPlatform(true);
@@ -1262,7 +1307,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void showPerformanceMonitor() {
-        if(perfMonitor == null) {
+        if (perfMonitor == null) {
             perfMonitor = new PerformanceMonitor();
             perfMonitor.pack();
             perfMonitor.setLocationByPlatform(true);
@@ -1294,9 +1339,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private void refreshSkin(final Frame frm) {
+    private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
-
             public void run() {
                 float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
                 float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
@@ -1321,7 +1365,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
-
             @Override
             public void run() {
                 t[0] = Thread.currentThread();
@@ -1338,7 +1381,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private void loadSkinFile(String f, Frame frm) {
+    private void loadSkinFile(String f, JFrame frm) {
         File fsFile = new File(f);
         if (fsFile.exists()) {
             f = fsFile.toURI().toString();
@@ -1362,13 +1405,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void init(Object m) {
+        try {
+            Class.forName("javafx.embed.swing.JFXPanel");
+            fxExists = true;
+            Platform.setImplicitExit(false);
+        } catch (Exception ex) {
+        }
+
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        if(!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
+        if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
         }
-        if(!blockMonitors && pref.getBoolean("PerformanceMonitor", false)) {
+        if (!blockMonitors && pref.getBoolean("PerformanceMonitor", false)) {
             showPerformanceMonitor();
         }
         if (defaultInitTarget != null && m == null) {
@@ -1385,9 +1435,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 cnt.add(canvas);
             }
         } else {
-            final Frame frm = new Frame();
-            frm.addWindowListener(new WindowListener() {
-
+            window = new JFrame();
+            window.addWindowListener(new WindowListener() {
                 public void windowOpened(WindowEvent e) {
                 }
 
@@ -1410,47 +1459,50 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void windowDeactivated(WindowEvent e) {
                 }
             });
-            frm.setLocationByPlatform(true);
-            frm.setLayout(new java.awt.BorderLayout());
-            hSelector = new Scrollbar (Scrollbar.HORIZONTAL);
-            vSelector = new Scrollbar (Scrollbar.VERTICAL);   
+
+
+            window.setLocationByPlatform(true);
+            window.setLayout(new java.awt.BorderLayout());
+            hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
+            vSelector = new JScrollBar(Scrollbar.VERTICAL);
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
-            
-            frm.add(java.awt.BorderLayout.CENTER, canvas);
-            
+
+
             scrollableSkin = pref.getBoolean("Scrollable", true);
-            if(scrollableSkin){
-                frm.add(java.awt.BorderLayout.SOUTH, hSelector);
-                frm.add(java.awt.BorderLayout.EAST, vSelector);
+            if (scrollableSkin) {
+                window.add(java.awt.BorderLayout.SOUTH, hSelector);
+                window.add(java.awt.BorderLayout.EAST, vSelector);
             }
+            window.add(java.awt.BorderLayout.CENTER, canvas);
+
             if (hasSkins()) {
                 String f = System.getProperty("skin");
                 if (f != null) {
-                    loadSkinFile(f, frm);
+                    loadSkinFile(f, window);
                 } else {
                     String d = System.getProperty("dskin");
                     f = pref.get("skin", d);
-                    loadSkinFile(f, frm);
+                    loadSkinFile(f, window);
                 }
             } else {
                 Resources.setRuntimeMultiImageEnabled(true);
-                frm.setUndecorated(true);
-                frm.setExtendedState(Frame.MAXIMIZED_BOTH);
+                window.setUndecorated(true);
+                window.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
-            frm.pack();
+            window.pack();
             if (getSkin() != null && !scrollableSkin) {
                 float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
                 float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
             }
-            
-            portrait = pref.getBoolean("Portrait", true);                    
-            if(!portrait){
+
+            portrait = pref.getBoolean("Portrait", true);
+            if (!portrait) {
                 canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                frm.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                window.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
             }
-            frm.setVisible(true);
+            window.setVisible(true);
         }
         if (useNativeInput) {
             Display.getInstance().setDefaultVirtualKeyboard(null);
@@ -1508,12 +1560,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /**
      * Creates a soft/weak reference to an object that allows it to be collected
-     * yet caches it. This method is in the porting layer since CLDC only includes
-     * weak references while some platforms include nothing at all and some include
-     * the superior soft references.
+     * yet caches it. This method is in the porting layer since CLDC only
+     * includes weak references while some platforms include nothing at all and
+     * some include the superior soft references.
      *
      * @param o object to cache
-     * @return a caching object or null  if caching isn't supported
+     * @return a caching object or null if caching isn't supported
      */
     public Object createSoftWeakRef(Object o) {
         return new SoftReference(o);
@@ -1545,79 +1597,79 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void setText(java.awt.Component c, String text) {
-        if(c instanceof java.awt.TextComponent) {
-            ((java.awt.TextComponent)c).setText(text);
+        if (c instanceof java.awt.TextComponent) {
+            ((java.awt.TextComponent) c).setText(text);
         } else {
-            ((JTextComponent)c).setText(text);
+            ((JTextComponent) c).setText(text);
         }
     }
 
     private String getText(java.awt.Component c) {
-        if(c instanceof java.awt.TextComponent) {
-            return ((java.awt.TextComponent)c).getText();
+        if (c instanceof java.awt.TextComponent) {
+            return ((java.awt.TextComponent) c).getText();
         } else {
-            return ((JTextComponent)c).getText();
+            return ((JTextComponent) c).getText();
         }
     }
-    
+
     private void setCaretPosition(java.awt.Component c, int p) {
-        if(c instanceof java.awt.TextComponent) {
-            ((java.awt.TextComponent)c).setCaretPosition(p);
+        if (c instanceof java.awt.TextComponent) {
+            ((java.awt.TextComponent) c).setCaretPosition(p);
         } else {
-            ((JTextComponent)c).setCaretPosition(p);
+            ((JTextComponent) c).setCaretPosition(p);
         }
     }
 
     private int getCaretPosition(java.awt.Component c) {
-        if(c instanceof java.awt.TextComponent) {
-            return ((java.awt.TextComponent)c).getCaretPosition();
+        if (c instanceof java.awt.TextComponent) {
+            return ((java.awt.TextComponent) c).getCaretPosition();
         } else {
-            return ((JTextComponent)c).getCaretPosition();
+            return ((JTextComponent) c).getCaretPosition();
         }
     }
-    
+
     /**
      * @inheritDoc
      */
     public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
         java.awt.Component awtTf;
         /*if ((constraint & com.codename1.ui.TextArea.DECIMAL) == com.codename1.ui.TextArea.DECIMAL) {
-            awtTf = new JFormattedTextField(NumberFormat.getNumberInstance());
-        } else {
-            if ((constraint & com.codename1.ui.TextArea.EMAILADDR) == com.codename1.ui.TextArea.EMAILADDR) {
-                try {
-                    awtTf = new JFormattedTextField(new MaskFormatter("*@*.*"));
-                } catch (ParseException ex) {
-                    ex.printStackTrace();
-                    return;
-                }
-            } else {
-                if ((constraint & com.codename1.ui.TextArea.NUMERIC) == com.codename1.ui.TextArea.NUMERIC) {
-                    awtTf = new JFormattedTextField(NumberFormat.getIntegerInstance());
-                } else {
-                    if ((constraint & com.codename1.ui.TextArea.PHONENUMBER) == com.codename1.ui.TextArea.PHONENUMBER) {
-                        try {
-                            awtTf = new JFormattedTextField(new MaskFormatter("(###) ###-####"));
-                        } catch (ParseException ex) {
-                            ex.printStackTrace();
-                            return;
-                        }
-                    } else {
-                        if (cmp instanceof com.codename1.ui.TextField) {
-                            java.awt.TextField t = new java.awt.TextField();
-                            awtTf = t;
-                            t.setSelectionEnd(0);
-                            t.setSelectionStart(0);
-                        } else {
-                            java.awt.TextArea t = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);;
-                            awtTf = t;
-                            t.setSelectionEnd(0);
-                            t.setSelectionStart(0);
-                        }                        
-                    }
-                }
-            }
-        }*/
+         awtTf = new JFormattedTextField(NumberFormat.getNumberInstance());
+         } else {
+         if ((constraint & com.codename1.ui.TextArea.EMAILADDR) == com.codename1.ui.TextArea.EMAILADDR) {
+         try {
+         awtTf = new JFormattedTextField(new MaskFormatter("*@*.*"));
+         } catch (ParseException ex) {
+         ex.printStackTrace();
+         return;
+         }
+         } else {
+         if ((constraint & com.codename1.ui.TextArea.NUMERIC) == com.codename1.ui.TextArea.NUMERIC) {
+         awtTf = new JFormattedTextField(NumberFormat.getIntegerInstance());
+         } else {
+         if ((constraint & com.codename1.ui.TextArea.PHONENUMBER) == com.codename1.ui.TextArea.PHONENUMBER) {
+         try {
+         awtTf = new JFormattedTextField(new MaskFormatter("(###) ###-####"));
+         } catch (ParseException ex) {
+         ex.printStackTrace();
+         return;
+         }
+         } else {
+         if (cmp instanceof com.codename1.ui.TextField) {
+         java.awt.TextField t = new java.awt.TextField();
+         awtTf = t;
+         t.setSelectionEnd(0);
+         t.setSelectionStart(0);
+         } else {
+         java.awt.TextArea t = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);;
+         awtTf = t;
+         t.setSelectionEnd(0);
+         t.setSelectionStart(0);
+         }                        
+         }
+         }
+         }
+         }*/
         if (cmp instanceof com.codename1.ui.TextField) {
             java.awt.TextField t = new java.awt.TextField();
             awtTf = t;
@@ -1628,7 +1680,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             awtTf = t;
             t.setSelectionEnd(0);
             t.setSelectionStart(0);
-        }                        
+        }
         final java.awt.Component tf = awtTf;
         if (keyCode > 0) {
             text += ((char) keyCode);
@@ -1729,6 +1781,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void flushGraphics(int x, int y, int width, int height) {
         canvas.blit(x, y, width, height);
+        
     }
 
     /**
@@ -1744,16 +1797,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
         ((BufferedImage) nativeImage).getRGB(x, y, width, height, arr, offset, width);
     }
-    
+
     private BufferedImage createTrackableBufferedImage(final int width, final int height) {
         return createTrackableBufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
     }
+
     private BufferedImage createTrackableBufferedImage(final int width, final int height, int type) {
-        if(perfMonitor != null) {
+        if (perfMonitor != null) {
             BufferedImage i = new BufferedImage(width, height, type) {
                 public void finalize() throws Throwable {
                     super.finalize();
-                    if(perfMonitor != null) {
+                    if (perfMonitor != null) {
                         perfMonitor.removeImageRAM(width * height * 4);
                     }
                 }
@@ -1764,16 +1818,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             return new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         }
     }
-    
+
     /**
      * @inheritDoc
      */
     public Object createImage(int[] rgb, final int width, final int height) {
         BufferedImage i = createTrackableBufferedImage(width, height);
         i.setRGB(0, 0, width, height, rgb, 0, width);
-        if(perfMonitor != null) {
-            perfMonitor.printToLog("Created RGB image width: " + width + " height: " + height + 
-                    " size (bytes) " + (width * height * 4));
+        if (perfMonitor != null) {
+            perfMonitor.printToLog("Created RGB image width: " + width + " height: " + height
+                    + " size (bytes) " + (width * height * 4));
         }
         return i;
     }
@@ -1784,7 +1838,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage n = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB) {
             public void finalize() throws Throwable {
                 super.finalize();
-                if(perfMonitor != null) {
+                if (perfMonitor != null) {
                     perfMonitor.removeImageRAM(width * height * 4);
                 }
             }
@@ -1795,7 +1849,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         perfMonitor.addImageRAM(width * height * 4);
         return n;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -1816,10 +1870,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             // prevents a security exception due to a JDK bug which for some stupid reason chooses
             // to create a temporary file in the spi of Image IO
             BufferedImage b = ImageIO.read(new MemoryCacheImageInputStream(i));
-            if(perfMonitor != null) {
+            if (perfMonitor != null) {
                 b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created path image " + path + " width: " + b.getWidth() + " height: " +b.getHeight() + 
-                        " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+                perfMonitor.printToLog("Created path image " + path + " width: " + b.getWidth() + " height: " + b.getHeight()
+                        + " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
             }
             return b;
         } catch (Throwable t) {
@@ -1834,10 +1888,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object createImage(InputStream i) throws IOException {
         try {
             BufferedImage b = ImageIO.read(i);
-            if(perfMonitor != null) {
+            if (perfMonitor != null) {
                 b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created InputStream image width: " + b.getWidth() + " height: " +b.getHeight() + 
-                        " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+                perfMonitor.printToLog("Created InputStream image width: " + b.getWidth() + " height: " + b.getHeight()
+                        + " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
             }
             return b;
         } catch (Throwable t) {
@@ -1850,9 +1904,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createMutableImage(int width, int height, int fillColor) {
-        if(perfMonitor != null) {
-            perfMonitor.printToLog("Created mutable image width: " + width + " height: " + height + 
-                    " size (bytes) " + (width * height * 4));
+        if (perfMonitor != null) {
+            perfMonitor.printToLog("Created mutable image width: " + width + " height: " + height
+                    + " size (bytes) " + (width * height * 4));
         }
         int a = (fillColor >> 24) & 0xff;
         if (a == 0xff) {
@@ -1886,11 +1940,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object createImage(byte[] bytes, int offset, int len) {
         try {
             BufferedImage b = ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
-            if(perfMonitor != null) {
+            if (perfMonitor != null) {
                 b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created data image width: " + b.getWidth() + " height: " + b.getHeight() + 
-                        " data size (bytes) " + bytes.length + 
-                        " unpacked size (bytes) " + (b.getWidth() * b.getHeight() * 4));
+                perfMonitor.printToLog("Created data image width: " + b.getWidth() + " height: " + b.getHeight()
+                        + " data size (bytes) " + bytes.length
+                        + " unpacked size (bytes) " + (b.getWidth() * b.getHeight() * 4));
             }
             return b;
         } catch (IOException ex) {
@@ -1904,7 +1958,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageWidth(Object i) {
-        if(i == null) return 0;
+        if (i == null) {
+            return 0;
+        }
         return ((BufferedImage) i).getWidth();
     }
 
@@ -1912,7 +1968,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageHeight(Object i) {
-        if(i == null) return 0;
+        if (i == null) {
+            return 0;
+        }
         return ((BufferedImage) i).getHeight();
     }
 
@@ -1931,10 +1989,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         int srcWidth = image.getWidth();
         int srcHeight = image.getHeight();
 
-        if(perfMonitor != null) {
-            perfMonitor.printToLog("Scaling image from width: " + srcWidth + " height: " + srcHeight + 
-                    " to width: " + width + " height: " + height + 
-                    " size (bytes) " + (width * height * 4));
+        if (perfMonitor != null) {
+            perfMonitor.printToLog("Scaling image from width: " + srcWidth + " height: " + srcHeight
+                    + " to width: " + width + " height: " + height
+                    + " size (bytes) " + (width * height * 4));
         }
 
         // no need to scale
@@ -2356,8 +2414,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object getNativeGraphics(Object image) {
         /*NativeScreenGraphics n = new NativeScreenGraphics();
-        n.sourceImage = (BufferedImage)image;
-        return n;*/
+         n.sourceImage = (BufferedImage)image;
+         return n;*/
         return ((BufferedImage) image).getGraphics();
     }
 
@@ -2562,7 +2620,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public boolean animateImage(Object nativeImage, long lastFrame) {
+    public boolean animateImage(Object nativeImage, long lastJFrame) {
         return false;
     }
 
@@ -2601,9 +2659,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("OS".equals(key)) {
             return "SE";
         }
-        if("AppVersion".equals(key)) {
+        if ("AppVersion".equals(key)) {
             File f = new File("codenameone_settings.properties");
-            if(f.exists()) {
+            if (f.exists()) {
                 try {
                     Properties p = new Properties();
                     p.load(new FileInputStream(f));
@@ -2686,25 +2744,61 @@ public class JavaSEPort extends CodenameOneImplementation {
      * Plays the sound in the given URI which is partially platform specific.
      *
      * @param uri the platform specific location for the sound
-     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @param onCompletion invoked when the audio file finishes playing, may be
+     * null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
      */
-    public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+    public Media createMedia(final String uri, final boolean isVideo, final Runnable onCompletion) throws IOException {
+        if (!fxExists) {
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            System.out.println(msg);
+            throw new IOException(msg);
+        }
         java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof Frame)) {
+        while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
             if (cnt == null) {
                 return null;
             }
         }
+        final java.awt.Container c = cnt;
 
-        if (uri.indexOf(':') < 0) {
-            String mimeType = "video/mp4";
-            return new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (Frame) cnt, onCompletion);
+        final Media[] media = new Media[1];
+        final Exception[] err = new Exception[1];
+        final javafx.embed.swing.JFXPanel mediaContainer = new javafx.embed.swing.JFXPanel();
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (uri.indexOf(':') < 0) {
+                        String mimeType = "video/mp4";
+                        media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, mediaContainer, onCompletion);
+                    }
+
+                    media[0] = new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, mediaContainer, onCompletion);
+                } catch (Exception ex) {
+                    err[0] = ex;
+                }
+            }
+        });
+
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (media[0] == null && err[0] == null) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        });
+        if (err[0] != null) {
+            throw new IOException(err[0]);
         }
+        return media[0];
 
-        return new CodenameOneMediaPlayer(uri, isVideo, (Frame) cnt, onCompletion);
     }
 
     /**
@@ -2712,19 +2806,56 @@ public class JavaSEPort extends CodenameOneImplementation {
      *
      * @param stream the stream containing the media data
      * @param mimeType the type of the data in the stream
-     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @param onCompletion invoked when the audio file finishes playing, may be
+     * null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
      */
-    public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+    public Media createMedia(final InputStream stream, final String mimeType, final Runnable onCompletion) throws IOException {
+        if (!fxExists) {
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            System.out.println(msg);
+            throw new IOException(msg);
+        }
         java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof Frame)) {
+        while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
             if (cnt == null) {
                 return null;
             }
         }
-        return new CodenameOneMediaPlayer(stream, mimeType, (Frame) cnt, onCompletion);
+        final java.awt.Container c = cnt;
+
+        final Media[] media = new Media[1];
+        final Exception[] err = new Exception[1];
+        final javafx.embed.swing.JFXPanel mediaContainer = new javafx.embed.swing.JFXPanel();
+
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    media[0] = new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, mediaContainer, onCompletion);
+                } catch (Exception ex) {
+                    err[0] = ex;
+                }
+            }
+        });
+
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (media[0] == null && err[0] == null) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        });
+        if (err[0] != null) {
+            throw new IOException(err[0]);
+        }
+        return media[0];
     }
 
     private class NativeScreenGraphics {
@@ -2814,9 +2945,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private File getStorageDir() {
         if (storageDir == null) {
-            if(getStorageData() == null) {
+            if (getStorageData() == null) {
                 String mainClass = System.getProperty("MainClass");
-                if(mainClass != null) {
+                if (mainClass != null) {
                     setStorageData(mainClass);
                 } else {
                     setStorageData("CodenameOneStorage");
@@ -2833,8 +2964,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
         /*if(currentAp == null || !currentAp.equals("22")){
-        throw new IOException("apn error");
-        }*/
+         throw new IOException("apn error");
+         }*/
         URL u = new URL(url);
 
         URLConnection con = u.openConnection();
@@ -2848,9 +2979,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         con.setDoInput(read);
         con.setDoOutput(write);
-        if(netMonitor != null) {
+        if (netMonitor != null) {
             NetworkRequestObject nr = new NetworkRequestObject();
-            if(nr != null) {
+            if (nr != null) {
                 nr.setUrl(url);
             }
             netMonitor.addRequest(con, nr);
@@ -2865,32 +2996,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         HttpURLConnection con = ((HttpURLConnection) connection);
         String url = con.getURL().toString();
         //a patch go get a readable login page for facebook
-        if(key.equals("User-Agent") && url.contains("facebook.com")){
+        if (key.equals("User-Agent") && url.contains("facebook.com")) {
             //blackberry user-agent gets an html without javascript.
-            
+
             //con.setRequestProperty("User-Agent", "Profile/MIDP-2.1 Configuration/CLDC-1.1");        
-                    
-            con.setRequestProperty("User-Agent", "Mozilla/5.0 (BlackBerry; U; BlackBerry 9860; en-GB) AppleWebKit/534.11+ (KHTML, like Gecko) Version/7.0.0.296 Mobile Safari/534.11+");        
-        }else{
+
+            con.setRequestProperty("User-Agent", "Mozilla/5.0 (BlackBerry; U; BlackBerry 9860; en-GB) AppleWebKit/534.11+ (KHTML, like Gecko) Version/7.0.0.296 Mobile Safari/534.11+");
+        } else {
             con.setRequestProperty(key, val);
         }
         updateRequestHeaders(con);
     }
 
     private void updateRequestHeaders(HttpURLConnection con) {
-        if(netMonitor != null) {
+        if (netMonitor != null) {
             NetworkRequestObject nr = netMonitor.getByConnection(con);
-            if(nr != null) {
+            if (nr != null) {
                 String requestHeaders = "";
                 Map<String, List<String>> props = con.getRequestProperties();
-                for(String header : props.keySet()) {
+                for (String header : props.keySet()) {
                     requestHeaders += header + "=" + props.get(header) + "\n";
                 }
                 nr.setHeaders(requestHeaders);
             }
         }
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -2900,9 +3031,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
             return o;
         }
-        if(netMonitor != null) {
-            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            if(nr != null) {
+        if (netMonitor != null) {
+            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+            if (nr != null) {
                 nr.setRequestBody("");
                 HttpURLConnection con = (HttpURLConnection) connection;
                 OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
@@ -2938,22 +3069,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
             return o;
         }
-        if(netMonitor != null) {
-            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            if(nr != null) {
+        if (netMonitor != null) {
+            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+            if (nr != null) {
                 HttpURLConnection con = (HttpURLConnection) connection;
                 String headers = "";
                 Map<String, List<String>> map = con.getHeaderFields();
-                for(String header : map.keySet()) {
+                for (String header : map.keySet()) {
                     headers += header + "=" + map.get(header) + "\n";
                 }
                 nr.setResponseHeaders(headers);
                 nr.setResponseBody("");
                 InputStream i = new BufferedInputStream(con.getInputStream()) {
                     public synchronized int read(byte b[], int off, int len)
-                        throws IOException {
+                            throws IOException {
                         int s = super.read(b, off, len);
-                        if(s > -1) {
+                        if (s > -1) {
                             nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
                         }
                         return s;
@@ -2973,12 +3104,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             String mtd = "GET";
             if (p) {
                 mtd = "POST";
-            } 
+            }
             ((HttpURLConnection) connection).setRequestMethod(mtd);
 
-            if(netMonitor != null) {
-                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-                if(nr != null) {
+            if (netMonitor != null) {
+                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+                if (nr != null) {
                     nr.setMethod(mtd);
                 }
             }
@@ -2993,9 +3124,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getResponseCode(Object connection) throws IOException {
         int code = ((HttpURLConnection) connection).getResponseCode();
-        if(netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            if(nr != null) {
+        if (netMonitor != null) {
+            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+            if (nr != null) {
                 nr.setResponseCode("" + code);
             }
         }
@@ -3014,9 +3145,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getContentLength(Object connection) {
         int contentLength = ((HttpURLConnection) connection).getContentLength();
-        if(netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection)connection);
-            if(nr != null) {
+        if (netMonitor != null) {
+            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+            if (nr != null) {
                 nr.setContentLength("" + contentLength);
             }
         }
@@ -3029,7 +3160,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String getHeaderField(String name, Object connection) throws IOException {
         return ((HttpURLConnection) connection).getHeaderField(name);
     }
-
 
     /**
      * @inheritDoc
@@ -3135,12 +3265,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private String unfile(String file) {
-        if(file.startsWith("file://")) {
+        if (file.startsWith("file://")) {
             return file.substring(7);
         }
         return file;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -3247,9 +3377,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void sendMessage(String[] recieptents, String subject, Message msg) {
         System.out.println("sending message to " + recieptents[0]);
     }
-    
+
     @Override
-    public void sendSMS(final String phoneNumber, final String message) throws IOException{
+    public void sendSMS(final String phoneNumber, final String message) throws IOException {
         System.out.println("sending sms to " + phoneNumber);
     }
 
@@ -3257,21 +3387,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void dial(String phoneNumber) {
         System.out.println("dialing to " + phoneNumber);
     }
-    
+
     @Override
-    public String [] getAllContacts(boolean withNumbers) {
-        return new String [] {"1", "2", "3", "4", "5"};
+    public String[] getAllContacts(boolean withNumbers) {
+        return new String[]{"1", "2", "3", "4", "5"};
     }
-    
+
     @Override
-    public Contact getContactById(String id){
+    public Contact getContactById(String id) {
         Contact contact = new Contact();
         contact.setId(id);
-        if(id.equals("1")){
+        if (id.equals("1")) {
             contact.setDisplayName("Chen Fishbein");
             contact.setFirstName("Chen");
             contact.setFamilyName("Fishbein");
-            
+
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -3279,18 +3409,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             Hashtable emails = new Hashtable();
             emails.put("work", "chen@codenameone.com");
             contact.setEmails(emails);
-            
+
             Hashtable addresses = new Hashtable();
             Address addr = new Address();
             addr.setCountry("IL");
             addr.setStreetAddress("Sapir 20");
             addresses.put("home", addr);
             contact.setAddresses(addresses);
-        }else if(id.equals("2")){
+        } else if (id.equals("2")) {
             contact.setDisplayName("Shai Almog");
             contact.setFirstName("Shai");
             contact.setFamilyName("Almog");
-            
+
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -3298,20 +3428,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             Hashtable emails = new Hashtable();
             emails.put("work", "shai@codenameone.com");
             contact.setEmails(emails);
-            
+
             Hashtable addresses = new Hashtable();
             Address addr = new Address();
             addr.setCountry("IL");
             addr.setStreetAddress("lev 1");
             addresses.put("home", addr);
             contact.setAddresses(addresses);
-        }if(id.equals("3")){
-            
+        }
+        if (id.equals("3")) {
+
             contact.setDisplayName("Eric Cartman");
             contact.setFirstName("Eric");
             contact.setFamilyName("Cartman");
 
-            
+
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -3319,15 +3450,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             Hashtable emails = new Hashtable();
             emails.put("work", "Eric.Cartman@codenameone.com");
             contact.setEmails(emails);
-            
+
             Hashtable addresses = new Hashtable();
             Address addr = new Address();
             addr.setCountry("US");
             addr.setStreetAddress("South Park");
             addresses.put("home", addr);
             contact.setAddresses(addresses);
-        }if(id.equals("4")){
-            
+        }
+        if (id.equals("4")) {
+
             contact.setDisplayName("Kyle Broflovski");
             contact.setFirstName("Kyle");
             contact.setFamilyName("Broflovski");
@@ -3339,20 +3471,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             Hashtable emails = new Hashtable();
             emails.put("work", "Kyle.Broflovski@codenameone.com");
             contact.setEmails(emails);
-            
+
             Hashtable addresses = new Hashtable();
             Address addr = new Address();
             addr.setCountry("US");
             addr.setStreetAddress("South Park");
             addresses.put("home", addr);
             contact.setAddresses(addresses);
-        }else if(id.equals("5")){
-            
+        } else if (id.equals("5")) {
+
             contact.setDisplayName("Kenny McCormick");
             contact.setFirstName("Kenny");
             contact.setFamilyName("McCormick");
 
-            
+
             Hashtable phones = new Hashtable();
             phones.put("mobile", "+111111");
             phones.put("home", "+222222");
@@ -3360,7 +3492,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             Hashtable emails = new Hashtable();
             emails.put("work", "Kenny.McCormick@codenameone.com");
             contact.setEmails(emails);
-            
+
             Hashtable addresses = new Hashtable();
             Address addr = new Address();
             addr.setCountry("US");
@@ -3368,12 +3500,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             addresses.put("home", addr);
             contact.setAddresses(addresses);
         }
-     
+
         return contact;
     }
 
-    
-    
     @Override
     public boolean shouldAutoDetectAccessPoint() {
         return false;
@@ -3381,7 +3511,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /**
      * Indicates whether looking up an access point is supported by this device
-     * 
+     *
      * @return true if access point lookup is supported
      */
     public boolean isAPSupported() {
@@ -3450,6 +3580,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /**
      * Captures a photo and notifies with the image data when available
+     *
      * @param response callback for the resulting image
      */
     public void capturePhoto(com.codename1.ui.events.ActionListener response) {
@@ -3463,51 +3594,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    class CodenameOneMediaPlayer implements Media, ControllerListener {
+    class CodenameOneMediaPlayer implements Media {
 
         private Runnable onCompletion;
-        private MediaPlayer player;
+        private javafx.scene.media.MediaPlayer player;
+//        private MediaPlayer player;
         private boolean realized = false;
         private boolean isVideo;
-        private VideoPanel video;
-        private Frame frm;
+        private javafx.embed.swing.JFXPanel videoPanel;
+        private JFrame frm;
         private boolean playing = false;
 
-        public CodenameOneMediaPlayer(String uri, boolean isVideo, Frame f, Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, Runnable onCompletion) throws IOException {
             this.onCompletion = onCompletion;
             this.isVideo = isVideo;
             this.frm = f;
             try {
-                player = jmapps.util.JMFUtils.createMediaPlayer(uri, f, "", "");
-                if(player != null){
-                    player.setPlaybackLoop(false);
-                    player.setPopupActive(false);
-                    player.addControllerListener(this);
-                    player.realize();
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            while (!realized) {
-                                try {
-                                    Thread.sleep(1000);
-                                } catch (InterruptedException ex) {
-                                    Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
-                                }
-                            }
-                        }
-                    });
-                    if (isVideo) {
-                        video = new VideoPanel(player);
-                    }
+                player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                player.setOnEndOfMedia(onCompletion);
+                if (isVideo) {
+                    videoPanel = fx;
                 }
+
             } catch (Exception ex) {
                 ex.printStackTrace();
                 throw new RuntimeException(ex);
             }
         }
 
-        public CodenameOneMediaPlayer(InputStream stream, String mimeType, Frame f, Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, Runnable onCompletion) throws IOException {
             String suffix = "";
             if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
                 suffix = ".mp3";
@@ -3544,28 +3659,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.isVideo = mimeType.contains("video");
             this.frm = f;
             try {
-                player = jmapps.util.JMFUtils.createMediaPlayer(temp.toURI().toURL().toString(), f, null, null);
-                if(player != null){
-                    player.setPlaybackLoop(false);
-                    player.setPopupActive(false);
-                    player.addControllerListener(this);
-                    player.realize();
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            while (!realized) {
-                                try {
-                                    Thread.sleep(1000);
-                                } catch (InterruptedException ex) {
-                                    Logger.getLogger(CodenameOneMediaPlayer.class.getName()).log(Level.SEVERE, null, ex);
-                                }
-                            }
-                        }
-                    });
-                    if (isVideo) {
-                        video = new VideoPanel(player);
-                    }
+                player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
+                player.setOnEndOfMedia(onCompletion);
+                if (isVideo) {
+                    videoPanel = fx;
                 }
 
             } catch (Exception ex) {
@@ -3575,71 +3672,63 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void cleanup() {
-            if(player == null){
-                return;
-            }
-            player.close();
             playing = false;
-            
+
         }
 
         public void play() {
-            if(player == null){
-                return;
-            }
-            player.start();
+            player.play();
             playing = true;
         }
 
         public void pause() {
-            if(player == null){
-                return;
-            }
             player.stop();
             playing = false;
         }
 
         public int getTime() {
-            if(player == null){
-                return -1;
-            }
-            return (int) player.getMediaTime().getSeconds();
+            return (int) player.getCurrentTime().toSeconds();
         }
 
         public void setTime(int time) {
-            if(player == null){
-                return;
-            }
-            player.setMediaTime(new Time(time));
+            player.seek(new Duration(time * 1000));
         }
 
         public int getDuration() {
-            if(player == null){
-                return -1;
-            }
-            return (int) player.getDuration().getSeconds();
+            return (int) player.getStopTime().toSeconds();
         }
 
         public void setVolume(int vol) {
-            if(player == null){
-                return;
-            }
-            int level = vol / 20;
-            player.setVolumeLevel(level + "");
+            player.setVolume(((double) vol / 100d));
         }
 
         public int getVolume() {
-            if(player == null){
-                return -1;
-            }
-            int level = Integer.parseInt(player.getVolumeLevel());
-            return level * 20;
+            return (int) player.getVolume() * 100;
         }
 
         @Override
         public Component getVideoComponent() {
-            if(video != null){
-                return new VideoComponent(frm, video);
+            if (videoPanel != null) {
+                final Component[] retVal = new Component[1];
+                Platform.runLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        retVal[0] = new VideoComponent(frm, videoPanel, player);
+                    }
+                });
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        while (retVal[0] == null) {
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                    }
+                });
+                return retVal[0];
             }
             System.out.println("Video Playing is not supported on this platform");
             Label l = new Label("Video");
@@ -3671,42 +3760,56 @@ public class JavaSEPort extends CodenameOneImplementation {
         public boolean isNativePlayerMode() {
             return false;
         }
-
-        @Override
-        public void controllerUpdate(ControllerEvent ce) {
-            if (ce instanceof RealizeCompleteEvent) {
-                realized = true;
-            }
-        }
     }
 
     class VideoComponent extends PeerComponent {
 
-        private VideoPanel vid;
-        private Frame frm;
-        private Container cnt = new Container();
+        private javafx.embed.swing.JFXPanel vid;
+        private JFrame frm;
+        private JPanel cnt = new JPanel();
+        private MediaView v;
 
-        public VideoComponent(Frame frm, VideoPanel vid) {
-            super(vid);
+        public VideoComponent(JFrame frm, javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
+            super(null);
+            cnt.setLayout(new BorderLayout());
+            cnt.add(BorderLayout.CENTER, vid);
+            Group root = new Group();
+            v = new MediaView(player);
+            root.getChildren().add(v);
+            vid.setScene(new Scene(root));
+
             this.vid = vid;
             this.frm = frm;
-            cnt.setLayout(null);
-            cnt.add(vid);
-
         }
 
         @Override
         protected void initComponent() {
             super.initComponent();
-            frm.add(cnt, 0);
-            frm.validate();
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    frm.add(cnt, 0);
+                    frm.validate();
+                    frm.repaint();
+                }
+            });
         }
 
         @Override
         protected void deinitialize() {
             super.deinitialize();
-            frm.remove(cnt);
-            frm.validate();
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    vid.removeAll();
+                    cnt.remove(vid);
+                    frm.remove(cnt);
+                    frm.validate();
+                    frm.repaint();
+                }
+            });
         }
 
         @Override
@@ -3725,11 +3828,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             int y = getAbsoluteY();
             int w = getWidth();
             int h = getHeight();
-
-            vid.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
+            
+            v.relocate(0, 0);
+            v.setFitWidth(w * zoomLevel);
+            v.setFitHeight(h * zoomLevel);
+            //vid.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
+            //         (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
+            //          (int) (w * zoomLevel),
+            //          (int) (h * zoomLevel));
+            cnt.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
                     (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
                     (int) (w * zoomLevel),
                     (int) (h * zoomLevel));
+
         }
     }
 
@@ -3748,24 +3859,23 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void beforeComponentPaint(Component c) {
-        if(perfMonitor != null) {
+        if (perfMonitor != null) {
             perfMonitor.beforeComponentPaint(c);
         }
     }
 
     public void afterComponentPaint(Component c) {
-        if(perfMonitor != null) {
+        if (perfMonitor != null) {
             perfMonitor.afterComponentPaint(c);
         }
     }
-
     private L10NManager l10n;
 
     /**
      * @inheritDoc
      */
     public L10NManager getLocalizationManager() {
-        if(l10n == null) {
+        if (l10n == null) {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 public String format(int number) {
@@ -3810,39 +3920,35 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Media createMediaRecorder(String path) throws IOException {
         throw new IOException("Not supported on Simulator");
     }
-    
-    
-    
     private com.codename1.ui.util.ImageIO imIO;
-    
+
     @Override
     public com.codename1.ui.util.ImageIO getImageIO() {
-        if(imIO == null) {
+        if (imIO == null) {
             imIO = new com.codename1.ui.util.ImageIO() {
-
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     String f = "png";
-                    if(format == FORMAT_JPEG) {
+                    if (format == FORMAT_JPEG) {
                         f = "jpeg";
                     }
                     Image img = Image.createImage(image).scaled(width, height);
-                    if(width < 0) {
+                    if (width < 0) {
                         width = img.getWidth();
                     }
-                    if(height < 0) {
+                    if (height < 0) {
                         width = img.getHeight();
                     }
-                    ImageIO.write(((BufferedImage)img.getImage()), f, response);
+                    ImageIO.write(((BufferedImage) img.getImage()), f, response);
                 }
 
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     String f = "png";
-                    if(format == FORMAT_JPEG) {
+                    if (format == FORMAT_JPEG) {
                         f = "jpeg";
                     }
-                    ImageIO.write(((BufferedImage)img.getImage()), f, response);
+                    ImageIO.write(((BufferedImage) img.getImage()), f, response);
                 }
 
                 @Override
@@ -3859,7 +3965,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         String user = p.get("user", null);
         Display d = Display.getInstance();
-        if(user == null) {
+        if (user == null) {
             JPanel pnl = new JPanel();
             JTextField tf = new JTextField(20);
             pnl.add(new JLabel("E-Mail For Push"));
@@ -3876,9 +3982,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         super.registerPush(id, noFallback);
     }
-    
+
     @Override
-    public Database openOrCreateDB(String databaseName) throws IOException{
+    public Database openOrCreateDB(String databaseName) throws IOException {
         try {
             // Load the HSQL Database Engine JDBC driver
             Class.forName("org.sqlite.JDBC");
@@ -3892,12 +3998,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             // It can contain directory names relative to the
             // current working directory
             File dir = new File(getStorageDir() + "/database");
-            if(!dir.exists()){
+            if (!dir.exists()) {
                 dir.mkdir();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" + 
-                    getStorageDir() + "/database/" + databaseName);
-            
+            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
+                    + getStorageDir() + "/database/" + databaseName);
+
             return new SEDatabase(conn);
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -3908,7 +4014,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void deleteDB(String databaseName) throws IOException {
         File f = new File(getStorageDir() + "/database/" + databaseName);
-        if(f.exists()){
+        if (f.exists()) {
             f.delete();
         }
     }
@@ -3922,17 +4028,167 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void setCommandBehavior(int commandBehavior) {
         //cannot show native menus on the simulator
-        if(commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE){
-            if(isTablet() && getPlatformName().equals("and")){
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
+            if (isTablet() && getPlatformName().equals("and")) {
                 //simulate native ics with the lightweight ics
                 commandBehavior = Display.COMMAND_BEHAVIOR_ICS;
-            }else{
+            } else {
                 return;
             }
         }
         super.setCommandBehavior(commandBehavior);
     }
-        
+
+    public boolean isNativeBrowserComponentSupported() {
+        return fxExists;
+    }
+
+    public PeerComponent createBrowserComponent(final Object parent) {
+        java.awt.Container cnt = canvas.getParent();
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                return null;
+            }
+        }
+        final java.awt.Container c = cnt;
+
+        final Exception[] err = new Exception[1];
+        final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
+        final SEBrowserComponent[] bc = new SEBrowserComponent[1];
+
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                StackPane root = new StackPane();
+                final WebView webView = new WebView();
+                root.getChildren().add(webView);                
+                webContainer.setScene(new Scene(root));
+                bc[0] = new SEBrowserComponent(JavaSEPort.this, (JFrame) c, webContainer, webView, (BrowserComponent) parent);
+            }
+        });
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (bc[0] == null && err[0] == null) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ex) {
+                    }
+                    System.out.println("blocked");
+                }
+            }
+        });
+        return bc[0];
+    }
+
+    public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
+        ((SEBrowserComponent) browserPeer).setProperty(key, value);
+    }
+
+    public String getBrowserTitle(PeerComponent browserPeer) {
+        return ((SEBrowserComponent) browserPeer).getTitle();
+    }
+
+    public String getBrowserURL(PeerComponent browserPeer) {
+        return ((SEBrowserComponent) browserPeer).getURL();
+    }
+
+    public void setBrowserURL(final PeerComponent browserPeer, final String url) {
+        if (url.startsWith("jar:")) {
+            super.setBrowserURL(browserPeer, url);
+            return;
+        }
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).setURL(url);
+            }
+        });
+    }
+
+    public void browserStop(final PeerComponent browserPeer) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).stop();
+            }
+        });
+    }
+
+    /**
+     * Reload the current page
+     *
+     * @param browserPeer browser instance
+     */
+    public void browserReload(final PeerComponent browserPeer) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).reload();
+            }
+        });
+    }
+
+    /**
+     * Indicates whether back is currently available
+     *
+     * @param browserPeer browser instance
+     * @return true if back should work
+     */
+    public boolean browserHasBack(PeerComponent browserPeer) {
+        return ((SEBrowserComponent) browserPeer).hasBack();
+    }
+
+    public boolean browserHasForward(PeerComponent browserPeer) {
+        return ((SEBrowserComponent) browserPeer).hasForward();
+    }
+
+    public void browserBack(final PeerComponent browserPeer) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).back();
+            }
+        });
+    }
+
+    public void browserForward(final PeerComponent browserPeer) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).forward();
+            }
+        });
+    }
+
+    public void browserClearHistory(final PeerComponent browserPeer) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).clearHistory();
+            }
+        });
+    }
+
+    public void setBrowserPage(final PeerComponent browserPeer, final String html, final String baseUrl) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).setPage(html, baseUrl);
+            }
+        });
+    }
+
+    public void browserExposeInJavaScript(final PeerComponent browserPeer, final Object o, final String name) {
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+            }
+        });
+    }
+
     private static JFileChooser createImagesFileChooser() {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle("Camera simulation - pick an image");
@@ -3941,7 +4197,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         fc.setAccessory(new ImagePreview(fc));
         return fc;
     }
-    
+
     public static class ImageFilter extends FileFilter {
 
         public boolean accept(File f) {
@@ -3977,7 +4233,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return ext;
         }
     }
-    
+
     public static class ImagePreview extends JComponent
             implements PropertyChangeListener {
 
@@ -4054,5 +4310,4 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
-    
 }

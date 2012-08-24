@@ -36,13 +36,11 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * A simple class that can invoke a lifecycle object to allow it to run a Codename One application.
- * Classes are loaded with a classloader so the UI skin can be updated and the lifecycle 
- * objects reloaded.
+ * A simple class that can invoke a lifecycle object to allow it to run a
+ * Codename One application. Classes are loaded with a classloader so the UI
+ * skin can be updated and the lifecycle objects reloaded.
  *
  * @author Shai Almog
  */
@@ -62,20 +60,21 @@ public class Simulator {
         for (int iter = 0; iter < files.length; iter++) {
             files[iter] = new File(t.nextToken());
         }
+        loadFXRuntime();
         ClassLoader ldr = new ClassPathLoader(files);
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
-        m.invoke(null, new Object[]{argv});        
-        
+        m.invoke(null, new Object[]{argv});
+
         new Thread() {
             public void run() {
-                while(true) {
+                while (true) {
                     try {
                         sleep(500);
                     } catch (InterruptedException ex) {
                     }
                     String r = System.getProperty("reload.simulator");
-                    if(r != null && r.equals("true")) {
+                    if (r != null && r.equals("true")) {
                         System.setProperty("reload.simulator", "");
                         try {
                             main(argv);
@@ -88,14 +87,35 @@ public class Simulator {
             }
         }.start();
     }
+
+    private static void loadFXRuntime() {
+        String javahome = System.getProperty("java.home");
+        String fx = javahome + "/lib/jfxrt.jar";
+        File f = new File(fx);
+        if (f.exists()) {
+            URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+            Class<?> sysclass = URLClassLoader.class;
+            try {
+                Method method = sysclass.getDeclaredMethod("addURL", new Class[]{URL.class});
+                method.setAccessible(true);
+                method.invoke(sysloader, new Object[]{f.toURI().toURL()});
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }//end try catch                        
+
+        }
+
+
+    }
 }
 
 class ClassPathLoader extends ClassLoader {
+
     private File[] classpath;
-    private Map classes = new HashMap(); 
+    private Map classes = new HashMap();
 
     public ClassPathLoader(File[] classpath) {
-        super(ClassPathLoader.class.getClassLoader()); 
+        super(ClassPathLoader.class.getClassLoader());
         this.classpath = classpath;
     }
 
@@ -113,11 +133,11 @@ class ClassPathLoader extends ClassLoader {
         }
 
         try {
-            for(File f : classpath) {
+            for (File f : classpath) {
                 InputStream is;
-                if(f.isDirectory()) {
+                if (f.isDirectory()) {
                     File current = new File(f, className.replace('.', File.separatorChar) + ".class");
-                    if(!current.exists()) {
+                    if (!current.exists()) {
                         continue;
                     }
                     is = new FileInputStream(current);
@@ -125,14 +145,14 @@ class ClassPathLoader extends ClassLoader {
                     try {
                         JarFile jar = new JarFile(f);
                         JarEntry entry = jar.getJarEntry(className.replace('.', '/') + ".class");
-                        if(entry == null) {
+                        if (entry == null) {
                             continue;
                         }
                         is = jar.getInputStream(entry);
-                        if(is == null) {
+                        if (is == null) {
                             continue;
                         }
-                    } catch(Throwable t) {
+                    } catch (Throwable t) {
                         continue;
                     }
                 }
@@ -152,5 +172,4 @@ class ClassPathLoader extends ClassLoader {
         }
         return findSystemClass(className);
     }
-
 }

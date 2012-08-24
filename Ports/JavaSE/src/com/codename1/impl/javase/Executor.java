@@ -37,8 +37,6 @@ import java.util.Properties;
  */
 public class Executor {
     public static void main(final String[] argv) throws Exception {
-        FixedJavaSoundRenderer r = new FixedJavaSoundRenderer();
-        r.usurpControlFromJavaSoundRenderer();
         final Class c = Class.forName(argv[0]);
         try {
             Method m = c.getDeclaredMethod("main", String[].class);
@@ -99,31 +97,4 @@ public class Executor {
         }
     }
 
-    public static class FixedJavaSoundRenderer extends com.sun.media.renderer.audio.JavaSoundRenderer {
-
-        public void usurpControlFromJavaSoundRenderer() {
-            final String OFFENDING_RENDERER_PLUGIN_NAME = com.sun.media.renderer.audio.JavaSoundRenderer.class.getName();
-            javax.media.Format[] rendererInputFormats = javax.media.PlugInManager.getSupportedInputFormats(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-            javax.media.Format[] rendererOutputFormats = javax.media.PlugInManager.getSupportedOutputFormats(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-            //should be only rendererInputFormats
-            if (rendererInputFormats != null || rendererOutputFormats != null) {
-                final String REPLACEMENT_RENDERER_PLUGIN_NAME = FixedJavaSoundRenderer.class.getName();
-                javax.media.PlugInManager.removePlugIn(OFFENDING_RENDERER_PLUGIN_NAME, javax.media.PlugInManager.RENDERER);
-                javax.media.PlugInManager.addPlugIn(REPLACEMENT_RENDERER_PLUGIN_NAME, rendererInputFormats, rendererOutputFormats, javax.media.PlugInManager.RENDERER);
-            }
-        }
-
-        @Override
-        protected com.sun.media.renderer.audio.device.AudioOutput createDevice(javax.media.format.AudioFormat format) {
-            return new com.sun.media.renderer.audio.device.JavaSoundOutput() {
-
-                @Override
-                public void setGain(double g) {
-                    g = Math.max(g, this.gc.getMinimum());
-                    g = Math.min(g, this.gc.getMaximum());
-                    super.setGain(g);
-                }
-            };
-        }
-    }
 }
