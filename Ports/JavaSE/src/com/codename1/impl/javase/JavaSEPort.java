@@ -166,7 +166,9 @@ import javax.swing.text.JTextComponent;
  * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
-
+    static {
+        System.setProperty("apple.laf.useScreenMenuBar", "true");
+    }
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin";
     private boolean touchDevice = true;
