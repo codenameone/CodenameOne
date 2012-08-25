@@ -1288,24 +1288,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void notifyCommandBehavior(int commandBehavior) {
+    public void notifyCommandBehavior(final int commandBehavior) {
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
             if (activity instanceof CodenameOneActivity) {
                 ((CodenameOneActivity) activity).enableNativeMenu(true);
-            } else {
-                System.err.println("activity must extend CodenameOneActivity to use "
-                        + "the native menu feature");
             }
-        } else {
-            if (hasActionBar()) {
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        activity.invalidateOptionsMenu();
+        }
+        if (hasActionBar()) {
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    activity.invalidateOptionsMenu();
+                    if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
+                        activity.getActionBar().show();
+                    } else {
                         activity.getActionBar().hide();
                     }
-                });
-            }
+                }
+            });
         }
     }
 
