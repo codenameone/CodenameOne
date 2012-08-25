@@ -27,6 +27,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Worker;
@@ -105,9 +106,8 @@ public class SEBrowserComponent extends PeerComponent {
             @Override
             public void run() {
                 frm.add(cnt, 0);
-                frm.repaint();
                 frm.validate();
-                frm.repaint();
+                instance.updateScreen(frm);
             }
         });
     }
@@ -123,7 +123,7 @@ public class SEBrowserComponent extends PeerComponent {
                 cnt.remove(panel);
                 frm.remove(cnt);
                 frm.validate();
-                frm.repaint();
+                instance.updateScreen(frm);
             }
         });
         
@@ -145,18 +145,30 @@ public class SEBrowserComponent extends PeerComponent {
 
             @Override
             public void run() {
-                int x = getAbsoluteX();
-                int y = getAbsoluteY();
-                int w = getWidth();
-                int h = getHeight();
+                final int x = getAbsoluteX();
+                final int y = getAbsoluteY();
+                final int w = getWidth();
+                final int h = getHeight();
+                Platform.runLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        web.relocate(0, 0);
+                        web.requestFocus();
 
-                web.relocate(0, 0);
-                cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
-                        (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
-                        (int) (w * instance.zoomLevel),
-                        (int) (h * instance.zoomLevel)); 
-                cnt.validate();                    
-                web.requestFocus();
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
+                                        (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+                                        (int) (w * instance.zoomLevel),
+                                        (int) (h * instance.zoomLevel));
+                                cnt.validate();
+                            }
+                        });
+                    }
+                });
+
+
             }
         });
     }

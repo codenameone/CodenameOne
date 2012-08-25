@@ -454,6 +454,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }                        
                     }
                 }
+                g.dispose();
             }
         }
         
@@ -3764,6 +3765,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    void updateScreen(final JFrame frm) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(400);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                canvas.validate();
+                frm.repaint();
+            }
+        }).start();
+
+    }
+        
     class VideoComponent extends PeerComponent {
 
         private javafx.embed.swing.JFXPanel vid;
@@ -3771,10 +3788,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JPanel cnt = new JPanel();
         private MediaView v;
 
-        public VideoComponent(JFrame frm, javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
+        public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
-            cnt.setLayout(new BorderLayout());
-            cnt.add(BorderLayout.CENTER, vid);
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    cnt.setLayout(new BorderLayout());
+                    cnt.add(BorderLayout.CENTER, vid);
+                }
+            });
+            
             Group root = new Group();
             v = new MediaView(player);
             root.getChildren().add(v);
@@ -3793,7 +3817,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void run() {
                     frm.add(cnt, 0);
                     frm.validate();
-                    frm.repaint();
+                    updateScreen(frm);
                 }
             });
         }
@@ -3808,8 +3832,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     vid.removeAll();
                     cnt.remove(vid);
                     frm.remove(cnt);
-                    frm.validate();
-                    frm.repaint();
+                    updateScreen(frm);
                 }
             });
         }
@@ -3822,26 +3845,33 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         public void paint(Graphics g) {
             onPositionSizeChange();
-        }
-
+        }                
+        
         @Override
         protected void onPositionSizeChange() {
-            int x = getAbsoluteX();
-            int y = getAbsoluteY();
-            int w = getWidth();
-            int h = getHeight();
+            final int x = getAbsoluteX();
+            final int y = getAbsoluteY();
+            final int w = getWidth();
+            final int h = getHeight();
             
-            v.relocate(0, 0);
-            v.setFitWidth(w * zoomLevel);
-            v.setFitHeight(h * zoomLevel);
-            //vid.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
-            //         (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
-            //          (int) (w * zoomLevel),
-            //          (int) (h * zoomLevel));
-            cnt.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
-                    (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
-                    (int) (w * zoomLevel),
-                    (int) (h * zoomLevel));
+            Platform.runLater(new Runnable() {
+                @Override
+                public void run() {
+                    v.setFitWidth(w * zoomLevel);
+                    v.setFitHeight(h * zoomLevel);
+                    
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            cnt.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
+                                    (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
+                                    (int) (w * zoomLevel),
+                                    (int) (h * zoomLevel));
+                            cnt.validate();
+                        }
+                    });
+                }
+            });
 
         }
     }
@@ -4074,10 +4104,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void run() {
                 while (bc[0] == null && err[0] == null) {
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(500);
                     } catch (InterruptedException ex) {
                     }
-                    System.out.println("blocked");
                 }
             }
         });
