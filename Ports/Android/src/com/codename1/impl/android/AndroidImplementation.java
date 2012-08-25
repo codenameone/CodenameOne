@@ -132,8 +132,8 @@ import java.util.logging.Logger;
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
     /**
-     * make sure these important keys have a negative value when passed
-     * to Codename One or they might be interpreted as characters.
+     * make sure these important keys have a negative value when passed to
+     * Codename One or they might be interpreted as characters.
      */
     static final int DROID_IMPL_KEY_LEFT = -23446;
     static final int DROID_IMPL_KEY_RIGHT = -23447;
@@ -171,23 +171,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Uri imageUri;
     private EventDispatcher callback;
 
-
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
 
-        if(!hasActionBar()){
+        if (!hasActionBar()) {
             try {
                 activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
-        }else{
+        } else {
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    activity.invalidateOptionsMenu();
+                }
+            });
+
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
-            }        
+            }
+
         }
 
         if (m instanceof CodenameOneActivity) {
@@ -198,14 +205,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
         /**
          * translate our default font height depending on the screen density.
-         * this is required for new high resolution devices.  otherwise everything
-         * looks awfully small.
+         * this is required for new high resolution devices. otherwise
+         * everything looks awfully small.
          *
-         * we use our default font height value of 16 and go from there.  i thought
-         * about using new Paint().getTextSize() for this value but if some new
-         * version of android suddenly returns values already tranlated to the screen
-         * then we might end up with too large fonts.  the documentation is not very
-         * precise on that.
+         * we use our default font height value of 16 and go from there. i
+         * thought about using new Paint().getTextSize() for this value but if
+         * some new version of android suddenly returns values already tranlated
+         * to the screen then we might end up with too large fonts. the
+         * documentation is not very precise on that.
          */
         final int defaultFontPixelHeight = 16;
         this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
@@ -213,10 +220,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         this.defaultFont = (Paint) ((Object[]) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM))[0];
         Display.getInstance().setTransitionYield(-1);
-        initSurface();
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                initSurface();
+            }
+        });
         /**
-         * devices are extemely sensitive so dragging should start
-         * a little later than suggested by default implementation.
+         * devices are extemely sensitive so dragging should start a little
+         * later than suggested by default implementation.
          */
         this.setDragStartPercentage(6);
         VirtualKeyboardInterface vkb = new AndroidKeyboard(this);
@@ -236,14 +248,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peers[i].release();
             }
         }
-        
+
         HttpURLConnection.setFollowRedirects(false);
     }
 
-    private boolean hasActionBar(){
+    private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
     }
-    
+
     public int translatePixelForDPI(int pixel) {
         return (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP, pixel,
@@ -270,14 +282,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void deinitialize() {
-        myView = null;
+        //activity.getWindowManager().removeView(relativeLayout);
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                relativeLayout.removeAllViews();
+                relativeLayout = null;
+                myView = null;
+            }
+        });
+
     }
 
     /**
      * init view. a lot of back and forth between this thread and the UI thread.
      */
     private void initSurface() {
-
+        
         relativeLayout = new RelativeLayout(activity);
         relativeLayout.setLayoutParams(new RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.FILL_PARENT,
@@ -292,7 +313,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         relativeLayout.addView(myView);
         myView.setVisibility(View.VISIBLE);
         activity.setContentView(relativeLayout);
-
         myView.requestFocus();
     }
 
@@ -326,7 +346,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public boolean minimizeApplication() {
         activity.runOnUiThread(new Runnable() {
-
             public void run() {
                 if (myView != null) {
                     myView.setVisibility(View.INVISIBLE);
@@ -339,7 +358,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void restoreMinimizedApplication() {
         activity.runOnUiThread(new Runnable() {
-
             public void run() {
                 if (myView != null) {
                     myView.setVisibility(View.VISIBLE);
@@ -370,7 +388,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // We must wait for this call to be over, otherwise Codename One's painting
         // of the next form will be garbled.
         activity.runOnUiThread(new Runnable() {
-
             @Override
             public void run() {
                 // Must be called from the UI thread
@@ -408,7 +425,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Log.e("Codename One", "Err on EDT", err);
 
         activity.runOnUiThread(new Runnable() {
-
             @Override
             public void run() {
                 UIManager m = UIManager.getInstance();
@@ -427,7 +443,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 bob.setTitle("");
                 bob.setPositiveButton(m.localize("ok", "OK"),
                         new DialogInterface.OnClickListener() {
-
                             @Override
                             public void onClick(DialogInterface d, int which) {
                                 d.dismiss();
@@ -637,9 +652,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Loads a native font based on a lookup for a font name and attributes. Font lookup
-     * values can be separated by commas and thus allow fallback if the primary font
-     * isn't supported by the platform.
+     * Loads a native font based on a lookup for a font name and attributes.
+     * Font lookup values can be separated by commas and thus allow fallback if
+     * the primary font isn't supported by the platform.
      *
      * @param lookup string describing the font
      * @return the native font object
@@ -958,9 +973,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     *  the next two methods are not used yet and are part of a potential performance enhancement.
-     *  see https://lwuit.dev.java.net/issues/show_bug.cgi?id=218
-     *  for details.
+     * the next two methods are not used yet and are part of a potential
+     * performance enhancement. see
+     * https://lwuit.dev.java.net/issues/show_bug.cgi?id=218 for details.
      */
     //@Override
     public void drawChar(Object graphics, char c, int x, int y) {
@@ -1174,9 +1189,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int getSoftkeyCount() {
         /**
-         * one menu button only.  we may have to stuff some code here
-         * as soon as there are devices that no longer have only a single
-         * menu button.
+         * one menu button only. we may have to stuff some code here as soon as
+         * there are devices that no longer have only a single menu button.
          */
         return 1;
     }
@@ -1232,30 +1246,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return Display.KEYBOARD_TYPE_VIRTUAL;
         }
         /**
-         * can we detect this?  but even if we could i think
-         * it is best to have this fixed to qwerty.  we pass unicode
-         * values to Codename One in any case.  check AndroidView.onKeyUpDown()
-         * method.  and read comment below.
+         * can we detect this? but even if we could i think it is best to have
+         * this fixed to qwerty. we pass unicode values to Codename One in any
+         * case. check AndroidView.onKeyUpDown() method. and read comment below.
          */
         return Display.KEYBOARD_TYPE_QWERTY;
         /**
          * some info from the MIDP docs about keycodes:
          *
-         *  "Applications receive keystroke events in which the individual keys are named within a space of key codes.
-         * Every key for which events are reported to MIDP applications is assigned a key code. The key code values are
-         * unique for each hardware key unless two keys are obvious synonyms for each other. MIDP defines the following
-         * key codes: KEY_NUM0, KEY_NUM1, KEY_NUM2, KEY_NUM3, KEY_NUM4, KEY_NUM5, KEY_NUM6, KEY_NUM7, KEY_NUM8, KEY_NUM9,
-         * KEY_STAR, and KEY_POUND. (These key codes correspond to keys on a ITU-T standard telephone keypad.) Other
-         * keys may be present on the keyboard, and they will generally have key codes distinct from those list above.
-         * In order to guarantee portability, applications should use only the standard key codes.
+         * "Applications receive keystroke events in which the individual keys
+         * are named within a space of key codes. Every key for which events are
+         * reported to MIDP applications is assigned a key code. The key code
+         * values are unique for each hardware key unless two keys are obvious
+         * synonyms for each other. MIDP defines the following key codes:
+         * KEY_NUM0, KEY_NUM1, KEY_NUM2, KEY_NUM3, KEY_NUM4, KEY_NUM5, KEY_NUM6,
+         * KEY_NUM7, KEY_NUM8, KEY_NUM9, KEY_STAR, and KEY_POUND. (These key
+         * codes correspond to keys on a ITU-T standard telephone keypad.) Other
+         * keys may be present on the keyboard, and they will generally have key
+         * codes distinct from those list above. In order to guarantee
+         * portability, applications should use only the standard key codes.
          *
-         * The standard key codes values are equal to the Unicode encoding for the character that represents the key.
-         * If the device includes any other keys that have an obvious correspondence to a Unicode character, their key
-         * code values should equal the Unicode encoding for that character. For keys that have no corresponding Unicode
-         * character, the implementation must use negative values. Zero is defined to be an invalid key code."
+         * The standard key codes values are equal to the Unicode encoding for
+         * the character that represents the key. If the device includes any
+         * other keys that have an obvious correspondence to a Unicode
+         * character, their key code values should equal the Unicode encoding
+         * for that character. For keys that have no corresponding Unicode
+         * character, the implementation must use negative values. Zero is
+         * defined to be an invalid key code."
          *
-         * Because the MIDP implementation is our reference and that implementation does not interpret the given keycodes
-         * we behave alike and pass on the unicode values.
+         * Because the MIDP implementation is our reference and that
+         * implementation does not interpret the given keycodes we behave alike
+         * and pass on the unicode values.
          */
     }
 
@@ -1275,12 +1296,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 System.err.println("activity must extend CodenameOneActivity to use "
                         + "the native menu feature");
             }
-        }else{
-            if(hasActionBar()){
+        } else {
+            if (hasActionBar()) {
                 activity.runOnUiThread(new Runnable() {
-
                     @Override
                     public void run() {
+                        activity.invalidateOptionsMenu();
                         activity.getActionBar().hide();
                     }
                 });
@@ -1298,13 +1319,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ("androidId".equals(key)) {
             return Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID);
         }
-        if("cellId".equals(key)) {
+        if ("cellId".equals(key)) {
             try {
                 String serviceName = Context.TELEPHONY_SERVICE;
                 TelephonyManager telephonyManager = (TelephonyManager) activity.getSystemService(serviceName);
-                int cellId=((GsmCellLocation)telephonyManager.getCellLocation()).getCid();
+                int cellId = ((GsmCellLocation) telephonyManager.getCellLocation()).getCid();
                 return "" + cellId;
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 return null;
             }
         }
@@ -1365,7 +1386,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 final boolean[] flag = new boolean[1];
                 Thread thread = new Thread() {
-
                     public void run() {
                         Looper.prepare();
                         WebView m_webview = new WebView(activity);
@@ -1392,7 +1412,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void execute(String url, ActionListener response) {
-        if(response != null){
+        if (response != null) {
             callback = new EventDispatcher();
             callback.addListener(response);
         }
@@ -1414,7 +1434,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -1428,7 +1448,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void playBuiltinSound(String soundIdentifier) {
         if (Display.SOUND_TYPE_BUTTON_PRESS == soundIdentifier) {
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     if (myView != null) {
                         myView.playSoundEffect(AudioManager.FX_KEY_CLICK);
@@ -1474,7 +1493,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final boolean[] flag = new boolean[1];
             final File f = file;
             activity.runOnUiThread(new Runnable() {
-
                 @Override
                 public void run() {
                     VideoView v = new VideoView(activity);
@@ -1515,7 +1533,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return retVal;
     }
- 
+
     /**
      * @inheritDoc
      */
@@ -1547,7 +1565,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final boolean[] flag = new boolean[1];
 
             activity.runOnUiThread(new Runnable() {
-
                 @Override
                 public void run() {
                     VideoView v = new VideoView(activity);
@@ -1578,14 +1595,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Media createMediaRecorder(final String path) throws IOException {
-        
-        final AndroidRecorder [] record = new AndroidRecorder[1];
-        final IOException [] error = new IOException[1];
+
+        final AndroidRecorder[] record = new AndroidRecorder[1];
+        final IOException[] error = new IOException[1];
 
         final Object lock = new Object();
         synchronized (lock) {
             activity.runOnUiThread(new Runnable() {
-
                 @Override
                 public void run() {
                     synchronized (lock) {
@@ -1601,29 +1617,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
                         } catch (IOException ex) {
                             error[0] = ex;
-                        }finally{
+                        } finally {
                             lock.notify();
                         }
 
-                        
+
                     }
                 }
             });
-            
+
             try {
                 lock.wait();
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }
-            
-            if(error[0] != null){
+
+            if (error[0] != null) {
                 throw error[0];
             }
-            
+
             return record[0];
         }
 
-        
+
     }
 
     /**
@@ -1668,14 +1684,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         if (bln) {
             /**
-             * whenever the base view receives focus we automatically block possible
-             * native subviews from gaining focus.
+             * whenever the base view receives focus we automatically block
+             * possible native subviews from gaining focus.
              */
             blockNativeFocusAll(true);
             if (this.lastDirectionalKeyEventReceivedByWrapper != 0) {
                 /**
-                 * because we also consume any key event in the OnKeyListener of the native wrappers,
-                 * we have to simulate key events to make Codename One move the focus to the next component.
+                 * because we also consume any key event in the OnKeyListener of
+                 * the native wrappers, we have to simulate key events to make
+                 * Codename One move the focus to the next component.
                  */
                 if (!myView.isInTouchMode()) {
                     switch (lastDirectionalKeyEventReceivedByWrapper) {
@@ -1700,20 +1717,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * wrapper component that capsules a native view object in a Codename One component. this
-     * involves A LOT of back and forth between the Codename One EDT and the Android UI thread.
+     * wrapper component that capsules a native view object in a Codename One
+     * component. this involves A LOT of back and forth between the Codename One
+     * EDT and the Android UI thread.
      *
      *
      * To use it you would:
      *
-     * 1) create your native Android view(s). Make sure to work on the Android UI thread when constructing
-     *    and modifying them.
-     * 2) create a Codename One peer component by calling:
+     * 1) create your native Android view(s). Make sure to work on the Android
+     * UI thread when constructing and modifying them. 2) create a Codename One
+     * peer component by calling:
      *
-     *         com.codename1.ui.PeerComponent.create(myAndroidView);
+     * com.codename1.ui.PeerComponent.create(myAndroidView);
      *
-     * 3) currently the view's size is not automatically calculated from the native view. so you should
-     *    set the preferred size of the Codename One component manually.
+     * 3) currently the view's size is not automatically calculated from the
+     * native view. so you should set the preferred size of the Codename One
+     * component manually.
      *
      *
      */
@@ -1749,7 +1768,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         void doSetVisibility(final boolean visible) {
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     v.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
                     if (visible) {
@@ -1766,7 +1784,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 nativePeers.remove(this);
             }
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     if (layoutWrapper != null) {
                         AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
@@ -1775,7 +1792,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
             Display.getInstance().invokeAndBlock(new Runnable() {
-
                 public void run() {
                     if (layoutWrapper != null) {
                         while (layoutWrapper.getParent() != null);
@@ -1791,12 +1807,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 nativePeers.add(this);
             }
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     if (layoutWrapper == null) {
                         /**
-                         * wrap the native item in a layout that we can move around on the surface view
-                         * as we like.
+                         * wrap the native item in a layout that we can move
+                         * around on the surface view as we like.
                          */
                         layoutWrapper = new AndroidRelativeLayout(activity, AndroidPeer.this, v);
                         v.setFocusable(AndroidPeer.this.isFocusable());
@@ -1819,7 +1834,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             blockNativeFocus(true);
                         }
                         layoutWrapper.setOnKeyListener(new View.OnKeyListener() {
-
                             public boolean onKey(View view, int i, KeyEvent ke) {
                                 lastDirectionalKeyEventReceivedByWrapper = AndroidView.internalKeyCodeTranslate(ke.getKeyCode());
 
@@ -1827,23 +1841,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 AndroidImplementation.this.myView.requestFocus();
 
                                 /**
-                                 * if the wrapper has focus, then only because the wrapped
-                                 * native component just lost focus. we consume whatever key
-                                 * events we receive, just to make sure no half press/release
-                                 * sequence reaches the base view (and therefore Codename One).
+                                 * if the wrapper has focus, then only because
+                                 * the wrapped native component just lost focus.
+                                 * we consume whatever key events we receive,
+                                 * just to make sure no half press/release
+                                 * sequence reaches the base view (and therefore
+                                 * Codename One).
                                  */
                                 return true;
                             }
                         });
                         layoutWrapper.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-
                             public void onFocusChange(View view, boolean bln) {
                                 Log.d("Codename One", "on focus change. " + view.toString() + " focus:" + bln + " touchmode: "
                                         + v.isInTouchMode());
                             }
                         });
                         layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
-
                             public boolean onTouch(View v, MotionEvent me) {
                                 return myView.onTouchEvent(me);
                             }
@@ -1855,7 +1869,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
             Display.getInstance().invokeAndBlock(new Runnable() {
-
                 public void run() {
                     if (layoutWrapper != null) {
                         while (layoutWrapper.getParent() == null);
@@ -1870,7 +1883,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // called by Codename One EDT to position the native component.
 
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     if (layoutWrapper != null) {
                         if (v.getVisibility() == View.VISIBLE) {
@@ -1911,7 +1923,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // EDT
             super.setFocusable(focusable);
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     v.setFocusable(focusable);
                 }
@@ -1924,7 +1935,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // EDT
             super.focusGained();
             activity.runOnUiThread(new Runnable() {
-
                 public void run() {
                     // allow this one to gain focus
                     blockNativeFocus(false);
@@ -1944,7 +1954,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             super.focusLost();
             if (layoutWrapper != null) {
                 activity.runOnUiThread(new Runnable() {
-
                     public void run() {
                         // request focus of the wrapper. that will trigger the
                         // android focus listener and move focus back to the
@@ -1958,7 +1967,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void paint(Graphics g) {
             super.paint(g);
-            
+
             if (canvas != null) {
                 //copy the native drawing to a different image
                 synchronized (canvas) {
@@ -2002,9 +2011,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * inner class that wraps the native components.
-     * this is a useful thingy to handle focus stuff and
-     * buffering.
+     * inner class that wraps the native components. this is a useful thingy to
+     * handle focus stuff and buffering.
      */
     class AndroidRelativeLayout extends RelativeLayout {
 
@@ -2028,7 +2036,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         /**
-         * create a layout parameter object that holds the native component's position.
+         * create a layout parameter object that holds the native component's
+         * position.
+         *
          * @return
          */
         private RelativeLayout.LayoutParams createMyLayoutParams(int x, int y, int width, int height) {
@@ -2046,7 +2056,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-                return super.drawChild(canvas, child, drawingTime);
+            return super.drawChild(canvas, child, drawingTime);
 
 //            if (child instanceof SurfaceView) {
 //                return super.drawChild(canvas, child, drawingTime);
@@ -2099,8 +2109,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
-     * might replace the DefaultLookAndFeel instance and the default transitions.
+     * Installs the native theme, this is only applicable if hasNativeTheme()
+     * returned true. Notice that this method might replace the
+     * DefaultLookAndFeel instance and the default transitions.
      */
     public void installNativeTheme() {
         hasNativeTheme();
@@ -2127,17 +2138,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public PeerComponent createBrowserComponent(final Object parent) {
-        final AndroidBrowserComponent [] bc = new AndroidBrowserComponent[1];
+        final AndroidBrowserComponent[] bc = new AndroidBrowserComponent[1];
 
         final Object lock = new Object();
         synchronized (lock) {
             activity.runOnUiThread(new Runnable() {
-
                 @Override
                 public void run() {
                     synchronized (lock) {
                         WebView wv = new WebView(activity) {
-
                             public boolean onKeyDown(int keyCode, KeyEvent event) {
                                 switch (keyCode) {
                                     case KeyEvent.KEYCODE_BACK:
@@ -2179,7 +2188,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
         ((AndroidBrowserComponent) browserPeer).setProperty(key, value);
     }
-    
+
     public String getBrowserTitle(PeerComponent browserPeer) {
         return ((AndroidBrowserComponent) browserPeer).getTitle();
     }
@@ -2202,6 +2211,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Reload the current page
+     *
      * @param browserPeer browser instance
      */
     public void browserReload(PeerComponent browserPeer) {
@@ -2210,6 +2220,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Indicates whether back is currently available
+     *
      * @param browserPeer browser instance
      * @return true if back should work
      */
@@ -2311,7 +2322,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.getSettings().setSupportZoom(true);
             this.act = act;
             web.setWebViewClient(new WebViewClient() {
-
                 public void onLoadResource(WebView view, String url) {
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
                     super.onLoadResource(view, url);
@@ -2380,7 +2390,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void setURL(final String url) {
             act.runOnUiThread(new Runnable() {
-
                 public void run() {
                     web.loadUrl(url);
                 }
@@ -2574,9 +2583,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return s;
         }
         return null;
-        
-        
-        
+
+
+
     }
 
     /**
@@ -2739,9 +2748,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     /*public void startThread(String name, Runnable r) {
-        new Thread(Thread.currentThread().getThreadGroup(), r, name, 64 * 1024).start();
-    }*/
-
+     new Thread(Thread.currentThread().getThreadGroup(), r, name, 64 * 1024).start();
+     }*/
     /**
      * @inheritDoc
      */
@@ -2775,6 +2783,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * This method returns the platform Location Control
+     *
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
@@ -2805,7 +2814,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     "mailto:" + to.toString()
                     + "?subject=" + Uri.encode(subject)
                     + "&body=" + Uri.encode(msg.getContent())));
-            
+
         }
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }
@@ -2828,19 +2837,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ArrayList<String> parts = sms.divideMessage(message);
         sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
     }
-    
-    public void notifyStatusBar(String tickerText, String contentTitle, 
+
+    public void notifyStatusBar(String tickerText, String contentTitle,
             String contentBody, boolean vibrate, boolean flashLights) {
         int id = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
-        
-        NotificationManager notificationManager = (NotificationManager)activity.getSystemService(Activity.NOTIFICATION_SERVICE);
+
+        NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
         Notification notification = new Notification(id, tickerText, System.currentTimeMillis());
-        
-        if(flashLights){
+
+        if (flashLights) {
             notification.defaults |= Notification.DEFAULT_LIGHTS;
             notification.flags |= Notification.FLAG_SHOW_LIGHTS;
         }
-        if(vibrate){
+        if (vibrate) {
             notification.defaults |= Notification.DEFAULT_VIBRATE;
         }
         Intent notificationIntent = new Intent();
@@ -2848,9 +2857,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, notificationIntent, 0);
 
         notification.setLatestEventInfo(activity, contentTitle, contentBody, contentIntent);
-        notificationManager.notify(10001, notification);        
+        notificationManager.notify(10001, notification);
     }
-    
+
     @Override
     public String[] getAllContacts(boolean withNumbers) {
         return AndroidContactsManager.getInstance().getContacts(activity, withNumbers);
@@ -2862,18 +2871,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public boolean isNativeShareSupported(){
+    public boolean isNativeShareSupported() {
         return true;
     }
-    
+
     @Override
-    public void share(String toShare){
+    public void share(String toShare) {
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
         shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, toShare);
         activity.startActivity(Intent.createChooser(shareIntent, "Share with..."));
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -2912,7 +2921,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             nativeVideo.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-
                 @Override
                 public void onCompletion(MediaPlayer arg0) {
                     if (onCompletion != null) {
@@ -2922,7 +2930,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
                     if (onCompletion != null) {
@@ -3070,7 +3077,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String path = convertImageUriToFilePath(data, activity);
                 callback.fireActionEvent(new ActionEvent(path));
                 return;
-            } else if(requestCode == OPEN_GALLERY){
+            } else if (requestCode == OPEN_GALLERY) {
                 Uri selectedImage = intent.getData();
                 String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
@@ -3078,10 +3085,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 cursor.moveToFirst();
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
-                cursor.close();            
-                callback.fireActionEvent(new ActionEvent(filePath));                                
+                cursor.close();
+                callback.fireActionEvent(new ActionEvent(filePath));
             } else {
-                callback.fireActionEvent(new ActionEvent("ok"));            
+                callback.fireActionEvent(new ActionEvent("ok"));
             }
         }
         callback.fireActionEvent(null);
@@ -3093,7 +3100,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-        
+
         String fileName = "temp.jpg";
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.TITLE, fileName);
@@ -3122,16 +3129,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Opens the device image gallery
+     *
      * @param response callback for the resulting image
      */
-    public void openImageGallery(ActionListener response){    
+    public void openImageGallery(ActionListener response) {
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
         this.activity.startActivityForResult(galleryIntent, OPEN_GALLERY);
     }
-    
-    
+
     class NativeImage extends Image {
 
         public NativeImage(Bitmap nativeImage) {
@@ -3139,7 +3146,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    /** Create a File for saving an image or video */
+    /**
+     * Create a File for saving an image or video
+     */
     private File getOutputMediaFile(boolean isVideo) {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
@@ -3175,10 +3184,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean hasAndroidMarket() {
         return hasAndroidMarket(activity);
     }
-    
+
     /**
-     * Indicates whether this is a Google certified device which means that it has Android market
-     * etc.
+     * Indicates whether this is a Google certified device which means that it
+     * has Android market etc.
      */
     public static boolean hasAndroidMarket(Context activity) {
         final PackageManager packageManager = activity.getPackageManager();
@@ -3190,19 +3199,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent i2 = new Intent(Intent.ACTION_VIEW);
         i2.setData(Uri.parse(url));
 
-        List<ResolveInfo> resolveInfo = packageManager.queryIntentActivities(i2,PackageManager.MATCH_DEFAULT_ONLY);
+        List<ResolveInfo> resolveInfo = packageManager.queryIntentActivities(i2, PackageManager.MATCH_DEFAULT_ONLY);
 
         return resolveInfo.size() > 0;
     }
-    
+
     @Override
     public void registerPush(String id, boolean noFallback) {
         boolean has = hasAndroidMarket();
-        if(noFallback && !has) {
+        if (noFallback && !has) {
             return;
-        } 
-        if(has) {
-            ((CodenameOneActivity)activity).registerForPush(id);
+        }
+        if (has) {
+            ((CodenameOneActivity) activity).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);
         }
@@ -3211,7 +3220,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void stopPollingLoop() {
         stopPolling();
     }
-    
+
     public static void registerPolling() {
         registerPollingFallback();
     }
@@ -3219,8 +3228,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void deregisterPush() {
         boolean has = hasAndroidMarket();
-        if(has) {
-            ((CodenameOneActivity)activity).stopReceivingPush();
+        if (has) {
+            ((CodenameOneActivity) activity).stopReceivingPush();
             deregisterPushFromServer();
         } else {
             super.deregisterPush();
@@ -3261,15 +3270,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-
-    
     private L10NManager l10n;
 
     /**
      * @inheritDoc
      */
     public L10NManager getLocalizationManager() {
-        if(l10n == null) {
+        if (l10n == null) {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 public String format(int number) {
@@ -3309,39 +3316,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return l10n;
     }
-    
     private com.codename1.ui.util.ImageIO imIO;
-    
+
     @Override
     public com.codename1.ui.util.ImageIO getImageIO() {
-        if(imIO == null) {
+        if (imIO == null) {
             imIO = new com.codename1.ui.util.ImageIO() {
-
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
-                    if(format == FORMAT_JPEG) {
+                    if (format == FORMAT_JPEG) {
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Image img = Image.createImage(image).scaled(width, height);
-                    if(width < 0) {
+                    if (width < 0) {
                         width = img.getWidth();
                     }
-                    if(height < 0) {
+                    if (height < 0) {
                         width = img.getHeight();
                     }
-                    Bitmap b = (Bitmap) img.getImage();                    
-                    b.compress(f, (int)(quality * 100), response);
+                    Bitmap b = (Bitmap) img.getImage();
+                    b.compress(f, (int) (quality * 100), response);
                 }
 
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
-                    if(format == FORMAT_JPEG) {
+                    if (format == FORMAT_JPEG) {
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Bitmap b = (Bitmap) img.getImage();
-                    b.compress(f, (int)(quality * 100), response);
+                    b.compress(f, (int) (quality * 100), response);
                 }
 
                 @Override
@@ -3352,9 +3357,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return imIO;
     }
-            
+
     @Override
-    public Database openOrCreateDB(String databaseName) throws IOException{
+    public Database openOrCreateDB(String databaseName) throws IOException {
         SQLiteDatabase db = activity.openOrCreateDatabase(databaseName, activity.MODE_PRIVATE, null);
         return new AndroidDB(db);
     }
@@ -3366,26 +3371,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean existsDB(String databaseName) {
-        File db = new File(activity.getApplicationInfo().dataDir+"/databases/" + databaseName);
+        File db = new File(activity.getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.exists();
     }
-    
+
     public boolean isNativeTitle() {
         return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
-    
+
     public void setCurrentForm(final Form f) {
         super.setCurrentForm(f);
-        if(isNativeTitle()){
+        if (isNativeTitle()) {
             activity.runOnUiThread(new Runnable() {
-
                 @Override
                 public void run() {
                     activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
                     activity.getActionBar().setTitle(f.getTitle());
                 }
             });
-         }
+        }
     }
-
 }

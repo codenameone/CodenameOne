@@ -42,6 +42,12 @@ public class CodenameOneActivity extends Activity {
     private boolean nativeMenu = false;
     private IntentResultListener intentResultListener;
     private boolean waitingForResult;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        waitingForResult = false;
+    }        
     
     /**
      * Get the Android native Menu
@@ -159,6 +165,14 @@ public class CodenameOneActivity extends Activity {
         waitingForResult = true;
         super.startActivityForResult(intent, requestCode);
     }
+
+    @Override
+    public void startActivity(Intent intent) {
+        waitingForResult = true;
+        super.startActivity(intent);
+    }
+    
+    
 
     public boolean isWaitingForResult() {
         return waitingForResult;
