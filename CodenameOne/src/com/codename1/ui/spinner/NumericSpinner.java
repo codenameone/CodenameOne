@@ -98,6 +98,9 @@ public class NumericSpinner extends BaseSpinner {
      * @return the value
      */
     public double getValue() {
+        if(spin != null) {
+            return ((Double)((SpinnerNumberModel)spin.getModel()).getValue()).doubleValue();
+        }
         return value;
     }
 
@@ -156,7 +159,7 @@ public class NumericSpinner extends BaseSpinner {
             return new Double(max);
         }
         if(name.equals("value")) {
-            return new Double(value);
+            return new Double(getValue());
         }
         if(name.equals("step")) {
             return new Double(step);
