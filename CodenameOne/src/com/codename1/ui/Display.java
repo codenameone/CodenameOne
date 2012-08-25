@@ -424,6 +424,12 @@ public final class Display {
         if(!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
             INSTANCE.displayInitTime = System.currentTimeMillis();
+            
+            //restore menu state from previous run if exists
+            int commandBehaviour = COMMAND_BEHAVIOR_DEFAULT;
+            if(INSTANCE.impl != null){
+                commandBehaviour = INSTANCE.impl.getCommandBehavior();
+            }
             INSTANCE.impl = (CodenameOneImplementation)ImplementationFactory.getInstance().createImplementation();
 
             INSTANCE.impl.setDisplayLock(lock);
@@ -469,7 +475,7 @@ public final class Display {
             //we set Nokia, beacause if the user agent is empty it is most likely a J2ME device
             ConnectionRequest.setDefaultUserAgent(INSTANCE.getProperty("User-Agent", 
                     "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124"));
-
+            INSTANCE.setCommandBehavior(commandBehaviour);
         }else{
             INSTANCE.impl.confirmControlView();
         }
