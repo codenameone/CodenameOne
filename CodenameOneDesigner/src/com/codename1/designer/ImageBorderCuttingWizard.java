@@ -567,7 +567,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         }
 
         if(veryHighDPI.isSelected()) {
-            float ratio = 720.0f / ratioWidth;
+            float ratio = 640.0f / ratioWidth;
             int w = Math.max((int)(img.getWidth() * ratio), 1);
             int h = Math.max((int)(img.getHeight() * ratio), 1);
             multi = ImageMultiEditor.scaleMultiImage(multiVal, com.codename1.ui.Display.DENSITY_VERY_HIGH, w, h, multi);
