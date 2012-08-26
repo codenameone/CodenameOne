@@ -525,7 +525,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
 
             // Generate Very High Resolution MultiImage
             case 3:
-                ratioWidth = 720;
+                ratioWidth = 640;
                 multiVal = com.codename1.ui.Display.DENSITY_VERY_HIGH;
                 break;
 

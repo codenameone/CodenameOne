@@ -96,7 +96,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     com.codename1.ui.Display.DENSITY_VERY_HIGH,
                     com.codename1.ui.Display.DENSITY_HD};
                 float[] WIDTHS = {
-                    176, 240, 360, 480, 768, 1024
+                    176, 240, 360, 480, 640, 1024
                 };
                 EncodedImage[] images = new EncodedImage[6];
                 int imageCount = 6;
@@ -490,7 +490,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         lowWidth.setValue((int)(240.0f * percentRatio));
         mediumWidth.setValue((int)(320.0f * percentRatio));
         highWidth.setValue((int)(480.0f * percentRatio));
-        veryHighWidth.setValue((int)(768.0f * percentRatio));
+        veryHighWidth.setValue((int)(640.0f * percentRatio));
         hdWidth.setValue((int)(1024.0f * percentRatio));
     }//GEN-LAST:event_percentWidthStateChanged
 
