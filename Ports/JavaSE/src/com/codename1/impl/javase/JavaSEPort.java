@@ -437,9 +437,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     if(nativeCmp){
                         java.awt.Component c = window.getContentPane().getComponent(0);
-                        g.translate(c.getX(), c.getY());
-                        c.update(g);
-                        g.translate(-c.getX(), -c.getY());
+                        if(c.isVisible()){
+                            g.translate(c.getX(), c.getY());
+                            c.update(g);
+                            g.translate(-c.getX(), -c.getY());
+                        }
                     }
                     
                     
@@ -3764,22 +3766,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
     }
-
-    void updateScreen(final JFrame frm) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Thread.sleep(400);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                canvas.validate();
-                frm.repaint();
-            }
-        }).start();
-
-    }
         
     class VideoComponent extends PeerComponent {
 
@@ -3787,6 +3773,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame frm;
         private JPanel cnt = new JPanel();
         private MediaView v;
+        private boolean init = false;
 
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
@@ -3796,6 +3783,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void run() {
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, vid);
+                    cnt.setVisible(false);
                 }
             });
             
@@ -3811,15 +3799,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void initComponent() {
             super.initComponent();
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-                    frm.add(cnt, 0);
-                    frm.validate();
-                    updateScreen(frm);
-                }
-            });
         }
 
         @Override
@@ -3832,10 +3811,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                     vid.removeAll();
                     cnt.remove(vid);
                     frm.remove(cnt);
-                    updateScreen(frm);
+                    frm.repaint();
                 }
             });
         }
+
+        protected void setLightweightMode(final boolean l) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+
+                    if (!l) {
+                        if (!init) {
+                            init = true;
+                            cnt.setVisible(true);
+                            frm.add(cnt, 0);
+                            frm.repaint();
+                        } else {
+                            cnt.setVisible(false);
+                        }
+                    } else {
+                        if (init) {
+                            cnt.setVisible(false);
+                        }
+                    }
+                }
+            });
+
+        }
+        
+        
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
@@ -3844,7 +3849,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void paint(Graphics g) {
-            onPositionSizeChange();
+            if(init){
+                onPositionSizeChange();
+            }
         }                
         
         @Override

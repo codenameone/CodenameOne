@@ -46,9 +46,10 @@ public class SEBrowserComponent extends PeerComponent {
     private WebView web;
     private javafx.embed.swing.JFXPanel panel;
     private JFrame frm;
-    private JPanel cnt = new JPanel();
     private JavaSEPort instance;
     private String currentURL;
+    private boolean init = false;
+    private JPanel cnt = new JPanel();
 
     public SEBrowserComponent(JavaSEPort instance, JFrame f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
         super(null);
@@ -56,18 +57,18 @@ public class SEBrowserComponent extends PeerComponent {
         this.instance = instance;
         this.frm = f;
         this.panel = fx;
-        
+
         cnt.setLayout(new BorderLayout());
         cnt.add(BorderLayout.CENTER, panel);
-        cnt.setOpaque(true);
-        
+        cnt.setVisible(false);
+
         web.getEngine().getLoadWorker().messageProperty().addListener(new ChangeListener<String>() {
             @Override
             public void changed(ObservableValue<? extends String> ov, String t, String t1) {
-                if(t1.startsWith("Loading http:")){
+                if (t1.startsWith("Loading http:")) {
                     String url = t1.substring("Loading ".length());
-                    if(!url.equals(currentURL)){
-                        p.fireWebEvent("onStart", new ActionEvent(url));                    
+                    if (!url.equals(currentURL)) {
+                        p.fireWebEvent("onStart", new ActionEvent(url));
                     }
                     currentURL = url;
                 }
@@ -75,7 +76,6 @@ public class SEBrowserComponent extends PeerComponent {
         });
 
         web.getEngine().getLoadWorker().stateProperty().addListener(new ChangeListener<State>() {
-            
             @Override
             public void changed(ObservableValue ov, State oldState, State newState) {
                 String url = web.getEngine().getLocation();
@@ -101,74 +101,78 @@ public class SEBrowserComponent extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
-        SwingUtilities.invokeLater(new Runnable() {
-
-            @Override
-            public void run() {
-                frm.add(cnt, 0);
-                frm.validate();
-                instance.updateScreen(frm);
-            }
-        });
     }
 
     @Override
     protected void deinitialize() {
-        super.deinitialize();        
+        super.deinitialize();
         SwingUtilities.invokeLater(new Runnable() {
-
             @Override
             public void run() {
-                panel.removeAll();       
+                panel.removeAll();
                 cnt.remove(panel);
                 frm.remove(cnt);
-                frm.validate();
-                instance.updateScreen(frm);
+                frm.repaint();
             }
         });
-        
+    }
+
+    protected void setLightweightMode(final boolean l) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+
+                if (!l) {
+                    if (!init) {
+                        init = true;
+                        cnt.setVisible(true);
+                        frm.add(cnt, 0);
+                        frm.repaint();
+                    } else {
+                        cnt.setVisible(false);
+                    }
+                } else {
+                    if (init) {
+                        cnt.setVisible(false);
+                    }
+                }
+            }
+        });
+
     }
 
     @Override
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-        return new com.codename1.ui.geom.Dimension((int)web.getWidth(), (int)web.getHeight());
+        return new com.codename1.ui.geom.Dimension((int) web.getWidth(), (int) web.getHeight());
     }
 
     @Override
     public void paint(Graphics g) {
-        onPositionSizeChange();
+        if (init) {
+            onPositionSizeChange();
+        }
     }
 
     @Override
     protected void onPositionSizeChange() {
         SwingUtilities.invokeLater(new Runnable() {
-
             @Override
             public void run() {
                 final int x = getAbsoluteX();
                 final int y = getAbsoluteY();
                 final int w = getWidth();
                 final int h = getHeight();
-                Platform.runLater(new Runnable() {
+
+                SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
-                        web.relocate(0, 0);
-                        web.requestFocus();
-
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
-                                        (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
-                                        (int) (w * instance.zoomLevel),
-                                        (int) (h * instance.zoomLevel));
-                                cnt.validate();
-                            }
-                        });
+                        cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
+                                (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+                                (int) (w * instance.zoomLevel),
+                                (int) (h * instance.zoomLevel));
+                        cnt.validate();
                     }
                 });
-
-
             }
         });
     }
