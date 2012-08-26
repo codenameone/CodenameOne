@@ -314,8 +314,8 @@ public class WebBrowser extends Container {
             setURL((String) value);
             return null;
         }
-        if (name.equals("page")) {
-            setURL((String) value);
+        if (name.equals("html")) {
+            setPage((String) value, null);
             return null;
         }
         return super.setPropertyValue(name, value);
