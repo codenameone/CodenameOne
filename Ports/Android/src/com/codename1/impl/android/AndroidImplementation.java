@@ -1383,6 +1383,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (Thread.currentThread().getName().equalsIgnoreCase("main")) {
                 WebView m_webview = new WebView(activity);
                 ua.append(m_webview.getSettings().getUserAgentString());
+                m_webview.destroy();
             } else {
                 final boolean[] flag = new boolean[1];
                 Thread thread = new Thread() {
@@ -1390,6 +1391,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         Looper.prepare();
                         WebView m_webview = new WebView(activity);
                         ua.append(m_webview.getSettings().getUserAgentString());
+                        m_webview.destroy();
                         Looper.loop();
                         flag[0] = true;
                         synchronized (flag) {
@@ -2365,19 +2367,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
 
-        public void setProperty(String key, Object value) {
-            WebSettings s = web.getSettings();
-            String methodName = "set" + key;
-            for (Method m : s.getClass().getMethods()) {
-                if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {
-                    try {
-                        m.invoke(s, value);
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                    return;
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.destroy();
                 }
-            }
+            });
+        }
+        
+        
+
+        public void setProperty(final String key, final Object value) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    WebSettings s = web.getSettings();
+                    String methodName = "set" + key;
+                    for (Method m : s.getClass().getMethods()) {
+                        if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {
+                            try {
+                                m.invoke(s, value);
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
         }
 
         public String getTitle() {
@@ -2397,7 +2415,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void reload() {
-            web.reload();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.reload();
+                }
+            });
         }
 
         public boolean hasBack() {
@@ -2409,27 +2431,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void back() {
-            web.goBack();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.goBack();
+                }
+            });
         }
 
         public void forward() {
-            web.goForward();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.goForward();
+                }
+            });
         }
 
         public void clearHistory() {
-            web.clearHistory();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.clearHistory();
+                }
+            });
         }
 
         public void stop() {
-            web.stopLoading();
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.stopLoading();
+                }
+            });
         }
 
-        public void setPage(String html, String baseUrl) {
-            web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
+        public void setPage(final String html, final String baseUrl) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
+                }
+            });
         }
 
-        public void exposeInJavaScript(Object o, String name) {
-            web.addJavascriptInterface(o, name);
+        public void exposeInJavaScript(final Object o, final String name) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.addJavascriptInterface(o, name);
+                }
+            });
         }
     }
 
