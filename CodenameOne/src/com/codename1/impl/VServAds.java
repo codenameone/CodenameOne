@@ -184,7 +184,7 @@ public class VServAds extends FullScreenAdService {
             Label adComponent = new Label();
             adComponent.getStyle().setBgColor(backgroundColor);
             adComponent.getStyle().setOpacity(0xff);
-            NetworkManager.getInstance().addToQueue(new ImageDownloadService(imageURL, adComponent));
+            NetworkManager.getInstance().addToQueueAndWait(new ImageDownloadService(imageURL, adComponent));
             return adComponent;
         } else {
             WebBrowser wb = new WebBrowser();

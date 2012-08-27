@@ -95,10 +95,15 @@ public abstract class FullScreenAdService {
         InfiniteProgress ip = new InfiniteProgress();
         Dialog ipDialog = ip.showInifiniteBlocking();
         NetworkManager.getInstance().addToQueueAndWait(r);
-        ipDialog.dispose();
-        if(failed() && !allowWithoutNetwork) {
-            Dialog.show("Network Error", "Please try again later", "Exit", null);
-            Display.getInstance().exitApplication();
+        if(failed()) {
+            ipDialog.dispose();
+            if(!allowWithoutNetwork) {
+                ipDialog.dispose();
+                Dialog.show("Network Error", "Please try again later", "Exit", null);
+                Display.getInstance().exitApplication();
+            } else {
+                return;
+            }
         }
         Component c = getPendingAd();
         if(c != null) {
