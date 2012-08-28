@@ -67,6 +67,7 @@ import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.Vector;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
@@ -2056,36 +2057,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return layoutParams;
         }
 
-        @Override
-        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            return super.drawChild(canvas, child, drawingTime);
-
-//            if (child instanceof SurfaceView) {
-//                return super.drawChild(canvas, child, drawingTime);
-//            }
-//
-//            Canvas c = peer.getBuffer();
-//
-//            boolean result;
-//            synchronized (c) {
-//                peer.clear();
-//                /**
-//                 * the EDT might draw the cache bitmap from within the flushGraphics()
-//                 * methods. synchronizing here to avoid half painted bitmaps or whatever
-//                 * might happen in the background if the EDT is reading and we are drawing.
-//                 */
-//                result = super.drawChild(c, child, drawingTime);
-//            }
-//            
-//            /**
-//             * now that this native component has been painted we certainly need a repaint.
-//             * notify the EDT.
-//             */
-//            peer.repaint();
-//            System.out.println("notify repaint peer==" + peer + " child==" + child);
-//            return result;
-        }
     }
+    
     private boolean testedNativeTheme;
     private boolean nativeThemeAvailable;
 
@@ -2254,6 +2227,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidBrowserComponent) browserPeer).exposeInJavaScript(o, name);
     }
 
+    
+    public boolean canForceOrientation() {
+        return true;
+    }
+
+    public void lockOrientation(boolean portrait) {
+        if(portrait){
+            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }else{
+            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);        
+        }
+    }
+    
     public boolean isAffineSupported() {
         return true;
     }
