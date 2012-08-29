@@ -417,7 +417,8 @@ public class InPlaceEditView extends FrameLayout {
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
         Dimension prefSize = textArea.getPreferredSize();
-        textArea.setText("");
+        //textArea.setText("");
+        
         textArea.setPreferredSize(prefSize);
         if (textArea instanceof TextField) {
             ((TextField) textArea).setEditable(false);
@@ -502,8 +503,8 @@ public class InPlaceEditView extends FrameLayout {
             public void afterTextChanged(Editable s) {
                 if (mInPlaceEditView.mIsEditing && mInPlaceEditView.mTextArea != null) {
                     try {
-                        //mInPlaceEditView.mTextArea.setText(s.toString());
-                        mInPlaceEditView.mTextArea.setText("");
+                        mInPlaceEditView.mTextArea.setText(s.toString());
+                        //mInPlaceEditView.mTextArea.setText("");
                         //mInPlaceEditView.mTextArea.commitChange();
                     } catch (Exception e) {
                         Log.e(TAG, e.toString() + " " + Log.getStackTraceString(e));
