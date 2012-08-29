@@ -1624,6 +1624,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         }
 
         public Component getVideoComponent() {
+            setVisible(true);
             return this;
         }
 
