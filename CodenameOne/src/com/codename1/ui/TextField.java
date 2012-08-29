@@ -1442,6 +1442,13 @@ public class TextField extends TextArea {
      * @inheritDoc
      */
     public void paint(Graphics g) {
+        
+        //the native input will show the string.
+        if(useNativeTextInput && Display.getInstance().isNativeInputSupported() &&
+                Display.getInstance().isTextEditing() && hasFocus()) {
+            return;
+        }
+
         UIManager manager = getUIManager();
         manager.getLookAndFeel().drawTextField(g, this);
         
@@ -1607,7 +1614,8 @@ public class TextField extends TextArea {
     
     /**
      * Adds a listener for data change events it will be invoked for every change
-     * made to the text field
+     * made to the text field, notice most platforms will invoke only the 
+     * DataChangedListener.CHANGED event
      * 
      * @param d the listener
      */
@@ -1624,7 +1632,12 @@ public class TextField extends TextArea {
         listeners.removeListener(d);
     }
     
-    private void fireDataChanged(int type, int index) {
+    /**
+     * Alert the TextField listeners the text has been changed on the TextField
+     * @param type the event type: Added, Removed or Change
+     * @param index cursor location of the event
+     */
+    public void fireDataChanged(int type, int index) {
         if(listeners != null) {
             listeners.fireDataChangeEvent(index, type);
         }
