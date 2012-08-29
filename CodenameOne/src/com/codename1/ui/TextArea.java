@@ -961,6 +961,12 @@ public class TextArea extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
+        
+        if(Display.getInstance().isNativeInputSupported() &&
+                Display.getInstance().isTextEditing() && hasFocus()) {
+            return;
+        }
+        
         getUIManager().getLookAndFeel().drawTextArea(g, this);
         paintHint(g);
     }
