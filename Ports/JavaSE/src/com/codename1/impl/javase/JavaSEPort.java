@@ -104,7 +104,10 @@ import com.codename1.ui.PeerComponent;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Scrollbar;
+import java.awt.TextComponent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.TextEvent;
+import java.awt.event.TextListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -1638,43 +1641,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
         java.awt.Component awtTf;
-        /*if ((constraint & com.codename1.ui.TextArea.DECIMAL) == com.codename1.ui.TextArea.DECIMAL) {
-         awtTf = new JFormattedTextField(NumberFormat.getNumberInstance());
-         } else {
-         if ((constraint & com.codename1.ui.TextArea.EMAILADDR) == com.codename1.ui.TextArea.EMAILADDR) {
-         try {
-         awtTf = new JFormattedTextField(new MaskFormatter("*@*.*"));
-         } catch (ParseException ex) {
-         ex.printStackTrace();
-         return;
-         }
-         } else {
-         if ((constraint & com.codename1.ui.TextArea.NUMERIC) == com.codename1.ui.TextArea.NUMERIC) {
-         awtTf = new JFormattedTextField(NumberFormat.getIntegerInstance());
-         } else {
-         if ((constraint & com.codename1.ui.TextArea.PHONENUMBER) == com.codename1.ui.TextArea.PHONENUMBER) {
-         try {
-         awtTf = new JFormattedTextField(new MaskFormatter("(###) ###-####"));
-         } catch (ParseException ex) {
-         ex.printStackTrace();
-         return;
-         }
-         } else {
-         if (cmp instanceof com.codename1.ui.TextField) {
-         java.awt.TextField t = new java.awt.TextField();
-         awtTf = t;
-         t.setSelectionEnd(0);
-         t.setSelectionStart(0);
-         } else {
-         java.awt.TextArea t = new java.awt.TextArea("", 0, 0, java.awt.TextArea.SCROLLBARS_NONE);;
-         awtTf = t;
-         t.setSelectionEnd(0);
-         t.setSelectionStart(0);
-         }                        
-         }
-         }
-         }
-         }*/
+        
         if (cmp instanceof com.codename1.ui.TextField) {
             java.awt.TextField t = new java.awt.TextField();
             awtTf = t;
@@ -1705,8 +1672,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             tf.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
+        setCaretPosition(tf, getText(tf).length());
         tf.requestFocus();
-        class Listener implements ActionListener, FocusListener, KeyListener, Runnable {
+        class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable {
 
             public synchronized void run() {
                 while (tf.getParent() != null) {
@@ -1722,6 +1690,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (tf instanceof java.awt.TextField) {
                     ((java.awt.TextField) tf).removeActionListener(this);
                 }
+                ((TextComponent)tf).removeTextListener(this);
                 tf.removeFocusListener(this);
                 canvas.remove(tf);
                 synchronized (this) {
@@ -1765,11 +1734,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return;
                 }
             }
+
+            public void textValueChanged(TextEvent e) {
+                if(cmp instanceof com.codename1.ui.TextField){
+                    ((com.codename1.ui.TextField)cmp).setText(getText(tf));
+                }
+                
+            }
         };
         final Listener l = new Listener();
         if (tf instanceof java.awt.TextField) {
-            ((java.awt.TextField) tf).addActionListener(l);
+            ((java.awt.TextField) tf).addActionListener(l);            
         }
+        ((TextComponent)tf).addTextListener(l);
         tf.addKeyListener(l);
         tf.addFocusListener(l);
         Display.getInstance().invokeAndBlock(l);
