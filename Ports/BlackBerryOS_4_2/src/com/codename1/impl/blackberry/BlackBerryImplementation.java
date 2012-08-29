@@ -386,7 +386,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 }
                 canvas.add(nativeEdit);
                 nativeEdit.setCursorPosition(lightweightEditTmp.getText().length());
-
                 try {
                     nativeEdit.setFocus();
                 } catch (Throwable t) {
@@ -1502,6 +1501,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             callback.onChanged();
             return b;
         }
+
+        protected void update(int i) {
+            super.update(i);
+            lightweightEdit.setText(getText());
+        }
+        
     }
 
     /**
@@ -1557,6 +1562,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         protected boolean navigationMovement(int dx, int dy, int status, int time) {
             callback.onChanged();
             return super.navigationMovement(dx, dy, status, time);
+        }
+        
+        protected void update(int i) {
+            super.update(i);
+            lightweightEdit.setText(getText());
         }
     }
 
