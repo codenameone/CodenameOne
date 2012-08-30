@@ -5,6 +5,7 @@
 package com.codename1.share;
 
 import com.codename1.ui.Command;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 
@@ -16,6 +17,7 @@ import com.codename1.ui.events.ActionEvent;
 public abstract class ShareService extends Command{
 
     private String message;
+    private Form original;
     
     /**
      * Constructor with the service name and icon
@@ -47,5 +49,30 @@ public abstract class ShareService extends Command{
     public void setMessage(String message){
         this.message = message;
     }
+    
+    /**
+     * Sets the Original Form (this is the Form of the share button)
+     */
+    public void setOriginalForm(Form original){
+        this.original = original;
+    }
+    
+    /**
+     * Gets the original Form
+     */
+    public Form getOriginal() {
+        return original;
+    }
+    
+    /**
+     * Once the share service has finished sharing it should call the finish 
+     * method
+     */ 
+    public void finish(){
+        original.showBack();
+    }
+
+    
+    
 
 }

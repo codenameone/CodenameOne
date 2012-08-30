@@ -55,6 +55,7 @@ class ShareForm extends Form{
         Command back = new Command("Back") {
 
             public void actionPerformed(ActionEvent evt) {
+                
                 contacts.showBack();
             }
         };

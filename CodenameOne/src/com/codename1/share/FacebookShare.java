@@ -22,7 +22,10 @@
  */
 package com.codename1.share;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.facebook.FaceBookAccess;
+import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -33,7 +36,7 @@ import java.io.IOException;
 
 /**
  * Facebook sharing service
- * 
+ *
  * @author Chen
  */
 public class FacebookShare extends ShareService {
@@ -53,38 +56,48 @@ public class FacebookShare extends ShareService {
             FaceBookAccess.getInstance().showAuthentication(this);
             return;
         }
-        if(evt.getSource() instanceof Exception) {
+        if (evt.getSource() instanceof Exception) {
             return;
         }
-        
+
         super.actionPerformed(evt);
     }
-    
-    
 
     /**
      * @inheritDoc
      */
     public void share(String toShare) {
-        final Form currentForm = Display.getInstance().getCurrent();
-
-        
         final ShareForm[] f = new ShareForm[1];
-        f[0] = new ShareForm(currentForm, "Post on My Wall", null, toShare,
+        f[0] = new ShareForm(getOriginal(), "Post on My Wall", null, toShare,
                 new ActionListener() {
-
                     public void actionPerformed(ActionEvent evt) {
                         try {
-                            FaceBookAccess.getInstance().postOnWall("me", f[0].getMessage());
+                            InfiniteProgress inf = new InfiniteProgress();
+                            final Dialog progress = inf.showInifiniteBlocking();
+                            FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {
+                                public void actionPerformed(ActionEvent evt) {
+                                    NetworkEvent ne = (NetworkEvent) evt;
+                                    int code = ne.getResponseCode();
+                                    FaceBookAccess.getInstance().removeResponseCodeListener(this);
+                                    progress.dispose();
+                                    Dialog.show("Failed to Share", "for some reason sharing has failed, try again later.", "Ok", null);
+                                    finish();
+                                }
+                            });
+                            FaceBookAccess.getInstance().postOnWall("me", f[0].getMessage(), new ActionListener() {
+                                public void actionPerformed(ActionEvent evt) {
+                                    progress.dispose();
+                                    finish();
+                                }
+                            });
+                            
                         } catch (IOException ex) {
                             ex.printStackTrace();
                             System.out.println("failed to share " + ex.getMessage());
                         }
-                        currentForm.show();
                     }
                 });
         f[0].show();
 
     }
-
 }

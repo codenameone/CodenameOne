@@ -101,6 +101,7 @@ public class ShareButton extends Button implements ActionListener{
         for (int i = 0; i < shareServices.size(); i++) {
             ShareService share = (ShareService) shareServices.elementAt(i);
             share.setMessage(textToShare);
+            share.setOriginalForm(getComponentForm());
         }
         List l = new List(shareServices);
         l.setCommandList(true);

@@ -89,7 +89,7 @@ public class SMSShare extends ShareService {
                                                     ex.printStackTrace();
                                                     System.out.println("failed to send sms to " + (String)contact.get("phone"));
                                                 }
-                                                currentForm.show();
+                                                finish();
                                             }
                                         });
                                 f[0].show();

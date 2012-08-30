@@ -579,10 +579,51 @@ public class FaceBookAccess {
      * @param message the message to post
      */
     public void postOnWall(String userId, String message) throws IOException {
+        postOnWall(userId, message, null);
+    }
+
+    /**
+     * Post like on a given post
+     *
+     * @param postId the post Id
+     */
+    public void postLike(String postId) throws IOException {
+        postLike(postId, null);
+    }
+
+    /**
+     * Post a comment on a given post
+     *
+     * @param postId the post id
+     * @param message the message to post
+     */
+    public void postComment(String postId, String message) throws IOException {
+        postComment(postId, message, null);
+    }
+    
+    /**
+     * Post a note onto the users wall
+     *
+     * @param userId the userId
+     * @param message the message to post
+     */
+    public void createNote(String userId, String subject, String message) throws IOException {
+        createNote(userId, subject, message, null);
+    }    
+    
+    
+    /**
+     * Post a message on the users wall
+     *
+     * @param userId the userId
+     * @param message the message to post
+     */
+    public void postOnWall(String userId, String message, ActionListener callback) throws IOException {
         checkAuthentication();
 
         FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);
         con.addArgument("message", "" + message);
+        con.addResponseListener(new Listener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -598,9 +639,10 @@ public class FaceBookAccess {
      *
      * @param postId the post Id
      */
-    public void postLike(String postId) throws IOException {
+    public void postLike(String postId, ActionListener callback) throws IOException {
         checkAuthentication();
         FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.LIKES, true);
+        con.addResponseListener(new Listener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -617,10 +659,11 @@ public class FaceBookAccess {
      * @param postId the post id
      * @param message the message to post
      */
-    public void postComment(String postId, String message) throws IOException {
+    public void postComment(String postId, String message, ActionListener callback) throws IOException {
         checkAuthentication();
 
         FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.COMMENTS, true);
+        con.addResponseListener(new Listener(con, callback));
         con.addArgument("message", "" + message);
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
@@ -638,10 +681,11 @@ public class FaceBookAccess {
      * @param userId the userId
      * @param message the message to post
      */
-    public void createNote(String userId, String subject, String message) throws IOException {
+    public void createNote(String userId, String subject, String message, ActionListener callback) throws IOException {
         checkAuthentication();
         
         FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.NOTES, true);
+        con.addResponseListener(new Listener(con, callback));
         con.addArgument("subject","" + subject);
         con.addArgument("message", "" + message);
         if (slider != null) {
@@ -796,6 +840,13 @@ public class FaceBookAccess {
         responseCodeListeners.addElement(a);
     }
 
+    /**
+     * Removes a response listener
+     */
+    public void removeResponseCodeListener(ActionListener a) {
+        responseCodeListeners.removeElement(a);
+    }
+    
     /**
      * This is a utility method that transforms a DefaultListModel that contains Hashtable entries
      * into a DefaultListModel that will contain FBObject objects that will be initialized with the Hashtable entries

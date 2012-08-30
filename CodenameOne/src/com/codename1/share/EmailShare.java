@@ -89,7 +89,7 @@ public class EmailShare extends ShareService {
                                                 recieptents[0] = f[0].getTo();
                                                 Message msg = new Message(toShare);
                                                 Message.sendMessage(recieptents, "share", msg);
-                                                currentForm.show();
+                                                finish();
                                             }
                                         });
                                 f[0].show();
