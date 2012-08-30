@@ -163,9 +163,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     BasicEditField nativeEdit;
     TextArea lightweightEdit;
     private BlackBerryCanvas canvas = createCanvas();
-    private UiApplication app;
-    private MIDlet midletInstance;
-    static boolean midlet;
+    CodenameOneUiApplication app;
     private boolean initGetProperty = true;
     private static EventDispatcher volumeListener;
     private NullField nullFld;
@@ -189,17 +187,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
     
     public void init(Object m) {
-        if (m instanceof UiApplication) {
-            app = (UiApplication) m;
-        } else {
-            if (m instanceof MIDlet) {
-                midlet = true;
-                midletInstance = (MIDlet) m;
-            } else {
-                midlet = false;
-            }
-            app = UiApplication.getUiApplication();
-        }
+        
+        app = (CodenameOneUiApplication) m;        
 
         if(askForPermission) {
             app.invokeAndWait(new Runnable() {
@@ -1705,26 +1694,15 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void execute(String url) {
-        if (midlet) {
-            try {
-                midletInstance.platformRequest(url);
-            } catch (ConnectionNotFoundException ex) {
-                ex.printStackTrace();
-            }
-        } else {
-            // requires signing
-            net.rim.blackberry.api.browser.BrowserSession browserSession = net.rim.blackberry.api.browser.Browser.getDefaultSession();
-            browserSession.displayPage(url);
-            browserSession.showBrowser();
-        }
+        app.setWaitingForReply(true);
+        // requires signing
+        net.rim.blackberry.api.browser.BrowserSession browserSession = net.rim.blackberry.api.browser.Browser.getDefaultSession();
+        browserSession.displayPage(url);
+        browserSession.showBrowser();
     }
 
     public void exitApplication() {
-        if (midlet) {
-            midletInstance.notifyDestroyed();
-        } else {
-            System.exit(0);
-        }
+        System.exit(0);
     }
 
     public String getProperty(String key, String defaultValue) {
@@ -1732,43 +1710,41 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if ("OS".equals(key)) {
             return "RIM";
         }
+        
         if ("IMEI".equals(key)) {
             return GPRSInfo.imeiToString(GPRSInfo.getIMEI());
         }
+        
+        //requires signing
+        if ("MSISDN".equals(key)) {
+            return Phone.getDevicePhoneNumber(true);
+        }
+        if ("AppVersion".equals(key)) {
+            return ApplicationDescriptor.currentApplicationDescriptor().getVersion();
+        }
+        if (initGetProperty) {
+            initGetProperty = false;
+            ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
+            if (ad != null) {
+                String moduleName = ad.getModuleName();
 
-        if (midletInstance != null) {
-            val = midletInstance.getAppProperty(key);
-        } else {
-            //requires signing
-            if ("MSISDN".equals(key)) {
-                return Phone.getDevicePhoneNumber(true);
-            }
-            if ("AppVersion".equals(key)) {
-               return ApplicationDescriptor.currentApplicationDescriptor().getVersion();
-            }
-            if (initGetProperty) {
-                initGetProperty = false;
-                ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
-                if (ad != null) {
-                    String moduleName = ad.getModuleName();
-
-                    if (moduleName != null) {
-                        CodeModuleGroup[] allGroups = CodeModuleGroupManager.loadAll();
-                        if (allGroups != null) {
-                            for (int i = 0; i < allGroups.length; i++) {
-                                if (allGroups[i].containsModule(moduleName)) {
-                                    group = allGroups[i];
-                                    break;
-                                }
+                if (moduleName != null) {
+                    CodeModuleGroup[] allGroups = CodeModuleGroupManager.loadAll();
+                    if (allGroups != null) {
+                        for (int i = 0; i < allGroups.length; i++) {
+                            if (allGroups[i].containsModule(moduleName)) {
+                                group = allGroups[i];
+                                break;
                             }
                         }
                     }
                 }
             }
-            if (group != null) {
-                val = group.getProperty(key);
-            }
         }
+        if (group != null) {
+            val = group.getProperty(key);
+        }
+
         if (val == null) {
             return defaultValue;
         }
@@ -2684,7 +2660,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
     }
 
-    public void capturePhoto(ActionListener response) {
+    public void capturePhoto(ActionListener response) {        
         EventLog.getInstance().logInformationEvent("capturePhoto");
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
@@ -2722,6 +2698,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 lastUSN = USN;
             }
         });
+        app.setWaitingForReply(true);
         synchronized (UiApplication.getEventLock()) {
             Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments());
         }
@@ -2773,6 +2750,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
         });
 
+        app.setWaitingForReply(true);
         ApplicationDescriptor desc = new ApplicationDescriptor(CodeModuleManager.getApplicationDescriptors(h)[0], null);
         try {
             ApplicationManager.getApplicationManager().runApplication(desc, true);
@@ -2815,6 +2793,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 message.setContent(msg.getContent());
             }
 
+            app.setWaitingForReply(true);
             Invoke.invokeApplication(Invoke.APP_TYPE_MESSAGES, new MessageArguments(message));
         } catch (Exception ex) {
             EventLog.getInstance().logErrorEvent("err " + ex.getMessage());
@@ -2824,6 +2803,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void dial(String phoneNumber) {   
         try {
             PhoneArguments call = new PhoneArguments(PhoneArguments.ARG_CALL, phoneNumber);
+            app.setWaitingForReply(true);
             Invoke.invokeApplication(Invoke.APP_TYPE_PHONE, call);            
         } catch (Exception e) {
             EventLog.getInstance().logErrorEvent("unable to open dialer " + e.getMessage());

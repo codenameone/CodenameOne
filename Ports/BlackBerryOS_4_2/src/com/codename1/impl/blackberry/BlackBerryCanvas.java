@@ -426,10 +426,8 @@ class BlackBerryCanvas extends FullScreen {
                 Display.getInstance().minimizeApplication();
                 return true;
             }
-            if(!BlackBerryImplementation.midlet) {
-                System.exit(0);
-                return true;
-            }
+            System.exit(0);
+            return true;
         }
         return super.keyDown(keyCode, time);
     }
@@ -503,9 +501,7 @@ class BlackBerryCanvas extends FullScreen {
     }
 
     public boolean onClose() {
-        if(!BlackBerryImplementation.midlet) {
-            System.exit(0);
-        }
+        System.exit(0);
         return true;
     }
 
