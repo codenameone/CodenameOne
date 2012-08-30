@@ -285,10 +285,6 @@ public class List extends Component {
         int index = model.getSelectedIndex();
         if(index >= 0){
             model.setSelectedIndex(index);
-
-            // scroll to the element, this can happen on some devices where laidOut is invoked before
-            // the component is initialized
-            selectElement(index);
         }
     }
 
