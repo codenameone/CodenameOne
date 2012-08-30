@@ -101,6 +101,7 @@ import com.codename1.media.Media;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.TextArea;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Scrollbar;
@@ -1707,6 +1708,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void keyTyped(KeyEvent e) {
+                String t = getText(tf);
+                
+                if(t.length() >= ((TextArea)cmp).getMaxSize()){
+                    e.consume();
+                }
             }
 
             public void keyPressed(KeyEvent e) {
@@ -1747,6 +1753,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             ((java.awt.TextField) tf).addActionListener(l);            
         }
         ((TextComponent)tf).addTextListener(l);
+        
+        
         tf.addKeyListener(l);
         tf.addFocusListener(l);
         Display.getInstance().invokeAndBlock(l);
