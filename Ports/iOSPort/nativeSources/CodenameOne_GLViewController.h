@@ -31,9 +31,11 @@
 #import "ExecutableOp.h"
 #import "GLUIImage.h"
 #import <MessageUI/MFMailComposeViewController.h>
+#import <MessageUI/MFMessageComposeViewController.h>
 #import <CoreLocation/CoreLocation.h>
+#import "StoreKit/StoreKit.h"
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, CLLocationManagerDelegate> {
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate> {
 @private
     EAGLContext *context;
     GLuint program;

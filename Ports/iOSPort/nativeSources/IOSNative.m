@@ -42,6 +42,7 @@
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
 #include "OpenUDID.h"
+#import "StoreKit/StoreKit.h"
 
 extern void initVMImpl();
 
@@ -810,8 +811,8 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
         NSLog(@"Error in listing files: %@", [error localizedDescription]);        
     }
     
-    org_xmlvm_runtime_XMLVMArray* byteArray = files;
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    org_xmlvm_runtime_XMLVMArray* strArray = files;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     
     int count = nsArr.count;
     for(int iter = 0 ; iter < count ; iter++) {
@@ -2214,4 +2215,30 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_LONG statement) {
     sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
     return sqlite3_column_count(stmt);
+}
+
+JAVA_OBJECT productsArrayPending = nil;
+
+void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(JAVA_OBJECT skus, JAVA_OBJECT products) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    org_xmlvm_runtime_XMLVMArray* strArray = skus;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int count = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    
+    NSString** stringArray = malloc(sizeof(NSString*) * count);
+    for(int iter = 0 ; iter < count ; iter++) {
+        stringArray[iter] = toNSString(data[iter]);
+    }
+    NSSet* productIdentifiers = [NSSet setWithObjects:stringArray count:count];
+    productsArrayPending = products;
+    
+    SKProductsRequest * request = [[[SKProductsRequest alloc] initWithProductIdentifiers:productIdentifiers] autorelease];
+    request.delegate = [CodenameOne_GLViewController instance];
+    [request start];
+    [pool release];
+}
+
+void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT sku) {
+    SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
+    [[SKPaymentQueue defaultQueue] addPayment:payment];
 }

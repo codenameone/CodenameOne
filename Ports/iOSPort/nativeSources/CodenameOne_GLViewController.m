@@ -41,6 +41,7 @@
 #import <CoreLocation/CoreLocation.h>
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #import <MobileCoreServices/UTCoreTypes.h>
+#include "com_codename1_payment_Product.h"
 
 extern void repaintUI();
 
@@ -1555,4 +1556,62 @@ extern int popoverSupported();
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
 	[self dismissModalViewControllerAnimated:YES];
 }
+
+-(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result error:(NSError*)error {
+	[self dismissModalViewControllerAnimated:YES];
+}
+
+extern JAVA_OBJECT productsArrayPending;
+
+- (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    if(productsArrayPending != nil) {
+        org_xmlvm_runtime_XMLVMArray* pArray = productsArrayPending;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        NSArray* arr = response.products;
+        int count = arr.count;
+        for(int iter = 0 ; iter < count ; iter++) {
+            SKProduct* prod = [arr objectAtIndex:iter];
+            NSString* sku = [prod productIdentifier];
+            com_codename1_payment_Product_setSku___java_lang_String(data[iter], fromNSString(sku));
+            
+            NSNumberFormatter *numberFormatter = [[NSNumberFormatter alloc] init];
+            [numberFormatter setFormatterBehavior:NSNumberFormatterBehavior10_4];
+            [numberFormatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+            [numberFormatter setLocale:prod.priceLocale];
+            NSString *formattedString = [numberFormatter stringFromNumber:prod.price];
+            com_codename1_payment_Product_setLocalizedPrice___java_lang_String(data[iter], fromNSString(formattedString));
+            
+            
+            com_codename1_payment_Product_setDescription___java_lang_String(data[iter], fromNSString([prod localizedDescription]));
+            com_codename1_payment_Product_setDisplayName___java_lang_String(data[iter], fromNSString([prod localizedTitle]));
+        }
+    }
+    productsArrayPending = nil;
+    [pool release];
+}
+
+- (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray *)transactions
+{
+    for (SKPaymentTransaction *transaction in transactions)
+    {
+        switch (transaction.transactionState)
+        {
+            case SKPaymentTransactionStatePurchased:
+                com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
+                break;
+            case SKPaymentTransactionStateFailed:
+                if (transaction.error.code != SKErrorPaymentCancelled) {
+                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), nil);
+                }
+                break;
+            case SKPaymentTransactionStateRestored:                
+                break;
+            default:
+                break;
+        }
+        [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+    }
+}
+
 @end
