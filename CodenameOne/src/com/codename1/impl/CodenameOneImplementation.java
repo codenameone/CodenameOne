@@ -37,6 +37,8 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.payment.Purchase;
+import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
@@ -119,6 +121,7 @@ public abstract class CodenameOneImplementation {
     private ActionListener logger;
     private static boolean pollingThreadRunning;
     private static PushCallback callback;
+    private static PurchaseCallback purchaseCallback;
     private int commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
     private static Runnable onCurrentFormChange;
     private static Runnable onExit;
@@ -152,6 +155,15 @@ public abstract class CodenameOneImplementation {
         callback = push;
     }
 
+    /**
+     * Allows the system to register the purchase callback instance
+     * 
+     * @param pc the pc callback
+     */
+    public static void setPurchaseCallback(PurchaseCallback pc) {
+        purchaseCallback = pc;
+    }
+    
     /**
      * Invoked by the display init method allowing the implementation to "bind"
      * 
@@ -4534,4 +4546,43 @@ public abstract class CodenameOneImplementation {
     public String getMsisdn() {
         return getProperty("MSISDN", null);
     }    
+
+    /**
+     * Returns the native OS purchase implementation if applicable, if not this
+     * method will fallback to a cross platform purchase manager. 
+     * 
+     * @param physicalGoods set to true to indicate that you are interested in purchasing
+     * physical goods which are normally not allowed in the OS in-app-purchase solutions.
+     * @return instance of the purchase class
+     */
+    public Purchase getInAppPurchase(boolean physicalGoods) {
+        return new Purchase() {
+            public boolean isManualPaymentSupported() {
+                return true;
+            }
+            
+            public String pay(double amount, String currency) {
+                /*String response = null;
+                ConnectionRequest cn = new ConnectionRequest();
+                String url = "https://sandbox.zooz.co/mobile/ExtendedServerAPI";
+                if(Display.getInstance().getProperty("payment.sandbox", "false").equalsIgnoreCase("false")) {
+                    url = "https://app.ZooZ.com/mobile/ExtendedServerAPI";
+                }
+                
+                String developerId = Display.getInstance().getProperty("zooz.devId", null);
+                if(developerId == null || developerId.length() == 0) {
+                    throw new RuntimeException("Missing developer id!");
+                }
+                cn.addRequestHeader("ZooZDeveloperId", developerId);
+                String serverAPIKey = Display.getInstance().getProperty("zooz.apiKey", null);
+                if(serverAPIKey == null || serverAPIKey.length() == 0) {
+                    throw new RuntimeException("Missing API key!");
+                }
+                cn.addRequestHeader("ZooZServerAPIKey", serverAPIKey);
+                NetworkManager.getInstance().addToQueueAndWait(cn);
+                return response;*/
+                return null;
+            }
+        };
+    }
 }

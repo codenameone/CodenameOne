@@ -68,6 +68,9 @@ public class DateTimeSpinner extends TimeSpinner {
      * @return the currentDate
      */
     public Date getCurrentDate() {
+        if(date != null) {
+            return (Date)date.getValue();
+        }
         return currentDate;
     }
 

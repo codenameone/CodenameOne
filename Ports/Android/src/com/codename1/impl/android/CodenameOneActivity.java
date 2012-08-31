@@ -25,17 +25,25 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
+import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import com.codename1.payment.PurchaseCallback;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
+import java.util.HashSet;
+import java.util.Set;
 
 public class CodenameOneActivity extends Activity {
     private Menu menu;
@@ -43,11 +51,160 @@ public class CodenameOneActivity extends Activity {
     private IntentResultListener intentResultListener;
     private boolean waitingForResult;
 
+    /**
+     * The SharedPreferences key for recording whether we initialized the
+     * database.  If false, then we perform a RestoreTransactions request
+     * to get all the purchases for this user.
+     */
+    private static final String BILLING_DB_INITIALIZED = "billing_db_initialized";
+    private CN1PurchaseObserver cnPurchaseObserver;
+    private BillingService billing;
+    private PurchaseDatabase purchaseDB;
+    private Set<String> ownedItms;
+    private boolean inAppBillingSupported = false;
+            
+        /**
+     * Each product in the catalog is either MANAGED or UNMANAGED.  MANAGED
+     * means that the product can be purchased only once per user (such as a new
+     * level in a game). The purchase is remembered by Android Market and
+     * can be restored if this application is uninstalled and then
+     * re-installed. UNMANAGED is used for products that can be used up and
+     * purchased multiple times (such as poker chips). It is up to the
+     * application to keep track of UNMANAGED products for the user.
+     */
+    private enum Managed { MANAGED, UNMANAGED }
+    
+    /**
+     * If the database has not been initialized, we send a
+     * RESTORE_TRANSACTIONS request to Android Market to get the list of purchased items
+     * for this user. This happens if the application has just been installed
+     * or the user wiped data. We do not want to do this on every startup, rather, we want to do
+     * only when the database needs to be initialized.
+     */
+    private void restoreDatabase() {
+        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        boolean initialized = prefs.getBoolean(BILLING_DB_INITIALIZED, false);
+        if (!initialized) {
+            billing.restoreTransactions();
+        }
+    }
+
+    public boolean isInAppBillingSupported() {
+        return inAppBillingSupported;
+    }
+    
+    private Set<String> getOwnedItems() {
+        if(ownedItms == null) {
+            ownedItms = new HashSet<String>();
+            doInitializeOwnedItems();
+        }
+        return ownedItms;
+    }
+    
+    /**
+     * Overriden by stub, returns the user application instance.
+     */
+    protected Object getApp() {
+        return null;
+    }
+    
+    boolean wasPurchased(String item) {
+        return getOwnedItems().contains(item);
+    }
+    
+    void purchase(String item) {
+        billing.requestPurchase(item, null, false);        
+    }
+
+    void subscribe(String item) {
+        billing.requestPurchase(item, null, true);        
+    }
+    
+    /**
+     * A {@link PurchaseObserver} is used to get callbacks when Android Market sends
+     * messages to this application so that we can update the UI.
+     */
+    private class CN1PurchaseObserver extends PurchaseObserver {
+        public CN1PurchaseObserver(Handler handler) {
+            super(CodenameOneActivity.this, handler);
+        }
+
+        @Override
+        public void onBillingSupported(boolean supported) {
+            if (supported) {
+                restoreDatabase();
+                inAppBillingSupported = true;
+            } 
+        }
+
+        @Override
+        public void onPurchaseStateChange(Consts.PurchaseState purchaseState, String itemId,
+                int quantity, long purchaseTime, String developerPayload) {
+            Object app = getApp();
+            if(app != null && app instanceof PurchaseCallback) {
+                PurchaseCallback pc = (PurchaseCallback)app;
+                if (purchaseState == Consts.PurchaseState.PURCHASED) {
+                    pc.itemPurchased(itemId);
+                    getOwnedItems().add(itemId);
+                }
+            } else {
+                if (purchaseState == Consts.PurchaseState.PURCHASED) {
+                    getOwnedItems().add(itemId);
+                }
+            }
+        }
+
+        @Override
+        public void onRequestPurchaseResponse(BillingService.RequestPurchase request,
+                Consts.ResponseCode responseCode) {
+            Object app = getApp();
+            if(app != null && app instanceof PurchaseCallback) {
+                PurchaseCallback pc = (PurchaseCallback)app;
+                if (responseCode == Consts.ResponseCode.RESULT_OK) {
+                        // purchase was successfully sent to server
+                } else if (responseCode == Consts.ResponseCode.RESULT_USER_CANCELED) {
+                    // user canceled purchase
+                    pc.itemPurchaseError(request.mProductId, "Canceled");
+                } else {
+                    // purchase failed
+                    pc.itemPurchaseError(request.mProductId, responseCode.name());
+                }
+            }
+        }
+
+        @Override
+        public void onRestoreTransactionsResponse(BillingService.RestoreTransactions request,
+                Consts.ResponseCode responseCode) {
+            if (responseCode == Consts.ResponseCode.RESULT_OK) {
+                // completed RestoreTransactions request
+                // Update the shared preferences so that we don't perform
+                // a RestoreTransactions again.
+                SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
+                SharedPreferences.Editor edit = prefs.edit();
+                edit.putBoolean(BILLING_DB_INITIALIZED, true);
+                edit.commit();
+            } else {
+                // RestoreTransactions error
+            }
+        }
+    }
+
+    
     @Override
     protected void onResume() {
         super.onResume();
         waitingForResult = false;
     }        
+    
+    /**
+     * Overriden by subclasses to return true if billing is supported on this
+     * build
+     * 
+     * @return false
+     */
+    protected boolean isBillingEnabled() {
+        return false;
+    }
     
     /**
      * Get the Android native Menu
@@ -67,6 +224,79 @@ public class CodenameOneActivity extends Activity {
     public void enableNativeMenu(boolean enable) {
         nativeMenu = enable;
     }
+    
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        if(isBillingEnabled()) {
+            Handler mHandler = new Handler();
+            cnPurchaseObserver = new CN1PurchaseObserver(mHandler);
+            billing = new BillingService();
+            billing.setContext(this);
+
+            purchaseDB = new PurchaseDatabase(this);
+
+            // Check if billing is supported.
+            ResponseHandler.register(cnPurchaseObserver);
+            billing.checkBillingSupported();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if(isBillingEnabled()) {
+            ResponseHandler.register(cnPurchaseObserver);
+        }
+    }
+
+    /**
+     * Reads the set of purchased items from the database in a background thread
+     * and then adds those items to the set of owned items in the main UI
+     * thread.
+     */
+    void doInitializeOwnedItems() {
+        Cursor cursor = purchaseDB.queryAllPurchasedItems();
+        if (cursor == null) {
+            return;
+        }
+
+        final Set<String> ownedItems = new HashSet<String>();
+        try {
+            int productIdCol = cursor.getColumnIndexOrThrow(
+                    PurchaseDatabase.PURCHASED_PRODUCT_ID_COL);
+            while (cursor.moveToNext()) {
+                String productId = cursor.getString(productIdCol);
+                ownedItems.add(productId);
+            }
+        } finally {
+            cursor.close();
+        }
+
+        ownedItems.addAll(ownedItems);
+    }
+    
+    /**
+     * Called when this activity is no longer visible.
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if(isBillingEnabled()) {
+            ResponseHandler.unregister(cnPurchaseObserver);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(isBillingEnabled()) {
+            purchaseDB.close();
+            billing.unbind();
+        }
+    }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

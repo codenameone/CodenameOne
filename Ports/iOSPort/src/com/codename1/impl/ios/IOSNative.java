@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
+import com.codename1.payment.Product;
 
 /**
  * Abstraction of the underlying native API's
@@ -318,4 +319,7 @@ public class IOSNative {
     public static native String sqlCursorValueAtColumnString(long statement, int col);
     
     public static native int sqlCursorGetColumnCount(long statementPeer);
+    
+    public static native void fetchProducts(String[] skus, Product[] products);
+    public static native void purchase(String sku);
 }

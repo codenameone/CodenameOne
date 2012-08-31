@@ -41,6 +41,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -2877,5 +2878,17 @@ public final class Display {
      */
     public String getMsisdn() {
         return impl.getMsisdn();
+    }
+
+    /**
+     * Returns the native OS purchase implementation if applicable, if not this
+     * method will fallback to a cross platform purchase manager. 
+     * 
+     * @param physicalGoods set to true to indicate that you are interested in purchasing
+     * physical goods which are normally not allowed in the OS in-app-purchase solutions.
+     * @return instance of the purchase class
+     */
+    public Purchase getInAppPurchase(boolean physicalGoods) {
+        return impl.getInAppPurchase(physicalGoods);
     }
 }

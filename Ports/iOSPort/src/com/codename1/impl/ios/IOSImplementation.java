@@ -42,12 +42,16 @@ import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.payment.Product;
+import com.codename1.payment.Purchase;
+import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
@@ -69,12 +73,15 @@ import java.util.Hashtable;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
+    private static PurchaseCallback purchaseCallback;
     private int timeout = 120000;
     private static Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
     private NativeFont defaultFont;
@@ -85,6 +92,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private TextArea currentEditing;
     private static boolean initialized;
     private boolean editingText;
+    private Lifecycle life;
     
     public void initEDT() {
         while(!initialized) {
@@ -112,6 +120,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().setTransitionYield(10);
         Display.getInstance().setDefaultVirtualKeyboard(null);
         callback = (Runnable)m;
+        if(m instanceof Lifecycle) {
+            life = (Lifecycle)m;
+        }
     }
 
     public void setThreadPriority(Thread t, int p) {
@@ -2837,6 +2848,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         pushCallback = callback;
     }
     
+    public static void setMainClass(Object main) {
+        if(main instanceof PushCallback) {
+            pushCallback = (PushCallback)main;
+        }
+        if(main instanceof PurchaseCallback) {
+            purchaseCallback = (PurchaseCallback)main;
+        }
+    }        
+    
     private L10NManager l10n;
 
     /**
@@ -3020,5 +3040,181 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean existsDB(String databaseName){
         return IOSNative.sqlDbExists(databaseName);
     }
+
+    /**
+     * Sent when the application is about to move from active to inactive state. 
+     * This can occur for certain types of temporary interruptions (such as an 
+     * incoming phone call or SMS message) or when the user quits the application 
+     * and it begins the transition to the background state.
+     * Use this method to pause ongoing tasks, disable timers, and throttle down 
+     * OpenGL ES frame rates. Games should use this method to pause the game.
+     */
+    public static void applicationWillResignActive() {
+        if(instance.life != null) {
+            instance.life.applicationWillResignActive();
+        }
+    }
+
+    /**
+     * Use this method to release shared resources, save user data, invalidate 
+     * timers, and store enough application state information to restore your 
+     * application to its current state in case it is terminated later.
+     * If your application supports background execution, this method is called 
+     * instead of applicationWillTerminate: when the user quits.
+     */
+    public static void applicationDidEnterBackground() {
+        if(instance.life != null) {
+            instance.life.applicationDidEnterBackground();
+        }
+    }
+
+    /**
+     * Use this method to release shared resources, save user data, invalidate 
+     * timers, and store enough application state information to restore your 
+     * application to its current state in case it is terminated later.
+     * If your application supports background execution, this method is called 
+     * instead of applicationWillTerminate: when the user quits.
+     */
+    public static void applicationWillEnterForeground() {
+        if(instance.life != null) {
+            instance.life.applicationWillEnterForeground();
+        }
+    }
     
+    /**
+     * Called as part of the transition from the background to the inactive state; 
+     * here you can undo many of the changes made on entering the background.
+     */
+    public static void applicationDidBecomeActive() {
+        if(instance.life != null) {
+            instance.life.applicationDidBecomeActive();
+        }
+    }
+    
+    /**
+     * Restart any tasks that were paused (or not yet started) while the 
+     * application was inactive. If the application was previously in the background, 
+     * optionally refresh the user interface.
+     */
+    public static void applicationWillTerminate() {
+        if(instance.life != null) {
+            instance.life.applicationWillTerminate();
+        }
+    }
+    
+
+    private Purchase pur;
+    private Vector purchasedItems;
+
+    private Vector getPurchased() {
+        if(purchasedItems == null) {
+            purchasedItems = (Vector)Storage.getInstance().readObject("CN1PurchasedItemList.dat");
+            if(purchasedItems == null) {
+                purchasedItems = new Vector();
+            }
+        }
+        return purchasedItems;
+    }
+    
+    static void itemPurchased(String sku) {
+        if(purchaseCallback != null) {
+            purchaseCallback.itemPurchased(sku);
+        }
+    }
+    
+    static void itemPurchaseError(String sku, String errorMessage) {
+        if(purchaseCallback != null) {
+            purchaseCallback.itemPurchaseError(sku, errorMessage);
+        }
+    }
+
+    static void itemRefunded(String sku) {
+        if(purchaseCallback != null) {
+            purchaseCallback.itemRefunded(sku);
+        }
+    }
+
+
+    static void subscriptionStarted(String sku) {
+        if(purchaseCallback != null) {
+            purchaseCallback.subscriptionStarted(sku);
+        }
+    }
+
+    static void subscriptionCanceled(String sku) {
+        if(purchaseCallback != null) {
+            purchaseCallback.subscriptionCanceled(sku);
+        }
+    }
+    
+    static void paymentFailed(String paymentCode, String failureReason) {
+        if(purchaseCallback != null) {
+            purchaseCallback.paymentFailed(paymentCode, failureReason);
+        }
+    }
+    
+    static void paymentSucceeded(String paymentCode, double amount, String currency) {
+        if(purchaseCallback != null) {
+            purchaseCallback.paymentSucceeded(paymentCode, amount, currency);
+        }
+    }
+    
+    public Purchase getInAppPurchase(boolean physicalGoods) {
+        if(physicalGoods) {
+            return super.getInAppPurchase(physicalGoods);
+        }
+        if(pur == null) {
+            pur = new Purchase() {
+                public boolean isManagedPaymentSupported() {
+                    return true;
+                }
+
+                public boolean isItemListingSupported() {
+                    return true;
+                }
+
+                public Product[] getProducts(String[] skus) {
+                    final Product[] p = new Product[skus.length];
+                    IOSNative.fetchProducts(skus, p);
+                    
+                    // wait for request to complete
+                    Display.getInstance().invokeAndBlock(new Runnable() {
+                        @Override
+                        public void run() {
+                            while(p[p.length - 1].getDisplayName() == null) {
+                                try {
+                                    Thread.currentThread().sleep(10);
+                                } catch (InterruptedException ex) {
+                                }
+                            }
+                        }
+                    });
+                    return p;
+                }
+
+                public boolean wasPurchased(String sku) {
+                    return getPurchased().contains(sku);
+                }
+
+                public void purchase(String sku) {
+                    IOSNative.purchase(sku);
+                }
+
+
+                /*public void subscribe(String sku) {
+                    purchase(sku);
+                }*/
+
+
+                public boolean isSubscriptionSupported() {
+                    return false;
+                }
+
+                public boolean isUnsubscribeSupported() {
+                    return false;
+                }
+            };
+        }
+        return pur;
+    }
 }

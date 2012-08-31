@@ -95,6 +95,7 @@ import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
+import com.codename1.payment.Purchase;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
@@ -126,6 +127,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -3422,5 +3424,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
+    }
+    
+    private Purchase pur;
+    
+    @Override
+    public Purchase getInAppPurchase(boolean physicalGoods) {
+        if(physicalGoods || !((CodenameOneActivity)activity).isInAppBillingSupported()) {
+            return super.getInAppPurchase(physicalGoods);
+        }
+        if(pur == null) {
+            pur = new Purchase() {
+                @Override
+                public boolean isManagedPaymentSupported() {
+                    return true;
+                }
+
+                @Override
+                public boolean wasPurchased(String sku) {
+                    return ((CodenameOneActivity)activity).wasPurchased(sku);
+                }
+
+                @Override
+                public void purchase(String sku) {
+                    ((CodenameOneActivity)activity).purchase(sku);
+                }
+
+                @Override
+                public void subscribe(String sku) {
+                    ((CodenameOneActivity)activity).subscribe(sku);
+                }
+
+                @Override
+                public boolean isSubscriptionSupported() {
+                    return true;
+                }
+
+                @Override
+                public boolean isUnsubscribeSupported() {
+                    return false;
+                }
+            };
+        }
+        return pur;
     }
 }
