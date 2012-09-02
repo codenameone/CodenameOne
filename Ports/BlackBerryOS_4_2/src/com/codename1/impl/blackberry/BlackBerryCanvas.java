@@ -188,29 +188,42 @@ class BlackBerryCanvas extends FullScreen {
     }
 
     public Menu getMenu(int val) {
-        if (commands != null) {
+        if (Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
             m = new Menu();
-            for (int iter = 0; iter < commands.size(); iter++) {
-                final Command cmd = (Command) commands.elementAt(iter);
-                MenuItem i = new MenuItem(cmd.getCommandName(), iter, iter) {
-                    public void run() {
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                impl.getCurrentForm().dispatchCommand(cmd, new ActionEvent(cmd));
-                            }
-                        });
-                    }
-                };
-                m.add(i);
+            if(commands != null){
+                for (int iter = 0; iter < commands.size(); iter++) {
+                    final Command cmd = (Command) commands.elementAt(iter);
+                    MenuItem i = new MenuItem(cmd.getCommandName(), iter, iter) {
+                        public void run() {
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    impl.getCurrentForm().dispatchCommand(cmd, new ActionEvent(cmd));
+                                }
+                            });
+                        }
+                    };
+                    m.add(i);
+                }
             }
             return m;
         }
         return super.getMenu(val);
     }
 
+    public boolean onMenu(int i) {
+        if(Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE){
+            return super.onMenu(i);
+        }else{
+            return true;
+        }
+    }
+
+    
     protected void makeMenu(Menu menu, int instance) {
-        menu = getMenu(instance);
-        super.makeMenu(menu, instance);
+        if(Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE){
+            menu = getMenu(instance);
+            super.makeMenu(menu, instance);
+        }
     }
 
     protected void onMenuDismissed(Menu arg0) {
@@ -485,7 +498,7 @@ class BlackBerryCanvas extends FullScreen {
             impl.keyReleased(Keypad.KEY_ESCAPE);
             return true;
         }
-        if (Keypad.key(keyCode) == Keypad.KEY_MENU && commands == null) {
+        if (Keypad.key(keyCode) == Keypad.KEY_MENU && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
             if(impl.nativeEdit == null || eventTarget == null) {
                 impl.keyPressed(BlackBerryImplementation.MENU_SOFT_KEY);
                 impl.keyReleased(BlackBerryImplementation.MENU_SOFT_KEY);
