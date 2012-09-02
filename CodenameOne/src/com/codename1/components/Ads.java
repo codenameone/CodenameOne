@@ -121,14 +121,25 @@ public class Ads extends Container implements HTMLCallback {
                     setAd(a);
                 }
             });
-            if (!refreshAd) {
-                requestAd();
-            }
+            
             if (refreshAd) {
                 getComponentForm().registerAnimated(this);
+            }else{
+                requestAd();            
             }
         }
     }
+
+    /**
+     * @inheritDoc
+     */
+    protected void deinitialize() {
+        if (refreshAd) {
+            getComponentForm().deregisterAnimated(this);
+        }
+    }
+    
+    
 
     private void requestAd() {
         service.requestAd();
@@ -139,7 +150,7 @@ public class Ads extends Container implements HTMLCallback {
      */
     public boolean animate() {
         Form parent = getComponentForm();
-        if (!parent.isVisible()) {
+        if (parent == null || !parent.isVisible()) {
             return false;
         }
         long t = System.currentTimeMillis();
