@@ -65,7 +65,8 @@ class BlackBerryCanvas extends FullScreen {
      * events directly from the device 
      */
     Field eventTarget;
-
+    private Menu m;
+ 
     public int getPreferredHeight() {
         return net.rim.device.api.ui.Graphics.getScreenHeight();
     }
@@ -125,7 +126,7 @@ class BlackBerryCanvas extends FullScreen {
             public int getPreferredWidth() {
                 return net.rim.device.api.ui.Graphics.getScreenWidth();
             }
-        }, NO_VERTICAL_SCROLL | NO_VERTICAL_SCROLLBAR | NO_HORIZONTAL_SCROLL | NO_HORIZONTAL_SCROLLBAR);
+        }, DEFAULT_MENU | NO_VERTICAL_SCROLL | NO_VERTICAL_SCROLLBAR | NO_HORIZONTAL_SCROLL | NO_HORIZONTAL_SCROLLBAR);
         this.impl = impl;
 
         // the alternative undeprecated API requires a signature
@@ -187,13 +188,17 @@ class BlackBerryCanvas extends FullScreen {
     }
 
     public Menu getMenu(int val) {
-        if(commands != null) {
-            Menu m = new Menu();
-            for(int iter = 0 ; iter < commands.size() ; iter++) {
-                final Command cmd = (Command)commands.elementAt(iter);
+        if (commands != null) {
+            m = new Menu();
+            for (int iter = 0; iter < commands.size(); iter++) {
+                final Command cmd = (Command) commands.elementAt(iter);
                 MenuItem i = new MenuItem(cmd.getCommandName(), iter, iter) {
                     public void run() {
-                        cmd.actionPerformed(new ActionEvent(cmd));
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                impl.getCurrentForm().dispatchCommand(cmd, new ActionEvent(cmd));
+                            }
+                        });
                     }
                 };
                 m.add(i);
@@ -203,8 +208,13 @@ class BlackBerryCanvas extends FullScreen {
         return super.getMenu(val);
     }
 
+    protected void makeMenu(Menu menu, int instance) {
+        menu = getMenu(instance);
+        super.makeMenu(menu, instance);
+    }
+
     protected void onMenuDismissed(Menu arg0) {
-        if(impl.nativeEdit != null || eventTarget != null) {
+        if(Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE || impl.nativeEdit != null || eventTarget != null) {
             super.onMenuDismissed(arg0);
         }
     }
