@@ -243,12 +243,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
         if (nativePeers.size() > 0) {
-            AndroidPeer[] peers = new AndroidPeer[nativePeers.size()];
-            for (int i = 0; i < leftSK.length; i++) {
-                peers[i] = (AndroidPeer) nativePeers.elementAt(i);
-            }
-            for (int i = 0; i < peers.length; i++) {
-                peers[i].release();
+            for (int i = 0; i < nativePeers.size(); i++) {
+                ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).init();
             }
         }
 
@@ -289,6 +285,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                if (nativePeers.size() > 0) {
+                    for (int i = 0; i < nativePeers.size(); i++) {
+                        ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
+                    }
+                }
                 relativeLayout.removeAllViews();
                 relativeLayout = null;
                 myView = null;
@@ -1494,7 +1495,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Media retVal;
 
         if (isVideo) {
-            final Video[] video = new Video[1];
+            final AndroidImplementation.Video[] video = new AndroidImplementation.Video[1];
             final boolean[] flag = new boolean[1];
             final File f = file;
             activity.runOnUiThread(new Runnable() {
@@ -1508,7 +1509,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } else {
                         v.setVideoURI(Uri.parse(uri));
                     }
-                    video[0] = new Video(v, activity, onCompletion);
+                    video[0] = new AndroidImplementation.Video(v, activity, onCompletion);
                     flag[0] = true;
                     synchronized (flag) {
                         flag.notify();
@@ -1566,7 +1567,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
         if (isVideo) {
-            final Video[] retVal = new Video[1];
+            final AndroidImplementation.Video[] retVal = new AndroidImplementation.Video[1];
             final boolean[] flag = new boolean[1];
 
             activity.runOnUiThread(new Runnable() {
@@ -1575,7 +1576,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     VideoView v = new VideoView(activity);
                     v.setZOrderMediaOverlay(true);
                     v.setVideoURI(Uri.fromFile(temp));
-                    retVal[0] = new Video(v, activity, onCompletion);
+                    retVal[0] = new AndroidImplementation.Video(v, activity, onCompletion);
                     flag[0] = true;
                     synchronized (flag) {
                         flag.notify();
@@ -1672,14 +1673,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!(nativeComponent instanceof View)) {
             throw new IllegalArgumentException(nativeComponent.getClass().getName());
         }
-        return new AndroidPeer((View) nativeComponent);
+        return new AndroidImplementation.AndroidPeer((View) nativeComponent);
     }
 
     private void blockNativeFocusAll(boolean block) {
         synchronized (this.nativePeers) {
             final int size = this.nativePeers.size();
             for (int i = 0; i < size; i++) {
-                AndroidPeer next = (AndroidPeer) this.nativePeers.get(i);
+                AndroidImplementation.AndroidPeer next = (AndroidImplementation.AndroidPeer) this.nativePeers.get(i);
                 next.blockNativeFocus(block);
             }
         }
@@ -1744,7 +1745,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     class AndroidPeer extends PeerComponent {
 
         private View v;
-        private AndroidRelativeLayout layoutWrapper = null;
+        private AndroidImplementation.AndroidRelativeLayout layoutWrapper = null;
         private Bitmap nativeBuffer;
         private Image image;
         private Rect bounds;
@@ -1781,16 +1782,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
-
-        @Override
+        
         protected void deinitialize() {
             super.deinitialize();
             synchronized (nativePeers) {
                 nativePeers.remove(this);
             }
+            deinit();
+        }
+
+        public void deinit(){
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    if (layoutWrapper != null) {
+                    if (layoutWrapper != null && AndroidImplementation.this.relativeLayout != null) {
                         AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
                         AndroidImplementation.this.relativeLayout.requestLayout();
                     }
@@ -1804,13 +1808,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
-
-        @Override
+        
         protected void initComponent() {
             super.initComponent();
             synchronized (nativePeers) {
                 nativePeers.add(this);
             }
+            init();
+        }
+        
+        public void init(){
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     if (layoutWrapper == null) {
@@ -1818,8 +1825,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                          * wrap the native item in a layout that we can move
                          * around on the surface view as we like.
                          */
-                        layoutWrapper = new AndroidRelativeLayout(activity, AndroidPeer.this, v);
-                        v.setFocusable(AndroidPeer.this.isFocusable());
+                        layoutWrapper = new AndroidImplementation.AndroidRelativeLayout(activity, AndroidImplementation.AndroidPeer.this, v);
+                        v.setFocusable(AndroidImplementation.AndroidPeer.this.isFocusable());
                         v.setFocusableInTouchMode(true);
                         ArrayList<View> viewList = new ArrayList<View>();
                         viewList.add(layoutWrapper);
@@ -1828,7 +1835,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         v.addFocusables(viewList, View.FOCUS_LEFT);
                         v.addFocusables(viewList, View.FOCUS_RIGHT);
                         if (v.isFocusable() || v.isFocusableInTouchMode()) {
-                            if (AndroidPeer.super.hasFocus()) {
+                            if (AndroidImplementation.AndroidPeer.super.hasFocus()) {
                                 AndroidImplementation.this.blockNativeFocusAll(true);
                                 blockNativeFocus(false);
                                 v.requestFocus();
@@ -1868,7 +1875,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         });
                     }
-                    AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
+                    if(AndroidImplementation.this.relativeLayout != null){
+                        AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
+                    }
 
                 }
             });
@@ -1893,13 +1902,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         if (v.getVisibility() == View.VISIBLE) {
 
                             RelativeLayout.LayoutParams layoutParams = layoutWrapper.createMyLayoutParams(
-                                    AndroidPeer.this.getAbsoluteX(),
-                                    AndroidPeer.this.getAbsoluteY(),
-                                    AndroidPeer.this.getWidth(),
-                                    AndroidPeer.this.getHeight());
+                                    AndroidImplementation.AndroidPeer.this.getAbsoluteX(),
+                                    AndroidImplementation.AndroidPeer.this.getAbsoluteY(),
+                                    AndroidImplementation.AndroidPeer.this.getWidth(),
+                                    AndroidImplementation.AndroidPeer.this.getHeight());
                             layoutWrapper.setLayoutParams(layoutParams);
-
-                            AndroidImplementation.this.relativeLayout.requestLayout();
+                            if(AndroidImplementation.this.relativeLayout != null){
+                                AndroidImplementation.this.relativeLayout.requestLayout();
+                            }
                         }
                     }
                 }
@@ -1987,7 +1997,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     || getHeight() != nativeBuffer.getHeight()) {
                 this.nativeBuffer = Bitmap.createBitmap(
                         getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-                image = new NativeImage(nativeBuffer);
+                image = new AndroidImplementation.NativeImage(nativeBuffer);
                 bounds = new Rect(0, 0, getWidth(), getHeight());
                 canvas = new Canvas(nativeBuffer);
             }
@@ -2021,9 +2031,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     class AndroidRelativeLayout extends RelativeLayout {
 
-        private AndroidPeer peer;
+        private AndroidImplementation.AndroidPeer peer;
 
-        public AndroidRelativeLayout(Context activity, AndroidPeer peer, View v) {
+        public AndroidRelativeLayout(Context activity, AndroidImplementation.AndroidPeer peer, View v) {
             super(activity);
 
             this.peer = peer;
@@ -2115,7 +2125,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public PeerComponent createBrowserComponent(final Object parent) {
-        final AndroidBrowserComponent[] bc = new AndroidBrowserComponent[1];
+        final AndroidImplementation.AndroidBrowserComponent[] bc = new AndroidImplementation.AndroidBrowserComponent[1];
 
         final Object lock = new Object();
         synchronized (lock) {
@@ -2148,7 +2158,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return super.onKeyUp(keyCode, event);
                             }
                         };
-                        bc[0] = new AndroidBrowserComponent(wv, activity, parent);
+                        bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, activity, parent);
                         lock.notify();
                     }
                 }
@@ -2163,15 +2173,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
-        ((AndroidBrowserComponent) browserPeer).setProperty(key, value);
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).setProperty(key, value);
     }
 
     public String getBrowserTitle(PeerComponent browserPeer) {
-        return ((AndroidBrowserComponent) browserPeer).getTitle();
+        return ((AndroidImplementation.AndroidBrowserComponent) browserPeer).getTitle();
     }
 
     public String getBrowserURL(PeerComponent browserPeer) {
-        return ((AndroidBrowserComponent) browserPeer).getURL();
+        return ((AndroidImplementation.AndroidBrowserComponent) browserPeer).getURL();
     }
 
     public void setBrowserURL(PeerComponent browserPeer, String url) {
@@ -2179,11 +2189,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             super.setBrowserURL(browserPeer, url);
             return;
         }
-        ((AndroidBrowserComponent) browserPeer).setURL(url);
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).setURL(url);
     }
 
     public void browserStop(PeerComponent browserPeer) {
-        ((AndroidBrowserComponent) browserPeer).stop();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).stop();
     }
 
     /**
@@ -2192,7 +2202,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param browserPeer browser instance
      */
     public void browserReload(PeerComponent browserPeer) {
-        ((AndroidBrowserComponent) browserPeer).reload();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).reload();
     }
 
     /**
@@ -2202,31 +2212,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return true if back should work
      */
     public boolean browserHasBack(PeerComponent browserPeer) {
-        return ((AndroidBrowserComponent) browserPeer).hasBack();
+        return ((AndroidImplementation.AndroidBrowserComponent) browserPeer).hasBack();
     }
 
     public boolean browserHasForward(PeerComponent browserPeer) {
-        return ((AndroidBrowserComponent) browserPeer).hasForward();
+        return ((AndroidImplementation.AndroidBrowserComponent) browserPeer).hasForward();
     }
 
     public void browserBack(PeerComponent browserPeer) {
-        ((AndroidBrowserComponent) browserPeer).back();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).back();
     }
 
     public void browserForward(PeerComponent browserPeer) {
-        ((AndroidBrowserComponent) browserPeer).forward();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).forward();
     }
 
     public void browserClearHistory(PeerComponent browserPeer) {
-        ((AndroidBrowserComponent) browserPeer).clearHistory();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).clearHistory();
     }
 
     public void setBrowserPage(PeerComponent browserPeer, String html, String baseUrl) {
-        ((AndroidBrowserComponent) browserPeer).setPage(html, baseUrl);
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).setPage(html, baseUrl);
     }
 
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
-        ((AndroidBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).exposeInJavaScript(o, name);
     }
 
     
@@ -2298,7 +2308,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
-    class AndroidBrowserComponent extends AndroidPeer {
+    class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
         private WebView web;
@@ -2950,7 +2960,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.nativeVideo = nativeVideo;
             this.activity = activity;
             if (nativeController) {
-                MediaController mc = new CN1MediaController();
+                MediaController mc = new AndroidImplementation.CN1MediaController();
                 nativeVideo.setMediaController(mc);
             }
 
