@@ -50,6 +50,7 @@ public class CodenameOneActivity extends Activity {
     private boolean nativeMenu = false;
     private IntentResultListener intentResultListener;
     private boolean waitingForResult;
+    private boolean background;
 
     /**
      * The SharedPreferences key for recording whether we initialized the
@@ -194,6 +195,7 @@ public class CodenameOneActivity extends Activity {
     protected void onResume() {
         super.onResume();
         waitingForResult = false;
+        background = false;
     }        
     
     /**
@@ -283,6 +285,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+        background = true;
         if(isBillingEnabled()) {
             ResponseHandler.unregister(cnPurchaseObserver);
         }
@@ -410,6 +413,10 @@ public class CodenameOneActivity extends Activity {
 
     protected void setWaitingForResult(boolean waitingForResult) {
         this.waitingForResult = waitingForResult;
+    }
+    
+    public boolean isBackground(){
+        return background;
     }
 
             

@@ -174,6 +174,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Uri imageUri;
     private EventDispatcher callback;
 
+
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
@@ -295,8 +296,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = null;
             }
         });
-
     }
+    
+    
 
     /**
      * init view. a lot of back and forth between this thread and the UI thread.
@@ -344,31 +346,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isMinimized() {
-        return myView == null || myView.getVisibility() != View.VISIBLE;
+        return ((CodenameOneActivity)activity).isBackground();
     }
 
     @Override
     public boolean minimizeApplication() {
-        activity.runOnUiThread(new Runnable() {
-            public void run() {
-                if (myView != null) {
-                    myView.setVisibility(View.INVISIBLE);
-                }
-            }
-        });
+        Intent startMain = new Intent(Intent.ACTION_MAIN);
+        startMain.addCategory(Intent.CATEGORY_HOME);
+        startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        activity.startActivity(startMain);
         return true;
     }
 
     @Override
     public void restoreMinimizedApplication() {
-        activity.runOnUiThread(new Runnable() {
-            public void run() {
-                if (myView != null) {
-                    myView.setVisibility(View.VISIBLE);
-                }
-
-            }
-        });
+        Intent i = new Intent(activity, activity.getClass());
+        i.setAction(Intent.ACTION_MAIN);
+        i.addCategory(Intent.CATEGORY_LAUNCHER);
+        activity.startActivity(i);
     }
 
     public void editString(final Component cmp, int maxSize, final int constraint, String text, int keyCode) {
