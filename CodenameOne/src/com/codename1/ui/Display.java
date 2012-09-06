@@ -1696,12 +1696,12 @@ public final class Display {
      */
     boolean shouldEDTSleep() {
         Form current = impl.getCurrentForm();
-        return (current == null || (!current.hasAnimations())) &&
+        return ((current == null || (!current.hasAnimations())) &&
                 (animationQueue == null || animationQueue.size() == 0) &&
                 inputEvents.size() == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged;
+                && !longPointerCharged ) || (isMinimized() && !hasNoSerialCallsPending());
     }
 
 
