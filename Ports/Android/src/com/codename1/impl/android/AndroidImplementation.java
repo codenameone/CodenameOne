@@ -173,6 +173,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     int lastDirectionalKeyEventReceivedByWrapper;
     private Uri imageUri;
     private EventDispatcher callback;
+    private int timeout = -1;
 
 
     @Override
@@ -2487,6 +2488,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
             c.setInstanceFollowRedirects(false);
+            if(timeout > -1) {
+                c.setConnectTimeout(timeout);
+            }
         }
         con.setDoInput(read);
         con.setDoOutput(write);
@@ -3472,5 +3476,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             };
         }
         return pur;
+    }
+
+    @Override
+    public boolean isTimeoutSupported() {
+        return true;
+    }
+
+    @Override
+    public void setTimeout(int t) {
+        timeout = t;
     }
 }
