@@ -151,6 +151,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
         setDisposeWhenPointerOutOfBounds(true);
         setTransitionInAnimator(transitionIn);
         setTransitionOutAnimator(transitionOut);
+        getTitleComponent().getParent().removeComponent(getTitleComponent());
         if(showTooltips) {
             setGlassPane(txtPainter);
         }
