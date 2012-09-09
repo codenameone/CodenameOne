@@ -231,6 +231,30 @@ public class ContainerList extends Container {
 
 
     /**
+     * Returns the current selected offset in the list
+     *
+     * @return the current selected offset in the list
+     */
+    public int getSelectedIndex() {
+        return model.getSelectedIndex();
+    }
+
+    /**
+     * Sets the current selected offset in the list, by default this implementation
+     * will scroll the list to the selection if the selection is outside of the screen
+     *
+     * @param index the current selected offset in the list
+     */
+    public void setSelectedIndex(int index) {
+        if (index < 0) {
+            throw new IllegalArgumentException("Selection index is negative:" + index);
+        }        
+        getComponentAt(index).requestFocus();
+        model.setSelectedIndex(index);
+    }
+    
+    
+    /**
      * @inheritDoc
      */
     public String[] getPropertyNames() {
