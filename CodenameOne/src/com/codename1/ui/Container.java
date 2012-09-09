@@ -2056,7 +2056,9 @@ public class Container extends Component {
         }
 
         public void destroy() {
-            parent.deregisterAnimatedInternal(this);
+            if(parent != null){
+                parent.deregisterAnimatedInternal(this);
+            }
             next.setParent(null);
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
@@ -2065,8 +2067,10 @@ public class Container extends Component {
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {
-                    if(layoutAnimationSpeed <= 0 && !dontRevalidate) {
-                        parent.revalidate();
+                    if (layoutAnimationSpeed <= 0 && !dontRevalidate) {
+                        if (parent != null) {
+                            parent.revalidate();
+                        }
                     }
                 }
             }
