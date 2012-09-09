@@ -1346,7 +1346,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if ("User-Agent".equals(key)) {
             String ua = getUserAgent();
-            return getUserAgent();
+            return ua;
         }
         if ("IMEI".equals(key)) {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
@@ -2393,11 +2393,49 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public String getTitle() {
-            return web.getTitle();
+            final String[] retVal = new String[1];
+            
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    retVal[0] = web.getTitle();
+                }
+            });
+            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    while (retVal[0] == null) {
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            });
+            return retVal[0];
         }
 
         public String getURL() {
-            return web.getUrl();
+            final String[] retVal = new String[1];
+            
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    retVal[0] = web.getUrl();
+                }
+            });
+            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    while (retVal[0] == null) {
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            });
+            return retVal[0];
         }
 
         public void setURL(final String url) {
@@ -2417,11 +2455,49 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean hasBack() {
-            return web.canGoBack();
+            final Boolean [] retVal = new Boolean[1];
+            
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    retVal[0] = web.canGoBack();
+                }
+            });
+            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    while (retVal[0] == null) {
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            });
+            return retVal[0].booleanValue();
         }
 
         public boolean hasForward() {
-            return web.canGoForward();
+            final Boolean [] retVal = new Boolean[1];
+            
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    retVal[0] = web.canGoForward();
+                }
+            });
+            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    while (retVal[0] == null) {
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            });
+            return retVal[0].booleanValue();
         }
 
         public void back() {
