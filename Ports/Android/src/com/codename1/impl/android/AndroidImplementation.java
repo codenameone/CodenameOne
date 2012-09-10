@@ -2193,7 +2193,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void browserDestroy(PeerComponent browserPeer) {
-        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).stop();
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).destroy();
     }
     
     /**
