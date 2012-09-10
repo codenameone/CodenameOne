@@ -2192,6 +2192,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidImplementation.AndroidBrowserComponent) browserPeer).stop();
     }
 
+    public void browserDestroy(PeerComponent browserPeer) {
+        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).stop();
+    }
+    
     /**
      * Reload the current page
      *
@@ -2361,18 +2365,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
 
-        @Override
-        protected void deinitialize() {
-            super.deinitialize();
-            act.runOnUiThread(new Runnable() {
-                public void run() {
-                    web.destroy();
-                }
-            });
-        }
-        
-        
-
         public void setProperty(final String key, final Object value) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
@@ -2531,7 +2523,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
-
+        
+        public void destroy() {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.destroy();
+                }
+            });
+        }
+        
         public void setPage(final String html, final String baseUrl) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
