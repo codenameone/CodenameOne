@@ -3155,6 +3155,13 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Release browser native resources
+     * @param browserPeer browser instance
+     */
+    public void browserDestroy(PeerComponent internal) {
+    }
+    
+    /**
      * Navigates forward in the history
      * @param browserPeer browser instance
      */

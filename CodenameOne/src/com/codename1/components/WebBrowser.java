@@ -256,6 +256,16 @@ public class WebBrowser extends Container {
     }
     
     /**
+     * Release WebBrowser native resources.
+     */
+    public void destroy() {
+        if (isNative) {
+            ((BrowserComponent) internal).destroy();
+        }
+        internal = null;
+    }
+
+    /**
      * Shows the given HTML in the native viewer
      *
      * @param html HTML web page
