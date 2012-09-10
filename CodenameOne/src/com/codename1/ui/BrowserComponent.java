@@ -210,6 +210,13 @@ public class BrowserComponent extends Container {
     }
 
     /**
+     * Release native resources of this Browser Component
+     */ 
+    public void destroy() {
+        Display.getInstance().getImplementation().browserDestroy(internal);        
+    }
+    
+    /**
      * Used internally by the implementation to fire an event from the native browser widget
      * 
      * @param type the type of the event
@@ -243,4 +250,5 @@ public class BrowserComponent extends Container {
     public void exposeInJavaScript(Object o, String name) {
         Display.getInstance().getImplementation().browserExposeInJavaScript(internal, o, name);
     }
+
 }
