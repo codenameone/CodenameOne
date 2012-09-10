@@ -2423,7 +2423,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             for(String currentName : allComponents.keySet()) {
                 String value = allComponents.get(currentName);
                 if(value.equals("com.codename1.ui.List") || value.equals("com.codename1.ui.ComboBox") ||
-                        value.equals("com.codename1.ui.list.ContainerList") ) {
+                        value.equals("com.codename1.ui.list.ContainerList") || value.equals("com.codename1.ui.list.MultiList")) {
                     listComponents.add(currentName);
                 }
             }
