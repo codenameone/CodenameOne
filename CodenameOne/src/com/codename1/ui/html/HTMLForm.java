@@ -407,13 +407,13 @@ class HTMLForm {
      * A convenience method used in reset()
      *
      * @param button The button to set (CheckBox/RadioButton)
-     * @param checked true to check, false to uncheck
+     * @param checkedX true to check, false to uncheck
      */
-    private void setButton(Button button,boolean checked) {
+    private void setButton(Button button,boolean checkedX) {
         if (button instanceof RadioButton) {
-            ((RadioButton)button).setSelected(checked);
+            ((RadioButton)button).setSelected(checkedX);
         } else {
-            ((CheckBox)button).setSelected(checked);
+            ((CheckBox)button).setSelected(checkedX);
         }
     }
 

@@ -88,54 +88,54 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * Sets images for checkbox checked/unchecked modes
      * 
-     * @param checked the image to draw in order to represent a checked checkbox
-     * @param unchecked the image to draw in order to represent an uncheck checkbox
+     * @param checkedX the image to draw in order to represent a checked checkbox
+     * @param uncheckedX the image to draw in order to represent an uncheck checkbox
      */
-    public void setCheckBoxImages(Image checked, Image unchecked) {
-        setCheckBoxImages(checked, unchecked, checked, unchecked);
+    public void setCheckBoxImages(Image checkedX, Image uncheckedX) {
+        setCheckBoxImages(checkedX, uncheckedX, checkedX, uncheckedX);
     }
 
     /**
      * Sets images for checkbox checked/unchecked modes
      *
-     * @param checked the image to draw in order to represent a checked checkbox
-     * @param unchecked the image to draw in order to represent an uncheck checkbox
+     * @param checkedX the image to draw in order to represent a checked checkbox
+     * @param uncheckedX the image to draw in order to represent an uncheck checkbox
      * @param disabledChecked same as checked for the disabled state
      * @param disabledUnchecked same as unchecked for the disabled state
      */
-    public void setCheckBoxImages(Image checked, Image unchecked, Image disabledChecked, Image disabledUnchecked) {
-        if (checked == null || unchecked == null) {
+    public void setCheckBoxImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+        if (checkedX == null || uncheckedX == null) {
             chkBoxImages = null;
         } else {
             if(disabledUnchecked == null) {
-                disabledUnchecked = unchecked;
+                disabledUnchecked = uncheckedX;
             }
             if(disabledChecked == null) {
-                disabledChecked = checked;
+                disabledChecked = checkedX;
             }
-            chkBoxImages = new Image[]{unchecked, checked, disabledUnchecked, disabledChecked};
+            chkBoxImages = new Image[]{uncheckedX, checkedX, disabledUnchecked, disabledChecked};
         }
     }
 
     /**
      * Sets images for checkbox when in focused mode
      *
-     * @param checked the image to draw in order to represent a checked checkbox
-     * @param unchecked the image to draw in order to represent an uncheck checkbox
+     * @param checkedX the image to draw in order to represent a checked checkbox
+     * @param uncheckedX the image to draw in order to represent an uncheck checkbox
      * @param disabledChecked same as checked for the disabled state
      * @param disabledUnchecked same as unchecked for the disabled state
      */
-    public void setCheckBoxFocusImages(Image checked, Image unchecked, Image disabledChecked, Image disabledUnchecked) {
-        if (checked == null || unchecked == null) {
+    public void setCheckBoxFocusImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+        if (checkedX == null || uncheckedX == null) {
             chkBoxImagesFocus = null;
         } else {
             if(disabledUnchecked == null) {
-                disabledUnchecked = unchecked;
+                disabledUnchecked = uncheckedX;
             }
             if(disabledChecked == null) {
-                disabledChecked = checked;
+                disabledChecked = checkedX;
             }
-            chkBoxImagesFocus = new Image[]{unchecked, checked, disabledUnchecked, disabledChecked};
+            chkBoxImagesFocus = new Image[]{uncheckedX, checkedX, disabledUnchecked, disabledChecked};
         }
     }
 

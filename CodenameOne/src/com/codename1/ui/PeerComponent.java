@@ -138,13 +138,6 @@ public class PeerComponent extends Component {
     /**
      * @inheritDoc
      */
-    public boolean isBorderPainted() {
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     public void keyPressed(int keyCode) {
     }
 

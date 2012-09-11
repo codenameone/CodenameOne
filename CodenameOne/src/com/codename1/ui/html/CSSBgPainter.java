@@ -44,7 +44,7 @@ class CSSBgPainter implements Painter {
     private Component parent,scrollableParent;
     int horizPos,vertPos;
     boolean horizIsPercentage,vertIsPercentage;
-    boolean fixed;
+    boolean fixedX;
 
     /**
      * Construct a background painter for the given component
@@ -100,7 +100,7 @@ class CSSBgPainter implements Painter {
      * Sets this background to be fixed, which means it isn't affected by scrolling, but stays fixed in the back of the component it is applied on.
      */
     void setFixed() {
-        fixed=true;
+        fixedX=true;
     }
 
     /**
@@ -149,7 +149,7 @@ class CSSBgPainter implements Painter {
         }
 
 
-        if (fixed) {
+        if (fixedX) {
             if (scrollableParent==null) {
                 scrollableParent=getScrollableParent(parent);
             }

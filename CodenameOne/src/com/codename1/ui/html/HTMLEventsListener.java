@@ -97,8 +97,8 @@ class HTMLEventsListener implements ActionListener,FocusListener {
         listeners=new Hashtable();
     }
 
-    private void toggleChecked(HTMLElement element,boolean checked) {
-        if (checked) {
+    private void toggleChecked(HTMLElement element,boolean checkedX) {
+        if (checkedX) {
             element.setAttributeById(HTMLElement.ATTR_CHECKED, "checked");
         } else {
             element.removeAttributeById(HTMLElement.ATTR_CHECKED);

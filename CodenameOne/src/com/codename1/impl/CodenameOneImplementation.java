@@ -74,8 +74,8 @@ public abstract class CodenameOneImplementation {
     /**
      * Indicates the range of "hard" RTL bidi characters in unicode
      */
-    private static final char RTL_RANGE_BEGIN = 0x590;
-    private static final char RTL_RANGE_END = 0x7BF;
+    private static final int RTL_RANGE_BEGIN = 0x590;
+    private static final int RTL_RANGE_END = 0x7BF;
 
     private Object lightweightClipboard;
 
