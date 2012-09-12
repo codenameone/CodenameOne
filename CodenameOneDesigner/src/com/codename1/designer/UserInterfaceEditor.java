@@ -941,8 +941,7 @@ public class UserInterfaceEditor extends BaseForm {
                             return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
                         }
                     }
-                    if(em.getRowId(row) == PROPERTY_NEXT_FORM || em.getRowId(row) == PROPERTY_BASE_FORM ||
-                            em.getRowId(row) == PROPERTY_EMBED) {
+                    if(em.getRowId(row) == PROPERTY_NEXT_FORM || em.getRowId(row) == PROPERTY_BASE_FORM) {
                         String[] uiNames = UserInterfaceEditor.this.res.getUIResourceNames();
                         Arrays.sort(uiNames);
                         String[] arr = new String[uiNames.length];
@@ -954,6 +953,34 @@ public class UserInterfaceEditor extends BaseForm {
                             }
                         }
                         JComboBox cb = new JComboBox(arr);
+                        cb.setRenderer(new DefaultListCellRenderer() {
+                            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                                if(value == null || index < 0) {
+                                    value = "[null]";
+                                }
+                                return super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                            }
+                        });
+                        currentEditor = new DefaultCellEditor(cb);
+                        registerListeners();
+                        return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
+                    }
+                    if(em.getRowId(row) == PROPERTY_EMBED) {
+                        String[] uiNames = UserInterfaceEditor.this.res.getUIResourceNames();
+                        Arrays.sort(uiNames);
+                        Vector<String> cmpList = new Vector<String>();
+                        for(String current : uiNames) {
+                            if(current.equals(UserInterfaceEditor.this.name)) {
+                                continue;
+                            }
+                            UIBuilderOverride tempBuilder = new UIBuilderOverride(null);
+                            if(tempBuilder.createContainer(UserInterfaceEditor.this.res, (String)current) instanceof com.codename1.ui.Form) {
+                                continue;
+                            }
+                            cmpList.add(current);
+                        }
+                        cmpList.add(0, null);
+                        JComboBox cb = new JComboBox(cmpList);
                         cb.setRenderer(new DefaultListCellRenderer() {
                             public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                                 if(value == null || index < 0) {
