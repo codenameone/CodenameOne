@@ -1231,6 +1231,26 @@ public class Dialog extends Form {
     }
 
     /**
+     * Returns the preferred size of the dialog, this allows developers to position a dialog
+     * manually in arbitrary positions.
+     * 
+     * @return the preferred size of this dialog
+     */
+    public Dimension getDialogPreferredSize() {
+        Component contentPane = super.getContentPane();
+        Style contentPaneStyle = getDialogStyle();
+        int width = Display.getInstance().getDisplayWidth();
+        int prefHeight = contentPane.getPreferredH();
+        int prefWidth = contentPane.getPreferredW();
+        prefWidth = Math.min(prefWidth, width);
+        if(contentPaneStyle.getBorder() != null) {
+            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
+            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
+        }
+        return new Dimension(prefWidth, prefHeight);
+    }
+    
+    /**
      * Convenience method to show a dialog sized to match its content.
      * 
      * @param position one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.

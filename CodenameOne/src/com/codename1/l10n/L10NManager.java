@@ -129,6 +129,24 @@ public class L10NManager {
     }
 
     /**
+     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     * @param d the date
+     * @return the date and time
+     */
+    public String formatDateTimeMedium(Date d) {
+        return d.toString();
+    }
+
+    /**
+     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     * @param d the date
+     * @return the date and time
+     */
+    public String formatDateTimeShort(Date d) {
+        return d.toString();
+    }
+
+    /**
      * Indicates whether the language is a right to left language
      * 
      * @return true for bidi/rtl languages
