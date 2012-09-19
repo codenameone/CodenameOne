@@ -98,4 +98,34 @@ public class AndroidDB extends Database {
     public void rollbackTransaction() throws IOException {
         db.endTransaction();
     }
+
+    @Override
+    public void execute(String sql, Object[] params) throws IOException {
+        try {
+            SQLiteStatement s = db.compileStatement(sql);
+            for (int i = 0; i < params.length; i++) {
+                Object p = params[i];
+                if(p == null){
+                    s.bindNull(i);
+                }else{
+                    if(p instanceof String){
+                        s.bindString(i + 1, (String)p);                    
+                    }else if(p instanceof byte[]){
+                        s.bindBlob(i, (byte [])p);
+                    }else if(p instanceof Double){
+                        s.bindDouble(i, ((Double)p).doubleValue());
+                    }else if(p instanceof Long){
+                        s.bindLong(i, ((Long)p).longValue());
+                    }
+                }
+            }
+            s.execute();
+            s.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException(e.getMessage());
+        }
+        
+    }
+
 }
