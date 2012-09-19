@@ -205,6 +205,7 @@ public class MultipartRequest extends ConnectionRequest {
                     int s = i.read(buffer);
                     while(s > -1) {
                         os.write(buffer, 0, s);
+                        os.flush();
                         s = i.read(buffer);
                     }
                     Util.cleanup(i);
