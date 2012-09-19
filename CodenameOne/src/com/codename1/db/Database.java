@@ -126,6 +126,23 @@ public abstract class Database {
     public abstract void execute(String sql, String [] params) throws IOException;
     
     /**
+     * Execute an update query with params.
+     * Used for INSERT, UPDATE, DELETE and similar sql statements.
+     * The sql can be constructed with '?' and the params will be binded to the
+     * query
+     * 
+     * @param sql the sql to execute
+     * @param params to bind to the query where the '?' exists, supported object 
+     * types are String, byte[], Double, Long and null
+     * 
+     * @throws IOException 
+     */
+    public void execute(String sql, Object [] params) throws IOException{
+        throw new RuntimeException("not implemented");
+    }
+    
+    
+    /**
      * This method should be called with SELECT type statements that return 
      * row set.  
      * 
