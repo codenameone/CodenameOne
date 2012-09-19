@@ -103,6 +103,37 @@ public class SEDatabase extends Database{
             throw new IOException(ex.getMessage());
         }
     }
+    
+    @Override
+    public void execute(String sql, Object[] params) throws IOException {
+        try {
+            PreparedStatement s =  conn.prepareStatement(sql);  
+            
+            if(params != null){
+                for (int i = 0; i < params.length; i++) {
+                    Object p = params[i];
+                    if (p == null) {
+                        s.setNull(i+1, java.sql.Types.NULL);
+                    } else {
+                        if (p instanceof String) {
+                            s.setString(i + 1, (String) p);
+                        } else if (p instanceof byte[]) {
+                            s.setBytes(i + 1, (byte[]) p);
+                        } else if (p instanceof Double) {
+                            s.setDouble(i + 1, ((Double) p).doubleValue());
+                        } else if (p instanceof Long) {
+                            s.setLong(i + 1, ((Long) p).longValue());
+                        }
+                    }                    
+                }
+            }
+            s.execute();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+    
 
     @Override
     public Cursor executeQuery(String sql, String[] params) throws IOException {
