@@ -433,9 +433,7 @@ public class TransportDetective {
         return stringData;
     }
     
-    // Переменна�? _target �?одержит URL
     public int getBestTransportForActiveCoverage() {
-        // Требует�?�? определить, какой тран�?порт нам �?ейча�? до�?тупен...
 
         int availableTransports = getAvailableTransportCoverage();
         int iCurTransport = -1;
