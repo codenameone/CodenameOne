@@ -996,7 +996,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, startAngle - 90,
+        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 270 - startAngle,
                 arcAngle, false, ((AndroidGraphics) graphics).getPaint());
 
     }
@@ -1007,7 +1007,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, startAngle - 90, 
+        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 270 - startAngle, 
                 arcAngle, true, ((AndroidGraphics) graphics).getPaint());
 
     }
