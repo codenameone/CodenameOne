@@ -393,7 +393,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Keywords relevant to this user’s specific session
+     * Keywords relevant to this user specific session
      * @param keywords
      */
     public void setKeywords(String[] keywords) {
@@ -417,7 +417,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Keywords relevant to this user’s specific session
+     * Keywords relevant to this user specific session
      * @return 
      */
     public String[] getKeywords() {
@@ -433,7 +433,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Category – a single word description of the application.
+     * Category is a single word description of the application.
      * @param category 
      */
     public void setCategory(String category) {
@@ -441,7 +441,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Category – a single word description of the application.
+     * Category is a single word description of the application.
      * @return a single word description of the application.
      */
     public String getCategory() {
@@ -449,7 +449,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Location string – comma separated list of country, state/province, city
+     * Location string is a comma separated list of country, state/province, city
      * For example: US, NY, NY
      * @param location 
      */
@@ -458,7 +458,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Location string – comma separated list of country, state/province, city
+     * Location string is a comma separated list of country, state/province, city
      * For example: US, NY, NY
      * @return 
      */

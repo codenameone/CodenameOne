@@ -37,7 +37,7 @@ public abstract class TiledProvider extends MapProvider {
     protected final String _url;
     // Very ugly cacheing
     private Point _tileNo;
-    private int _zoomLevel;
+    protected int _zoomLevel;
 
     /**
      * Creates a new Tiled provider

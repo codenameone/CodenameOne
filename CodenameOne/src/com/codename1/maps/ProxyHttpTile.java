@@ -56,6 +56,9 @@ public class ProxyHttpTile extends Tile {
         String cacheId = url.substring(url.indexOf(":")+1);
         cacheId = StringUtil.replaceAll(cacheId, "\\", "_");
         cacheId = StringUtil.replaceAll(cacheId, "/", "_");
+        cacheId = StringUtil.replaceAll(cacheId, ".", "_");
+        cacheId = StringUtil.replaceAll(cacheId, "?", "_");
+        cacheId = StringUtil.replaceAll(cacheId, "&", "_");
         
         ImageDownloadService.createImageToStorage(url, new ActionListener() {
 

@@ -72,24 +72,6 @@ public class MapComponent extends Container {
      */
     public MapComponent() {
         this(new OpenStreetMapProvider());
-        Location l = LocationManager.getLocationManager().getLastKnownLocation();
-        if (l != null) {
-            Coord centerPosition = new Coord(l.getLatitude(), l.getLongitude());
-            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
-        } else {
-            _center = new Coord(0, 0, true);
-        }
-        Painter bg = new Painter() {
-
-            public void paint(Graphics g, Rectangle rect) {
-                paintmap(g);
-            }
-        };
-        getUnselectedStyle().setBgTransparency(255);
-        getSelectedStyle().setBgTransparency(255);
-        getUnselectedStyle().setBgPainter(bg);
-        getSelectedStyle().setBgPainter(bg);
-        drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);
     }
 
     /**
@@ -97,7 +79,7 @@ public class MapComponent extends Container {
      * @param provider map provider
      */
     public MapComponent(MapProvider provider) {
-        this(provider, new Coord(0, 0, true), 4, true);
+        this(provider, (Coord)null, 4, true);
     }
 
     /**
@@ -144,7 +126,19 @@ public class MapComponent extends Container {
      */
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel, boolean cacheEnabled) {
         _map = new CacheProviderProxy(provider);
-        _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
+        
+        if (centerPosition == null) {
+            Location l = LocationManager.getLocationManager().getLastKnownLocation();
+            if (l != null) {
+                Coord p = new Coord(l.getLatitude(), l.getLongitude());
+                _center = p.isProjected() ? p : _map.projection().fromWGS84(p);
+            } else {
+                _center = new Coord(0, 0, true);
+            }
+        }else{
+            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);        
+        }
+        
         _zoom = zoomLevel;
         _layers = new Vector();
         setFocusable(false);
@@ -171,6 +165,17 @@ public class MapComponent extends Container {
             buttonsbar.addComponent(in);
             addComponent(BorderLayout.SOUTH, buttonsbar);
         }
+        Painter bg = new Painter() {
+
+            public void paint(Graphics g, Rectangle rect) {
+                paintmap(g);
+            }
+        };
+        getUnselectedStyle().setBgTransparency(255);
+        getSelectedStyle().setBgTransparency(255);
+        getUnselectedStyle().setBgPainter(bg);
+        getSelectedStyle().setBgPainter(bg);
+        drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);        
     }
 
     /**
