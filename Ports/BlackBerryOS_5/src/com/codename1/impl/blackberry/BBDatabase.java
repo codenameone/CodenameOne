@@ -83,8 +83,10 @@ public class BBDatabase extends Database{
         try {
             final net.rim.device.api.database.Statement statement = db.createStatement(sql);
             statement.prepare();
-            for (int i = 0; i < params.length; i++) {
-                statement.bind(i+1, params[i]);                
+            if(params != null){
+                for (int i = 0; i < params.length; i++) {
+                    statement.bind(i+1, params[i]);                
+                }
             }
             statement.execute();
             statement.close();
@@ -94,12 +96,44 @@ public class BBDatabase extends Database{
         }
     }
 
+    public void execute(String sql, Object [] params) throws IOException{
+        try {
+            final net.rim.device.api.database.Statement statement = db.createStatement(sql);
+            statement.prepare();
+            if (params != null) {
+                for (int i = 0; i < params.length; i++) {
+                    Object p = params[i];
+                    if (p == null) {
+                        statement.bind(i + 1, (String) p);
+                    } else {
+                        if (p instanceof String) {
+                            statement.bind(i + 1, (String) p);
+                        } else if (p instanceof byte[]) {
+                            statement.bind(i + 1, (byte[]) p);
+                        } else if (p instanceof Double) {
+                            statement.bind(i + 1, ((Double) p).doubleValue());
+                        } else if (p instanceof Long) {
+                            statement.bind(i + 1, ((Long) p).longValue());
+                        }
+                    }
+                }
+            }
+            statement.execute();
+            statement.close();
+        } catch (DatabaseException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+    
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         try {
             final net.rim.device.api.database.Statement statement = db.createStatement(sql);
             statement.prepare();
-            for (int i = 0; i < params.length; i++) {
-                statement.bind(i+1, params[i]);                
+            if(params != null){
+                for (int i = 0; i < params.length; i++) {
+                    statement.bind(i+1, params[i]);                
+                }
             }
             net.rim.device.api.database.Cursor cursor = statement.getCursor();           
             BBCursor c = new BBCursor(cursor){

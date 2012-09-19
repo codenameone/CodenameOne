@@ -340,6 +340,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
                 lastUSN = USN;
             }
         });
+        app.setWaitingForReply(true);
         synchronized (UiApplication.getEventLock()) {
             Invoke.invokeApplication(Invoke.APP_TYPE_CAMERA, new CameraArguments(CameraArguments.ARG_VIDEO_RECORDER));
         }
