@@ -168,14 +168,14 @@ public class BufferedOutputStream extends OutputStream {
             In this way buffered streams will cascade harmlessly. */
             flushBuffer();
             out.write(b, off, len);
-            return;
+        } else {
+        	if (len > buf.length - count) {
+        		flushBuffer();
+        	}
+        	System.arraycopy(b, off, buf, count, len);
+        	count += len;
         }
-        if (len > buf.length - count) {
-            flushBuffer();
-        }
-        System.arraycopy(b, off, buf, count, len);
-        count += len;
-        totalBytesWritten += (int) count;
+        totalBytesWritten += len;
         fireProgress();
         lastActivityTime = System.currentTimeMillis();
     }
