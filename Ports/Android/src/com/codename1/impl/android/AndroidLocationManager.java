@@ -28,6 +28,9 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         Context context = (Context) ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         Criteria criteria = new Criteria();
+        criteria.setSpeedRequired(true);
+        criteria.setAltitudeRequired(true);
+        
         // If GPS provider, then create and start GPS listener
         LocationProvider provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
         boolean enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
