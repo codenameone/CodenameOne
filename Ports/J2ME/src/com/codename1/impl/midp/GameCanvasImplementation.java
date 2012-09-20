@@ -1650,30 +1650,6 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-//    public void paintVideo(Component cmp, boolean fullScreen, Object nativeGraphics, Object video,
-//            Object player) {
-//        try {
-//            VideoControl vidc = (VideoControl) video;
-//            if (fullScreen) {
-//                vidc.setDisplayLocation(0, 0);
-//                vidc.setDisplaySize(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
-//            } else {
-//                vidc.setDisplayLocation(cmp.getAbsoluteX(), cmp.getAbsoluteY());
-//                int w = cmp.getWidth();
-//                int h = cmp.getHeight();
-//                if (vidc.getDisplayWidth() != w || vidc.getDisplayHeight() != h) {
-//                    vidc.setDisplaySize(w, h);
-//                }
-//
-//            }
-//        } catch (MediaException ex) {
-//            ex.printStackTrace();
-//        }
-//    }
-
-    /**
-     * @inheritDoc
-     */
     public boolean minimizeApplication() {
         try {
             minimized = true;

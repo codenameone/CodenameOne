@@ -8,6 +8,7 @@ import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import java.io.IOException;
 import javax.microedition.location.Coordinates;
+import javax.microedition.location.Criteria;
 import javax.microedition.location.LocationException;
 import javax.microedition.location.LocationProvider;
 import javax.microedition.location.QualifiedCoordinates;
@@ -25,7 +26,10 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
 
     public int getStatus() {
         try {
-            LocationProvider provider = LocationProvider.getInstance(null);
+            Criteria c = new Criteria();
+            c.setSpeedAndCourseRequired(true);
+            c.setAltitudeRequired(true);
+            LocationProvider provider = LocationProvider.getInstance(c);
             int status = converState(provider.getState());
             setStatus(status);
         } catch (Exception ex) {
@@ -37,7 +41,10 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
     public Location getCurrentLocation() throws IOException {
 
         try {
-            LocationProvider provider = LocationProvider.getInstance(null);
+            Criteria c = new Criteria();
+            c.setSpeedAndCourseRequired(true);
+            c.setAltitudeRequired(true);
+            LocationProvider provider = LocationProvider.getInstance(c);
             return convert(provider.getLocation(-1));
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -47,7 +54,10 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
 
     protected void bindListener() {
         try {
-            LocationProvider provider = LocationProvider.getInstance(null);
+            Criteria c = new Criteria();
+            c.setSpeedAndCourseRequired(true);
+            c.setAltitudeRequired(true);
+            LocationProvider provider = LocationProvider.getInstance(c);
             provider.setLocationListener(this, -1, -1, -1);
         } catch (LocationException ex) {
             ex.printStackTrace();
@@ -57,7 +67,10 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
 
     protected void clearListener() {
         try {
-            LocationProvider provider = LocationProvider.getInstance(null);
+            Criteria c = new Criteria();
+            c.setSpeedAndCourseRequired(true);
+            c.setAltitudeRequired(true);
+            LocationProvider provider = LocationProvider.getInstance(c);
             provider.setLocationListener(null, 1, 1, 1);
         } catch (LocationException ex) {
             ex.printStackTrace();
