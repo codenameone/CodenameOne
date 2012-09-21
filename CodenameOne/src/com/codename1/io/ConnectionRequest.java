@@ -229,6 +229,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             if(isWriteRequest()) {
+            	progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
                 if(shouldStop()) {
                     return;
@@ -948,7 +949,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @inheritDoc
      */
     public void ioStreamUpdate(Object source, int bytes) {
-        NetworkManager.getInstance().fireProgressEvent(this, progress, contentLength, bytes);
+        NetworkManager.getInstance().fireProgressEvent(this, progress, getContentLength(), bytes);
     }
 
     /**

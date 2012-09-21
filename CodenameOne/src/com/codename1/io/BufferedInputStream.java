@@ -403,12 +403,14 @@ public class BufferedInputStream extends InputStream {
         lastActivityTime = System.currentTimeMillis();
         if(disableBuffering) {
             int v = getInIfOpen().read(b, off, len);
-            if(printInput && v > -1) {
-                System.out.print(new String(b, off, v));
+            if (v > -1) {
+            	if(printInput) {
+            		System.out.print(new String(b, off, v));
+            	}
+            
+            	totalBytesRead += v;
+            	fireProgress();
             }
-
-            totalBytesRead += v;
-            fireProgress();
             return v;
         }
         getBufIfOpen(); // Check for closed stream
@@ -439,8 +441,10 @@ public class BufferedInputStream extends InputStream {
                 yieldTime();
             }
         }
-        totalBytesRead += n;
-        fireProgress();
+        if (n > 0) {
+        	totalBytesRead += n;
+        	fireProgress();
+        }
         lastActivityTime = System.currentTimeMillis();
 
         return n;
