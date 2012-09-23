@@ -25,6 +25,7 @@
 package com.codename1.impl.blackberry;
 
 import com.codename1.db.Database;
+import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
@@ -38,6 +39,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import javax.microedition.io.HttpConnection;
+
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
 import net.rim.device.api.database.DatabaseIOException;
@@ -452,4 +456,21 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         }
         return file;
     }
+
+	/* (non-Javadoc)
+	 * @see com.codename1.impl.blackberry.BlackBerryImplementation#openOutputStream(java.lang.Object)
+	 */
+	public OutputStream openOutputStream(Object connection) throws IOException {
+		if (connection instanceof String) {
+			return super.openOutputStream(connection);
+		}
+        OutputStream os = ((HttpConnection) connection).openOutputStream();
+        // getSoftwareVersion() not available in legacy port,introduced at API 4.3.0
+        int majorVersion = DeviceInfo.getSoftwareVersion().charAt(0)-'0';
+        // in version 7, BBOS started supporting HTTP 1.1, so facade not required.
+        if (majorVersion < 7) {
+        	os = new BlackBerryOutputStream(os);
+        }
+        return new BufferedOutputStream(os, ((HttpConnection) connection).getURL());
+	}
 }
