@@ -2036,7 +2036,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             o.setConnection(fc);
             return o;
         }
-        return new BufferedOutputStream(((HttpConnection) connection).openOutputStream(), ((HttpConnection) connection).getURL());
+        OutputStream os = new BlackBerryOutputStream(((HttpConnection) connection).openOutputStream());
+        return new BufferedOutputStream(os, ((HttpConnection) connection).getURL());
     }
 
     /**
