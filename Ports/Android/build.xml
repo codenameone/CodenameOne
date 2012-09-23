@@ -76,6 +76,10 @@
         <copy file="../../Themes/android_holo_light.res" todir="src" />
     </target>
 
+    <target name="-post-compile">
+        <delete file="build/classes/com/vending/billing/IMarketBuillingService.class" />
+    </target>
+
     <target name="-pre-clean">
         <delete dir="build/tmp" />
     </target>
