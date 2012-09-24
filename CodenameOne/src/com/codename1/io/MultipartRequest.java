@@ -46,6 +46,7 @@ public class MultipartRequest extends ConnectionRequest {
     private Hashtable filesizes = new Hashtable();
     private Hashtable mimeTypes = new Hashtable();
     private static final String CRLF = "\r\n"; 
+    private long contentLength = -1L;
     
     /**
      * Initialize variables
@@ -62,7 +63,8 @@ public class MultipartRequest extends ConnectionRequest {
     }
 
     protected void initConnection(Object connection) {
-        addRequestHeader("Content-Length", String.valueOf(calculateContentLength()));
+    	contentLength = calculateContentLength();
+       	addRequestHeader("Content-Length", Long.toString(contentLength));
         super.initConnection(connection);
     }
 
@@ -174,6 +176,9 @@ public class MultipartRequest extends ConnectionRequest {
         writer = new OutputStreamWriter(os, "UTF-8"); 
         Enumeration e = args.keys();
         while(e.hasMoreElements()) {
+        	if (shouldStop()) {
+        		break;
+        	}
             String key = (String)e.nextElement();
             Object value = args.get(key);
             
@@ -199,19 +204,28 @@ public class MultipartRequest extends ConnectionRequest {
                 writer.write(CRLF);
                 writer.write(CRLF);
                 writer.flush();
-                if(value instanceof InputStream) {
-                    InputStream i = (InputStream)value;
-                    byte[] buffer = new byte[8192];
-                    int s = i.read(buffer);
-                    while(s > -1) {
-                        os.write(buffer, 0, s);
-                        os.flush();
-                        s = i.read(buffer);
-                    }
-                    Util.cleanup(i);
+                InputStream i;
+                if (value instanceof InputStream) {
+                	i = (InputStream)value;
                 } else {
-                    os.write((byte[])value);
+                	i = new ByteArrayInputStream((byte[])value);
                 }
+                byte[] buffer = new byte[8192];
+                int s = i.read(buffer);
+                while(s > -1) {
+                	if (shouldStop()) {
+                		break;
+                	}
+                	os.write(buffer, 0, s);
+                	os.flush();
+                	s = i.read(buffer);
+                }
+                // (when passed by stream, leave for caller to clean up).
+                if (!(value instanceof InputStream)) {
+                	Util.cleanup(i);
+                }
+                args.remove(key);
+                value = null;
                 writer.flush();
             }
             writer.write(CRLF);
@@ -222,4 +236,18 @@ public class MultipartRequest extends ConnectionRequest {
         writer.write(CRLF);
         writer.close();
     }
+
+    /* (non-Javadoc)
+	 * @see com.codename1.io.ConnectionRequest#getContentLength()
+	 */
+	public int getContentLength() {
+		return (int)contentLength;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.codename1.io.ConnectionRequest#onRedirect(java.lang.String)
+	 */
+	public boolean onRedirect(String url) {
+		return true;
+	}
 }
