@@ -80,6 +80,7 @@
         <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone3gs" />
         <copy file="../../Themes/blackberry_theme.res" todir="../../Skins/torch" />
         <copy file="../../Themes/android_holo_light.res" todir="../../Skins/xoom" />
+        <copy file="../../Themes/winTheme.res" todir="../../Skins/lumia" />
 
         
         <zip basedir="../../Skins/nexus" destfile="../../Skins/nexus.skin" compress="false">
@@ -109,10 +110,14 @@
         <zip basedir="../../Skins/xoom" destfile="../../Skins/xoom.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
+        <zip basedir="../../Skins/lumia" destfile="../../Skins/lumia.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
     </target>    
     
     <target name="-pre-compile">
         <copy file="../../Skins/torch.skin" todir="src" />
+        <copy file="../../Skins/lumia.skin" todir="src" />
         <copy file="../../Skins/android.skin" todir="src" />
         <copy file="../../Skins/feature_phone.skin" todir="src" />
         <copy file="../../Skins/ipad.skin" todir="src" />

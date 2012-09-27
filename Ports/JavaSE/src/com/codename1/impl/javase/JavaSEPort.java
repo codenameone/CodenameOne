@@ -174,7 +174,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
     }
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin";
+    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
     private boolean touchDevice = true;
     private boolean rotateTouchKeysOnLandscape;
     private int keyboardType = Display.KEYBOARD_TYPE_UNKNOWN;
@@ -374,6 +374,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         int x, y;
 
         C() {
+            super(null);
             addKeyListener(this);
             addMouseListener(this);
             addMouseMotionListener(this);
@@ -944,6 +945,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             } else if (platformName.equals("me")) {
                 ua = "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124";
+            } else {
+                if(platformName.equals("win")) {
+                    ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows Phone OS 7.5; Trident/5.0; IEMobile/9.0; NOKIA; Lumia 800)";
+                } else {
+                    ua = "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1";
+                }
             }
             Display.getInstance().setProperty("User-Agent", ua);
 
@@ -3944,6 +3951,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Media createMediaRecorder(String path) throws IOException {
         throw new IOException("Not supported on Simulator");
     }
+
     private com.codename1.ui.util.ImageIO imIO;
 
     @Override
@@ -4053,11 +4061,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setCommandBehavior(int commandBehavior) {
         //cannot show native menus on the simulator
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
-            if (isTablet() && getPlatformName().equals("and")) {
-                //simulate native ics with the lightweight ics
-                commandBehavior = Display.COMMAND_BEHAVIOR_ICS;
+            if(getPlatformName().equals("win")) {
+                commandBehavior = Display.COMMAND_BEHAVIOR_BUTTON_BAR;
             } else {
-                return;
+                if (isTablet() && getPlatformName().equals("and")) {
+                    //simulate native ics with the lightweight ics
+                    commandBehavior = Display.COMMAND_BEHAVIOR_ICS;
+                } else {
+                    return;
+                }
             }
         }
         super.setCommandBehavior(commandBehavior);
