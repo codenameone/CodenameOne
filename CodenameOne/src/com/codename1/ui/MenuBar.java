@@ -396,6 +396,10 @@ public class MenuBar extends Container implements ActionListener {
      */
     public void setBackCommand(Command backCommand) {
         this.backCommand = backCommand;
+        if(backCommand != null && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
+            removeCommand(backCommand);
+        }
+        
         int b = getCommandBehavior();
         if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_ICS
                 || Display.getInstance().isNativeTitle()) {
@@ -892,6 +896,10 @@ public class MenuBar extends Container implements ActionListener {
             return;
         }
 
+        if(getBackCommand() == cmd && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
+            return;
+        }
+        
         // special case for default commands which are placed at the end and aren't overriden later
         if (soft.length > 2 && cmd == parent.getDefaultCommand()) {
             commands.addElement(cmd);

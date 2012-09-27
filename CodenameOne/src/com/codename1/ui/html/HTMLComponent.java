@@ -66,7 +66,7 @@ import java.util.Vector;
  * browser when applicable which is a far superior approach.
  * @author Ofir Leitner
  */
-public class HTMLComponent extends Container implements ActionListener,AsyncDocumentRequestHandler.IOCallback {
+public class HTMLComponent extends Container implements ActionListener,IOCallback {
 
 //    long startTime;
 //    String msg="";

@@ -77,6 +77,7 @@ public class Label extends Component {
         this.text = text;
         localize();
         setFocusable(false);
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
     Label(String text, String uiid) {
@@ -87,6 +88,7 @@ public class Label extends Component {
         // moved this to the UIManager initializations
         //setAlignment(CENTER);
         setUIID(uiid);
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
     /**
@@ -94,6 +96,7 @@ public class Label extends Component {
      */
     public Label() {
         this("");
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
     /** 
@@ -104,14 +107,7 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    protected void initLaf(UIManager uim) {
-        super.initLaf(uim);
-        endsWith3Points = uim.getLookAndFeel().isDefaultEndsWith3Points();
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
     

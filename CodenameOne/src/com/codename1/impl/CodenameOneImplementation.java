@@ -4513,10 +4513,11 @@ public abstract class CodenameOneImplementation {
      * @param commandBehavior the commandBehavior to set
      */
     public void setCommandBehavior(int commandBehavior) {
-        if(!isTouchDevice())
+        if(!isTouchDevice()) {
             if(commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
                 commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
             }
+        }
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);
     }

@@ -46,20 +46,4 @@ public interface AsyncDocumentRequestHandler extends DocumentRequestHandler {
      * @param callback The HTMLComponent that should be called back when the stream was fetched.
      */
     public void resourceRequestedAsync(DocumentInfo docInfo, IOCallback callback);
-
-    /**
-     * This interface is implemented by HTMLComponent and ResourceThread (The two classes using the AsyncDocumentRequestHandler)
-     */
-    public interface IOCallback {
-
-        /**
-         * Called when the stream of the document is ready
-         *
-         * @param is The ready InputStream
-         * @param docInfo A DocumentInfo object representing the fetched InputStream
-         */
-        public void streamReady(InputStream is,DocumentInfo docInfo);
-
-    }
-
 }

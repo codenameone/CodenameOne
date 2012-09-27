@@ -357,7 +357,7 @@ class ResourceThreadQueue {
      *
      * @author Ofir Leitner
      */
-    class ResourceThread implements Runnable, AsyncDocumentRequestHandler.IOCallback {
+    class ResourceThread implements Runnable, IOCallback {
 
         Component imgLabel;
         Vector labels;

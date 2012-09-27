@@ -35,7 +35,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
+import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.html.HTMLComponent;

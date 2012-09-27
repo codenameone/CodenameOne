@@ -1347,6 +1347,8 @@ public class Form extends Container {
                 contentStyle.setMargin(Component.LEFT, left, false);
                 contentStyle.setMargin(Component.RIGHT, right, false);
             }
+            titleStyle.setMarginUnit(null);
+            contentStyle.setMarginUnit(null);
             if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
                 ((BGPainter) p).setPreviousForm(previousForm);
             } else {

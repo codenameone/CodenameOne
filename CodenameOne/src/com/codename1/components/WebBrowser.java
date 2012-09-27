@@ -25,7 +25,7 @@ package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.html.AsyncDocumentRequestHandler.IOCallback;
+import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;

@@ -951,6 +951,7 @@ public abstract class LookAndFeel {
         defaultSnapToGrid = manager.isThemeConstant("snapGridBool", false);
         defaultAlwaysTensile = manager.isThemeConstant("alwaysTensileBool", false);
         defaultTensileDrag = manager.isThemeConstant("tensileDragBool", true);
+        defaultEndsWith3Points = manager.isThemeConstant("endsWith3PointsBool", true);
         defaultTensileHighlight = manager.isThemeConstant("tensileHighlightBool", false);
         tensileHighlightBottomImage = null;
         tensileHighlightTopImage = null;

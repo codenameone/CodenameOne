@@ -932,9 +932,19 @@ public class UIManager {
             }
             if(paddingUnit != null) {
                 style.setPaddingUnit(paddingUnit);
+            } else {
+                // special case for pixel based padding
+                if(padding != null) {
+                    style.setPaddingUnit(null);
+                }
             }
             if(marginUnit != null) {
                 style.setMarginUnit(marginUnit);
+            } else {
+                // special case for pixel based margin
+                if(margin != null) {
+                    style.setMarginUnit(null);
+                }
             }
             if (alignment != null) {
                 style.setAlignment(alignment.intValue());

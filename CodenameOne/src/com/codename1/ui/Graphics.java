@@ -367,6 +367,9 @@ public final class Graphics {
     }
 
     private void drawStringImpl(String str, int x, int y) {
+        if(str.length() == 0) {
+            return;
+        }
         if(!(current instanceof CustomFont)) {
             impl.drawString(nativeGraphics, str, x + xTranslate, y + yTranslate);
         } else {
@@ -385,6 +388,9 @@ public final class Graphics {
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
      */
     public void drawString(String str, int x, int y,int textDecoration) {
+        if(str.length() == 0) {
+            return;
+        }
         // this if has only the minor effect of providing a slighly faster execution path
         if(textDecoration != 0) {
             boolean raised = (textDecoration & Style.TEXT_DECORATION_3D)!=0;
