@@ -2627,8 +2627,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             cam.addComponent(BorderLayout.SOUTH, time);
             
             cam.revalidate();
-            
-            cam.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            ActionListener l = new ActionListener() {
 
                 boolean recording = false;
                 OutputStream out = null;
@@ -2702,7 +2701,10 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                     
                     
                 }
-            });
+            };
+            cam.addGameKeyListener(Display.GAME_FIRE, l);
+            cam.addPointerReleasedListener(l);
+            
         } catch (IOException ex) {
             ex.printStackTrace();
             throw new RuntimeException("failed to start camera");
@@ -2726,8 +2728,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             video.setVisible(true);
             cam.addComponent(BorderLayout.CENTER, video);
             cam.revalidate();
-            
-            cam.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            ActionListener l = new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
                     VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
@@ -2759,7 +2760,10 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                         System.out.println("failed to take picture");
                     }
                 }
-            });
+            };
+            cam.addGameKeyListener(Display.GAME_FIRE, l);
+            cam.addPointerReleasedListener(l);
+            
         } catch (IOException ex) {
             ex.printStackTrace();
             throw new RuntimeException("failed to start camera");
@@ -2795,8 +2799,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             cam.addComponent(BorderLayout.SOUTH, time);
             
             cam.revalidate();
-            
-            cam.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            ActionListener l = new ActionListener() {
                 boolean recording = false;
                 OutputStream out = null;
                 String videoPath = null;
@@ -2871,7 +2874,10 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                     
                     
                 }
-            });
+            };
+            cam.addGameKeyListener(Display.GAME_FIRE, l);
+            cam.addPointerReleasedListener(l);
+            
         } catch (IOException ex) {
             ex.printStackTrace();
             throw new RuntimeException("failed to start camera");
