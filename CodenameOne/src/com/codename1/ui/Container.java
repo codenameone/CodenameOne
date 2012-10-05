@@ -1037,7 +1037,7 @@ public class Container extends Component {
             switch (direction) {
                 case Display.GAME_UP:
                     if(!cyclic && getScrollY() == 0){
-                        return false;
+                        return true;
                     }
                     y = getScrollY() - scrollIncrement;
                     edge = f.findNextFocusUp() == null;
