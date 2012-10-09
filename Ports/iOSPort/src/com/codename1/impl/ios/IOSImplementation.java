@@ -2867,31 +2867,39 @@ public class IOSImplementation extends CodenameOneImplementation {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 public String format(int number) {
-                    return NumberFormat.getNumberInstance().format(number);
+                    return IOSNative.formatInt(number);
                 }
 
                 public String format(double number) {
-                    return NumberFormat.getNumberInstance().format(number);
+                    return IOSNative.formatDouble(number);
                 }
 
                 public String formatCurrency(double currency) {
-                    return NumberFormat.getCurrencyInstance().format(currency);
+                    return IOSNative.formatCurrency(currency);
                 }
 
                 public String formatDateLongStyle(Date d) {
-                    return DateFormat.getDateInstance(DateFormat.LONG).format(d);
+                    return IOSNative.formatDate(d.getTime());
                 }
 
                 public String formatDateShortStyle(Date d) {
-                    return DateFormat.getDateInstance(DateFormat.SHORT).format(d);
+                    return IOSNative.formatDateShort(d.getTime());
                 }
 
                 public String formatDateTime(Date d) {
-                    return DateFormat.getDateTimeInstance().format(d);
+                    return IOSNative.formatDateTime(d.getTime());
+                }
+                
+                public String formatDateTimeMedium(Date d) {
+                    return IOSNative.formatDateTimeMedium(d.getTime());
+                }
+
+                public String formatDateTimeShort(Date d) {
+                    return IOSNative.formatDateTimeShort(d.getTime());
                 }
 
                 public String getCurrencySymbol() {
-                    return NumberFormat.getInstance().getCurrency().getSymbol();
+                    return IOSNative.getCurrencySymbol();
                 }
 
                 public void setLocale(String locale, String language) {

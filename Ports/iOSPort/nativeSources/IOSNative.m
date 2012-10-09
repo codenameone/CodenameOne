@@ -829,7 +829,7 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OB
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
     NSString* ns = [NSString stringWithUTF8String:chrs];
-    [fm currentDirectoryPath:ns];
+    [fm createDirectoryAtPath:ns attributes:nil];
     [fm release];
     [pool release];
 }
@@ -1484,7 +1484,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
-        if(picker == nil) {
+        if(picker == nil || ![MFMailComposeViewController canSendMail]) {
             return;
         }
         picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
@@ -1871,22 +1871,24 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
     JAVA_OBJECT  number, JAVA_OBJECT  text) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        MFMessageComposeViewController *picker = [[MFMessageComposeViewController alloc] init];
-        picker.messageComposeDelegate = [CodenameOne_GLViewController instance];
-        
-        // Recipient.
-        NSString *recipient = toNSString(number);
-        NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
-        
-        [picker setRecipients:recipientsArray];
-        
-        // Body.
-        NSString *smsBody = toNSString(text);
-        [picker setBody:smsBody];
-        
-        [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
-        
-        [picker release];
+        if([MFMessageComposeViewController canSendText]) {
+            MFMessageComposeViewController *picker = [[MFMessageComposeViewController alloc] init];
+            picker.messageComposeDelegate = [CodenameOne_GLViewController instance];
+            
+            // Recipient.
+            NSString *recipient = toNSString(number);
+            NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
+            
+            [picker setRecipients:recipientsArray];
+            
+            // Body.
+            NSString *smsBody = toNSString(text);
+            [picker setBody:smsBody];
+            
+            [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+            
+            [picker release];
+        }
         [pool release];
     });
 }
@@ -2241,4 +2243,93 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT sku) {
     SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
     [[SKPaymentQueue defaultQueue] addPayment:payment];
+}
+
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(JAVA_INT i) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+    [formatter setNumberStyle:NSNumberFormatterNoStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromNumber:[NSNumber numberWithInt:i]]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(JAVA_DOUBLE d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+    [formatter setNumberStyle:NSNumberFormatterNoStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(JAVA_DOUBLE d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+    [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(JAVA_LONG d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateStyle:NSDateFormatterMediumStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromDate:date]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(JAVA_LONG d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateStyle:NSDateFormatterShortStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromDate:date]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(JAVA_LONG d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateStyle:NSDateFormatterLongStyle];
+    [formatter setTimeStyle:NSDateFormatterLongStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromDate:date]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(JAVA_LONG d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateStyle:NSDateFormatterMediumStyle];
+    [formatter setTimeStyle:NSDateFormatterMediumStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromDate:date]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(JAVA_LONG d) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateStyle:NSDateFormatterShortStyle];
+    [formatter setTimeStyle:NSDateFormatterShortStyle];
+    JAVA_OBJECT o = fromNSString([formatter stringFromDate:date]);
+    [pool release];
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__() {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+    JAVA_OBJECT c = fromNSString([formatter currencyCode]);
+    [pool release];
+    return c;
 }

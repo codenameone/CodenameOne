@@ -150,23 +150,24 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             
             // EMAILADDR
-            if((constraint & 1) == 1) {
+            int cccc = constraint & 0xff;
+            if(cccc == 1) {
                 utf.keyboardType = UIKeyboardTypeEmailAddress;
             } else {
                 // NUMERIC
-                if((constraint & 2) == 2) {
+                if(cccc == 2) {
                     utf.keyboardType = UIKeyboardTypeNumberPad;
                 } else {
                     // PHONENUMBER
-                    if((constraint & 3) == 3) {
+                    if(cccc == 3) {
                         utf.keyboardType = UIKeyboardTypePhonePad;
                     } else {
                         // URL
-                        if((constraint & 4) == 4) {
+                        if(cccc == 4) {
                             utf.keyboardType = UIKeyboardTypeURL;
                         } else {
                             // DECIMAL
-                            if((constraint & 5) == 5) {
+                            if(cccc == 5) {
                                 utf.keyboardType = UIKeyboardTypeDecimalPad;
                             }
                         }
@@ -897,11 +898,16 @@ static CodenameOne_GLViewController *sharedSingleton;
             }
         }
     } else {
-        if([UIScreen mainScreen].scale > 1) {
-            img = [UIImage imageNamed:@"Default@2x.png"];
+        /*if([UIScreen mainScreen].scale > 1) {
+            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
+                img = [UIImage imageNamed:@"Default@2x.png"];
+            } else {
+                img = [UIImage imageNamed:@"Default@2x.png"];
+            }
         } else {
             img = [UIImage imageNamed:@"Default.png"];
-        }
+        }*/
+        img = [UIImage imageNamed:@"Default.png"];
     }
     if(img != nil) {
         float scale = scaleValue;
@@ -1557,7 +1563,7 @@ extern int popoverSupported();
 	[self dismissModalViewControllerAnimated:YES];
 }
 
--(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result error:(NSError*)error {
+-(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
 	[self dismissModalViewControllerAnimated:YES];
 }
 

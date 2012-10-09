@@ -322,4 +322,14 @@ public class IOSNative {
     
     public static native void fetchProducts(String[] skus, Product[] products);
     public static native void purchase(String sku);
+
+    public static native String formatInt(int i);
+    public static native String formatDouble(double d);
+    public static native String formatCurrency(double d);
+    public static native String formatDate(long date);
+    public static native String formatDateShort(long date);
+    public static native String formatDateTime(long date);
+    public static native String formatDateTimeMedium(long date);
+    public static native String formatDateTimeShort(long date);
+    public static native String getCurrencySymbol();
 }
