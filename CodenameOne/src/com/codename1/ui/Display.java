@@ -2743,7 +2743,7 @@ public final class Display {
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
     public void registerPush(String id, boolean noFallback) {
-        if(Preferences.get("push_id", null) == null) {
+        if(Preferences.get("push_id", (long)-1) > 0) {
             impl.registerPush(id, noFallback);
         }
     }

@@ -37,6 +37,9 @@ public class Preferences {
         if(p == null) {
             if(Storage.getInstance().exists("CN1Preferences")) {
                 p = (Hashtable)Storage.getInstance().readObject("CN1Preferences");
+                if(p == null) {
+                    p = new Hashtable();                    
+                }
             } else {
                 p = new Hashtable();
             }

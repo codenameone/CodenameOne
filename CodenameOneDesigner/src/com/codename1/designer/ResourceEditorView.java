@@ -793,6 +793,7 @@ public class ResourceEditorView extends FrameView {
         android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
         icsNativeTheme = new javax.swing.JMenuItem();
         blackberryNativeTheme = new javax.swing.JRadioButtonMenuItem();
+        winNativeTheme = new javax.swing.JRadioButtonMenuItem();
         customNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu4 = new javax.swing.JMenu();
         addMultiImages = new javax.swing.JMenuItem();
@@ -1401,6 +1402,12 @@ public class ResourceEditorView extends FrameView {
         blackberryNativeTheme.addActionListener(formListener);
         jMenu1.add(blackberryNativeTheme);
 
+        nativeThemeButtonGroup.add(winNativeTheme);
+        winNativeTheme.setText("Windows Phone Theme");
+        winNativeTheme.setName("winNativeTheme"); // NOI18N
+        winNativeTheme.addActionListener(formListener);
+        jMenu1.add(winNativeTheme);
+
         nativeThemeButtonGroup.add(customNativeTheme);
         customNativeTheme.setText("Custom Theme");
         customNativeTheme.setName("customNativeTheme"); // NOI18N
@@ -1630,6 +1637,9 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == addMultiImages) {
                 ResourceEditorView.this.addMultiImagesActionPerformed(evt);
             }
+            else if (evt.getSource() == quickMultiImages) {
+                ResourceEditorView.this.quickMultiImagesActionPerformed(evt);
+            }
             else if (evt.getSource() == addImages) {
                 ResourceEditorView.this.addImagesActionPerformed(evt);
             }
@@ -1678,8 +1688,8 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
             }
-            else if (evt.getSource() == quickMultiImages) {
-                ResourceEditorView.this.quickMultiImagesActionPerformed(evt);
+            else if (evt.getSource() == winNativeTheme) {
+                ResourceEditorView.this.winNativeThemeActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -3098,6 +3108,10 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
                 blackberryNativeTheme.setSelected(true);
                 return;
             } 
+            if(t.equals("/winTheme.res")) {
+                winNativeTheme.setSelected(true);
+                return;
+            } 
         } else {
             customNativeTheme.setSelected(true);
         }
@@ -3175,6 +3189,10 @@ private void livePreviewUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN
     private void quickMultiImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_quickMultiImagesActionPerformed
         new AddAndScaleMultiImage().selectFilesSimpleMode(mainPanel, loadedResources);
     }//GEN-LAST:event_quickMultiImagesActionPerformed
+
+private void winNativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_winNativeThemeActionPerformed
+        setNativeTheme("/winTheme.res", true);
+}//GEN-LAST:event_winNativeThemeActionPerformed
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
@@ -4742,5 +4760,6 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JPanel treeArea;
     private javax.swing.JMenuItem undoItem;
     private javax.swing.JScrollPane userInterfaceScroll;
+    private javax.swing.JRadioButtonMenuItem winNativeTheme;
     // End of variables declaration//GEN-END:variables
 }

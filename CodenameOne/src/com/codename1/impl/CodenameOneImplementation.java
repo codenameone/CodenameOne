@@ -4316,16 +4316,16 @@ public abstract class CodenameOneImplementation {
      * For use by implementations, stop receiving push notifications from the server
      */
     public static void deregisterPushFromServer() {
-        long i = Preferences.get("push_id", -1);
+        long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
             r.setUrl("https://codename-one.appspot.com/deregisterPush");
-            r.addArgument("p", Preferences.get("push_id", ""));
+            r.addArgument("p", "" + i);
             r.addArgument("a", getApplicationKey());
             NetworkManager.getInstance().addToQueue(r);
-            Preferences.set("push_id", null);
-            Preferences.set("push_key", null);
+            Preferences.delete("push_id");
+            Preferences.delete("push_key");
         }
     }
     
@@ -4351,8 +4351,8 @@ public abstract class CodenameOneImplementation {
             return;
         }
         pollingThreadRunning = true;
-        final String pushId = Preferences.get("push_id", null);
-        if(pushId != null) {
+        final long pushId = Preferences.get("push_id", (long)-1);
+        if(pushId > -1) {
             new CodenameOneThread(new Runnable() {
                 public void run() {
                     String lastReq = Preferences.get("last_push_req", "0");
@@ -4361,7 +4361,7 @@ public abstract class CodenameOneImplementation {
                             ConnectionRequest cr = new ConnectionRequest();
                             cr.setUrl("https://codename-one.appspot.com/pollManualPush");
                             cr.setPost(false);
-                            cr.addArgument("i", pushId);
+                            cr.addArgument("i", "" + pushId);
                             cr.addArgument("last", lastReq);
                             NetworkManager.getInstance().addToQueueAndWait(cr);
                             DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));

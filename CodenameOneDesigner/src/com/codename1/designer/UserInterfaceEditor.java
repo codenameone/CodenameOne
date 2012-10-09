@@ -5515,7 +5515,7 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
             lockForDragging = false;
             return; 
         }
-        addComponentToContainer(new com.codename1.maps.MapComponent(), "Map");
+        addComponentToContainer(new com.codename1.maps.MapComponent(), "MapComponent");
     }//GEN-LAST:event_codenameOneMapActionPerformed
 
     private void codenameOneMultiListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMultiListActionPerformed
