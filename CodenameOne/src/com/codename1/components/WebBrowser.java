@@ -174,7 +174,7 @@ public class WebBrowser extends Container {
      * @param mime the mime type of the image e.g. image/png
      * @return a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
      */
-    public String createDataURI(byte[] data, String mime) {
+    public static String createDataURI(byte[] data, String mime) {
         return "data:" + mime + ";base64," + Base64.encode(data);
     }
     
