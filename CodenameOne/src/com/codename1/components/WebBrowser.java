@@ -36,6 +36,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DefaultHTMLCallback;
 import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.Base64;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -163,6 +164,20 @@ public class WebBrowser extends Container {
         addComponent(BorderLayout.CENTER, internal);
     }
 
+    /**
+     * This method creates a <a href="http://en.wikipedia.org/wiki/Data_URI_scheme">data URI</a>
+     * which allows developers creating HTML for local use to embed local images into the HTML by
+     * appending them as a URI. E.g. instead of referencing a file or URL just load the image data
+     * and place the contents of this string into the src attribute.
+     * <p>This is the easiest way to get an HTML with local images to work on all mobile platforms.
+     * @param data data of an image
+     * @param mime the mime type of the image e.g. image/png
+     * @return a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
+     */
+    public String createDataURI(byte[] data, String mime) {
+        return "data:" + mime + ";base64," + Base64.encode(data);
+    }
+    
     /**
      * This is a callback method, this method is called before the url has been
      * loaded
