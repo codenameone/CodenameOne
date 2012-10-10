@@ -1423,9 +1423,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         try {
             Class.forName("javafx.embed.swing.JFXPanel");
-            fxExists = true;
             Platform.setImplicitExit(false);
-        } catch (Exception ex) {
+            fxExists = true;
+        } catch (Throwable ex) {
         }
 
         URLConnection.setDefaultAllowUserInteraction(true);
