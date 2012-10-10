@@ -313,6 +313,8 @@ public final class Display {
 
     private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
+    private boolean recursivePointerReleaseA;
+    private boolean recursivePointerReleaseB;
     private int pointerX, pointerY;
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
@@ -1602,6 +1604,10 @@ public final class Display {
 
     private Form eventForm;
     
+    boolean isRecursivePointerRelease() {
+        return recursivePointerReleaseB;
+    }
+    
     /**
      * Invoked on the EDT to propagate the event
      */
@@ -1619,14 +1625,22 @@ public final class Display {
             eventForm = f;
             break;
         case KEY_RELEASED:
+            // pointer release can cycle into invoke and block which will cause this method 
+            // to recurse if a pointer will be released while we are in an invoke and block state
+            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+            Form xf = eventForm;
+            eventForm = null;
+
             //make sure the released event is sent to the same Form who got a
             //pressed event
-            if(eventForm == f){
+            if(xf == f){
                 f.keyReleased(ev[1]);                
             }
-            eventForm = null;
             break;
         case POINTER_PRESSED:
+            if(recursivePointerReleaseA) {
+                recursivePointerReleaseB = true;
+            } 
             dragOccured = false;
             dragPathLength = 0;
             pointerPressedAndNotReleasedOrDragged = true;
@@ -1634,13 +1648,22 @@ public final class Display {
             eventForm = f;
             break;
         case POINTER_RELEASED:
+            recursivePointerReleaseA = true;            
             pointerPressedAndNotReleasedOrDragged = false;
-            //make sure the released event is sent to the same Form who got a
-            //pressed event
-            if(eventForm == f){
+            
+            // pointer release can cycle into invoke and block which will cause this method 
+            // to recurse if a pointer will be released while we are in an invoke and block state
+            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+            Form x = eventForm;
+            eventForm = null;
+
+            // make sure the released event is sent to the same Form that got a
+            // pressed event
+            if(x == f){
                 f.pointerReleased(pointerEvent(1, ev), pointerEvent(2, ev));
             }
-            eventForm = null;
+            recursivePointerReleaseA = false;
+            recursivePointerReleaseB = false;
             break;
         case POINTER_DRAGGED:
             dragOccured = true;

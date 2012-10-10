@@ -2007,7 +2007,7 @@ public class Form extends Container {
                 dragged = null;
             }
         }
-        if (buttonsAwatingRelease != null) {
+        if (buttonsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
             for (int iter = 0; iter < buttonsAwatingRelease.size(); iter++) {
                 Button b = (Button) buttonsAwatingRelease.elementAt(iter);
                 b.setState(Button.STATE_DEFAULT);
