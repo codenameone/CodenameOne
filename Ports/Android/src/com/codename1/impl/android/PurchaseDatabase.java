@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.codename1.impl.android;
 
 import com.codename1.impl.android.Consts.PurchaseState;
@@ -141,13 +142,61 @@ public class PurchaseDatabase {
                 PurchaseState state = PurchaseState.valueOf(stateIndex);
                 // Note that a refunded purchase is treated as a purchase. Such
                 // a friendly refund policy is nice for the user.
-                if (state == PurchaseState.PURCHASED || state == PurchaseState.REFUNDED) {
-                    quantity += 1;
+                if(state == PurchaseState.PURCHASED) {
+                    quantity++;
+                }
+                else if(state == PurchaseState.REFUNDED || state == PurchaseState.CANCELED || state == PurchaseState.EXPIRED) {
+                    quantity--;
+                    //this check MUST be here or negative quantities will mess up managed items that are refunded
+                    //and then purchased again
+                    if(quantity < 0) {
+                        quantity = 0;
+                    }
                 }
             }
 
             // Update the "purchased items" table
             updatePurchasedItem(productId, quantity);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return quantity;
+    }
+    
+    /**
+     * This is used for testing, basically a copy of updatePurchase above
+     * can be removed if necessary
+     * 
+     * @param sku
+     * @return quantity owned for sku 
+     */
+    public int enumerateHistory(String sku) {
+        Cursor cursor = mDb.query(PURCHASE_HISTORY_TABLE_NAME, HISTORY_COLUMNS,
+                HISTORY_PRODUCT_ID_COL + "=?", new String[] { sku }, null, null, null, null);
+        if (cursor == null) {
+            return 0;
+        }
+        int quantity = 0;
+        try {
+            // Count the number of times the product was purchased
+            while (cursor.moveToNext()) {
+                int stateIndex = cursor.getInt(2);
+                PurchaseState state = PurchaseState.valueOf(stateIndex);
+                Log.v("PurchaseDatabase", sku + ", state: " + state);
+                // Note that a refunded purchase is treated as a purchase. Such
+                // a friendly refund policy is nice for the user.
+                if(state == PurchaseState.PURCHASED) {
+                    quantity++;
+                }
+                else if(state == PurchaseState.REFUNDED || state == PurchaseState.CANCELED || state == PurchaseState.EXPIRED) {
+                    quantity--;
+                    if(quantity < 0) {
+                        quantity = 0;
+                    }
+                }
+            }
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -184,8 +233,7 @@ public class PurchaseDatabase {
             // the database version changes instead of dropping the tables and
             // re-creating them.
             if (newVersion != DATABASE_VERSION) {
-                Log.w(TAG, "Database upgrade from old: " + oldVersion + " to: " +
-                    newVersion);
+                Log.w(TAG, "Database upgrade from old: " + oldVersion + " to: " + newVersion);
                 db.execSQL("DROP TABLE IF EXISTS " + PURCHASE_HISTORY_TABLE_NAME);
                 db.execSQL("DROP TABLE IF EXISTS " + PURCHASED_ITEMS_TABLE_NAME);
                 createPurchaseTable(db);

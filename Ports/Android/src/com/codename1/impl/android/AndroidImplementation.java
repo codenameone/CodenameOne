@@ -187,13 +187,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
         } else {
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    activity.invalidateOptionsMenu();
-                }
-            });
-
+            activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
+            
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
             } catch (Exception e) {
@@ -251,6 +246,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         HttpURLConnection.setFollowRedirects(false);
+    }
+    
+    private static class InvalidateOptionsMenuImpl implements Runnable {
+        private Activity activity;
+
+        public InvalidateOptionsMenuImpl(Activity activity) {
+            this.activity = activity;
+        }
+        
+        @Override
+        public void run() {
+            activity.invalidateOptionsMenu();
+        }
     }
 
     private boolean hasActionBar() {
@@ -1288,24 +1296,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void notifyCommandBehavior(final int commandBehavior) {
+    public void notifyCommandBehavior(int commandBehavior) {
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
             if (activity instanceof CodenameOneActivity) {
                 ((CodenameOneActivity) activity).enableNativeMenu(true);
             }
         }
         if (hasActionBar()) {
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    activity.invalidateOptionsMenu();
-                    if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
-                        activity.getActionBar().show();
-                    } else {
-                        activity.getActionBar().hide();
-                    }
-                }
-            });
+            activity.runOnUiThread(new NotifyCommandBehaviorImpl(activity, commandBehavior));
+        }
+    }
+    
+    private static class NotifyCommandBehaviorImpl implements Runnable {
+        private Activity activity;
+        private int commandBehavior;
+        
+        public NotifyCommandBehaviorImpl(Activity activity, int commandBehavior) {
+            this.activity = activity;
+            this.commandBehavior = commandBehavior;
+        }
+        
+        @Override
+        public void run() {
+            activity.invalidateOptionsMenu();
+            if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
+                activity.getActionBar().show();
+            } else {
+                activity.getActionBar().hide();
+            }
         }
     }
 
@@ -1861,8 +1879,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                         layoutWrapper.setOnFocusChangeListener(new View.OnFocusChangeListener() {
                             public void onFocusChange(View view, boolean bln) {
-                                Log.d("Codename One", "on focus change. " + view.toString() + " focus:" + bln + " touchmode: "
-                                        + v.isInTouchMode());
+                                Log.d("Codename One", "on focus change. " + view.toString() + " focus:" + bln + " touchmode: " + v.isInTouchMode());
                             }
                         });
                         layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
@@ -3271,33 +3288,44 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private File getOutputMediaFile(boolean isVideo) {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
-        activity.getComponentName();
+        if(android.os.Build.VERSION.SDK_INT >= 8) {
+            return GetOutputMediaFile.getOutputMediaFile(isVideo, activity);
+        }
+        else {
+            return null;
+        }
+    }
+    
+    private static class GetOutputMediaFile {
+        public static File getOutputMediaFile(boolean isVideo, Activity activity) {
+            activity.getComponentName();
 
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "" + activity.getTitle());
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
+            File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_PICTURES), "" + activity.getTitle());
+            // This location works best if you want the created images to be shared
+            // between applications and persist after your app has been uninstalled.
 
-        // Create the storage directory if it does not exist
-        if (!mediaStorageDir.exists()) {
-            if (!mediaStorageDir.mkdirs()) {
-                Log.d("MyCameraApp", "failed to create directory");
-                return null;
+            // Create the storage directory if it does not exist
+            if (!mediaStorageDir.exists()) {
+                if (!mediaStorageDir.mkdirs()) {
+                    Log.d("MyCameraApp", "failed to create directory");
+                    return null;
+                }
             }
-        }
 
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        File mediaFile = null;
-        if (!isVideo) {
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator
-                    + "IMG_" + timeStamp + ".jpg");
-        } else {
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator
-                    + "VID_" + timeStamp + ".mp4");
-        }
+            // Create a media file name
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            File mediaFile = null;
+            if (!isVideo) {
+                mediaFile = new File(mediaStorageDir.getPath() + File.separator
+                        + "IMG_" + timeStamp + ".jpg");
+            } else {
+                mediaFile = new File(mediaStorageDir.getPath() + File.separator
+                        + "VID_" + timeStamp + ".mp4");
+            }
 
-        return mediaFile;
+            return mediaFile;
+        }
     }
 
     private boolean hasAndroidMarket() {
@@ -3501,14 +3529,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void setCurrentForm(final Form f) {
         super.setCurrentForm(f);
         if (isNativeTitle()) {
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
-                    activity.getActionBar().setTitle(f.getTitle());
-                }
-            });
+            activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
         }
+    }
+    
+    private static class SetCurrentFormImpl implements Runnable {
+        private Activity activity;
+        private Form f;
+        
+        public SetCurrentFormImpl(Activity activity, Form f) {
+            this.activity = activity;
+            this.f = f;
+        }
+
+        @Override
+        public void run() {
+            activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
+            activity.getActionBar().setTitle(f.getTitle());
+        }
+        
     }
     
     private Purchase pur;
@@ -3516,7 +3555,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Purchase getInAppPurchase(boolean physicalGoods) {
         if(physicalGoods || !((CodenameOneActivity)activity).isInAppBillingSupported()) {
-            return super.getInAppPurchase(physicalGoods);
+            return new Purchase() {
+                @Override
+                public boolean wasPurchased(String sku) {
+                    return ((CodenameOneActivity)activity).wasPurchased(sku);
+                }
+            };
         }
         if(pur == null) {
             pur = new Purchase() {
@@ -3542,7 +3586,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public boolean isSubscriptionSupported() {
-                    return true;
+                    return ((CodenameOneActivity)activity).isSubscriptionSupported();
                 }
 
                 @Override

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.codename1.impl.android;
 
 /**
@@ -45,7 +46,8 @@ public class Consts {
         // Responses to requestPurchase or restoreTransactions.
         PURCHASED,   // User was charged for the order.
         CANCELED,    // The charge failed on the server.
-        REFUNDED;    // User received a refund for the order.
+        REFUNDED,    // User received a refund for the order.
+        EXPIRED;    //a subscription is expired
 
         // Converts from an ordinal value to the PurchaseState
         public static PurchaseState valueOf(int index) {
@@ -64,11 +66,14 @@ public class Consts {
     // Intent actions that we send from the BillingReceiver to the
     // BillingService.  Defined by this application.
     public static final String ACTION_CONFIRM_NOTIFICATION =
-        "com.example.dungeons.CONFIRM_NOTIFICATION";
+            //"com.example.subscriptions.CONFIRM_NOTIFICATION";
+            "changethis.CONFIRM_NOTIFICATION";
     public static final String ACTION_GET_PURCHASE_INFORMATION =
-        "com.example.dungeons.GET_PURCHASE_INFORMATION";
+            //"com.example.subscriptions.GET_PURCHASE_INFORMATION";
+            "changethis.GET_PURCHASE_INFORMATION";
     public static final String ACTION_RESTORE_TRANSACTIONS =
-        "com.example.dungeons.RESTORE_TRANSACTIONS";
+            //"com.example.subscriptions.RESTORE_TRANSACTIONS";
+            "changethis.RESTORE_TRANSACTIONS";
 
     // Intent actions that we receive in the BillingReceiver from Market.
     // These are defined by Market and cannot be changed.
@@ -86,9 +91,6 @@ public class Consts {
     public static final String INAPP_REQUEST_ID = "request_id";
     public static final String INAPP_RESPONSE_CODE = "response_code";
 
-    public static final String ITEM_TYPE_INAPP = "inapp";
-    public static final String ITEM_TYPE_SUBSCRIPTION = "subs";
-   
     // These are the names of the fields in the request bundle.
     public static final String BILLING_REQUEST_METHOD = "BILLING_REQUEST";
     public static final String BILLING_REQUEST_API_VERSION = "API_VERSION";
@@ -104,5 +106,9 @@ public class Consts {
     public static final String BILLING_RESPONSE_REQUEST_ID = "REQUEST_ID";
     public static long BILLING_RESPONSE_INVALID_REQUEST_ID = -1;
 
+    // These are the types supported in the IAB v2
+    public static final String ITEM_TYPE_INAPP = "inapp";
+    public static final String ITEM_TYPE_SUBSCRIPTION = "subs";
+    
     public static final boolean DEBUG = false;
 }

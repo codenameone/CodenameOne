@@ -9,6 +9,7 @@ import com.codename1.impl.android.Consts.ResponseCode;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.os.Handler;
@@ -45,7 +46,7 @@ public abstract class PurchaseObserver {
      * {@link BillingService#checkBillingSupported()} request.
      * @param supported true if in-app billing is supported.
      */
-    public abstract void onBillingSupported(boolean supported);
+    public abstract void onBillingSupported(boolean supported, String type);
 
     /**
      * This is the callback that is invoked when an item is purchased,
@@ -150,6 +151,7 @@ public abstract class PurchaseObserver {
     void postPurchaseStateChange(final PurchaseState purchaseState, final String itemId,
             final int quantity, final long purchaseTime, final String developerPayload) {
         mHandler.post(new Runnable() {
+            @Override
             public void run() {
                 onPurchaseStateChange(
                         purchaseState, itemId, quantity, purchaseTime, developerPayload);

@@ -1,6 +1,6 @@
 // Copyright 2010 Google Inc. All Rights Reserved.
-package com.codename1.impl.android;
 
+package com.codename1.impl.android;
 
 import com.codename1.impl.android.BillingService.RequestPurchase;
 import com.codename1.impl.android.BillingService.RestoreTransactions;
@@ -55,9 +55,9 @@ public class ResponseHandler {
      * {@link BillingService#checkBillingSupported()}.
      * @param supported true if in-app billing is supported.
      */
-    public static void checkBillingSupportedResponse(boolean supported) {
+    public static void checkBillingSupportedResponse(boolean supported, String type) {
         if (sPurchaseObserver != null) {
-            sPurchaseObserver.onBillingSupported(supported);
+            sPurchaseObserver.onBillingSupported(supported, type);
         }
     }
 
@@ -110,6 +110,7 @@ public class ResponseHandler {
         // the database because we need to read and update the current quantity
         // first.
         new Thread(new Runnable() {
+            @Override
             public void run() {
                 PurchaseDatabase db = new PurchaseDatabase(context);
                 int quantity = db.updatePurchase(

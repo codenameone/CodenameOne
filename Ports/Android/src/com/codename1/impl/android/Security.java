@@ -1,25 +1,5 @@
-/*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *  
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- * 
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
- * need additional information or have any questions.
- */
+// Copyright 2010 Google Inc. All Rights Reserved.
+
 package com.codename1.impl.android;
 
 import com.codename1.impl.android.Consts.PurchaseState;
@@ -32,6 +12,7 @@ import org.json.JSONObject;
 
 import android.text.TextUtils;
 import android.util.Log;
+import java.io.UnsupportedEncodingException;
 
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -144,7 +125,11 @@ public class Security {
              * Generally, encryption keys / passwords should only be kept in memory
              * long enough to perform the operation they need to perform.
              */
-            String base64EncodedPublicKey = "your public key here";
+            String base64EncodedPublicKey = getBase64EncodedPublicKey();
+            if(base64EncodedPublicKey == null) {
+                Log.w(TAG, "could not find public key");
+                return null;
+            }
             PublicKey key = Security.generatePublicKey(base64EncodedPublicKey);
             verified = Security.verify(key, signedData, signature);
             if (!verified) {
@@ -263,5 +248,40 @@ public class Security {
             Log.e(TAG, "Base64 decoding failed.");
         }
         return false;
+    }
+    
+    /**
+     * XOR's two hex strings to get the developer key
+     * developer key has to included or in-app billing will not work at all
+     * 
+     * @return developer public key 
+     */
+    private static String getBase64EncodedPublicKey() {
+        String h1 = "hex string 1";
+        String h2 = "hex string 2";
+        byte[] b1 = toByteArray(h1), b2 = toByteArray(h2);
+        if(b1.length != b2.length) {
+            return null;
+        }
+        byte[] r = new byte[b1.length];
+        for(int i = 0; i < b1.length; i++) {
+            r[i] = (byte)(b1[i] ^ b2[i]);
+        }
+        String result;
+        try {
+            result = new String(r, "UTF-8");
+        }
+        catch (UnsupportedEncodingException ex) {
+             result = new String(r);
+        }
+        return result;
+    }
+    
+    public static byte[] toByteArray(String hex) {
+       byte[] array = new byte[hex.length() / 2];
+       for(int i = 0; i+1 < hex.length(); i += 2) {
+           array[i/2] = (byte)(Integer.parseInt(hex.substring(i, i+2), 16) & 0xff);
+       }
+       return array;
     }
 }

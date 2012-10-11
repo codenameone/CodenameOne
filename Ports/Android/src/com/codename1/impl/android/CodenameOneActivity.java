@@ -61,9 +61,13 @@ public class CodenameOneActivity extends Activity {
     private CN1PurchaseObserver cnPurchaseObserver;
     private BillingService billing;
     private PurchaseDatabase purchaseDB;
-    private Set<String> ownedItms;
+    
+    private final Object lock = new Object();
+    private Set<String> ownedItems;
     private boolean inAppBillingSupported = false;
-            
+    private boolean subscriptionSupported = false;
+    
+    
         /**
      * Each product in the catalog is either MANAGED or UNMANAGED.  MANAGED
      * means that the product can be purchased only once per user (such as a new
@@ -86,7 +90,12 @@ public class CodenameOneActivity extends Activity {
         SharedPreferences prefs = getPreferences(MODE_PRIVATE);
         boolean initialized = prefs.getBoolean(BILLING_DB_INITIALIZED, false);
         if (!initialized) {
-            billing.restoreTransactions();
+            this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    billing.restoreTransactions();
+                }
+            });
         }
     }
 
@@ -94,12 +103,25 @@ public class CodenameOneActivity extends Activity {
         return inAppBillingSupported;
     }
     
-    private Set<String> getOwnedItems() {
-        if(ownedItms == null) {
-            ownedItms = new HashSet<String>();
-            doInitializeOwnedItems();
+    public boolean isSubscriptionSupported() {
+        return subscriptionSupported;
+    }
+    
+    private void addItem(String item) {
+        synchronized(lock) {
+            if(ownedItems == null) {
+                ownedItems = new HashSet<String>();
+            }
+            ownedItems.add(item);
         }
-        return ownedItms;
+    }
+    
+    private void removeItem(String item) {
+        synchronized(lock) {
+            if(ownedItems != null) {
+                ownedItems.remove(item);
+            }
+        }
     }
     
     /**
@@ -110,15 +132,29 @@ public class CodenameOneActivity extends Activity {
     }
     
     boolean wasPurchased(String item) {
-        return getOwnedItems().contains(item);
+        synchronized(lock) {
+            return ownedItems != null ? ownedItems.contains(item) : false;
+        }
     }
     
-    void purchase(String item) {
-        billing.requestPurchase(item, null, false);        
+    void purchase(final String item) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                billing.requestPurchase(item, Consts.ITEM_TYPE_INAPP, null);
+            }
+        });    
     }
 
-    void subscribe(String item) {
-        billing.requestPurchase(item, null, true);        
+    void subscribe(final String item) {
+        if(subscriptionSupported) {
+            this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    billing.requestPurchase(item, Consts.ITEM_TYPE_SUBSCRIPTION, null);
+                }
+            });
+        }
     }
     
     /**
@@ -131,29 +167,51 @@ public class CodenameOneActivity extends Activity {
         }
 
         @Override
-        public void onBillingSupported(boolean supported) {
-            if (supported) {
-                restoreDatabase();
-                inAppBillingSupported = true;
-            } 
+        public void onBillingSupported(boolean supported, String type) {
+            if(type == null || type.equals(Consts.ITEM_TYPE_INAPP)) {
+                if (supported) {
+                    restoreDatabase();
+                    inAppBillingSupported = true;
+                }
+            } else if(type.equals(Consts.ITEM_TYPE_SUBSCRIPTION)) {
+                if(supported) {
+                    restoreDatabase();
+                    inAppBillingSupported = true;
+                    subscriptionSupported = true;
+                }
+                else {
+                    CodenameOneActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            billing.checkBillingSupported(Consts.ITEM_TYPE_INAPP);
+                        }
+                    });
+                }
+            }
         }
 
         @Override
         public void onPurchaseStateChange(Consts.PurchaseState purchaseState, String itemId,
                 int quantity, long purchaseTime, String developerPayload) {
+            if (Consts.DEBUG) {
+                Log.i("CodeNameOne", "onPurchaseStateChange() itemId: " + itemId + " " + purchaseState);
+            }
             Object app = getApp();
-            if(app != null && app instanceof PurchaseCallback) {
-                PurchaseCallback pc = (PurchaseCallback)app;
-                if (purchaseState == Consts.PurchaseState.PURCHASED) {
+            PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback)app : null;
+            if(purchaseState == Consts.PurchaseState.PURCHASED) {
+                addItem(itemId);
+                if(pc != null) {
                     pc.itemPurchased(itemId);
-                    getOwnedItems().add(itemId);
                 }
-            } else {
-                if (purchaseState == Consts.PurchaseState.PURCHASED) {
-                    getOwnedItems().add(itemId);
+            } else if(purchaseState == Consts.PurchaseState.REFUNDED || purchaseState == Consts.PurchaseState.CANCELED || purchaseState == Consts.PurchaseState.EXPIRED) {
+                if(quantity <= 0) {
+                    removeItem(itemId);
+                }
+                if(pc != null) {
+                    pc.itemRefunded(itemId);
                 }
             }
-        }
+}
 
         @Override
         public void onRequestPurchaseResponse(BillingService.RequestPurchase request,
@@ -241,7 +299,7 @@ public class CodenameOneActivity extends Activity {
 
             // Check if billing is supported.
             ResponseHandler.register(cnPurchaseObserver);
-            billing.checkBillingSupported();
+            billing.checkBillingSupported(Consts.ITEM_TYPE_SUBSCRIPTION);
         }
     }
 
@@ -250,33 +308,60 @@ public class CodenameOneActivity extends Activity {
         super.onStart();
         if(isBillingEnabled()) {
             ResponseHandler.register(cnPurchaseObserver);
+            initializeOwnedItems();
+            //purchaseDB.enumerateHistory("com.tspx.tvportal.payment.upgrade");
         }
     }
 
+     /**
+     * Creates a background thread that reads the database and initializes the
+     * set of owned items.
+     */
+    private void initializeOwnedItems() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                doInitializeOwnedItems();
+            }
+        }).start();
+    }
+    
     /**
      * Reads the set of purchased items from the database in a background thread
-     * and then adds those items to the set of owned items in the main UI
-     * thread.
+     * and then adds those items to the set of owned items
      */
-    void doInitializeOwnedItems() {
+    private void doInitializeOwnedItems() {
         Cursor cursor = purchaseDB.queryAllPurchasedItems();
         if (cursor == null) {
             return;
         }
 
-        final Set<String> ownedItems = new HashSet<String>();
+        Set<String> newItems = new HashSet<String>();
         try {
             int productIdCol = cursor.getColumnIndexOrThrow(
                     PurchaseDatabase.PURCHASED_PRODUCT_ID_COL);
+            int quantityCol = cursor.getColumnIndexOrThrow(PurchaseDatabase.PURCHASED_QUANTITY_COL);
             while (cursor.moveToNext()) {
-                String productId = cursor.getString(productIdCol);
-                ownedItems.add(productId);
+                int quanity = cursor.getInt(quantityCol);
+                if(quanity > 0) {
+                    String productId = cursor.getString(productIdCol);
+                    newItems.add(productId);
+                }
             }
         } finally {
             cursor.close();
         }
 
-        ownedItems.addAll(ownedItems);
+        if(newItems.size() > 0) {
+            synchronized(lock) {
+                if(ownedItems != null) {
+                    ownedItems.addAll(newItems);
+                }
+                else {
+                    ownedItems = new HashSet<String>(newItems);
+                }
+            }
+        }
     }
     
     /**
