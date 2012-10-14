@@ -2596,7 +2596,7 @@ private void duplicateItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN
     }
 }//GEN-LAST:event_duplicateItemActionPerformed
 
-private GenerateHelper helper = new GenerateHelper();
+//private GenerateHelper helper = new GenerateHelper();
 
 private static boolean configureNetbeans() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("netbeansInstall", null);

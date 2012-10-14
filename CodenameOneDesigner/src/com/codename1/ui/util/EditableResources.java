@@ -1326,9 +1326,11 @@ public class EditableResources extends Resources implements TreeModel {
     com.codename1.ui.Image createSVG(boolean animated, byte[] data) throws IOException {
         com.codename1.ui.Image img = super.createSVG(animated, data);
         SVG s = (SVG)img.getSVGDocument();
-        s.setDpis(dpisLoaded);
-        s.setWidthForDPI(widthForDPI);
-        s.setHeightForDPI(heightForDPI);
+        if(s != null) {
+            s.setDpis(dpisLoaded);
+            s.setWidthForDPI(widthForDPI);
+            s.setHeightForDPI(heightForDPI);
+        }
         return img;
     }
 

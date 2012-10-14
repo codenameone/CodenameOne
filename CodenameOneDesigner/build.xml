@@ -72,16 +72,35 @@
 
     -->
     <target name="-pre-compile">
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="src/GeneratedProject" />
+        <!-- copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="src/GeneratedProject" / -->
         <copy file="../Themes/androidTheme.res" todir="src" />
         <copy file="../Themes/blackberry_theme.res" todir="src" />
+        <copy file="../Themes/winTheme.res" todir="src" />
         <copy file="../Themes/iPhoneTheme.res" todir="src" />
+        <copy file="../Themes/android_holo_light.res" todir="src" />
     </target>
+    <property name="one-jar.dist.dir" value="one-jar-ant-task-0.98"/>
+    <import file="${one-jar.dist.dir}/one-jar-ant-task.xml" optional="true" />
     <target name="release" depends="jar">        
+      <delete file="dist/lib/JavaSE.jar" />
+      <delete file="dist/lib/CodenameOne.jar" />
+
+      <mkdir dir="build/onejar" />
+      <mkdir dir="build/onejar/main" />
+      <mkdir dir="build/onejar/lib" />
+      <!-- copydir src="one-jar-boot-0.97" dest="build/onejar" />
+      <copy file="dist/CodenameOneDesigner.jar" todir="build/onejar/main" />
+      <copy todir="build/onejar/lib"> 
+        <fileset dir="dist/lib" includes="**/*.jar" />
+      </copy>
+
+      <jar destfile="dist/designer.jar" basedir="build/onejar" compress="true" manifest="onejar.manifest">
+      </jar -->
+      
       <jar destfile="dist/tempJar.jar">
         <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>          
       </jar>
-      <jar destfile="dist/designer.jar">
+      <jar destfile="dist/designer.jar" compress="false">
         <zipfileset src="dist/CodenameOneDesigner.jar" excludes="META-INF/**" />
         <zipfileset src="dist/tempJar.jar" excludes="META-INF/**" />
         <manifest>

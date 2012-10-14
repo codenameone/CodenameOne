@@ -43,7 +43,7 @@ import javax.swing.event.TableModelListener;
  *
  * @author Shai Almog
  */
-public class MultiImageSVGEditor extends javax.swing.JPanel {
+public class MultiImageSVGEditor extends BaseForm {
     private EditableResources res;
     private String name;
     private CodenameOneImageRenderer renderer;
