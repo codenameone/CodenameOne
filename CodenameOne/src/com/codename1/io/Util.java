@@ -188,7 +188,7 @@ public class Util {
 
         if(o instanceof Vector) {
             Vector v = (Vector)o;
-            out.writeUTF(o.getClass().getName());
+            out.writeUTF("java.util.Vector");
             int size = v.size();
             out.writeInt(size);
             for(int iter = 0 ; iter < size ; iter++) {
@@ -199,7 +199,7 @@ public class Util {
 
         if(o instanceof Hashtable) {
             Hashtable v = (Hashtable)o;
-            out.writeUTF(o.getClass().getName());
+            out.writeUTF("java.util.Hashtable");
             out.writeInt(v.size());
             Enumeration k = v.keys();
             while(k.hasMoreElements()) {
@@ -525,42 +525,36 @@ public class Util {
                 }
                 return v;
             }
-            Class cls = (Class) externalizables.get(type);
-            if (cls != null) {
-                Externalizable ex = (Externalizable) cls.newInstance();
-                ex.internalize(input.readInt(), input);
-                return ex;
-            }
-            Object o = null;
-            o = Class.forName(type).newInstance();
-            if (o instanceof Vector) {
-                Vector v = (Vector) o;
+            if ("java.util.Vector".equals(type)) {
+                Vector v = new Vector();
                 int size = input.readInt();
                 for (int iter = 0; iter < size; iter++) {
                     v.addElement(readObject(input));
                 }
                 return v;
             }
-            if (o instanceof Hashtable) {
-                Hashtable v = (Hashtable) o;
+            if ("java.util.Hashtable".equals(type)) {
+                Hashtable v = new Hashtable();
                 int size = input.readInt();
                 for(int iter = 0 ; iter < size ; iter++) {
                     v.put(readObject(input), readObject(input));
                 }
                 return v;
             }
-            throw new IOException("Object type not supported: " + o.getClass().getName());
+            Class cls = (Class) externalizables.get(type);
+            if (cls != null) {
+                Externalizable ex = (Externalizable) cls.newInstance();
+                ex.internalize(input.readInt(), input);
+                return ex;
+            }
+            throw new IOException("Object type not supported: " + type);
         } catch (InstantiationException ex1) {
             ex1.printStackTrace();
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
         } catch (IllegalAccessException ex1) {
             ex1.printStackTrace();
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
-        } catch (ClassNotFoundException ex1) {
-            System.out.println("Verify that you invoked Util.register for your externalizable classes properly!");
-            ex1.printStackTrace();
-            throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
-        }
+        } 
     }
 
     /**

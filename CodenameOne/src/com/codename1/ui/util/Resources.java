@@ -877,8 +877,12 @@ public class Resources {
                         input.readFully(s);
                         String baseURL = input.readUTF();
                         boolean animated = input.readBoolean();
-                        readMultiImage(input, true);
-                        return createSVG(animated, s);
+                        Image img = readMultiImage(input, true);
+                        Image svg = createSVG(animated, s);
+                        if(svg.getSVGDocument() == null) {
+                            return img;
+                        }
+                        return svg;
                     } else {
                         svgSize -= input.skip(svgSize);
                         while(svgSize > 0) {
