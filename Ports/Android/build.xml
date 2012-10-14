@@ -96,10 +96,17 @@
         <delete file="${dist.jar}.old" / -->
         <delete file="${dist.jar}" />
         <mkdir dir="build/tmp"/>
+        <echo message="Building to javac.classpath = ${javac.classpath}" />
+        <echo message="build.classes.dir = ${build.classes.dir}" />
+        <echo message="src.dir = ${src.dir}" />
         <javac destdir="build/tmp"
             classpath="${javac.classpath}:${build.classes.dir}">
-            <src path="${src.dir}" />
             <src path="../../CodenameOne/src" />
+        </javac>        
+        <delete file="build/tmp/com/codename1/impl/CodenameOneThread*" />
+        <javac destdir="build/tmp"
+            classpath="${javac.classpath}:build/tmp">
+            <src path="${src.dir}" />
         </javac>        
         <jar jarfile="${dist.jar}" basedir="build/tmp">
             <fileset dir="src" includes="*.res" />
