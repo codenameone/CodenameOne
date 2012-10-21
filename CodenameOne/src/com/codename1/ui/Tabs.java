@@ -369,6 +369,7 @@ public class Tabs extends Container {
      *
      * @see #insertTab
      * @see #removeTabAt
+     * @deprecated should use radio button as an argument
      */
     public void addTab(Button tab, Component component) {
         insertTab(tab, component, tabsContainer.getComponentCount());
@@ -417,6 +418,7 @@ public class Tabs extends Container {
      *
      * @see #addTab
      * @see #removeTabAt
+     * @deprecated should use radio button as an argument
      */
     public void insertTab(Button tab, Component component,
             int index) {

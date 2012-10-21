@@ -95,6 +95,16 @@ public class MultiButton extends Container {
     }
     
     /**
+     * Allows us to gain direct access to the icon component so we can set it directly without going
+     * via the other methods, this is especially useful for classes such as the ImageDownloadService
+     * which can then update the icon seamlessly.
+     * @return the component used internally to represent the icon
+     */
+    public Label getIconComponent() {
+        return icon;
+    }
+    
+    /**
      * Turns the multi-button into a checkbox multi-button
      * 
      * @param b true for a checkbox multi-button

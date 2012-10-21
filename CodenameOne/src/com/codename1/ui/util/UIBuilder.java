@@ -2057,7 +2057,12 @@ public class UIBuilder {
                 exitForm(currentForm);
             }
             if(formNavigationStack != null && formNavigationStack.size() > 0) {
-                initBackForm(f);
+                String name = f.getName();
+                if(name != null && name.equals(homeForm)) {
+                    formNavigationStack.clear();
+                } else {
+                    initBackForm(f);
+                }
             }
             beforeShow(f);
             f.showBack();
