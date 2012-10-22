@@ -198,7 +198,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      private static final int INPUT_SUBMIT = 5;
      private static final int INPUT_TEXT = 6;
      private static final int INPUT_IMAGE = 7; // image is not officially supported in XHTML-MP 1.0 but we support it
-     //private static final int INPUT_BUTTON = 8; //button is not supported in XHTML-MP 1.0
+     private static final int INPUT_BUTTON = 8; //button is not supported in XHTML-MP 1.0
      //private static final int INPUT_FILE = 9; //file upload is not supported in XHTML-MP 1.0
      
     /**
@@ -206,7 +206,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      */
     private static String[] INPUT_TYPE_STRINGS = {
             "checkbox","hidden","password","radio","reset",
-            "submit","text","image" 
+            "submit","text","image", "button"
     };
 
     /**
@@ -2578,6 +2578,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
                 cmp=resetButton;
                 
                 break;
+            case INPUT_BUTTON:
             case INPUT_SUBMIT:
                 Command submitCmd=null;
                 if (curForm!=null) {
@@ -3077,6 +3078,9 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
                 case HTMLElement.TAG_FORM:
                     curForm=new HTMLForm(this,child.getAttributeById(HTMLElement.ATTR_ACTION),child.getAttributeById(HTMLElement.ATTR_METHOD),child.getAttributeById(HTMLElement.ATTR_ENCTYPE));
                     pushContainer(child);
+                    break;
+                case HTMLElement.TAG_BUTTON:
+                    handleInput(child,curAlign);
                     break;
                 case HTMLElement.TAG_INPUT:
                     handleInput(child,curAlign);

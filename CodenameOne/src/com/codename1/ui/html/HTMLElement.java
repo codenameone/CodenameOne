@@ -155,10 +155,11 @@ public class HTMLElement extends Element {
  public static final int TAG_TBODY = 79;
  public static final int TAG_TFOOT = 80;
 
+ public static final int TAG_BUTTON = 81;
  //Text nodes (not an actual tag - text segments are added by the parser as the 'text' tag
- public static final int TAG_TEXT = 81;
+ public static final int TAG_TEXT = 82;
 
- private static int LAST_TAG_INDEX = HTMLComponent.PROCESS_HTML_MP1_ONLY?TAG_FIELDSET:TAG_TFOOT; // In any case we exclude TAG_TEXT, which is given only on text element creation
+ private static int LAST_TAG_INDEX = HTMLComponent.PROCESS_HTML_MP1_ONLY?TAG_FIELDSET:TAG_BUTTON; // In any case we exclude TAG_TEXT, which is given only on text element creation
 
 
 /**
@@ -179,7 +180,7 @@ static final String[] TAG_NAMES = {
     ,"hr","optgroup","style","b","i","big","small","fieldset"
     //html4 tags
     ,"u","font","del","ins","tt","basefont","menu","s","strike","center","dir","map","area","legend","sub","sup","noscript","noframes"
-    ,"thead","tbody","tfoot"
+    ,"thead","tbody","tfoot","button"
     ,"text"
 };
 
@@ -603,7 +604,24 @@ static final String[] TAG_NAMES = {
         ATTR_ALIGN,
         ATTR_VALIGN
      }, //TAG_TFOOT = 80;
-     {}, //TEXT = 81;
+     {
+        ATTR_ACCESSKEY, // character
+        ATTR_CHECKED, // checked
+        ATTR_EMPTYOK, // true | false    // This attribute was said to be supported on XHTML-MP1 on various sources, but verified as not
+        ATTR_FORMAT, // cdata            // Deprecated but still supported
+        //ATTR_ISTYLE, // cdata            // This attribute was said to be supported on XHTML-MP1 on various sources, but verified as not
+        //ATTR_LOCALSRC, // cdata          // This attribute was said to be supported on XHTML-MP1 on various sources, but verified as not
+        ATTR_MAXLENGTH, // number
+        ATTR_NAME, // cdata
+        ATTR_SIZE, // cdata
+        ATTR_SRC, // URL
+        ATTR_TABINDEX, // number
+        ATTR_TYPE, // text | password | checkbox | radio | submit | reset | hidden
+        ATTR_VALUE, // cdata
+        ATTR_DISABLED,
+        ATTR_READONLY
+     },//BUTTON = 81;
+     {}, //TEXT = 82;
 
  };
 
