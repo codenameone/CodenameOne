@@ -59,7 +59,7 @@ public class CodenameOneThread extends Thread {
                 }
             }
 
-        }, threadName, 35536);
+        }, threadName, 65536);
         this.r = r;
     }
     
