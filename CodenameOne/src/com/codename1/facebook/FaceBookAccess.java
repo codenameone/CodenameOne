@@ -928,4 +928,15 @@ public class FaceBookAccess {
     public static void setToken(String tok){
         token = tok;
     }
+    
+    /**
+     * log out the current user
+     */
+    public static void logOut(){
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setUrl("https://www.facebook.com/logout.php?access_token="+token+"&confirm=1&next="+redirectURI);
+        NetworkManager.getInstance().addToQueueAndWait(req);
+        token = null;
+    }
 }
