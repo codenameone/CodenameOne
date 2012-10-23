@@ -11,9 +11,7 @@ import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.ContentValues;
-import android.content.DialogInterface;
-import android.content.Intent;
+import android.content.*;
 import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -66,7 +64,6 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.Vector;
-import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -3032,6 +3029,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return new String[]{"phone", "android", "android-phone"};
         }
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public void copyToClipboard(Object obj) {
+        ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(activity.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
+        clipboard.setPrimaryClip(clip);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPasteDataFromClipboard() {
+        ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(activity.CLIPBOARD_SERVICE);
+        ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+        return item.getText();    
+    }
+    
 
     public class Video extends AndroidImplementation.AndroidPeer implements Media {
 
@@ -3381,17 +3397,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private static String convertImageUriToFilePath(Uri imageUri, Activity activity) {
         Cursor cursor = null;
-        try {
-            String[] proj = {MediaStore.Images.Media.DATA};
-            cursor = activity.managedQuery(imageUri, proj, null, null, null);
-            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-            cursor.moveToFirst();
-            return cursor.getString(column_index);
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
+        String[] proj = {MediaStore.Images.Media.DATA};
+        cursor = activity.managedQuery(imageUri, proj, null, null, null);
+        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+        cursor.moveToFirst();
+        return cursor.getString(column_index);
     }
 
     class CN1MediaController extends MediaController {
