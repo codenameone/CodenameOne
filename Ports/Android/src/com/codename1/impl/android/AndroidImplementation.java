@@ -1001,25 +1001,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void drawArc(Object graphics, int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 270 - startAngle,
-                arcAngle, false, ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, false, ((AndroidGraphics) graphics).getPaint());
     }
 
     @Override
     public void fillArc(Object graphics, int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 270 - startAngle, 
-                arcAngle, true, ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, true, ((AndroidGraphics) graphics).getPaint());
     }
-
+    
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
 
