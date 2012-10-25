@@ -117,11 +117,7 @@ public class CSVParser {
                         stringBuf.append('"');
                         nextChar();
                     } else {
-                        if(next == -1) {
-                            stringBuf.append('"');
-                        } else {
-                            isQuoteMode = false;
-                        }
+                        isQuoteMode = false;
                     }
                 } else {
                     stringBuf.append((char)currentChar);
