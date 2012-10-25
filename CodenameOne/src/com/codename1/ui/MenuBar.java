@@ -114,6 +114,7 @@ public class MenuBar extends Container implements ActionListener {
     private Command cancelMenuItem;
     private Form parent;
     private boolean thirdSoftButton;
+    private boolean hideEmptyCommands;
 
     /**
      * Empty Constructor
@@ -132,6 +133,7 @@ public class MenuBar extends Container implements ActionListener {
         cancelMenuItem = createMenuCancelCommand();
         UIManager manager = parent.getUIManager();
         LookAndFeel lf = manager.getLookAndFeel();
+        hideEmptyCommands = manager.isThemeConstant("hideEmptyCommandsBool", false);
         menuStyle = manager.getComponentStyle("Menu");
         setUIID("SoftButton");
         menuCommand = new Command(manager.localize("menu", "Menu"), lf.getMenuIcons()[2]);
@@ -762,11 +764,13 @@ public class MenuBar extends Container implements ActionListener {
                 Button back = createBackCommandButton();
                 leftContainer.addComponent(back);
                 back.setUIID("BackCommand");
+                hideEmptyCommand(back);
             } else {
                 Button b = (Button) leftContainer.getComponentAt(0);
                 if (b.getCommand() != parent.getBackCommand()) {
                     b.setCommand(parent.getBackCommand());
                     b.setUIID("BackCommand");
+                    hideEmptyCommand(b);
                 }
             }
             componentCount++;
@@ -840,6 +844,14 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
+    private void hideEmptyCommand(Button b) {
+        if(hideEmptyCommands) {
+            if(b.getText() == null || b.getText().length() == 0) {
+                b.setUIID("Container");
+            }
+        }
+    }
+    
     private void ensureCommandsInContainer(Command a, Command b, Container c, String styleA, String styleB) {
         if (c.getComponentCount() == 0) {
             Button btn = new Button(a);
@@ -850,6 +862,7 @@ public class MenuBar extends Container implements ActionListener {
                 btn.setUIID(styleB);
                 c.addComponent(btn);
             }
+            hideEmptyCommand(btn);
             return;
         }
         if (c.getComponentCount() == 1) {
@@ -863,6 +876,7 @@ public class MenuBar extends Container implements ActionListener {
                 btn.setUIID(styleB);
                 c.addComponent(btn);
             }
+            hideEmptyCommand(btn);
             return;
         }
         if (c.getComponentCount() == 2) {
@@ -871,12 +885,14 @@ public class MenuBar extends Container implements ActionListener {
             if (btn.getCommand() != a) {
                 btn.setCommand(a);
             }
+            hideEmptyCommand(btn);
             if (b != null) {
                 btn = (Button) c.getComponentAt(1);
                 btn.setUIID(styleB);
                 if (btn.getCommand() != b) {
                     btn.setCommand(b);
                 }
+                hideEmptyCommand(btn);
             } else {
                 c.removeComponent(c.getComponentAt(1));
             }
