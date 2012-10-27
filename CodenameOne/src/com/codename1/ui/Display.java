@@ -1099,11 +1099,19 @@ public final class Display {
         if(edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
-
+        Form current = impl.getCurrentForm();
+        
+        
         if(autoFoldVKBOnFormSwitch && !(newForm instanceof Dialog)) {
             setShowVirtualKeyboard(false);
         }
 
+        if(current == newForm){
+            current.revalidate();
+            current.repaint();
+            return;
+        }
+        
         if(editingText) {
             switch(showDuringEdit) {
                 case SHOW_DURING_EDIT_ALLOW_DISCARD:
@@ -1126,7 +1134,6 @@ public final class Display {
             return;
         }
 
-        Form current = impl.getCurrentForm();
         if(current != null){
             if(current.isInitialized()) {
                 current.deinitializeImpl();
