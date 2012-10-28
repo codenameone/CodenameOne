@@ -28,6 +28,7 @@ import com.codename1.system.CrashReport;
 import com.codename1.ui.Display;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Hashtable;
 
 /**
@@ -136,7 +137,11 @@ public class CodenameOneThread extends Thread {
             }
             String[] stk = new String[size];
             
-            DataInputStream di = new DataInputStream(Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat"));
+            InputStream inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
+            if(inp == null) {
+                return t.toString();
+            }
+            DataInputStream di = new DataInputStream(inp);
             int totalAmount = di.readInt();
             String lastClass = "";
             for(int x = 0 ; x < totalAmount ; x++) {
