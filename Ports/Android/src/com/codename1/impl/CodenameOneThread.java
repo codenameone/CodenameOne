@@ -24,10 +24,14 @@ package com.codename1.impl;
 
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import com.codename1.io.Util;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.Display;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Hashtable;
 
 /**
@@ -149,7 +153,16 @@ public class CodenameOneThread extends Thread {
             }
             String[] stk = new String[size];
             
-            DataInputStream di = new DataInputStream(Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat"));
+            InputStream inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
+            if(inp == null) {
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                t.printStackTrace(pw);
+                String str = sw.toString();
+                Util.cleanup(sw);
+                return str;
+            }
+            DataInputStream di = new DataInputStream(inp);
             int totalAmount = di.readInt();
             String lastClass = "";
             for(int x = 0 ; x < totalAmount ; x++) {
