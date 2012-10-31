@@ -323,7 +323,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int keyCode) {
         TextArea txtCmp = (TextArea) cmp;
-        nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), keyCode);
+        String edit = (String) txtCmp.getClientProperty("RIM.nativePopup");
+  
+        if(edit != null){
+            EditPopup editpop = new EditPopup(txtCmp, maxSize);
+            editpop.startEdit();
+        }else{        
+            nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), keyCode);
+        }
     }
 
     public void nativeEdit(final Component cmp, final int maxSize, final int constraint, String text, int keyCode) {
@@ -1299,36 +1306,39 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         private String cancelString;
         protected final BasicEditField nativeEdit;
 
-        protected EditPopup(TextArea lightweightEdit, boolean password, int maxSize) {
-            super(new VerticalFieldManager(), Field.FOCUSABLE | Field.EDITABLE | Screen.DEFAULT_MENU);
+        protected EditPopup(TextArea lightweightEdit, int maxSize) {
+            super(new VerticalFieldManager(VerticalFieldManager.VERTICAL_SCROLL), Field.FOCUSABLE | Field.EDITABLE | Screen.DEFAULT_MENU);
 
             UIManager m = UIManager.getInstance();
             okString = m.localize("ok", "OK");
             cancelString = m.localize("cancel", "Cancel");
             this.lightweightEdit = lightweightEdit;
             long type = 0;
-            switch (lightweightEdit.getConstraint()) {
-                case TextArea.DECIMAL:
-                    type = BasicEditField.FILTER_REAL_NUMERIC;
-                    break;
-                case TextArea.EMAILADDR:
-                    type = BasicEditField.FILTER_EMAIL;
-                    break;
-                case TextArea.NUMERIC:
-                    type = BasicEditField.FILTER_NUMERIC;
-                    break;
-                case TextArea.PHONENUMBER:
-                    type = BasicEditField.FILTER_PHONE;
-                    break;
-                case TextArea.NON_PREDICTIVE:
-                    type = BasicEditField.NO_COMPLEX_INPUT;
-                    break;
+            int constraint = lightweightEdit.getConstraint();
+            if ((constraint & TextArea.DECIMAL) == TextArea.DECIMAL) {
+                type = BasicEditField.FILTER_REAL_NUMERIC;
+            } else if ((constraint & TextArea.EMAILADDR) == TextArea.EMAILADDR) {
+                type = BasicEditField.FILTER_EMAIL;
+            } else if ((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
+                type = BasicEditField.FILTER_NUMERIC;
+            } else if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
+                type = BasicEditField.FILTER_PHONE;
+            } else if ((constraint & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE) {
+                type = BasicEditField.NO_COMPLEX_INPUT;
             }
-            if (password) {
+
+
+            if (lightweightEdit.isSingleLineTextArea()) {
+                type |= BasicEditField.NO_NEWLINE;
+            }
+
+            if ((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 nativeEdit = new BBPasswordEditField(lightweightEdit, type, maxSize);
             } else {
                 nativeEdit = new BBEditField(lightweightEdit, type, maxSize);
             }
+            
+            
             // using Field.EDITABLE flag now because of bug with DevTrack ID 354265 at
             // https://www.blackberry.com/jira/browse/JAVAAPI-101
             //nativeEdit.setEditable(true);
@@ -1495,8 +1505,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         protected void update(int i) {
             super.update(i);
             lightweightEdit.setText(getText());
+            callback.onChanged();
         }
-        
     }
 
     /**
@@ -1557,6 +1567,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         protected void update(int i) {
             super.update(i);
             lightweightEdit.setText(getText());
+            callback.onChanged();
         }
     }
 
@@ -1607,6 +1618,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 int rowsGap = t.getRowsGap();
                 int lineHeight = textFont.getHeight() + rowsGap;
                 t.scrollRectToVisible(t.getScrollX(), cursorY * lineHeight, t.getWidth(), lineHeight, t);
+                
+                app.invokeLater(new Runnable() {
+                    public void run() {
+                        canvas.updateRIMLayout();
+                    }
+                });
             }
         }
     }
