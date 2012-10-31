@@ -145,7 +145,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
     }
 
     public boolean isNativeBrowserComponentSupported() {
-        return false;
+        return BlackBerryImplementation.nativeBrowser;
     }
 
     public PeerComponent createBrowserComponent(Object browserComponent) {

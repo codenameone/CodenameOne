@@ -3808,11 +3808,15 @@ public class Component implements Animation, StyleListener {
                         case Style.BACKGROUND_NONE:
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED:
-                            if (iW != width || iH != height) {
-                                bgImage = bgImage.scaled(width, height);
-                                s.setBgImage(bgImage, true);
+                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
+                                g.drawImage(s.getBgImage(), x, y, width, height);
+                            } else {
+                                if (iW != width || iH != height) {
+                                    bgImage = bgImage.scaled(width, height);
+                                    s.setBgImage(bgImage, true);
+                                }
+                                g.drawImage(s.getBgImage(), x, y);
                             }
-                            g.drawImage(s.getBgImage(), x, y);
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_BOTH:
                             g.tileImage(bgImage, x, y, width, height);

@@ -139,6 +139,7 @@ import net.rim.device.api.system.SystemListener2;
  * @author Shai Almog, Thorsten Schemm
  */
 public class BlackBerryImplementation extends CodenameOneImplementation {
+    public static boolean nativeBrowser = false;
 
     private static CodeModuleGroup group;
     static Hashtable fieldComponentMap = new Hashtable();

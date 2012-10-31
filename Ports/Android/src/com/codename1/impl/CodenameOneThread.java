@@ -45,6 +45,7 @@ public class CodenameOneThread extends Thread {
     private Runnable r;
     private static Class CODE = CodenameOneThread.class;
     private Hashtable exceptionStack = new Hashtable();
+    public static int STACK_FRAME_SIZE = 65536;
     
     /**
      * Constructor accepting the runnable
@@ -63,7 +64,7 @@ public class CodenameOneThread extends Thread {
                 }
             }
 
-        }, threadName, 65536);
+        }, threadName, STACK_FRAME_SIZE);
         this.r = r;
     }
     

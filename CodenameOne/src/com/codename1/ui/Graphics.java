@@ -485,7 +485,7 @@ public final class Graphics {
     public void drawImage(Image img, int x, int y) {
         img.drawImage(this, nativeGraphics, x, y);
     }
-
+    
     /**
      * Draws the image so its top left coordinate corresponds to x/y and scales it to width/height
      *

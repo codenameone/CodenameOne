@@ -118,6 +118,7 @@ public class ConnectionRequest implements IOProgressListener {
     private Dialog showOnInit;
     private Dialog disposeOnCompletion;
     private byte[] data;
+    private int responseCode;
 
     private int silentRetryCount = 0;
     private boolean failSilently;
@@ -249,7 +250,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             timeSinceLastUpdate = System.currentTimeMillis();
-            int responseCode = impl.getResponseCode(connection);
+            responseCode = impl.getResponseCode(connection);
             
             String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
             if(cookies != null && cookies.length > 0){
@@ -338,6 +339,15 @@ public class ConnectionRequest implements IOProgressListener {
         });
     }
 
+    /**
+     * Returns the response code for this request, this is only relevant after the request completed and
+     * might contain a temporary (e.g. redirect) code while the request is in progress
+     * @return the response code
+     */
+    public int getResposeCode() {
+        return responseCode;
+    }
+    
     /**
      * This mimics the behavior of browsers that convert post operations to get operations when redirecting a
      * request.
@@ -606,7 +616,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
         }
     }
-
+    
     /**
      * Kills this request if possible
      */

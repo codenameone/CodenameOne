@@ -888,7 +888,9 @@ public final class Display {
                 // is the same as waiting with no time limit
                 if(!noSleep){
                     synchronized(lock){
+                        impl.edtIdle(true);
                         lock.wait(Math.max(1, framerateLock - (time)));
+                        impl.edtIdle(false);
                     }
                 }
             } else {
@@ -1033,6 +1035,16 @@ public final class Display {
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {
                     edtLoopImpl();
+                     synchronized(lock){
+                         if(shouldEDTSleep()) {
+                             impl.edtIdle(true);
+                             try {
+                                lock.wait(10);
+                             } catch (InterruptedException ex) {
+                             }
+                             impl.edtIdle(false);
+                         }
+                     }
                 }
                 // if the thread thew an exception we need to throw it onwards
                 if(w.getErr() != null) {

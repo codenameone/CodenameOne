@@ -146,6 +146,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
+import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
@@ -157,6 +158,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
@@ -175,6 +177,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+
+    /**
+     * @return the showEDTWarnings
+     */
+    public static boolean isShowEDTWarnings() {
+        return showEDTWarnings;
+    }
+
+    /**
+     * @param aShowEDTWarnings the showEDTWarnings to set
+     */
+    public static void setShowEDTWarnings(boolean aShowEDTWarnings) {
+        showEDTWarnings = aShowEDTWarnings;
+    }
+
+    /**
+     * @return the showEDTViolationStacks
+     */
+    public static boolean isShowEDTViolationStacks() {
+        return showEDTViolationStacks;
+    }
+
+    /**
+     * @param aShowEDTViolationStacks the showEDTViolationStacks to set
+     */
+    public static void setShowEDTViolationStacks(boolean aShowEDTViolationStacks) {
+        showEDTViolationStacks = aShowEDTViolationStacks;
+    }
     private boolean touchDevice = true;
     private boolean rotateTouchKeysOnLandscape;
     private int keyboardType = Display.KEYBOARD_TYPE_UNKNOWN;
@@ -221,6 +251,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean blockMonitors;
     private static boolean fxExists = false;
     private JFrame window;
+    private long lastIdleTime;
+    private static boolean showEDTWarnings = true;
+    private static boolean showEDTViolationStacks = false;
+    private boolean inInit;
 
     public static void blockMonitors() {
         blockMonitors = true;
@@ -237,7 +271,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("PerformanceMonitor", false);
     }
-
+    
+    class EDTViolation extends Exception {
+        public EDTViolation() {
+            super("EDT Violation Stack!");
+        }
+    }
+    
+    private void checkEDT() {
+        if(isShowEDTWarnings() && !Display.getInstance().isEdt() && !inInit) {
+            System.out.println("EDT violation detected!");
+            if(isShowEDTViolationStacks()) {
+                new EDTViolation().printStackTrace();
+            }
+        } 
+    }
+    
     public static void setBaseResourceDir(File f) {
         baseResourceDir = f;
     }
@@ -329,6 +378,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void installNativeTheme() {
+        checkEDT();
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
@@ -613,7 +663,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidth() && y >= 0 && y < getDisplayHeight()) {
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
                         JavaSEPort.this.pointerPressed(x, y);
                     }
@@ -655,7 +705,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidth() && y >= 0 && y < getDisplayHeight()) {
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
                         JavaSEPort.this.pointerReleased(x, y);
                     }
@@ -680,14 +730,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidth() && y >= 0 && y < getDisplayHeight()) {
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
                         JavaSEPort.this.pointerDragged(x, y);
                     }
                 } else {
-                    x = Math.min(x, getDisplayWidth());
+                    x = Math.min(x, getDisplayWidthImpl());
                     x = Math.max(x, 0);
-                    y = Math.min(y, getDisplayHeight());
+                    y = Math.min(y, getDisplayHeightImpl());
                     y = Math.max(y, 0);
                     JavaSEPort.this.pointerReleased(x, y);
                     releaseLock = true;
@@ -856,7 +906,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         try {
             ZipInputStream z = new ZipInputStream(skin);
             ZipEntry e = z.getNextEntry();
-            Properties props = new Properties();
+            final Properties props = new Properties();
             BufferedImage map = null;
             BufferedImage landscapeMap = null;
 
@@ -957,7 +1007,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
-            float factor = ((float) getDisplayHeight()) / 480.0f;
+            float factor = ((float) getDisplayHeightImpl()) / 480.0f;
             int med = (int) (15.0f * factor);
             int sm = (int) (11.0f * factor);
             int la = (int) (19.0f * factor);
@@ -984,26 +1034,35 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
 
-            if (nativeThemeData != null) {
-                nativeThemeRes = Resources.open(new ByteArrayInputStream(nativeThemeData));
-            } else {
-                try {
-                    String t = props.getProperty("nativeThemeAttribute", null);
-                    if (t != null) {
-                        Properties cnop = new Properties();
-                        File cnopFile = new File("codenameone_settings.properties");
-                        if (cnopFile.exists()) {
-                            cnop.load(new FileInputStream(cnopFile));
-                            t = cnop.getProperty(t, null);
-                            if (t != null && new File(t).exists()) {
-                                nativeThemeRes = Resources.open(new FileInputStream(t));
+            final byte[] nativeThemeFinalData = nativeThemeData;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    if (nativeThemeFinalData != null) {
+                        try {
+                            nativeThemeRes = Resources.open(new ByteArrayInputStream(nativeThemeFinalData));
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        try {
+                            String t = props.getProperty("nativeThemeAttribute", null);
+                            if (t != null) {
+                                Properties cnop = new Properties();
+                                File cnopFile = new File("codenameone_settings.properties");
+                                if (cnopFile.exists()) {
+                                    cnop.load(new FileInputStream(cnopFile));
+                                    t = cnop.getProperty(t, null);
+                                    if (t != null && new File(t).exists()) {
+                                        nativeThemeRes = Resources.open(new FileInputStream(t));
+                                    }
+                                }
                             }
+                        } catch (IOException ioErr) {
+                            ioErr.printStackTrace();
                         }
                     }
-                } catch (IOException ioErr) {
-                    ioErr.printStackTrace();
                 }
-            }
+            });
 
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
@@ -1014,12 +1073,68 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
             simulatorMenu.add(zoomMenu);
+            
+            JMenu debugEdtMenu = new JMenu("Debug EDT");
+            simulatorMenu.add(debugEdtMenu);
+            
             JMenuItem zoom50 = new JMenuItem("50%");
             zoomMenu.add(zoom50);
             JMenuItem zoom100 = new JMenuItem("100%");
             zoomMenu.add(zoom100);
             JMenuItem zoom200 = new JMenuItem("200%");
             zoomMenu.add(zoom200);
+            
+            JRadioButtonMenuItem debugEdtNone = new JRadioButtonMenuItem("None");
+            JRadioButtonMenuItem debugEdtLight = new JRadioButtonMenuItem("Light");
+            JRadioButtonMenuItem debugEdtFull = new JRadioButtonMenuItem("Full");
+            debugEdtMenu.add(debugEdtNone);
+            debugEdtMenu.add(debugEdtLight);
+            debugEdtMenu.add(debugEdtFull);
+            ButtonGroup bg = new ButtonGroup();
+            bg.add(debugEdtNone);
+            bg.add(debugEdtLight);
+            bg.add(debugEdtFull);
+            final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            int debugEdtSelection = pref.getInt("debugEDTMode", 0);
+            switch(debugEdtSelection) {
+                case 0:
+                    debugEdtNone.setSelected(true);
+                    setShowEDTWarnings(false);
+                    setShowEDTViolationStacks(false);
+                    break;
+                case 2:
+                    debugEdtFull.setSelected(true);
+                    setShowEDTWarnings(true);
+                    setShowEDTViolationStacks(true);
+                    break;
+                default:
+                    debugEdtLight.setSelected(true);
+                    setShowEDTWarnings(true);
+                    setShowEDTViolationStacks(false);
+                    break;
+            }
+            debugEdtNone.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    setShowEDTWarnings(false);
+                    setShowEDTViolationStacks(false);
+                    pref.putInt("debugEDTMode", 0);
+                }
+            });
+            debugEdtFull.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    setShowEDTWarnings(true);
+                    setShowEDTViolationStacks(true);
+                    pref.putInt("debugEDTMode", 2);
+                }
+            });
+            debugEdtLight.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    setShowEDTWarnings(true);
+                    setShowEDTViolationStacks(false);
+                    pref.putInt("debugEDTMode", 1);
+                }
+            });
+            
             JMenuItem screenshot = new JMenuItem("Screenshot");
             simulatorMenu.add(screenshot);
             screenshot.addActionListener(new ActionListener() {
@@ -1107,7 +1222,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(performanceMonitor);
 
             JMenu skinMenu = new JMenu("Skins");
-            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             String skinNames = pref.get("skins", DEFAULT_SKINS);
             if (skinNames != null) {
                 if (skinNames.length() < DEFAULT_SKINS.length()) {
@@ -1421,6 +1535,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void init(Object m) {
+        inInit = true;
         try {
             Class.forName("javafx.embed.swing.JFXPanel");
             Platform.setImplicitExit(false);
@@ -1532,6 +1647,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (m instanceof Runnable) {
             Display.getInstance().callSerially((Runnable) m);
         }
+        inInit = false;
     }
 
     /**
@@ -1544,12 +1660,17 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void flashBacklight(int duration) {
+        checkEDT();
     }
 
     /**
      * @inheritDoc
      */
     public int getDisplayWidth() {
+        return getDisplayWidthImpl();
+    }
+
+    private int getDisplayWidthImpl() {
         if (getScreenCoordinates() != null) {
             return getScreenCoordinates().width;
         }
@@ -1564,6 +1685,10 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getDisplayHeight() {
+        return getDisplayHeightImpl();
+    }
+
+    private int getDisplayHeightImpl() {
         if (getScreenCoordinates() != null) {
             return getScreenCoordinates().height;
         }
@@ -1605,10 +1730,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean isNativeInputSupported() {
+        checkEDT();
         return useNativeInput;
     }
 
     public boolean isNativeInputImmediate() {
+        checkEDT();
         return useNativeInput;
     }
 
@@ -1648,6 +1775,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
+        checkEDT();
         java.awt.Component awtTf;
         
         if (cmp instanceof com.codename1.ui.TextField) {
@@ -1773,18 +1901,47 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void saveTextEditingState() {
     }
 
+    @Override
+    public void edtIdle(boolean enter) {
+        if(isShowEDTWarnings()) {
+            if(enter) {
+                checkLastFrame();
+            } else {
+                lastIdleTime = System.currentTimeMillis();
+            }
+        }
+    }
+    
+    private void checkLastFrame() {
+        long t = System.currentTimeMillis();
+        if(lastIdleTime > 0) {
+            long diff = t - lastIdleTime;
+            if(diff > 150) {
+                System.out.println("Rendering frame took too long " + diff + " milliseconds");
+            }
+        }
+        lastIdleTime = t;
+    }
+
     /**
      * @inheritDoc
      */
     public void flushGraphics(int x, int y, int width, int height) {
+        if(isShowEDTWarnings()) {
+            checkEDT();
+            checkLastFrame();
+        }
         canvas.blit(x, y, width, height);
-        
     }
 
     /**
      * @inheritDoc
      */
     public void flushGraphics() {
+        if(isShowEDTWarnings()) {
+            checkEDT();
+            checkLastFrame();
+        }
         canvas.blit();
     }
 
@@ -1792,6 +1949,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
+        checkEDT();
         ((BufferedImage) nativeImage).getRGB(x, y, width, height, arr, offset, width);
     }
 
@@ -1820,6 +1978,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(int[] rgb, final int width, final int height) {
+        checkEDT();
         BufferedImage i = createTrackableBufferedImage(width, height);
         i.setRGB(0, 0, width, height, rgb, 0, width);
         if (perfMonitor != null) {
@@ -1851,6 +2010,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(String path) throws IOException {
+        checkEDT();
         if (exists(path)) {
             InputStream is = null;
             try {
@@ -1883,6 +2043,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(InputStream i) throws IOException {
+        checkEDT();
         try {
             BufferedImage b = ImageIO.read(i);
             if (perfMonitor != null) {
@@ -1901,6 +2062,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createMutableImage(int width, int height, int fillColor) {
+        checkEDT();
         if (perfMonitor != null) {
             perfMonitor.printToLog("Created mutable image width: " + width + " height: " + height
                     + " size (bytes) " + (width * height * 4));
@@ -1928,6 +2090,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean isAlphaMutableImageSupported() {
+        checkEDT();
         return true;
     }
 
@@ -1935,6 +2098,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(byte[] bytes, int offset, int len) {
+        checkEDT();
         try {
             BufferedImage b = ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
             if (perfMonitor != null) {
@@ -1955,6 +2119,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageWidth(Object i) {
+        checkEDT();
         if (i == null) {
             return 0;
         }
@@ -1965,6 +2130,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getImageHeight(Object i) {
+        checkEDT();
         if (i == null) {
             return 0;
         }
@@ -1975,6 +2141,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean isScaledImageDrawingSupported() {
+        checkEDT();
         return true;
     }
 
@@ -1982,6 +2149,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object scale(Object nativeImage, int width, int height) {
+        checkEDT();
         BufferedImage image = (BufferedImage) nativeImage;
         int srcWidth = image.getWidth();
         int srcHeight = image.getHeight();
@@ -2042,6 +2210,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object rotate(Object image, int degrees) {
+        checkEDT();
         int width = getImageWidth(image);
         int height = getImageHeight(image);
         int[] arr = new int[width * height];
@@ -2163,6 +2332,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setNativeFont(Object graphics, Object font) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setFont(font(font));
     }
@@ -2171,6 +2341,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getClipX(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         java.awt.Rectangle r = nativeGraphics.getClipBounds();
         if (r == null) {
@@ -2183,6 +2354,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getClipY(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         java.awt.Rectangle r = nativeGraphics.getClipBounds();
         if (r == null) {
@@ -2195,6 +2367,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getClipWidth(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         java.awt.Rectangle r = nativeGraphics.getClipBounds();
         if (r == null) {
@@ -2204,7 +2377,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return ng.sourceImage.getWidth();
                 }
             }
-            return getDisplayWidth();
+            return getDisplayWidthImpl();
         }
         return r.width;
     }
@@ -2213,6 +2386,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getClipHeight(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         java.awt.Rectangle r = nativeGraphics.getClipBounds();
         if (r == null) {
@@ -2222,7 +2396,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return ng.sourceImage.getHeight();
                 }
             }
-            return getDisplayHeight();
+            return getDisplayHeightImpl();
         }
         return r.height;
     }
@@ -2231,6 +2405,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setClip(Object graphics, int x, int y, int width, int height) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setClip(x, y, width, height);
     }
@@ -2239,6 +2414,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void clipRect(Object graphics, int x, int y, int width, int height) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.clipRect(x, y, width, height);
     }
@@ -2247,6 +2423,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawLine(x1, y1, x2, y2);
     }
@@ -2255,6 +2432,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void fillRect(Object graphics, int x, int y, int w, int h) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRect(x, y, w, h);
     }
@@ -2263,6 +2441,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean isAlphaGlobal() {
+        checkEDT();
         return true;
     }
 
@@ -2270,6 +2449,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawRect(Object graphics, int x, int y, int width, int height) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRect(x, y, width, height);
     }
@@ -2278,6 +2458,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
@@ -2286,6 +2467,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void fillRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
@@ -2294,6 +2476,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillArc(x, y, width, height, startAngle, arcAngle);
     }
@@ -2302,6 +2485,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawArc(x, y, width, height, startAngle, arcAngle);
     }
@@ -2310,6 +2494,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setColor(Object graphics, int RGB) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setColor(new Color(RGB));
     }
@@ -2318,6 +2503,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getColor(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         return nativeGraphics.getColor().getRGB();
     }
@@ -2326,6 +2512,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setAlpha(Object graphics, int alpha) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
         nativeGraphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
@@ -2335,6 +2522,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getAlpha(Object graphics) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         Object c = nativeGraphics.getComposite();
         if (c != null && c instanceof AlphaComposite) {
@@ -2347,6 +2535,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawString(Object graphics, String str, int x, int y) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         if (zoomLevel != 1) {
             nativeGraphics = (Graphics2D) nativeGraphics.create();
@@ -2366,6 +2555,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawImage(Object graphics, Object img, int x, int y) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, null);
     }
@@ -2374,6 +2564,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, w, h, null);
     }
@@ -2382,6 +2573,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void fillTriangle(Object graphics, int x1, int y1, int x2, int y2, int x3, int y3) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillPolygon(new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
     }
@@ -2391,6 +2583,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         if (cache == null || cache.getWidth() != w || cache.getHeight() != h) {
             cache = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
@@ -2442,6 +2635,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
+        checkEDT();
         return stringWidth(nativeFont, new String(ch, offset, length));
     }
 
@@ -2449,6 +2643,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int stringWidth(Object nativeFont, String str) {
+        checkEDT();
         return (int) Math.ceil(font(nativeFont).getStringBounds(str, canvas.getFRC()).getWidth());
     }
 
@@ -2456,6 +2651,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int charWidth(Object nativeFont, char ch) {
+        checkEDT();
         return (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
     }
 
@@ -2463,6 +2659,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getHeight(Object nativeFont) {
+        checkEDT();
         return font(nativeFont).getSize() + 1;
     }
 
@@ -2470,10 +2667,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createFont(int face, int style, int size) {
+        checkEDT();
         return new int[]{face, style, size};
     }
 
     private java.awt.Font createAWTFont(int[] i) {
+        checkEDT();
         int face = i[0];
         int style = i[1];
         int size = i[2];
@@ -2533,6 +2732,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getFace(Object nativeFont) {
+        checkEDT();
         if (font(nativeFont).getFamily().equals(fontFaceMonospace)) {
             return Font.FACE_MONOSPACE;
         }
@@ -2549,6 +2749,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getSize(Object nativeFont) {
+        checkEDT();
         if (nativeFont == null) {
             return Font.SIZE_MEDIUM;
         }
@@ -2569,6 +2770,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getStyle(Object nativeFont) {
+        checkEDT();
         if (font(nativeFont).isBold()) {
             if (font(nativeFont).isItalic()) {
                 return Font.STYLE_BOLD | Font.STYLE_ITALIC;
@@ -2597,6 +2799,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object loadNativeFont(String lookup) {
+        checkEDT();
         return java.awt.Font.decode(lookup.split(";")[0]);
     }
 
@@ -2604,6 +2807,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillPolygon(xPoints, yPoints, nPoints);
     }
@@ -2612,22 +2816,26 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void drawPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawPolygon(xPoints, yPoints, nPoints);
     }
 
     @Override
     public boolean animateImage(Object nativeImage, long lastJFrame) {
+        checkEDT();
         return false;
     }
 
     @Override
     public Object createSVGImage(String baseURL, byte[] data) throws IOException {
+        checkEDT();
         return null;
     }
 
     @Override
     public boolean isSVGSupported() {
+        checkEDT();
         return false;
     }
 
@@ -2670,6 +2878,37 @@ public class JavaSEPort extends CodenameOneImplementation {
             return null;
         }
         String s = System.getProperty(key);
+
+        if(key.equals("built_by_user")) {
+            Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+            String user = p.get("user", null);
+            Display d = Display.getInstance();
+            if (user == null) {
+                JPanel pnl = new JPanel();
+                JTextField tf = new JTextField(20);
+                pnl.add(new JLabel("E-Mail For Push"));
+                pnl.add(tf);
+                int val = JOptionPane.showConfirmDialog(canvas, pnl, "Please Enter Build Email Account", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                if(val != JOptionPane.OK_OPTION) {
+                    return null;
+                }
+                user = tf.getText();
+                //p.put("user", user);
+            }
+            d.setProperty("built_by_user", user);
+            return user;
+        }
+        
+        if(key.equals("package_name")) {
+            String mainClass = System.getProperty("MainClass");
+            if (mainClass != null) {
+                mainClass = mainClass.substring(0, mainClass.lastIndexOf('.'));
+                Display.getInstance().setProperty("package_name", mainClass);
+            }
+            return mainClass;
+        }
+        
+        
         if (s == null) {
             return defaultValue;
         }
@@ -2862,10 +3101,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isAffineSupported() {
+        checkEDT();
         return true;
     }
 
     public void resetAffine(Object nativeGraphics) {
+        checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
         if (zoomLevel != 1) {
@@ -2874,21 +3115,25 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void scale(Object nativeGraphics, float x, float y) {
+        checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.scale(x, y);
     }
 
     public void rotate(Object nativeGraphics, float angle) {
+        checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.rotate(angle);
     }
 
     public void rotate(Object nativeGraphics, float angle, int pX, int pY) {
+        checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.rotate(angle, pX, pY);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
+        checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.shear(x, y);
     }
@@ -2910,6 +3155,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setAntiAliased(Object graphics, boolean a) {
+        checkEDT();
         Graphics2D g2d = getGraphics(graphics);
         if (a) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -2919,6 +3165,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isAntiAliased(Object graphics) {
+        checkEDT();
         Graphics2D g2d = getGraphics(graphics);
         return g2d.getRenderingHint(RenderingHints.KEY_ANTIALIASING) == RenderingHints.VALUE_ANTIALIAS_ON;
     }

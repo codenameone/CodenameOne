@@ -1095,7 +1095,7 @@ public abstract class CodenameOneImplementation {
      */
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
     }
-
+    
     /**
      * Allows an implementation to optimize image tiling rendering logic
      * 
@@ -2323,6 +2323,18 @@ public abstract class CodenameOneImplementation {
         throw new IOException("Unsupported operation");
     }
 
+    /**
+     * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
+     * will only work in the case of truetype fonts!
+     * @param font the native font instance
+     * @param sizePixels the size of the font in pixels
+     * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
+     * @return scaled font instance
+     */
+    public Object deriveTrueTypeFont(Object font, int size, int weight) {
+        throw new RuntimeException("Unsupported operation");
+    }
+    
     /**
      * Returns true if the system supports dynamically loading truetype fonts from
      * a stream.
