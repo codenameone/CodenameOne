@@ -3077,6 +3077,8 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
             EditableResources er = new EditableResources();
             er.openFile(i);
             JavaSEPortWithSVGSupport.setNativeTheme(er);
+            JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
+            JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
             i.close();
             Preferences p = Preferences.userNodeForPackage(getClass());
             p.put("nativeCN1Theme", file);

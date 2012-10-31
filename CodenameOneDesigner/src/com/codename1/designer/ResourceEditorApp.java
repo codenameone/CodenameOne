@@ -175,6 +175,8 @@ public class ResourceEditorApp extends SingleFrameApplication {
             }
         }
         JavaSEPortWithSVGSupport.blockMonitors();
+        JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
+        JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
         launch(ResourceEditorApp.class, args);

@@ -334,6 +334,8 @@ public class ThemeEditor extends BaseForm {
     }
 
     private void initMIDlet() {        
+        JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
+        JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
         // if the last element is selected in the combo its a MIDlet otherwise
         // its a UI form
         if(uiPreviewContent.getSelectedIndex() == uiPreviewContent.getModel().getSize() - 1) {
