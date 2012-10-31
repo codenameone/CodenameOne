@@ -67,7 +67,7 @@ public class BlackBerryVirtualKeyboard implements VirtualKeyboardInterface{
             if(focus != null && focus instanceof TextArea){
                 TextArea txtCmp = (TextArea) focus;
                 if((txtCmp.getConstraint() & TextArea.NON_PREDICTIVE) == 0){
-                    canvas.getImplementation().nativeEdit(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), 0);
+                    canvas.getImplementation().editString(txtCmp, txtCmp.getMaxSize(), txtCmp.getConstraint(), txtCmp.getText(), 0);
                 }
             }            
         } else {
