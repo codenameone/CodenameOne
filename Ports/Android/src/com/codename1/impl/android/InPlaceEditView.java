@@ -223,7 +223,10 @@ public class InPlaceEditView extends FrameLayout {
         addView(mEditText, mEditLayoutParams);
 
         mTextArea = textArea;
-        Component nextDown = textArea.getComponentForm().findNextFocusVertical(true);
+        Component nextDown = mTextArea.getNextFocusDown();
+        if(nextDown == null){
+            nextDown = textArea.getComponentForm().findNextFocusVertical(true);
+        }
         if (mTextArea.isSingleLineTextArea()) {
             if (nextDown != null && nextDown instanceof TextArea) {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
