@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import java.util.Vector;
@@ -210,6 +211,9 @@ public class Container extends Component {
      */
     public void setLayout(Layout layout) {
         this.layout = layout;
+        if(layout instanceof BorderLayout && isScrollable()) {
+            setScrollable(false);
+        }
     }
 
     /**
