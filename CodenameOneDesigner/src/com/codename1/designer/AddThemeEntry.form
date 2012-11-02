@@ -219,7 +219,7 @@
                           <Component id="jLabel2" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="gradientSize" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="253" max="32767" attributes="0"/>
+                      <EmptySpace pref="258" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -490,7 +490,7 @@
                               <Component id="colorHelp" min="-2" max="-2" attributes="0"/>
                           </Group>
                       </Group>
-                      <EmptySpace pref="275" max="32767" attributes="0"/>
+                      <EmptySpace pref="280" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -657,7 +657,7 @@
                           <Component id="alignmentCombo" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="alignHelp" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="368" max="32767" attributes="0"/>
+                      <EmptySpace pref="373" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -749,16 +749,16 @@
                                   <Component id="paddingRight" alignment="0" max="32767" attributes="0"/>
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="paddingRightUnit" min="-2" pref="105" max="-2" attributes="0"/>
-                                  <Component id="paddingLeftUnit" min="-2" pref="105" max="-2" attributes="0"/>
-                                  <Component id="paddingTopUnit" alignment="0" min="-2" pref="105" max="-2" attributes="0"/>
-                                  <Component id="paddingBottomUnit" min="-2" pref="105" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="paddingLeftUnit" alignment="0" pref="159" max="32767" attributes="0"/>
+                                  <Component id="paddingRightUnit" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="paddingTopUnit" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="paddingBottomUnit" alignment="0" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                           <Component id="derivePadding" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="221" max="32767" attributes="0"/>
+                      <EmptySpace pref="167" max="32767" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Component id="deriveHelp3" linkSize="9" alignment="1" min="-2" max="-2" attributes="0"/>
                           <Component id="paddingHelp" linkSize="9" alignment="1" min="-2" max="-2" attributes="0"/>
@@ -796,14 +796,14 @@
                           <Component id="paddingBottomUnit" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel11" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace max="32767" attributes="0"/>
+                      <EmptySpace pref="297" max="32767" attributes="0"/>
                   </Group>
                   <Group type="102" alignment="1" attributes="0">
-                      <EmptySpace max="32767" attributes="0"/>
+                      <EmptySpace min="-2" max="-2" attributes="0"/>
                       <Component id="deriveHelp3" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
+                      <EmptySpace min="-2" max="-2" attributes="0"/>
                       <Component id="paddingHelp" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace min="-2" pref="368" max="-2" attributes="0"/>
+                      <EmptySpace max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -976,7 +976,11 @@
             <DimensionLayout dim="0">
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" alignment="0" attributes="0">
-                      <Group type="103" groupAlignment="1" attributes="0">
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="102" alignment="0" attributes="0">
+                              <EmptySpace min="10" pref="10" max="10" attributes="0"/>
+                              <Component id="deriveMargin" min="-2" max="-2" attributes="0"/>
+                          </Group>
                           <Group type="102" alignment="0" attributes="0">
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" max="-2" attributes="0">
@@ -989,25 +993,22 @@
                               <Group type="103" groupAlignment="1" max="-2" attributes="0">
                                   <Component id="marginTop" alignment="0" pref="82" max="32767" attributes="0"/>
                                   <Component id="marginRight" alignment="0" max="32767" attributes="0"/>
-                                  <Component id="marginLeft" alignment="0" max="32767" attributes="0"/>
                                   <Component id="marginBottom" max="32767" attributes="0"/>
+                                  <Component id="marginLeft" alignment="0" max="32767" attributes="0"/>
                               </Group>
                               <EmptySpace type="unrelated" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="marginBottomUnit" alignment="1" pref="0" max="32767" attributes="0"/>
-                                  <Component id="marginTopUnit" alignment="0" pref="0" max="32767" attributes="0"/>
-                                  <Component id="marginRightUnit" alignment="0" min="-2" pref="109" max="-2" attributes="0"/>
-                                  <Component id="marginLeftUnit" pref="0" max="32767" attributes="0"/>
+                                  <Component id="marginLeftUnit" pref="154" max="32767" attributes="0"/>
+                                  <Component id="marginTopUnit" max="32767" attributes="0"/>
+                                  <Component id="marginBottomUnit" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="marginRightUnit" alignment="0" max="32767" attributes="0"/>
                               </Group>
-                              <EmptySpace max="32767" attributes="0"/>
-                              <Component id="marginHelp" linkSize="10" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <Group type="102" alignment="0" attributes="0">
-                              <EmptySpace min="10" pref="10" max="10" attributes="0"/>
-                              <Component id="deriveMargin" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace pref="406" max="32767" attributes="0"/>
-                              <Component id="deriveHelp4" linkSize="10" min="-2" max="-2" attributes="0"/>
-                          </Group>
+                      </Group>
+                      <EmptySpace pref="171" max="32767" attributes="0"/>
+                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                          <Component id="deriveHelp4" max="32767" attributes="0"/>
+                          <Component id="marginHelp" pref="97" max="32767" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
@@ -1017,36 +1018,40 @@
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="deriveMargin" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="deriveHelp4" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Component id="deriveMargin" min="-2" max="-2" attributes="0"/>
+                          <Component id="deriveHelp4" alignment="1" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="2" attributes="0">
-                          <Component id="marginLeftUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginLeft" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginHelp" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel17" alignment="2" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="102" attributes="0">
+                              <Group type="103" groupAlignment="2" attributes="0">
+                                  <Component id="marginLeftUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginLeft" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel17" alignment="2" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="2" attributes="0">
+                                  <Component id="marginRight" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginRightUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel24" alignment="2" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="2" attributes="0">
+                                  <Component id="jLabel25" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginTop" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginTopUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="2" attributes="0">
+                                  <Component id="jLabel26" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginBottom" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="marginBottomUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                          </Group>
+                          <Component id="marginHelp" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="2" attributes="0">
-                          <Component id="jLabel24" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginRight" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginRightUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="2" attributes="0">
-                          <Component id="jLabel25" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginTop" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginTopUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="2" attributes="0">
-                          <Component id="jLabel26" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginBottom" linkSize="16" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="marginBottomUnit" linkSize="18" alignment="2" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace pref="290" max="32767" attributes="0"/>
+                      <EmptySpace pref="298" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1263,7 +1268,7 @@
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="imageBorderWizard" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jScrollPane1" pref="322" max="32767" attributes="0"/>
+                      <Component id="jScrollPane1" pref="327" max="32767" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
               </Group>
@@ -1407,7 +1412,7 @@
                           <Component id="baseStyle" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="baseStyleType" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="371" max="32767" attributes="0"/>
+                      <EmptySpace pref="376" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1547,7 +1552,7 @@
                           <Component id="textDecorationCombo" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel7" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="256" max="32767" attributes="0"/>
+                      <EmptySpace pref="261" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
