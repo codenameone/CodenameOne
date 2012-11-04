@@ -1004,8 +1004,8 @@ public class MenuBar extends Container implements ActionListener {
                 }
                 if (parent.getBackCommand() != cmd) {
                     if (behavior != Display.COMMAND_BEHAVIOR_ICS) {
-                        setLayout(new GridLayout(1, getCommandCount()));
-                        addComponent(index, createTouchCommandButton(cmd));
+                        setLayout(new GridLayout(1, getComponentCount() + 1));
+                        addComponent(Math.min(getComponentCount(), index), createTouchCommandButton(cmd));
                         revalidate();
                     }
                 } else {
