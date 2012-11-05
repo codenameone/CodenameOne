@@ -155,7 +155,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
         this.visibilityChangedTo(false);
     }
 
-    
     private void initBitmaps(int w, int h) {
         this.bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         this.canvas = new Canvas(this.bitmap);
@@ -200,7 +199,7 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
         if(!Display.isInitialized()) {
             return;
         }
-        if (this.width < w || this.height < h) {
+        if (this.width != w && (this.width < w || this.height < h)) {
             this.initBitmaps(w, h);
         }
         this.width = w;
@@ -233,8 +232,7 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
             };
             f.addOrientationListener(orientation);
         }
-        Display.getInstance().sizeChanged(w, h);
-        
+        Display.getInstance().sizeChanged(w, h);        
     }
 
     @Override

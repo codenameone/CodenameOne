@@ -132,9 +132,14 @@ public class InPlaceEditView extends FrameLayout {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-
+        
+        Component c = mTextArea.getComponentForm().getComponentAt((int)event.getX(), (int)event.getY());
+        boolean leaveVKBOpen = false;
+        if(c != null && c instanceof TextArea && ((TextArea)c).isEditable() && ((TextArea)c).isEnabled())  {
+            leaveVKBOpen = true;
+        }
         // When the user touches the screen outside the text-area, finish editing
-        endEditing(REASON_TOUCH_OUTSIDE);
+        endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen);
 
         // Return false so that the event will propagate to the underlying view
         // We don't want to consume this event
@@ -297,7 +302,7 @@ public class InPlaceEditView extends FrameLayout {
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
      */
-    private synchronized void endEditing(int reason) {
+    private synchronized void endEditing(int reason, boolean forceVKBOpen) {
 
         if (mEditText == null) {
             return;
@@ -307,7 +312,7 @@ public class InPlaceEditView extends FrameLayout {
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
         boolean isNextActionFlagSet = (mEditText.getImeOptions() == EditorInfo.IME_ACTION_NEXT);
-        boolean leaveKeyboardShowing = (reason == REASON_IME_ACTION) && isNextActionFlagSet;
+        boolean leaveKeyboardShowing = (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
         if (!leaveKeyboardShowing) {
             showVirtualKeyboard(false);
         }
@@ -346,12 +351,16 @@ public class InPlaceEditView extends FrameLayout {
      */
     void onEditorAction(int actionCode) {
         if (actionCode == EditorInfo.IME_ACTION_NEXT) {
-            Component next = mTextArea.getComponentForm().findNextFocusVertical(true);
+            Component next = mTextArea.getNextFocusDown();
+            if (next == null) {
+                next = mTextArea.getComponentForm().findNextFocusVertical(true);
+            }
+
             if (next instanceof TextArea) {
                 nextTextArea = (TextArea) next;
             }
         }
-        endEditing(REASON_IME_ACTION);
+        endEditing(REASON_IME_ACTION, false);
     }
 
     /**
@@ -367,7 +376,7 @@ public class InPlaceEditView extends FrameLayout {
 
     public static void endEdit() {
         if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED);
+            sInstance.endEditing(REASON_UNDEFINED, false);
             ViewParent p = sInstance.getParent();
             if (p != null) {
                 ((ViewGroup) p).removeView(sInstance);
@@ -550,7 +559,7 @@ public class InPlaceEditView extends FrameLayout {
             // again
             if (keyCode == KeyEvent.KEYCODE_BACK
                     || keyCode == KeyEvent.KEYCODE_MENU) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY);
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false);
             }
 
             return super.onKeyDown(keyCode, event);
