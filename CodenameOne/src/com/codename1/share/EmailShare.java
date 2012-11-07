@@ -116,8 +116,8 @@ public class EmailShare extends ShareService {
     private MultiButton createRendererMultiButton() {
         MultiButton b = new MultiButton();
         b.setIconName("icon");
-        b.setNameLine1("displayName");
-        b.setNameLine2("email");
+        b.setNameLine1("fname");
+        b.setNameLine2("phone");
         b.setUIID("Label");
         return b;
     }
