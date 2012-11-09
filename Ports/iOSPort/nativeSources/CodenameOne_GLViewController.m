@@ -907,7 +907,12 @@ static CodenameOne_GLViewController *sharedSingleton;
         } else {
             img = [UIImage imageNamed:@"Default.png"];
         }*/
-        img = [UIImage imageNamed:@"Default.png"];
+        if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
+            // workaround for stupid iphone 5 behavior where image named just DOESN'T WORK!
+            img = [UIImage imageNamed:@"Default-568h@2x.png"];
+        } else {
+            img = [UIImage imageNamed:@"Default.png"];
+        }
     }
     if(img != nil) {
         float scale = scaleValue;
@@ -921,7 +926,7 @@ static CodenameOne_GLViewController *sharedSingleton;
          gl = [[GLUIImage alloc] initWithImage:img];
          dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width / 2 h:img.size.height / 2];
          } else {*/
-        CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, img.size.width, img.size.height - 20 * scale));
+        CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()));
         img = [UIImage imageWithCGImage:imageRef];
         CGImageRelease(imageRef);
         
@@ -1461,8 +1466,8 @@ static BOOL skipNextTouch = NO;
             displayHeight = (int)self.view.bounds.size.height * scaleValue;
             //screenSizeChanged(displayWidth, displayHeight);
             repaintUI();
-            skipNextTouch = YES;
-            return;
+            //skipNextTouch = YES;
+            //return;
         }
     }
     pointerPressedC(xArray, yArray, 1);
