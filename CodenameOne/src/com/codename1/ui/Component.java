@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Rectangle;
@@ -55,10 +56,12 @@ public class Component implements Animation, StyleListener {
      */
     private Component nextFocusDown;
     private Component nextFocusUp;
+    
     /**
      * Indicates whether component is enabled or disabled
      */
     private boolean enabled = true;
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the right key
@@ -230,6 +233,9 @@ public class Component implements Animation, StyleListener {
     private Image dragImage;
     private Component dropTargetComponent;
 
+    private String cloudBoundProperty;
+    private String cloudDestinationProperty;
+    
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
     }
@@ -3694,6 +3700,67 @@ public class Component implements Animation, StyleListener {
         Display.getInstance().getImplementation().cancelRepaint(this);
     }
 
+    /**
+     * Returns the names of the properties within this component that can be bound for persistence
+     * @return a string array of property names or null
+     */
+    public String[] getBindablePropertyNames() {
+        return null;
+    }
+    
+    /**
+     * Returns the types of the properties that are bindable within this component
+     * @return the class for binding
+     */
+    public Class[] getBindablePropertyTypes() {
+        return null;
+    }
+    
+    /**
+     * Binds the given property name to the given bind target
+     * @param prop the property name
+     * @param target the target binder
+     */
+    public void bindProperty(String prop, BindTarget target) {
+    }
+    
+    /**
+     * Removes a bind target from the given property name
+     * @param prop the property names
+     * @param target the target binder
+     */
+    public void unbindProperty(String prop, BindTarget target) {
+    }
+
+    /**
+     * Indicates the property within this component that should be bound to the cloud object
+     * @return the cloudBoundProperty
+     */
+    public String getCloudBoundProperty() {
+        return cloudBoundProperty;
+    }
+
+    /**
+     * @param cloudBoundProperty the cloudBoundProperty to set
+     */
+    public void setCloudBoundProperty(String cloudBoundProperty) {
+        this.cloudBoundProperty = cloudBoundProperty;
+    }
+
+    /**
+     * @return the cloudDestinationProperty
+     */
+    public String getCloudDestinationProperty() {
+        return cloudDestinationProperty;
+    }
+
+    /**
+     * @param cloudDestinationProperty the cloudDestinationProperty to set
+     */
+    public void setCloudDestinationProperty(String cloudDestinationProperty) {
+        this.cloudDestinationProperty = cloudDestinationProperty;
+    }
+    
     class BGPainter implements Painter, Animation {
         private Motion wMotion, hMotion;
         private Form previousTint;

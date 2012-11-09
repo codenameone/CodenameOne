@@ -20,11 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.io;
+package com.codename1.cloud;
 
+import com.codename1.cloud.BindTarget;
+import com.codename1.io.Externalizable;
+import com.codename1.io.Util;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -32,6 +38,7 @@ import java.util.Vector;
  * A cloud object can be persisted to the cloud or locally
  * it is a set of key/value pairs that can be either strings
  * or numbers. There is a 512 character limit on string length!
+ * Notice: keys starting with CN1_ are reserved for internal usage!
  *
  * @author Shai Almog
  */
@@ -97,8 +104,10 @@ public final class CloudObject implements Externalizable {
      */
     public static final int ACCESS_PRIVATE = 5;
 
-    
+
+    private static Hashtable<String, CustomProperty> custom = new Hashtable<String, CustomProperty>();
     private Hashtable values = new Hashtable();
+    private Hashtable deferedValues;
     
     private String cloudId;
     private long lastModified;
@@ -176,6 +185,33 @@ public final class CloudObject implements Externalizable {
     }
     
     /**
+     * Allows us to extract an object from the cloud object without knowing its type in advance
+     * or whether it exists
+     * @param key the key for the object
+     * @return the value of the object
+     */
+    public Object getObject(String key) {
+        Object o = values.get(key);
+        if(o == null) {
+            CustomProperty cp = custom.get(key);
+            if(cp != null) {
+                return cp.propertyValue(this, key);
+            }
+        }
+        return o;
+    }
+    
+    /**
+     * Install a custom property on the given property name
+     * 
+     * @param key the key on which to install the custom property
+     * @param cp the custom property implementation
+     */
+    public static void setCustomProperty(String key, CustomProperty cp) {
+        custom.put(key, cp);
+    }
+    
+    /**
      * Sets a value that can be no more than 512 characters
      * 
      * @param key the key for the given value
@@ -202,7 +238,7 @@ public final class CloudObject implements Externalizable {
      * @return a string value
      */
     public String getString(String key) {
-        return (String)values.get(key);
+        return (String)getObject(key);
     }
     
     /**
@@ -248,7 +284,7 @@ public final class CloudObject implements Externalizable {
      * @return a long value
      */
     public Long getLong(String key) {
-        return (Long)values.get(key);
+        return (Long)getObject(key);
     }
 
     /**
@@ -285,7 +321,7 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Integer getInteger(String key) {
-        return (Integer)values.get(key);
+        return (Integer)getObject(key);
     }
 
     /**
@@ -322,7 +358,7 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Double getDouble(String key) {
-        return (Double)values.get(key);
+        return (Double)getObject(key);
     }
 
     /**
@@ -359,7 +395,7 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Float getFloat(String key) {
-        return (Float)values.get(key);
+        return (Float)getObject(key);
     }
 
     /**
@@ -396,7 +432,7 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Boolean getBoolean(String key) {
-        return (Boolean)values.get(key);
+        return (Boolean)getObject(key);
     }
 
     /**
@@ -469,5 +505,81 @@ public final class CloudObject implements Externalizable {
             return cloudId.hashCode();
         }
         return 0;
+    }
+    
+    /**
+     * Binds a UI tree to the cloud object so its values automatically update in the cloud object
+     * 
+     * @param ui the component tree to bind
+     * @param defer  whether to defer the binding which requires developers to explicitly commit
+     * the binding to perform the changes
+     */
+    public void bindTree(Container ui, boolean defer) {
+        int componentCount = ui.getComponentCount();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component c = ui.getComponentAt(iter);
+            if(c instanceof Container) {
+                bindTree((Container)c, defer);
+                continue;
+            }
+            
+        }
+    }
+    
+    /**
+     * Binds a property value within the given component to this cloud object, this means that
+     * when the component changes the cloud object changes unless deferred. If the defer flag is 
+     * false all changes are stored in a temporary location and only "committed" once commitBindings()
+     * is invoked.
+     * @param cmp the component to bind
+     * @param propertyName the name of the property in the bound component
+     * @param attributeName the key within the cloud object
+     * @param defer  whether to defer the binding which requires developers to explicitly commit
+     * the binding to perform the changes
+     */
+    public void bindProperty(Component cmp, final String propertyName, final String attributeName, final boolean defer) {
+        BindTarget target = new BindTarget() {
+            public void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue) {
+                if(defer) {
+                    deferedValues.put(attributeName, newValue);
+                } else {
+                    values.put(attributeName, newValue);
+                    status = STATUS_MODIFIED;
+                }                
+            }
+        };
+        cmp.bindProperty(propertyName, target);
+        cmp.putClientProperty("CN1Bind" + propertyName, target);
+    }
+    
+    /**
+     * Releases the binding for the specific property name
+     * @param cmp the component
+     * @param propertyName the name of the property
+     */
+    public void unbind(Component cmp, String propertyName) {
+        BindTarget t = (BindTarget)cmp.getClientProperty("CN1Bind" + propertyName);
+        cmp.unbindProperty(propertyName, t);;
+    }
+    
+    /**
+     * If deferred changes exist this method applies these changes to the data
+     */
+    public void commitBinding() {
+        if(deferedValues != null && deferedValues.size() > 0) {
+            Enumeration en = deferedValues.keys();
+            while(en.hasMoreElements()) {
+                Object k = en.nextElement();
+                values.put(k, deferedValues.get(k));
+            }
+            deferedValues = null;
+        }
+    }
+    
+    /**
+     * If deferred changes exist this method discards such values
+     */
+    public void cancelBinding() {
+        deferedValues = null;
     }
 }

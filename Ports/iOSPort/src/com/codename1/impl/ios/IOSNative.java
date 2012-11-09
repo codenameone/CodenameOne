@@ -332,4 +332,7 @@ public class IOSNative {
     public static native String formatDateTimeMedium(long date);
     public static native String formatDateTimeShort(long date);
     public static native String getCurrencySymbol();
+    
+    public static native void scanQRCode();
+    public static native void scanBarCode();
 }

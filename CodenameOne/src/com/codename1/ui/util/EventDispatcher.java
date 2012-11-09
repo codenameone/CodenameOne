@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.cloud.BindTarget;
 import com.codename1.ui.*;
 import com.codename1.ui.events.*;
 import com.codename1.ui.plaf.Style;
@@ -111,6 +112,13 @@ public class EventDispatcher {
         return o instanceof StyleListener[];
     }
 
+    boolean isBindTargetArray(Object o) {
+        if(isXMLVMWorkaround()) {
+            return o.getClass() == new BindTarget[1].getClass();
+        }
+        return o instanceof BindTarget[];
+    }
+
     class CallbackClass implements Runnable {
         private Object[] iPending;
         private Object iPendingEvent;
@@ -135,6 +143,14 @@ public class EventDispatcher {
                 iPending = pending;
             }
 
+            if(isStyleListenerArray(iPending)) {
+                Object[] p = (Object[])iPendingEvent;
+                fireStyleChangeSync((StyleListener[])iPending, (String)p[0], (Style)p[1]);
+                pendingEvent = null;
+                pending = null;
+                return;
+            }
+
             if(isActionListenerArray(iPending)) {
                 fireActionSync((ActionListener[])iPending, (ActionEvent)iPendingEvent);
                 return;
@@ -155,11 +171,9 @@ public class EventDispatcher {
                 return;
             }
 
-            if(isStyleListenerArray(iPending)) {
-                Object[] p = (Object[])iPendingEvent;
-                fireStyleChangeSync((StyleListener[])iPending, (String)p[0], (Style)p[1]);
-                pendingEvent = null;
-                pending = null;
+            if(isBindTargetArray(iPending)) {
+                Object[] a = (Object[])iPendingEvent;
+                fireBindTargetChangeSync((BindTarget[])iPending, (Component)a[0], (String)a[1], a[2], a[3]);
                 return;
             }
         }
@@ -234,6 +248,55 @@ public class EventDispatcher {
         }
     }
     
+    /**
+     * Fired when a property of the component changes to a new value
+     * 
+     * @param source the source component
+     * @param propertyName the name of the property
+     * @param oldValue the old value of the property
+     * @param newValue the new value for the property
+     */
+    public void fireBindTargetChange(Component source, String propertyName, Object oldValue, Object newValue) {
+        if(listeners == null || listeners.size() == 0) {
+            return;
+        }
+        BindTarget[] array;
+        synchronized(this) {
+            array = new BindTarget[listeners.size()];
+            for(int iter = 0 ; iter < array.length ; iter++) {
+                array[iter] = (BindTarget)listeners.elementAt(iter);
+            }
+        }
+        // if we already are on the EDT just fire the event
+        if(Display.getInstance().isEdt()) {
+            fireBindTargetChangeSync(array, source, propertyName, oldValue, newValue);
+        } else {
+            pending = array;
+            pendingEvent = new Object[] {source, propertyName, oldValue, newValue};
+            if(blocking) {
+                Display.getInstance().callSeriallyAndWait(callback);
+            } else {
+                Display.getInstance().callSerially(new CallbackClass());
+            }
+            pending = null;
+            pendingEvent = null;
+        }
+    }
+    
+    /**
+     * Fired when a property of the component changes to a new value
+     * 
+     * @param source the source component
+     * @param propertyName the name of the property
+     * @param oldValue the old value of the property
+     * @param newValue the new value for the property
+     */
+    private void fireBindTargetChangeSync(BindTarget[] arr, Component source, String propertyName, Object oldValue, Object newValue) {
+        for(int iter = 0 ; iter < arr.length ; iter++) {
+            arr[iter].propertyChanged(source, propertyName, oldValue, newValue);
+        }
+    }
+
     /**
      * Fires the style change even to the listeners
      *

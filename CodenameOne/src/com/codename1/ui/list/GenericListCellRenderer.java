@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.list;
 
+import com.codename1.cloud.CloudObject;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
@@ -45,7 +46,7 @@ import java.util.Vector;
 
 /**
  * The generic list cell renderer can display containers or arbitrary Codename One components
- * as items in a list. It generally relies on the source data being either a hashtable or
+ * as items in a list. It generally relies on the source data being either a hashtable a CloudObject or
  * a list of Strings. It extracts values from the hashtable using the component name as
  * an indication to the hashtable key lookup.
  * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.
@@ -232,12 +233,37 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                             val = h.get(currentName);
                         }
                     }
-                    setComponentValueWithTickering(entries[iter], val, list);
+                    setComponentValueWithTickering(entries[iter], val, list, cmp);
                     entries[iter].setFocus(entries[iter].isFocusable());
                 }
             } else {
-                setComponentValueWithTickering(entries[0], value, list);
-                entries[0].setFocus(entries[0].isFocusable());
+                if(value instanceof CloudObject) {
+                    CloudObject h = (CloudObject)value;
+                    Boolean enabled = (Boolean)h.getBoolean(ENABLED);
+                    if(enabled != null) {
+                        cmp.setEnabled(enabled.booleanValue());
+                    }
+                    for(int iter = 0 ; iter < entries.length ; iter++) {
+                        String currentName = entries[iter].getName();
+
+                        Object val;
+                        if(currentName.equals("$number")) {
+                            val = "" + (index + 1);
+                        } else {
+                            // a selected entry might differ in its value to allow for
+                            // behavior such as rollover images
+                            val = h.getObject("#" + currentName);
+                            if(val == null) {
+                                val = h.getObject(currentName);
+                            }
+                        }
+                        setComponentValueWithTickering(entries[iter], val, list, cmp);
+                        entries[iter].setFocus(entries[iter].isFocusable());
+                    }
+                } else {
+                    setComponentValueWithTickering(entries[0], value, list, cmp);
+                    entries[0].setFocus(entries[0].isFocusable());
+                }
             }
             return cmp;
         } else {
@@ -261,13 +287,29 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                 for(int iter = 0 ; iter < entries.length ; iter++) {
                     String currentName = entries[iter].getName();
                     if(currentName.equals("$number")) {
-                        setComponentValue(entries[iter], "" + (index + 1), list);
+                        setComponentValue(entries[iter], "" + (index + 1), list, cmp);
                         continue;
                     }
-                    setComponentValue(entries[iter], h.get(currentName), list);
+                    setComponentValue(entries[iter], h.get(currentName), list, cmp);
                 }
             } else {
-                setComponentValue(entries[0], value, list);
+                if(value instanceof CloudObject) {
+                    CloudObject h = (CloudObject)value;
+                    Boolean enabled = h.getBoolean(ENABLED);
+                    if(enabled != null) {
+                        cmp.setEnabled(enabled.booleanValue());
+                    }
+                    for(int iter = 0 ; iter < entries.length ; iter++) {
+                        String currentName = entries[iter].getName();
+                        if(currentName.equals("$number")) {
+                            setComponentValue(entries[iter], "" + (index + 1), list, cmp);
+                            continue;
+                        }
+                        setComponentValue(entries[iter], h.getObject(currentName), list, cmp);
+                    }
+                } else {
+                    setComponentValue(entries[0], value, list, cmp);
+                }
             }
             return cmp;
         }
@@ -286,8 +328,8 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
         return v != null && "true".equalsIgnoreCase(v.toString());
     }
 
-    private void setComponentValueWithTickering(Component cmp, Object value, Component l) {
-        setComponentValue(cmp, value, l);
+    private void setComponentValueWithTickering(Component cmp, Object value, Component l, Component rootRenderer) {
+        setComponentValue(cmp, value, l, rootRenderer);
         if(cmp instanceof Label) {
             if(selectionListener) {
                 if(l instanceof List) {
@@ -322,7 +364,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
      * @param cmp one of the components that is or is a part of the renderer
      * @param value the value to install into the component
      */
-    private void setComponentValue(Component cmp, Object value, Component parent) {
+    private void setComponentValue(Component cmp, Object value, Component parent, Component rootRenderer) {
         // fixed components shouldn't be modified by the renderer, this allows for
         // hardcoded properties in the renderer. We still want them to go through the
         // process so renderer selected/unselected styles are applied
@@ -362,8 +404,12 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                         }
                     }
                 }
+                Image oldImage = ((Label)cmp).getIcon();
                 ((Label)cmp).setIcon(i);
                 ((Label)cmp).setText("");
+                if(oldImage == null || oldImage.getWidth() != i.getWidth() || oldImage.getHeight() != i.getHeight()) {
+                    ((Container)rootRenderer).revalidate();
+                }
                 return;
             } else {
                 ((Label)cmp).setIcon(null);
@@ -591,7 +637,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                             return;
                         }
                     }
-                }
+                } 
             }
         }
     }

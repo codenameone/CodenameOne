@@ -2,6 +2,7 @@ package com.codename1.impl.android;
 
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.view.MotionEvent;
+import com.codename1.codescan.ScanResult;
 import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
 
@@ -82,6 +83,7 @@ import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.widget.MediaController;
 import android.widget.VideoView;
+import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
@@ -171,6 +173,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Uri imageUri;
     private EventDispatcher callback;
     private int timeout = -1;
+    private CodeScannerImpl scannerInstance;
 
 
     @Override
@@ -3612,5 +3615,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void setTimeout(int t) {
         timeout = t;
+    }
+
+    @Override
+    public CodeScanner getCodeScanner() {
+        if(scannerInstance == null) {
+            scannerInstance = new CodeScannerImpl();
+        }
+        return scannerInstance;
+    }
+    
+    class CodeScannerImpl extends CodeScanner implements IntentResultListener {
+        private ScanResult callback;
+        
+        @Override
+        public void scanQRCode(ScanResult callback) {
+            if (activity instanceof CodenameOneActivity) {
+                ((CodenameOneActivity) activity).setIntentResultListener(this);
+            }
+            this.callback = callback;
+            IntentIntegrator in = new IntentIntegrator(activity);
+            in.initiateScan(in.QR_CODE_TYPES);
+        }
+
+        @Override
+        public void scanBarCode(ScanResult callback) {
+            if (activity instanceof CodenameOneActivity) {
+                ((CodenameOneActivity) activity).setIntentResultListener(this);
+            }
+            this.callback = callback;
+            IntentIntegrator in = new IntentIntegrator(activity);
+            in.initiateScan(in.PRODUCT_CODE_TYPES);
+        }
+
+        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            if (requestCode == IntentIntegrator.REQUEST_CODE && callback != null) {
+                if (resultCode == Activity.RESULT_OK) {
+                    String contents = data.getStringExtra("SCAN_RESULT");
+                    String formatName = data.getStringExtra("SCAN_RESULT_FORMAT");
+                    byte[] rawBytes = data.getByteArrayExtra("SCAN_RESULT_BYTES");
+                    callback.scanCompleted(contents, formatName, rawBytes);
+                } else {
+                    callback.scanError(resultCode, null);
+                }
+                callback = null;
+            }
+            
+            // restore old activity handling
+            if (activity instanceof CodenameOneActivity) {
+                ((CodenameOneActivity) activity).setIntentResultListener(AndroidImplementation.this);
+            }
+        }
     }
 }

@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
@@ -4604,5 +4605,13 @@ public abstract class CodenameOneImplementation {
                 return null;
             }
         };
+    }
+    
+    /**
+     * Returns the native implementation of the code scanner or null
+     * @return code scanner instance
+     */
+    public CodeScanner getCodeScanner() {
+        return null;
     }
 }

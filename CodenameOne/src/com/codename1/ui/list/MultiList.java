@@ -32,6 +32,8 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class MultiList extends List {
+    private MultiButton sel;
+    private MultiButton unsel;
     /**
      * Constructor for the GUI builder
      */
@@ -41,8 +43,15 @@ public class MultiList extends List {
             h("Entry 2", "more..."),
             h("Entry 3", "more..."),
         }));
-        MultiButton sel = new MultiButton();
-        MultiButton unsel = new MultiButton();
+        sel = new MultiButton();
+        unsel = new MultiButton();
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    protected void initComponent() {
+        super.initComponent();
         GenericListCellRenderer gn = new GenericListCellRenderer(sel, unsel);
         setRenderer(gn);
     }
@@ -52,5 +61,81 @@ public class MultiList extends List {
         h.put("Line1", fline);
         h.put("Line2", sline);
         return h;
+    }
+    
+    /**
+     * Allows developers to customize the properties of the selected multi-button in code
+     * @return the selected multi button
+     */
+    public MultiButton getSelectedButton() {
+        return sel;
+    }
+
+    /**
+     * Allows developers to customize the properties of the unselected multi-button in code
+     * @return the unselected multi button
+     */
+    public MultiButton getUnselectedButton() {
+        return unsel;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {
+            "name1", "name2", "name3", "name4", 
+            "uiid1", "uiid2", "uiid3", "uiid4", "iconName", "iconUiid", "iconPosition",
+            "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
+            "invertFirstTwoEntries", "checkBox", "radioButton", 
+            "maskName"
+        };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {
+           String.class,// name1
+           String.class,// name2
+           String.class,// name3
+           String.class,// name4
+           String.class,// uiid1
+           String.class,// uiid2
+           String.class,// uiid3
+           String.class,// uiid4
+           String.class,// iconName
+           String.class,// iconUiid
+           String.class,// iconPosition
+           String.class,// emblemName
+           String.class,// emblemUiid
+           String.class,// emblemPosition
+           Boolean.class,
+           Boolean.class,
+           Boolean.class,
+           Boolean.class,
+           String.class
+       };
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        return unsel.getPropertyValue(name);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        unsel.setPropertyValue(name, value);
+        String v = sel.setPropertyValue(name, value);
+        if(isInitialized()) {
+            GenericListCellRenderer gn = new GenericListCellRenderer(sel, unsel);
+            setRenderer(gn);
+        }
+        return v;
     }
 }

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
@@ -2932,5 +2933,13 @@ public final class Display {
      */
     public Purchase getInAppPurchase(boolean physicalGoods) {
         return impl.getInAppPurchase(physicalGoods);
+    }
+    
+    /**
+     * Returns the native implementation of the code scanner or null
+     * @return code scanner instance
+     */
+    public CodeScanner getCodeScanner() {
+        return impl.getCodeScanner();
     }
 }

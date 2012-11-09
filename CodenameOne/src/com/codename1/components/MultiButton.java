@@ -321,7 +321,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * Sets the name of the row (important for use in generic renderers
+     * Sets the name of the row (important for use in generic renderers)
      * 
      * @param t name to set
      */
@@ -337,7 +337,7 @@ public class MultiButton extends Container {
     public String getNameLine1() {
         return firstRow.getName();
     }
-
+    
     /**
      * Sets the UIID of the row
      * 

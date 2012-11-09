@@ -20,26 +20,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.io;
+package com.codename1.cloud;
 
 /**
- * Thrown in case of a server error or failure in connection
+ * Used as a callback for the asynchronous version of the cloud storage API, these methods 
+ * are invoked on the EDT!
  *
  * @author Shai Almog
  */
-public class CloudException extends Exception {
-    private int errorCode;
-    CloudException(int errorCode) {
-        super("Cloud exception " + errorCode);
-        this.errorCode = errorCode;
-    }
+public interface CloudResponse<T> {
+    /**
+     * Invoked to return a value from the asynchronous version of the API
+     * 
+     * @param returnValue the return value of the metho
+     */
+    public void onSuccess(T returnValue);
     
     /**
-     * Returns the error code for the cloud exception, see the cloud storage for return codes
+     * Invoked if there was a server error 
      * 
-     * @return the error code
+     * @param err the exception containing the error details
      */
-    public int getErrorCode() {
-        return errorCode;
-    }
+    public void onError(CloudException err);
 }

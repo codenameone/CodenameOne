@@ -20,8 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.io;
+package com.codename1.cloud;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;

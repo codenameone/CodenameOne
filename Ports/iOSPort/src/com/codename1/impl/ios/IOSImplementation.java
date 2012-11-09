@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.codescan.CodeScanner;
+import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.impl.CodenameOneImplementation;
@@ -54,6 +56,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -67,9 +70,11 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
@@ -93,6 +98,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static boolean initialized;
     private boolean editingText;
     private Lifecycle life;
+    private static CodeScannerImpl scannerInstance;
     
     public void initEDT() {
         while(!initialized) {
@@ -2604,7 +2610,33 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(s == null) {
             return null;
         }
-        return s.split(",");
+        
+        // iOS has a bug where it concates identical headers using a comma
+        // but since cookies use a comma in their expires header we need to 
+        // join them back together...
+        String[] tokenized = s.split(",");
+        if(tokenized.length > 1) {
+            List<String> result = new ArrayList<String>();
+            String loaded = null;
+            for(String current : tokenized) {
+                if(loaded != null) {
+                    result.add(loaded + current);
+                    loaded = null;
+                } else {
+                    int p = current.indexOf("expires=");
+                    int c = current.lastIndexOf(";");
+                    if(c < p && p > 0) {
+                        loaded = current;
+                    } else {
+                        result.add(current);
+                    }
+                }
+            }
+            String[] resultArr = new String[result.size()];
+            result.toArray(resultArr);
+            return resultArr;
+        }
+        return tokenized;
     }
 
     /**
@@ -3097,6 +3129,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationDidBecomeActive();
         }
+        Form f = Display.getInstance().getCurrent();
+        if(f != null) {
+            f.revalidate();
+        }
     }
     
     /**
@@ -3224,5 +3260,44 @@ public class IOSImplementation extends CodenameOneImplementation {
             };
         }
         return pur;
+    }
+    
+    @Override
+    public CodeScanner getCodeScanner() {
+        if(scannerInstance == null) {
+            scannerInstance = new CodeScannerImpl();
+        }
+        return scannerInstance;
+    }
+    
+    static void scanCompleted(String contents, String formatName) {
+        scannerInstance.callback.scanCompleted(contents, formatName, null);
+        scannerInstance.callback = null;
+    }
+
+    static void scanError(int errorCode, String message) {
+        scannerInstance.callback.scanError(errorCode, message);
+        scannerInstance.callback = null;
+    }
+
+    static void scanCanceled() {
+        scannerInstance.callback.scanCanceled();
+        scannerInstance.callback = null;
+    }
+    
+    class CodeScannerImpl extends CodeScanner  {
+        private ScanResult callback;
+        
+        @Override
+        public void scanQRCode(ScanResult callback) {
+            this.callback = callback;
+            IOSNative.scanQRCode();
+        }
+
+        @Override
+        public void scanBarCode(ScanResult callback) {
+            this.callback = callback;
+            IOSNative.scanBarCode();
+        }
     }
 }

@@ -1512,23 +1512,30 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void loadSkinFile(String f, JFrame frm) {
-        File fsFile = new File(f);
-        if (fsFile.exists()) {
-            f = fsFile.toURI().toString();
-        }
-        if (f.contains(":")) {
-            try {
-                // load Via URL loading
-                loadSkinFile(new URL(f).openStream(), frm);
-            } catch (IOException ex) {
-                ex.printStackTrace();
+        try {
+            File fsFile = new File(f);
+            if (fsFile.exists()) {
+                f = fsFile.toURI().toString();
             }
-        } else {
-            loadSkinFile(getResourceAsStream(getClass(), f), frm);
+            if (f.contains(":")) {
+                try {
+                    // load Via URL loading
+                    loadSkinFile(new URL(f).openStream(), frm);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            } else {
+                loadSkinFile(getResourceAsStream(getClass(), f), frm);
+            }
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            pref.put("skin", f);
+            addSkinName(f);
         }
-        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        pref.put("skin", f);
-        addSkinName(f);
+        catch(Throwable t) {
+            t.printStackTrace();
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            pref.remove("skin");
+        }
     }
 
     /**
