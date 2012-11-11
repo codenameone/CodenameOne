@@ -563,6 +563,10 @@ public class Tabs extends Container {
      */
     public void removeTabAt(int index) {
         checkIndex(index);
+//        if(index == activeComponent){
+            activeComponent--;
+            activeComponent = Math.max(activeComponent, 0);
+//        }
         Component key = tabsContainer.getComponentAt(index);
         tabsContainer.removeComponent(key);
         Component content = contentPane.getComponentAt(index);
