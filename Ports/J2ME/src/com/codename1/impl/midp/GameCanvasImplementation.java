@@ -23,6 +23,8 @@
  */
 package com.codename1.impl.midp;
 
+import com.codename1.impl.midp.codescan.CodeScannerImpl;
+import com.codename1.codescan.CodeScanner;
 import com.codename1.components.MediaPlayer;
 import com.codename1.contacts.Contact;
 import com.codename1.impl.CodenameOneImplementation;
@@ -1464,6 +1466,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         
         MIDPVideoComponent(MMAPIPlayer player) {            
             this.player = player;
+            putClientProperty("nativePlayer", player.nativePlayer);
         }
 
         public int getDuration() {
@@ -1595,7 +1598,8 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         }
 
         public void cleanup() {
-            player.cleanup();
+            player.cleanup();            
+            putClientProperty("nativePlayer", null);
             if(nativePlayer && curentForm != null){
                 curentForm.showBack();
                 curentForm = null;
@@ -3042,4 +3046,37 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         }
         return lm;
     }
+    
+    
+    /**
+     * Returns the native implementation of the code scanner or null
+     *
+     * @return code scanner instance
+     */
+    public CodeScanner getCodeScanner() {
+        
+        MMAPIPlayer player = null;
+        
+        String platform = System.getProperty("microedition.platform");
+        if (platform != null && platform.indexOf("Nokia") >= 0) {
+            try {
+                player = MMAPIPlayer.createPlayer("capture://image", null);                
+            } catch (Throwable e) {
+            	// Ignore all exceptions for image capture, continue with video capture...
+            }
+        }
+        if (player == null) {
+            try {
+                player = MMAPIPlayer.createPlayer("capture://video", null);                
+            } catch (Exception e) {
+                // The Nokia 2630 throws this if image/video capture is not supported
+                throw new RuntimeException("Image/video capture not supported on this phone");
+            }
+        }
+        
+        MIDPVideoComponent video = new MIDPVideoComponent(player);
+        video.setFocusable(false);
+        return new CodeScannerImpl(video);
+    }
+
 }

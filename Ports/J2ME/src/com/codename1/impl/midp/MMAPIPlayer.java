@@ -42,7 +42,7 @@ import javax.microedition.media.control.VolumeControl;
  * this class might be changed at any moment it is an implementation detail
  * @author Shai Almog
  */
-class MMAPIPlayer implements PlayerListener, Media{
+public class MMAPIPlayer implements PlayerListener, Media{
     private static int volume = -1;
     private boolean deleted;
     private int lastTime;
