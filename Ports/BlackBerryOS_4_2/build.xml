@@ -81,6 +81,8 @@
                 <exclude name="META-INF/*" />
                 <exclude name="**/ImplementationFactory*" />
             </zipfileset>
+            <zipfileset src="lib/zxing_lib.jar">
+            </zipfileset>
             <manifest>
             </manifest>
         </jar>
