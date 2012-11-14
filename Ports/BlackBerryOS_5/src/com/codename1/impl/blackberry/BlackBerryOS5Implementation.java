@@ -24,7 +24,11 @@
  */
 package com.codename1.impl.blackberry;
 
+import com.codename1.codescan.CodeScanner;
 import com.codename1.db.Database;
+import com.codename1.impl.blackberry.codescan.AdvancedMultimediaManager;
+import com.codename1.impl.blackberry.codescan.CodeScannerImpl;
+import com.codename1.impl.blackberry.codescan.MultimediaManager;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.BrowserComponent;
@@ -473,4 +477,13 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         }
         return new BufferedOutputStream(os, ((HttpConnection) connection).getURL());
 	}
+        
+        
+    public CodeScanner getCodeScanner() {
+        
+        systemOut("AdvancedMultimediaManager");
+
+        return new CodeScannerImpl(new AdvancedMultimediaManager());
+    }
+        
 }
