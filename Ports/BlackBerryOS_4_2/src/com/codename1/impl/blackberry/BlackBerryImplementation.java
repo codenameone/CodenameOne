@@ -24,6 +24,7 @@
  */
 package com.codename1.impl.blackberry;
 
+import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
@@ -36,6 +37,8 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.blackberry.codescan.CodeScannerImpl;
+import com.codename1.impl.blackberry.codescan.MultimediaManager;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
@@ -2973,5 +2976,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         EventLog.getInstance().logInformationEvent(content);
     }
     
-       
+    public CodeScanner getCodeScanner() {
+        systemOut("MultimediaManager");
+        return new CodeScannerImpl(new MultimediaManager());
+    }
 }
