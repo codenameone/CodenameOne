@@ -1560,7 +1560,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         
         String hide = System.getProperty("hideMenu", "false");
-        System.out.println("hide " + hide);
         if(hide != null && hide.equals("true")){
             showMenu = false;
         }
