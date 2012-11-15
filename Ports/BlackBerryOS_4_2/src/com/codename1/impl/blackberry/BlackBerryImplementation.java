@@ -2956,7 +2956,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 }
 
                 public String formatDateTime(Date d) {
-                    return DateFormat.getInstance(DateFormat.DATE_FULL).format(d);
+                    String date = DateFormat.getInstance(DateFormat.DATE_FULL).format(d);
+                    String time = DateFormat.getInstance(DateFormat.TIME_FULL).format(d);
+                    return date + " " + time;
                 }
 
                 public String getCurrencySymbol() {
