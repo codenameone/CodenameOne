@@ -340,12 +340,39 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if (nativeEdit != null) {
             finishEdit(true);
         }
-
         lightweightEdit = (TextArea) cmp;
         if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
-            text += ((char) keyCode);
+            
+            //if this is a number
+            if ((constraint & TextArea.DECIMAL) == TextArea.DECIMAL
+                    || (constraint & TextArea.NUMERIC) == TextArea.NUMERIC
+                    || (constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
+                if(keyCode == 119){
+                    text += "1";
+                }else if(keyCode == 101){
+                    text += "2";                
+                }else if(keyCode == 114){
+                    text += "3";                
+                }else if(keyCode == 115){
+                    text += "4";                
+                }else if(keyCode == 100){
+                    text += "5";                
+                }else if(keyCode == 102){
+                    text += "6";                
+                }else if(keyCode == 122){
+                    text += "7";                
+                }else if(keyCode == 120){
+                    text += "8";                
+                }else if(keyCode == 99){
+                    text += "9";                
+                }
+            }else{
+                text += ((char) keyCode);            
+            }
+            
             lightweightEdit.setText(text);
         }
+        
         class LightweightEdit implements Runnable, Animation {
 
             public void run() {
@@ -366,9 +393,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 } else if ((constraint & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE) {
                     type = BasicEditField.NO_COMPLEX_INPUT;
                 }
-                        
-                    
-                
 
                 if (lightweightEditTmp.isSingleLineTextArea()) {
                     type |= BasicEditField.NO_NEWLINE;
@@ -380,6 +404,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     nativeEdit = new BBEditField(lightweightEditTmp, type, maxSize);
                 }
                 nativeEdit.setEditable(true);
+                
                 Font f = nativeEdit.getFont();
                 if (f.getHeight() > lightweightEditTmp.getStyle().getFont().getHeight()) {
                     nativeEdit.setFont(f.derive(f.getStyle(), lightweightEditTmp.getStyle().getFont().getHeight()));
@@ -2975,11 +3000,10 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     public void systemOut(String content){
-        EventLog.getInstance().logInformationEvent(content);
+        EventLog.getInstance().logAlwaysEvent(content);
     }
     
     public CodeScanner getCodeScanner() {
-        systemOut("MultimediaManager");
         return new CodeScannerImpl(new MultimediaManager());
     }
 }
