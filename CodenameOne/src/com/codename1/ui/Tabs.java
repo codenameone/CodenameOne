@@ -27,6 +27,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -76,7 +77,10 @@ public class Tabs extends Container {
     private int lastX = -1;
     private boolean dragStarted = false;
     private int activeComponent = 0;
+    private int active = 0;
+    
     private EventDispatcher focusListeners;
+    private EventDispatcher selectionListener;
     private TabFocusListener focusListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
@@ -217,10 +221,10 @@ public class Tabs extends Container {
                 int xOffset;
                 if(isRTL()) {
                     xOffset = (size - i) * contentPane.getWidth();
-                    xOffset -= ((size - activeComponent) * contentPane.getWidth());
+                    xOffset -= ((size - active) * contentPane.getWidth());
                 } else {
                     xOffset = i * contentPane.getWidth();
-                    xOffset -= (activeComponent * contentPane.getWidth());
+                    xOffset -= (active * contentPane.getWidth());
                 }
                 xOffset += motionX;
                 Component component = contentPane.getComponentAt(i);
@@ -233,7 +237,7 @@ public class Tabs extends Container {
                 }
                 slideToDestMotion = null;
                 deregisterAnimatedInternal();
-                setSelectedIndex(activeComponent);
+                setSelectedIndex(active);
             }
             return true;
         }
@@ -460,11 +464,12 @@ public class Tabs extends Container {
                         }
                     }
                 }
-                activeComponent = tabsContainer.getComponentIndex(b);
-                Component content = contentPane.getComponentAt(activeComponent);
+                active = tabsContainer.getComponentIndex(b);                
+                Component content = contentPane.getComponentAt(active);
                 if (content instanceof Container) {
                     ((Container) content).setBlockFocus(false);
                 }
+                setSelectedIndex(active);
                 initTabsFocus();
                 selectedTab = b;
                 selectedTab.setShouldCalcPreferredSize(true);
@@ -563,10 +568,9 @@ public class Tabs extends Container {
      */
     public void removeTabAt(int index) {
         checkIndex(index);
-//        if(index == activeComponent){
-            activeComponent--;
-            activeComponent = Math.max(activeComponent, 0);
-//        }
+        int act = activeComponent - 1;
+        act = Math.max(act, 0);
+        setSelectedIndex(act);
         Component key = tabsContainer.getComponentAt(index);
         tabsContainer.removeComponent(key);
         Component content = contentPane.getComponentAt(index);
@@ -645,6 +649,7 @@ public class Tabs extends Container {
     /**
      * Adds a focus listener to the tabs buttons
      * 
+     * @deprecated use addSelectionListener instead
      * @param listener FocusListener
      */
     public void addTabsFocusListener(FocusListener listener){
@@ -653,10 +658,13 @@ public class Tabs extends Container {
         }
         focusListeners.addListener(listener);
     }
+    
+    
      
     /**
      * Removes a foucs Listener from the tabs buttons
      * 
+     * @deprecated use addSelectionListener instead
      * @param listener FocusListener
      */
     public void removeTabsFocusListener(FocusListener listener){
@@ -664,6 +672,32 @@ public class Tabs extends Container {
             focusListeners.removeListener(listener);
         }
     }
+    
+    /**
+     * Adds a selection listener to the tabs.
+     * 
+     * @param listener SelectionListener
+     */
+    public void addSelectionListener(SelectionListener listener){
+        if(selectionListener == null){
+            selectionListener = new EventDispatcher();
+        }
+        selectionListener.addListener(listener);
+    }
+    
+    
+     
+    /**
+     * Removes a selection Listener from the tabs
+     * 
+     * @param listener SelectionListener
+     */
+    public void removeSelectionListener(SelectionListener listener){
+        if(selectionListener != null){
+            selectionListener.removeListener(listener);
+        }
+    }
+    
 
     /**
      * @inheritDoc
@@ -712,12 +746,20 @@ public class Tabs extends Container {
      * @throws IndexOutOfBoundsException if index is out of range
      * (index < 0 || index >= tab count)
      */
-    public void setSelectedIndex(int index) {
+    public void setSelectedIndex(int index) {        
         if (index < 0 || index >= tabsContainer.getComponentCount()) {
             throw new IndexOutOfBoundsException("Index: "+index+", Tab count: "+tabsContainer.getComponentCount());
         }
+        if(index == activeComponent){
+            return;
+        }
+        if(selectionListener != null){
+            selectionListener.fireSelectionEvent(activeComponent, index);
+        }
+        activeComponent = index;
         Button b = (Button)tabsContainer.getComponentAt(index);
         b.fireClicked();
+        b.requestFocus();
     }
 
     /**
@@ -1031,18 +1073,18 @@ public class Tabs extends Container {
                                     diff *= -1;
                                 }
                                 if (diff > 0) {
-                                    activeComponent--;
-                                    if (activeComponent < 0) {
-                                        activeComponent = 0;
+                                    active = activeComponent - 1;
+                                    if (active < 0) {
+                                        active = 0;
                                     }
                                 } else {
-                                    activeComponent++;
-                                    if (activeComponent >= contentPane.getComponentCount()) {
-                                        activeComponent = contentPane.getComponentCount() - 1;
+                                    active = activeComponent + 1;
+                                    if (active >= contentPane.getComponentCount()) {
+                                        active = contentPane.getComponentCount() - 1;
                                     }
                                 }
                             }
-                            int start = contentPane.getComponentAt(activeComponent).getX();
+                            int start = contentPane.getComponentAt(active).getX();
                             int end = 0;
                             slideToDestMotion = Motion.createSplineMotion(start, end, 250);
                             slideToDestMotion.start();
