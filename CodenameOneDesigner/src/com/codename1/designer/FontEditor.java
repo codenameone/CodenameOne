@@ -757,7 +757,7 @@ public class FontEditor extends BaseForm {
      * Creates a bitmap font object
      */
     public com.codename1.ui.Font createBitmapFont() {
-        BufferedImage image = new BufferedImage(5000, 50, BufferedImage.TYPE_INT_RGB);
+        BufferedImage image = new BufferedImage(5000, 100, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = (Graphics2D)image.getGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2d.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);

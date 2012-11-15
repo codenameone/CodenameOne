@@ -421,7 +421,7 @@ public class EventDispatcher {
     }
     
     /**
-     * Synchronious internal call for common code
+     * Synchronous internal call for common code
      */
     private void fireActionSync(ActionListener[] array, ActionEvent ev) {
         for(int iter = 0 ; iter < array.length ; iter++) {

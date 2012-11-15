@@ -47,10 +47,21 @@ public class CacheMap {
     private Hashtable weakCache = new Hashtable();
 
     private int storageCacheSize = 0;
-    private Vector storageCacheContent = new Vector();
+    private Vector storageCacheContentVec;
     private String cachePrefix = "";
     private boolean alwaysStore;
-
+    private int storageKey = -1;
+    
+    private Vector getStorageCacheContent() {
+        if(storageCacheContentVec == null) {
+            storageCacheContentVec = (Vector)Storage.getInstance().readObject("$CACHE$Idx" + cachePrefix);
+            if(storageCacheContentVec == null) {
+                storageCacheContentVec = new Vector();
+            }
+        }
+        return storageCacheContentVec;
+    }
+    
     /**
      * Default constructor
      */
@@ -65,6 +76,8 @@ public class CacheMap {
     public CacheMap(String prefix) {
         this.cachePrefix = prefix;
     }
+    
+    
     
     /**
      * Indicates the size of the memory cache after which the cache won't grow further
@@ -126,9 +139,21 @@ public class CacheMap {
      * 
      * @param key entry to remove from the cache
      */
-    public void delete(String key) {
+    public void delete(Object key) {
         memoryCache.remove(key);
         weakCache.remove(key);
+        Vector storageCacheContent = getStorageCacheContent();
+        int s = storageCacheContent.size();
+        for(int iter = 0 ; iter < s ; iter++) {
+            Object[] obj = (Object[])storageCacheContent.elementAt(iter);
+            if(obj[1].equals(key)) {
+                Storage.getInstance().deleteStorageFile("$CACHE$" + cachePrefix + key.toString());
+                obj[0] = new Long(Long.MIN_VALUE);
+                obj[1] = obj[0];                
+                Storage.getInstance().writeObject("$CACHE$Idx" + cachePrefix, storageCacheContent);
+                return;
+            }
+        }
     }
     
     /**
@@ -152,14 +177,18 @@ public class CacheMap {
             }
         }
         if(storageCacheSize > 0) {
+            Vector storageCacheContent = getStorageCacheContent();
             for(int iter = 0 ; iter < storageCacheContent.size() ; iter++) {
                 Object[] obj = (Object[])storageCacheContent.elementAt(iter);
                 if(obj[1].equals(key)) {
                     // place the object back into the memory cache and return the value
-                    Vector v = (Vector)Storage.getInstance().readObject("$CACHE$" + cachePrefix + iter);
-                    Object val = v.elementAt(0);
-                    put(key, val);
-                    return val;
+                    Vector v = (Vector)Storage.getInstance().readObject("$CACHE$" + cachePrefix + key.toString());
+                    if(v != null) {
+                        Object val = v.elementAt(0);
+                        put(key, val);
+                        return val;
+                    }
+                    return null;
                 }
             }
         }
@@ -186,6 +215,21 @@ public class CacheMap {
         if(storageCacheSize < 1) {
             return;
         }
+
+        Vector storageCacheContent = getStorageCacheContent();
+        int vecSize = storageCacheContent.size();
+
+        // find the best place
+        for(int iter = 0 ; iter < vecSize ; iter++) {
+            Object[] index = (Object[])storageCacheContent.elementAt(iter);
+            Object indexKey = index[1];
+            if(indexKey.equals(key)) {
+                // already in storage just update the data
+                placeInStorageCache(iter, key, lastAccessed, value);
+                return;
+            }
+        }
+        
         if(storageCacheContent.size() < storageCacheSize) {
             placeInStorageCache(storageCacheContent.size(), key, lastAccessed, value);
         } else {
@@ -193,7 +237,7 @@ public class CacheMap {
             int offset = 0;
 
             // find the best place
-            for(int iter = 0 ; iter < storageCacheSize ; iter++) {
+            for(int iter = 0 ; iter < vecSize ; iter++) {
                 Object[] index = (Object[])storageCacheContent.elementAt(iter);
                 long current = ((Long)index[0]).longValue();
                 if(smallest > current) {
@@ -211,12 +255,14 @@ public class CacheMap {
         Long l = new Long(lastAccessed);
         v.addElement(l);
         v.addElement(key);
-        Storage.getInstance().writeObject("$CACHE$" + cachePrefix + offset, v);
+        Storage.getInstance().writeObject("$CACHE$" + cachePrefix + key.toString(), v);
+        Vector storageCacheContent = getStorageCacheContent();
         if(storageCacheContent.size() > offset) {
             storageCacheContent.setElementAt(new Object[] {l, key}, offset);
         } else {
             storageCacheContent.insertElementAt(new Object[] {l, key}, offset);
         }
+        Storage.getInstance().writeObject("$CACHE$Idx" + cachePrefix, storageCacheContent);
     }
     
     /**
@@ -235,15 +281,20 @@ public class CacheMap {
         while(en.hasMoreElements()) {
             r.addElement(en.nextElement());
         }
+        Vector storageCacheContent = getStorageCacheContent();
         for(int iter = 0 ; iter < storageCacheContent.size() ; iter++) {
             Object[] o = (Object[])storageCacheContent.elementAt(iter);
-            r.addElement(o[1]);
+            if(!r.contains(o[1])) {
+                r.addElement(o[1]);
+            }
         }
         return r;
     }
 
     private Vector fetchFromStorageCache(int offset) {
-        return (Vector)Storage.getInstance().readObject("$CACHE$" + cachePrefix + offset);
+        Vector v = getStorageCacheContent();
+        Object[] arr = (Object[])v.elementAt(offset);
+        return (Vector)Storage.getInstance().readObject("$CACHE$" + cachePrefix + arr[1].toString());
     }
 
     /**
@@ -251,9 +302,14 @@ public class CacheMap {
      */
     public void clearStorageCache() {
         if(storageCacheSize > 0) {
-            for(int iter = 0 ; iter < storageCacheSize ; iter++) {
-                Storage.getInstance().deleteStorageFile("$CACHE$" + cachePrefix + iter);
+            Vector v = getStorageCacheContent();
+            int s = v.size();
+            for(int iter = 0 ; iter < s ; iter++) {
+                Object[] arr = (Object[])v.elementAt(iter);
+                Storage.getInstance().deleteStorageFile("$CACHE$" + cachePrefix + arr[iter].toString());
             }
+            Storage.getInstance().deleteStorageFile("$CACHE$Idx" + cachePrefix);
+            storageCacheContentVec = new Vector();
         }
     }
 
@@ -275,12 +331,18 @@ public class CacheMap {
      */
     public void setStorageCacheSize(int storageCacheSize) {
         this.storageCacheSize = storageCacheSize;
-        for(int iter = 0 ; iter < storageCacheSize ; iter++) {
+        /*for(int iter = 0 ; iter < storageCacheSize ; iter++) {
             Vector v = fetchFromStorageCache(iter);
             if(v != null) {
-                storageCacheContent.insertElementAt(new Object[] {v.elementAt(1), v.elementAt(2)}, iter);
+                Object o = new Object[] {v.elementAt(1), v.elementAt(2)};
+                Vector storageCacheContent = getStorageCacheContent();
+                if(iter >= storageCacheContent.size()) {
+                    storageCacheContent.addElement(o);
+                } else {
+                    storageCacheContent.insertElementAt(o, iter);
+                }
             }
-        }
+        }*/
         if(storageCacheSize == 0) {
             alwaysStore = false;
         }

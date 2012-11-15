@@ -183,6 +183,9 @@ public class UIBuilder {
     static final int PROPERTY_FLATTEN = 73;
     static final int PROPERTY_DISPOSE_WHEN_POINTER_OUT = 74;
 
+    static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
+    static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
+
     static final int LAYOUT_BOX_X = 5002;
     static final int LAYOUT_BOX_Y = 5003;
     static final int LAYOUT_GRID = 5006;
@@ -1114,6 +1117,14 @@ public class UIBuilder {
                 case PROPERTY_DISPOSE_WHEN_POINTER_OUT:
                     ((Dialog)cmp).setDisposeWhenPointerOutOfBounds(in.readBoolean());
                     break;
+                    
+                case PROPERTY_CLOUD_BOUND_PROPERTY:
+                    cmp.setCloudBoundProperty(in.readUTF());
+                    break;
+                    
+                case PROPERTY_CLOUD_DESTINATION_PROPERTY:
+                    cmp.setCloudDestinationProperty(in.readUTF());
+                    break;
 
                 case PROPERTY_DIALOG_POSITION:
                     String pos = in.readUTF();
@@ -1155,7 +1166,11 @@ public class UIBuilder {
                     break;
 
                 case PROPERTY_VERTICAL_ALIGNMENT:
-                    ((Label)cmp).setVerticalAlignment(in.readInt());
+                    if(cmp instanceof TextArea) {
+                        ((TextArea)cmp).setVerticalAlignment(in.readInt());
+                    } else {
+                        ((Label)cmp).setVerticalAlignment(in.readInt());
+                    }
                     break;
 
                 case PROPERTY_TEXT_POSITION:

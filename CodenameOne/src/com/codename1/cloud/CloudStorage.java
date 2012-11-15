@@ -45,8 +45,9 @@ import java.util.Vector;
  * definitions).<br>
  * The calls to this class only become effective as a single batch when commit
  * is sent. The commit can be synchronous or asynchronous.<br>
- * <b>Important</b> due to the nature of the underlying object data store the
- * basic data is case sensitive and queries/sort will be performed in a case
+ * <b>Important</b> due to the nature of the underlying object data store queries
+ * can only be performed against an indexed field of which there are 10 hardcoded
+ * indexes! Basic data is case sensitive and queries/sort will be performed in a case
  * sensitive way! In order to work around this create a property with an identical 
  * name that contains the field as lower or upper case in order to query/sort 
  * against.
@@ -54,8 +55,8 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class CloudStorage {
-    static final String SERVER_URL = "https://codename-one.appspot.com"; 
-    //static final String SERVER_URL = "http://127.0.0.1:8888"; 
+    //static final String SERVER_URL = "https://codename-one.appspot.com"; 
+    static final String SERVER_URL = "http://127.0.0.1:8888"; 
             
     /**
      * Return code for methods in this class indicating a successful operation
@@ -91,15 +92,30 @@ public class CloudStorage {
      */
     public static final int RETURN_CODE_FAIL_PERMISSION_VIOLATION = 5;
 
+    /**
+     * Indicates the type of the field for queries and filtering
+     */
+    static final String TYPE_FIELD = "CN1Type";
+    
+    /**
+     * Indicates the index field prefix
+     */
+    static final String INDEX_FIELD = "CN1Index";
+
     private static CloudStorage INSTANCE;
     
-    private Vector storageQueue = new Vector();
+    private Vector storageQueue;
     
     static {
         Util.register("CloudObject", CloudObject.class);
     }
     
-    private CloudStorage() {}
+    private CloudStorage() {
+        storageQueue = (Vector)Storage.getInstance().readObject("CN1StorageQueue");
+        if(storageQueue == null) {
+            storageQueue = new Vector();
+        }
+    }
     
     /**
      * Creates an instance of the cloud storage object, only one instance should be used per application.
@@ -135,7 +151,7 @@ public class CloudStorage {
      */
     public synchronized void delete(CloudObject cl) {
         storageQueue.addElement(cl.getCloudId());
-        Storage.getInstance().writeObject("CN1StorageQueue", cl.getCloudId());
+        Storage.getInstance().writeObject("CN1StorageQueue", storageQueue);
         cl.setStatus(CloudObject.STATUS_DELETE_IN_PROGRESS);
     }
     
@@ -152,7 +168,30 @@ public class CloudStorage {
     public void refresh(CloudObject[] objects, CloudResponse<Integer> response) {
         refreshImpl(objects, response);
     }
-
+    
+    private Vector<CloudObject> pendingRefreshes;
+    
+    /**
+     * Adds the given object to a set of refresh operations in which we don't
+     * really care if the operation is successful
+     * @param obj the object to refresh
+     */
+    public void refreshAsync(CloudObject obj) {
+        if(pendingRefreshes == null) {
+            pendingRefreshes = new Vector<CloudObject>();
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    CloudObject[] arr = new CloudObject[pendingRefreshes.size()];
+                    pendingRefreshes.toArray(arr);
+                    pendingRefreshes = null;
+                    refresh(arr);
+                }
+            });
+        }
+        pendingRefreshes.addElement(obj);
+        obj.setStatus(CloudObject.STATUS_REFRESH_IN_PROGRESS);
+    }
+    
     class RefreshConnection extends ConnectionRequest {
         int returnValue;
         CloudObject[] objects;
@@ -242,6 +281,7 @@ public class CloudStorage {
     public CloudObject[] fetch(String[] cloudIds) throws CloudException {
         CloudObject[] objs = new CloudObject[cloudIds.length];
         for(int iter = 0 ; iter < objs.length ; iter++) {
+            objs[iter] = new CloudObject();
             objs[iter].setCloudId(cloudIds[iter]);
         }
         int err = refresh(objs);
@@ -259,11 +299,11 @@ public class CloudStorage {
      * @param cloudIds the object id's to fetch
      * @param response returns the response from the server
      * @return the cloud objects or null if a server error occurred
-     * @throws CloudException thrown for a server side/connection error
      */
-    public void fetch(String[] cloudIds, final CloudResponse<CloudObject[]> response) throws CloudException {
+    public void fetch(String[] cloudIds, final CloudResponse<CloudObject[]> response) {
         final CloudObject[] objs = new CloudObject[cloudIds.length];
         for(int iter = 0 ; iter < objs.length ; iter++) {
+            objs[iter] = new CloudObject();
             objs[iter].setCloudId(cloudIds[iter]);
         }
         refresh(objs, new CloudResponse<Integer>() {
@@ -281,66 +321,123 @@ public class CloudStorage {
      * Performs a query to the server finding the objects where the key
      * value is equal to the given value. 
      * This operation executes immeditely without waiting for commit.
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * 
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param sort the property to sort on or null to ignore sorting
-     * @param asc true for ascending order search, false otherwise (ignored when unsorted)
      * @return array of objects matching the query
      * @throws CloudException thrown for a server side/connection error
      */
-    public CloudObject[] queryEquals(String key, String value, int page, int limit, int visibilityScope, String sort, boolean asc) throws CloudException {
-        return (CloudObject[])queryImpl(key, value, page, limit, visibilityScope, 1, sort, asc, false, null);
+    public CloudObject[] queryEquals(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, false, null);
     }
     
     /**
-     * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * Performs a query to the server finding the objects where the sort is equal to the given value. 
+     * This operation executes immeditely without waiting for commit.
+     * 
+     * @param type the object type
+     * @param index the index on which the sore is based
+     * @param ascending indicates if the sort order is ascending or descending 
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @return the number of elements
+     * @return array of objects matching the query
      * @throws CloudException thrown for a server side/connection error
      */
-    public int queryEqualsCount(String key, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(key, value, 0, 0, visibilityScope, 1, null, false, true, null)).intValue();
+    public CloudObject[] querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
+        return (CloudObject[])queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, false, null);
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value and returning
+     * the cloud key of these objects. 
+     * This operation executes immeditely without waiting for commit.
+     * 
+     * @param type the object type
+     * @param index the index on which the sore is based
+     * @param ascending indicates if the sort order is ascending or descending 
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     * @return the keys for the cloud objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public String[] querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
+        return (String[])queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, true, null);
+    }
+    
+    /**
+     * Equivalent to the standard query but just returns the keys matching the given query
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     * @return the keys for the cloud objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public String[] queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+        return (String[])queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, true, null);
     }
 
     /**
      * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
      * @return the number of elements
      * @throws CloudException thrown for a server side/connection error
      */
-    public int queryGreaterThanCount(String key, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(key, value, 0, 0, visibilityScope, 2, null, false, true, null)).intValue();
+    public int queryEqualsCount(String type, int index, String value, int visibilityScope) throws CloudException {
+        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 1, 0, false, true, false, null)).intValue();
     }
 
     /**
      * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
      * @return the number of elements
      * @throws CloudException thrown for a server side/connection error
      */
-    public int queryLessThanCount(String key, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(key, value, 0, 0, visibilityScope, 3, null, false, true, null)).intValue();
+    public int queryGreaterThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
+        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 2, 0, false, true, false, null)).intValue();
+    }
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     * @return the number of elements
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public int queryLessThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
+        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 3, 0, false, true, false, null)).intValue();
     }
 
     /**
      * Performs a query to the server finding the objects where the key
      * value is greater than the given value. 
      * This operation executes immeditely without waiting for commit.
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
@@ -348,16 +445,17 @@ public class CloudStorage {
      * @return array of objects matching the query
      * @throws CloudException thrown for a server side/connection error
      */
-    public CloudObject[] queryGreaterThan(String key, String value, int page, int limit, int visibilityScope) throws CloudException {
-        return (CloudObject[])queryImpl(key, value, page, limit, visibilityScope, 2, null, false, false, null);
+    public CloudObject[] queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 2, 0, false, false, false, null);
     }
 
     /**
      * Performs a query to the server finding the objects where the key
      * value is smaller than the given value. 
      * This operation executes immeditely without waiting for commit.
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
@@ -365,14 +463,15 @@ public class CloudStorage {
      * @return array of objects matching the query
      * @throws CloudException thrown for a server side/connection error
      */
-    public CloudObject[] queryLessThan(String key, String value, int page, int limit, int visibilityScope, boolean mine) throws CloudException {
-        return (CloudObject[])queryImpl(key, value, page, limit, visibilityScope, 3, null, false, false, null);
+    public CloudObject[] queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 3, 0, false, false, false, null);
     }
     
     class QueryRequest extends ConnectionRequest {
         int returnValue = RETURN_CODE_FAIL_SERVER_ERROR;
         CloudResponse response;
         boolean countQuery;
+        boolean keyQuery;
         Object returnObject;
         
         protected void postResponse() {
@@ -400,6 +499,15 @@ public class CloudStorage {
                     returnValue = RETURN_CODE_SUCCESS;
                     return;
                 }
+                if(keyQuery) {
+                    String[] result = new String[count];
+                    for(int iter = 0 ; iter  < result.length ; iter++) {
+                        result[iter] = di.readUTF();
+                    }
+                    returnValue = RETURN_CODE_SUCCESS;
+                    returnObject = result;
+                    return;
+                }
 
                 objects = new CloudObject[count];
                 for(int iter = 0 ; iter  < objects.length ; iter++) {
@@ -420,23 +528,27 @@ public class CloudStorage {
         }
     }
     
-    private Object queryImpl(String key, String value, int page, int limit, int visibilityScope, int operator, String sort, boolean asc, boolean countQuery, CloudResponse response) throws CloudException {
+    private Object queryImpl(String type, String value, int index, int page, int limit, int visibilityScope, int operator, int sort, boolean asc, boolean countQuery, boolean keyQuery, CloudResponse response) throws CloudException {
         QueryRequest queryRequest = new QueryRequest();
         queryRequest.response = response;
         queryRequest.countQuery = countQuery;
+        queryRequest.keyQuery = keyQuery;
         queryRequest.setPost(true);
         queryRequest.setUrl(SERVER_URL + "/objStoreQuery");
         
         queryRequest.addArgument("t", CloudPersona.getCurrentPersona().getToken());
         queryRequest.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        queryRequest.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
-        queryRequest.addArgument("k", key);
-        queryRequest.addArgument("v", value);
+        queryRequest.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));        
+        queryRequest.addArgument("ty", type);
+        if(value != null && index > 0) {
+            queryRequest.addArgument("k", INDEX_FIELD + index);
+            queryRequest.addArgument("v", value);
+        }
         queryRequest.addArgument("p", "" + page);
         queryRequest.addArgument("l", "" + limit);
         queryRequest.addArgument("sc", "" + visibilityScope);
-        if(sort != null) {
-            queryRequest.addArgument("s", sort);
+        if(sort != 0) {
+            queryRequest.addArgument("s", INDEX_FIELD + sort);
             if(asc) {
                 queryRequest.addArgument("sd", "0");
             } else {
@@ -445,6 +557,10 @@ public class CloudStorage {
         }
         if(countQuery) {
             queryRequest.addArgument("c", "1");
+        } else {
+            if(keyQuery) {
+                queryRequest.addArgument("c", "2");
+            }
         }
         
         queryRequest.addArgument("o", "" + operator);
@@ -462,78 +578,139 @@ public class CloudStorage {
         return queryRequest.returnObject;
     }
     
-    
     /**
-     * Performs a query to the server finding the objects where the key
-     * value is equal to the given value. 
+     * Performs a query to the server finding the objects where the sort is equal to the given value. 
      * This operation executes immeditely without waiting for commit.
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * 
+     * @param type the object type
+     * @param index the index on which the sore is based
+     * @param ascending indicates if the sort order is ascending or descending 
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param sort the property to sort on or null to ignore sorting
-     * @param asc true for ascending order search, false otherwise (ignored when unsorted)
-     * @param response callback containing the return value or error message
      */
-    public void queryEquals(String key, String value, int page, int limit, int visibilityScope, String sort, boolean asc, CloudResponse<CloudObject[]> response) {
+    public void querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
         try {
-            queryImpl(key, value, page, limit, visibilityScope, 1, sort, asc, false, response);
+            queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, false, response);
         } catch(CloudException e) {
             // won't happen
-            e.printStackTrace();
+            response.onError(e);
+        }
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is equal to the given value. 
+     * This operation executes immeditely without waiting for commit.
+     * 
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     */
+    public void queryEquals(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
+        try {
+            queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, false, response);
+        } catch(CloudException e) {
+            // won't happen
+            response.onError(e);
         }
     }
     
     /**
      * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param response callback containing the return value or error message
      */
-    public void queryEqualsCount(String key, String value, int visibilityScope, CloudResponse<Integer> response) {
+    public void queryEqualsCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
         try {
-            queryImpl(key, value, 0, 0, visibilityScope, 1, null, false, true, response);
+            queryImpl(type, value, index, 0, 0, visibilityScope, 1, 0, false, true, false, response);
         } catch(CloudException e) {
             // won't happen
-            e.printStackTrace();
+            response.onError(e);
         }
     }
 
     /**
      * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param response callback containing the return value or error message
+     * @return the number of elements
      */
-    public void queryGreaterThanCount(String key, String value, int visibilityScope, CloudResponse<Integer> response) {
+    public void queryGreaterThanCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
         try {
-            queryImpl(key, value, 0, 0, visibilityScope, 2, null, false, true, response);
+            queryImpl(type, value, index, 0, 0, visibilityScope, 2, 0, false, true, false, response);
         } catch(CloudException e) {
             // won't happen
-            e.printStackTrace();
+            response.onError(e);
         }
-}
+    }
+    
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value and returning
+     * the cloud key of these objects. 
+     * This operation executes immeditely without waiting for commit.
+     * 
+     * @param type the object type
+     * @param index the index on which the sore is based
+     * @param ascending indicates if the sort order is ascending or descending 
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     */
+    public void querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse<String[]> response) {
+        try {
+            queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, true, response);
+        } catch(CloudException e) {
+            // won't happen
+            response.onError(e);
+        }
+    }
+    
+    /**
+     * Equivalent to the standard query but just returns the keys matching the given query
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     */
+    public void queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<String[]> response) {
+        try {
+            queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, true, response);
+        } catch(CloudException e) {
+            // won't happen
+            response.onError(e);
+        }
+    }
 
     /**
      * Equivalent to the standard query but just returns the total count of entries that will be returned
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param response callback containing the return value or error message
      */
-    public void queryLessThanCount(String key, String value, int visibilityScope, CloudResponse<Integer> response)  {
+    public void queryLessThanCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
         try {
-            queryImpl(key, value, 0, 0, visibilityScope, 3, null, false, true, response);
+            queryImpl(type, value, index, 0, 0, visibilityScope, 3, 0, false, true, false, response);
         } catch(CloudException e) {
             // won't happen
-            e.printStackTrace();
+            response.onError(e);
         }
     }
 
@@ -541,24 +718,44 @@ public class CloudStorage {
      * Performs a query to the server finding the objects where the key
      * value is greater than the given value. 
      * This operation executes immeditely without waiting for commit.
-     * @param key the key within the object store
-     * @param value the value of said key to include in the response object
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @param response callback containing the return value or error message
      */
-    public void queryGreaterThan(String key, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
+    public void queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
         try {
-            queryImpl(key, value, page, limit, visibilityScope, 2, null, false, false, response);
+            queryImpl(type, value, index, page, limit, visibilityScope, 2, 0, false, false, false, response);
         } catch(CloudException e) {
             // won't happen
-            e.printStackTrace();
+            response.onError(e);
         }
     }
-    
-    
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is smaller than the given value. 
+     * This operation executes immeditely without waiting for commit.
+     * @param type the object type
+     * @param index the index to query for the given value
+     * @param value the value of said index to include in the response object
+     * @param page the page of responses (allows for paging)
+     * @param limit number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the 
+     * CloudObject constants ACCESS_*
+     * @return array of objects matching the query
+     */
+    public void queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
+        try {
+            queryImpl(type, value, index, page, limit, visibilityScope, 3, 0, false, false, false, response);
+        } catch(CloudException e) {
+            // won't happen
+            response.onError(e);
+        }
+    }    
     
     /**
      * Allows uploading of images etc. to the cloud which can later on be referenced as URL's.

@@ -24,6 +24,7 @@ package com.codename1.cloud;
 
 import com.codename1.io.CacheMap;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.ListModel;
@@ -38,18 +39,27 @@ import java.util.Vector;
  */
 public class CloudListModel implements ListModel {
     
-    private String key;
-    private String value;
+    private String type;
     private int visibilityScope;
     private int batchSize = 20;
-    private String sortProperty;
+    private int keyBatchSize = 1000;
+    private int sortProperty;
     private boolean ascending;
-    private int size = -1;
+    private Object[] keys;
     private EventDispatcher modelListener = new EventDispatcher();
     private EventDispatcher selectionListener = new EventDispatcher();
     private int selectedIndex = 0;
     private Hashtable loadingPlaceholder;
     private CacheMap cache;
+    private int index;
+    private String queryValue;
+    
+    /**
+     * Refreshes items in the current view every 30 seconds when repainted
+     */
+    private int refreshRateMillis = 30000;
+    
+    private long[] lastRefresh;
     
     /**
      * Creates a list model that shows all the cloud elements that have the given key matching
@@ -58,26 +68,65 @@ public class CloudListModel implements ListModel {
      * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
      * and caches data as needed.
      * 
-     * @param key the key within the object
-     * @param value the value to narrow the objects shown on the list
+     * @param type the type of object shown on the list
      * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
-     * @param sortProperty the property by which we sort the entries
+     * @param sortProperty the index by which we sort the entries, 0 for unsorted
      * @param ascending whether the sort is ascending or descending 
      */
-    public CloudListModel(String key, String value, int visibilityScope, String sortProperty, boolean ascending) {
-        this.key = key;
-        this.value = value;
+    public CloudListModel(String type, int visibilityScope, int sortProperty, boolean ascending) {
+        this.type = type;
         this.visibilityScope = visibilityScope;
         this.sortProperty = sortProperty;
         this.ascending = ascending;
-        cache = new CacheMap(key + "_" + value + visibilityScope);
+        init();
+    }
+    
+    private void init() {
+        cache = new CacheMap(type + visibilityScope + sortProperty);
         cache.setCacheSize(30);
         cache.setStorageCacheSize(100);
         cache.setAlwaysStore(true);
         loadingPlaceholder = new Hashtable();
         loadingPlaceholder.put("Line1", "Loading...");
+        loadingPlaceholder.put("Placeholder", Boolean.TRUE);
+        
+        // remove loading placeholders that might have gotten stuck in cache
+        Vector v = cache.getKeysInCache();
+        int cacheSize = v.size();
+        for(int iter = 0 ; iter < cacheSize ; iter++) {
+            Object k = v.elementAt(iter);
+            Object e = cache.get(k);
+            if(e instanceof Hashtable) {
+                Hashtable h = (Hashtable)e;
+                if(h.containsKey("Placeholder")) {
+                    cache.delete(k);
+                }
+            }
+        }        
     }
-    
+        
+    /**
+     * Creates a list model that shows all the cloud elements that have the given key matching
+     * the given value at the visibility scope listed bellow. This model can be further narrowed 
+     * down by using the filter functionality bellow.<br>
+     * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
+     * and caches data as needed.
+     * 
+     * @param type the type of object shown on the list
+     * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
+     * @param index the index by which we limit the entries
+     * @param value the queryValue for the given index
+     * @param ascending whether the sort is ascending or descending 
+     */
+    public CloudListModel(String type, int visibilityScope, int index, String queryValue, boolean ascending) {
+        this.type = type;
+        this.visibilityScope = visibilityScope;
+        this.index = index;
+        this.queryValue = queryValue;
+        this.ascending = ascending;
+        init();
+    }
+        
     /**
      * Refreshes the list from the server, this method blocks the EDT until
      * completion.
@@ -99,6 +148,12 @@ public class CloudListModel implements ListModel {
             int response = CloudStorage.getInstance().refresh(obj);
             if(response != CloudStorage.RETURN_CODE_SUCCESS) {
                 onError(new CloudException(response));
+            } else {
+                // persist the object to the cache and fire the list model change
+                for(int iter = 0 ; iter < obj.length ; iter++) {
+                    cache.put(obj[iter].getCloudId(), obj[iter]);
+                }
+                modelListener.fireDataChangeEvent(0, getSize());
             }
         }
     }
@@ -150,6 +205,7 @@ public class CloudListModel implements ListModel {
      */
     public void setLoadingPlaceholder(Hashtable loadingPlaceholder) {
         this.loadingPlaceholder = loadingPlaceholder;
+        this.loadingPlaceholder.put("Placeholder", Boolean.TRUE);
     }
     
     /**
@@ -182,12 +238,25 @@ public class CloudListModel implements ListModel {
      * @inheritDoc
      */
     public Object getItemAt(int index) {
-        if(index < size && index > -1){
-            Object key = new Integer(index);
-            Object value = cache.get(key);
+        if(keys != null && index < keys.length && index > -1){
+            Object value = cache.get(keys[index]);
             if(value == null) {
                 value = getLoadingPlaceholder();
                 fillUpList(index);
+            } else {
+                if(value instanceof CloudObject) {
+                    long time = System.currentTimeMillis();
+                    if(lastRefresh[index] + refreshRateMillis < time) {
+                        CloudObject cld = (CloudObject)value;
+                        if(cld.getLastModified() > lastRefresh[index]) {
+                            lastRefresh[index] = cld.getLastModified();
+                        } else {
+                            if(cld.getStatus() == CloudObject.STATUS_COMMITTED) {
+                                CloudStorage.getInstance().refreshAsync(cld);
+                            }
+                        }
+                    }
+                }
             }
             return value;
         }
@@ -196,50 +265,88 @@ public class CloudListModel implements ListModel {
     }
 
     private void fillUpList(final int startIndex) {
-        for(int iter = startIndex ; iter < size ; iter++) {
-            Integer key = new Integer(iter);
-            if(cache.get(key) == null) {
-                cache.put(key, value);
+        final int len = Math.min(batchSize, keys.length - startIndex);
+        Vector<String> request = new Vector<String>();
+        for(int iter = startIndex ; iter < startIndex + len ; iter++) {
+            if(cache.get(keys[iter]) == null) {
+                cache.put(keys[iter], loadingPlaceholder);
+                request.addElement((String)keys[iter]);
             }
         }
-        CloudStorage.getInstance().queryEquals(key, value, startIndex, batchSize, visibilityScope, sortProperty, ascending, new CloudResponse<CloudObject[]>() {
+        CloudResponse<CloudObject[]> resp = new CloudResponse<CloudObject[]>() {
             public void onSuccess(CloudObject[] returnValue) {
-                for(int iter = startIndex ; iter < returnValue.length ; iter++) {
-                    Integer key = new Integer(iter);
-                    cache.put(key, returnValue[iter]);
+                for(int iter = 0 ; iter < returnValue.length ; iter++) {
+                    cache.put(returnValue[iter].getCloudId(), returnValue[iter]);
                 }
-                modelListener.fireDataChangeEvent(startIndex, returnValue.length);
+                modelListener.fireDataChangeEvent(startIndex, len);
             }
 
             public void onError(CloudException err) {
                 CloudListModel.this.onError(err);
             }
-        });
+        };
+        String[] arr = new String[request.size()];
+        request.toArray(arr);
+        CloudStorage.getInstance().fetch(arr, resp);
+    }
+    
+    private void newRefreshRate() {
+        lastRefresh = new long[keys.length];
+        long t = System.currentTimeMillis();
+        for(int iter = 0 ; iter < lastRefresh.length ; iter++) {
+            lastRefresh[iter] = t;
+        }
     }
     
     /**
      * @inheritDoc
      */
     public int getSize() {
-        if(size < 0) {
-            Integer lstSize = (Integer)cache.get("ListSize");
-            if(lstSize != null) {
-                size = lstSize.intValue();
-                return size;
+        if(keys == null) {
+            keys = (Object[])cache.get("keyIndex");
+            if(keys == null) {
+                keys = new Object[0];
+            } else {
+                newRefreshRate();
             }
-            size = 0;
-            CloudStorage.getInstance().queryEqualsCount(key, value, visibilityScope, new CloudResponse<Integer>() {
-                public void onSuccess(Integer returnValue) {
-                    size = returnValue.intValue();
+            
+            // refresh the key list even if we have them in cache since this might have changed
+            CloudResponse<String[]> resp = new CloudResponse<String[]>() {
+                private int responseOffset;
+                public void onSuccess(String[] returnValue) {
+                    if(responseOffset == 0) {
+                        keys = returnValue;
+                    } else {
+                        String[] k = new String[keys.length + returnValue.length];
+                        Util.mergeArrays(keys, returnValue, k);
+                        keys = k;
+                    }
+                    newRefreshRate();
+                    cache.put("keyIndex", keys);
                     modelListener.fireDataChangeEvent(-1, DataChangedListener.ADDED);
+                    
+                    // we might have more data, send another request
+                    if(returnValue.length == keyBatchSize) {
+                        responseOffset = keys.length;
+                        if(index > 0) {
+                            CloudStorage.getInstance().queryEqualsKeys(type, index, queryValue, keys.length, keyBatchSize, visibilityScope, this);
+                        } else {
+                            CloudStorage.getInstance().querySortedKeys(type, sortProperty, ascending, keys.length, keyBatchSize, visibilityScope, this);
+                        }
+                    }
                 }
 
                 public void onError(CloudException err) {
                     CloudListModel.this.onError(err);
                 }
-            });
+            };
+            if(index > 0) {
+                CloudStorage.getInstance().queryEqualsKeys(type, index, queryValue, 0, keyBatchSize, visibilityScope, resp);
+            } else {
+                CloudStorage.getInstance().querySortedKeys(type, sortProperty, ascending, 0, keyBatchSize, visibilityScope, resp);
+            }
         }
-        return size;
+        return keys.length;
     }
 
     /**
@@ -301,8 +408,8 @@ public class CloudListModel implements ListModel {
      */
     public void addItem(Object item) {
         CloudObject cld = (CloudObject)item;
-        if(cld.getObject(key) == null) {
-            cld.setString(key, value);
+        if(cld.getType() == null) {
+            cld.setType(type);
         }
         CloudStorage.getInstance().save(cld);
     }
@@ -318,6 +425,24 @@ public class CloudListModel implements ListModel {
             CloudObject cld = (CloudObject)o;
             CloudStorage.getInstance().delete(cld);
         }
+    }
+
+    /**
+     * Indicates the rate in milliseconds in which to poll the server for the current data
+     * of elements that are visible at the moment.
+     * @return the refreshRateMillis
+     */
+    public int getRefreshRateMillis() {
+        return refreshRateMillis;
+    }
+
+    /**
+     * Indicates the rate in milliseconds in which to poll the server for the current data
+     * of elements that are visible at the moment.
+     * @param refreshRateMillis the refreshRateMillis to set
+     */
+    public void setRefreshRateMillis(int refreshRateMillis) {
+        this.refreshRateMillis = refreshRateMillis;
     }
     
 }

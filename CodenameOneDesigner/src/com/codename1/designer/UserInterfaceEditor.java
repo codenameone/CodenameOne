@@ -221,6 +221,8 @@ public class UserInterfaceEditor extends BaseForm {
     static final int PROPERTY_SNAP_TO_GRID = 72;
     static final int PROPERTY_FLATTEN = 73;
     static final int PROPERTY_DISPOSE_WHEN_POINTER_OUT = 74;
+    static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
+    static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
 
     private static final String TYPE_KEY = "$TYPE_NAME$";
 
@@ -326,7 +328,8 @@ public class UserInterfaceEditor extends BaseForm {
         "ThumbImage", "DialogPosition", "GrowByContent",
         "Constraint", "MaxSize",
         "TensileDragEnabled", "TactileTouch", "SnapToGrid",
-        "Flatten", "DisposeWhenPointerOutOfBounds"
+        "Flatten", "DisposeWhenPointerOutOfBounds", 
+        "CloudBoundProperty", "CloudDestinationProperty"
     };
     private static final int[] SUPPORTED_COMPONENT_KEYS = {
         PROPERTY_TEXT, /*PROPERTY_ALIGNMENT,*/ PROPERTY_LAYOUT,
@@ -344,7 +347,8 @@ public class UserInterfaceEditor extends BaseForm {
         PROPERTY_SLIDER_THUMB, PROPERTY_DIALOG_POSITION, PROPERTY_TEXT_AREA_GROW,
         PROPERTY_TEXT_CONSTRAINT, PROPERTY_TEXT_MAX_LENGTH,
         PROPERTY_TENSILE_DRAG_ENABLED, PROPERTY_TACTILE_TOUCH, PROPERTY_SNAP_TO_GRID,
-        PROPERTY_FLATTEN, PROPERTY_DISPOSE_WHEN_POINTER_OUT
+        PROPERTY_FLATTEN, PROPERTY_DISPOSE_WHEN_POINTER_OUT,
+        PROPERTY_CLOUD_BOUND_PROPERTY, PROPERTY_CLOUD_DESTINATION_PROPERTY
     };
     private final Class[] SUPPORTED_COMPONENT_PROPERTY_CLASSES = {
         String.class, /*Integer.class,*/ com.codename1.ui.layouts.Layout.class,
@@ -362,7 +366,8 @@ public class UserInterfaceEditor extends BaseForm {
         com.codename1.ui.Image.class, String.class, Boolean.class,
         Integer.class, Integer.class,
         Boolean.class, Boolean.class, Boolean.class,
-        Boolean.class, Boolean.class
+        Boolean.class, Boolean.class,
+        String.class, String.class
     };
     private final int[] FAKE_COMPONENT_PROPERTY_KEYS = {
         PROPERTY_LAYOUT_CONSTRAINT, PROPERTY_LIST_ITEMS, PROPERTY_COMMANDS, PROPERTY_BASE_FORM
@@ -2645,6 +2650,14 @@ public class UserInterfaceEditor extends BaseForm {
         } else {
             out.writeUTF("");
         }
+        if(cmp.getCloudBoundProperty() != null) {
+            out.writeInt(PROPERTY_CLOUD_BOUND_PROPERTY);
+            out.writeUTF(cmp.getCloudBoundProperty());
+        }
+        if(cmp.getCloudDestinationProperty() != null) {
+            out.writeInt(PROPERTY_CLOUD_DESTINATION_PROPERTY);
+            out.writeUTF(cmp.getCloudDestinationProperty());
+        }
         if(isActualContainer(cmp)) {
             com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
             if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_X)) {
@@ -2965,6 +2978,10 @@ public class UserInterfaceEditor extends BaseForm {
             } else {
                 if(cmp instanceof com.codename1.ui.TextArea) {
                     com.codename1.ui.TextArea txt = (com.codename1.ui.TextArea)cmp;
+                    if(isPropertyModified(cmp, PROPERTY_VERTICAL_ALIGNMENT)) {
+                        out.writeInt(PROPERTY_VERTICAL_ALIGNMENT);
+                        out.writeInt(txt.getVerticalAlignment());
+                    }
                     if(isPropertyModified(cmp, PROPERTY_TEXT)) {
                         out.writeInt(PROPERTY_TEXT);
                         out.writeUTF(txt.getText());

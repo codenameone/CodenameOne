@@ -3701,7 +3701,8 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Returns the names of the properties within this component that can be bound for persistence
+     * Returns the names of the properties within this component that can be bound for persistence,
+     * the order of these names mean that the first one will be the first bound
      * @return a string array of property names or null
      */
     public String[] getBindablePropertyNames() {
@@ -3731,16 +3732,42 @@ public class Component implements Animation, StyleListener {
      */
     public void unbindProperty(String prop, BindTarget target) {
     }
+    
+    /**
+     * Allows the binding code to extract the value of the property
+     * @param prop the property
+     * @return the value for the property
+     */
+    public Object getBoundPropertyValue(String prop) {
+        return null;
+    }
 
+    /**
+     * Sets the value of a bound property within this component, notice that this method MUST NOT fire
+     * the property change event when invoked to prevent recursion!
+     * 
+     * @param prop the property whose value should be set
+     * @param value the value
+     */
+    public void setBoundPropertyValue(String prop, Object value) {
+    }
+    
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @return the cloudBoundProperty
      */
     public String getCloudBoundProperty() {
+        if(cloudBoundProperty == null) {
+            String[] props = getBindablePropertyNames();
+            if(props != null && props.length > 0) {
+                return props[0];
+            }
+        }
         return cloudBoundProperty;
     }
 
     /**
+     * Indicates the property within this component that should be bound to the cloud object
      * @param cloudBoundProperty the cloudBoundProperty to set
      */
     public void setCloudBoundProperty(String cloudBoundProperty) {
@@ -3748,13 +3775,19 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * The destination property of the CloudObject
+     * 
      * @return the cloudDestinationProperty
      */
     public String getCloudDestinationProperty() {
+        if(cloudDestinationProperty == null || cloudDestinationProperty.length() == 0) {
+            return getName();
+        }
         return cloudDestinationProperty;
     }
 
     /**
+     * The destination property of the CloudObject
      * @param cloudDestinationProperty the cloudDestinationProperty to set
      */
     public void setCloudDestinationProperty(String cloudDestinationProperty) {

@@ -992,4 +992,12 @@ public class Util {
     static CodenameOneImplementation getImplementation() { 
         return implInstance;
     }
+    
+    /**
+     * Merges arrays into one larger array
+     */
+    public static void mergeArrays(Object[] arr1, Object[] arr2, Object[] destinationArray) {
+        System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);
+        System.arraycopy(arr2, 0, destinationArray, arr1.length, arr2.length);
+    }
 }

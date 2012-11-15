@@ -38,7 +38,7 @@ import java.util.Vector;
  * A cloud object can be persisted to the cloud or locally
  * it is a set of key/value pairs that can be either strings
  * or numbers. There is a 512 character limit on string length!
- * Notice: keys starting with CN1_ are reserved for internal usage!
+ * Notice: keys starting with CN1 are reserved for internal usage!
  *
  * @author Shai Almog
  */
@@ -103,7 +103,23 @@ public final class CloudObject implements Externalizable {
      * An object that can only be viewed or modified by its creator
      */
     public static final int ACCESS_PRIVATE = 5;
+    
+    
+    /**
+     * Changes to the bound property won't be reflected into the bound cloud object until commit binding is invoked
+     */
+    public static final int BINDING_DEFERRED = 1;
 
+    /**
+     * Changes to the bound property will be reflected instantly into the cloud object
+     */
+    public static final int BINDING_IMMEDIATE = 2;
+
+    /**
+     * Changes to the bound property will be reflected instantly into the cloud object and the object would
+     * be saved immediately (not committed!).
+     */
+    public static final int BINDING_AUTO_SAVE = 3;
 
     private static Hashtable<String, CustomProperty> custom = new Hashtable<String, CustomProperty>();
     private Hashtable values = new Hashtable();
@@ -116,19 +132,33 @@ public final class CloudObject implements Externalizable {
     private int accessPermissions = ACCESS_PRIVATE;
     
     /**
-     * Default constructor
+     * Default constructor for externalization purposes only!
      */
-    public CloudObject() {
+    public CloudObject() {}
+    
+    /**
+     * Constructor
+     * @param type the type of the object
+     */
+    public CloudObject(String type) {
+        values.put(CloudStorage.TYPE_FIELD, type);
     }
     
     /**
      * Create an object with different permissions settings
      * 
+     * @param type the type of the object
      * @param permissions one of the ACCESS_* values
      */
-    public CloudObject(int permissions) {
+    public CloudObject(String type, int permissions) {
+        accessPermissions = permissions;
+        values.put(CloudStorage.TYPE_FIELD, type);
+    }
+    
+    CloudObject(int permissions) {
         accessPermissions = permissions;
     }
+    
     
     /**
      * Returns one of the status constants in this class
@@ -149,8 +179,90 @@ public final class CloudObject implements Externalizable {
     Hashtable getValues() {
         return values;
     }
-        
+     
+    /**
+     * Set the type of the object
+     * @param type the type of the field
+     */
+    public void setType(String type) {
+        setString(CloudStorage.TYPE_FIELD, type);
+    }
 
+    /**
+     * Returns the type of the object
+     * @return the type of the object
+     */
+    public String getType() {
+        return getString(CloudStorage.TYPE_FIELD);
+    }
+    
+    /**
+     * Only indexed values can be queried and sorted
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexString(int index, String value) {
+        if(index > 10 || index < 1) {
+            throw new IllegalArgumentException("Invalid index: " + index);
+        }
+        setString(CloudStorage.INDEX_FIELD + index, value);
+    }
+    
+    /**
+     * Returns the index value for the given index number
+     * 
+     * @param index the index number
+     * @return the value of this entry for that index as a String
+     */
+    public String getIndexString(int index) {
+        return getString(CloudStorage.INDEX_FIELD + index);
+    }
+    
+    /**
+     * Only indexed values can be queried and sorted
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexLong(int index, long value) {
+        if(index > 10 || index < 1) {
+            throw new IllegalArgumentException("Invalid index: " + index);
+        }
+        setLong(CloudStorage.INDEX_FIELD + index, value);
+    }
+    
+    /**
+     * Returns the index value for the given index number
+     * 
+     * @param index the index number
+     * @return the value of this entry for that index as a Long value
+     */
+    public Long getIndexLong(int index) {
+        return getLong(CloudStorage.INDEX_FIELD + index);
+    }
+
+    
+    /**
+     * Only indexed values can be queried and sorted
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexDouble(int index, double value) {
+        if(index > 10 || index < 1) {
+            throw new IllegalArgumentException("Invalid index: " + index);
+        }
+        setDouble(CloudStorage.INDEX_FIELD + index, value);
+    }
+    
+    /**
+     * Returns the index value for the given index number
+     * 
+     * @param index the index number
+     * @return the value of this entry for that index as a Double value
+     */
+    public Double getIndexDouble(int index) {
+        return getDouble(CloudStorage.INDEX_FIELD + index);
+    }
+    
     /**
      * Returns true if this object is owned by me or is world writeable
      * @return ownership status
@@ -208,7 +320,11 @@ public final class CloudObject implements Externalizable {
      * @param cp the custom property implementation
      */
     public static void setCustomProperty(String key, CustomProperty cp) {
-        custom.put(key, cp);
+        if(cp == null) {
+            custom.remove(key);
+        } else {
+            custom.put(key, cp);
+        }
     }
     
     /**
@@ -330,7 +446,7 @@ public final class CloudObject implements Externalizable {
      * @param key the key for the given value
      * @param value the value
      */
-    public void setDouble(String key, long value) {
+    public void setDouble(String key, double value) {
         if(!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
@@ -511,18 +627,50 @@ public final class CloudObject implements Externalizable {
      * Binds a UI tree to the cloud object so its values automatically update in the cloud object
      * 
      * @param ui the component tree to bind
-     * @param defer  whether to defer the binding which requires developers to explicitly commit
+     * @param defer bind settings whether to defer the binding which requires developers to explicitly commit
      * the binding to perform the changes
+     * @param objectLead if set to true the UI property is initialized from values in the CloudObject, if false
+     * the cloud object property is initialized from the UI
      */
-    public void bindTree(Container ui, boolean defer) {
+    public void bindTree(Container ui, int defer, boolean objectLead) {
         int componentCount = ui.getComponentCount();
         for(int iter = 0 ; iter < componentCount ; iter++) {
             Component c = ui.getComponentAt(iter);
             if(c instanceof Container) {
-                bindTree((Container)c, defer);
+                bindTree((Container)c, defer, objectLead);
                 continue;
             }
             
+            String bind = c.getCloudBoundProperty();
+            if(bind != null && bind.length() > 0) {
+                String attributeName = c.getCloudDestinationProperty();            
+                if(attributeName != null) {
+                    bindProperty(c, bind, attributeName, defer, objectLead);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Clears the binding to this component tree
+     * @param ui the container whose children might be bound
+     */
+    public void unbindTree(Container ui) {
+        int componentCount = ui.getComponentCount();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component c = ui.getComponentAt(iter);
+            if(c instanceof Container) {
+                unbindTree((Container)c);
+                continue;
+            }
+            
+            String bind = c.getCloudBoundProperty();
+            if(bind != null && bind.length() > 0) {
+                String attributeName = c.getCloudDestinationProperty();            
+                if(attributeName != null) {
+                    unbindProperty(c, bind);
+                }
+            }
         }
     }
     
@@ -534,18 +682,58 @@ public final class CloudObject implements Externalizable {
      * @param cmp the component to bind
      * @param propertyName the name of the property in the bound component
      * @param attributeName the key within the cloud object
-     * @param defer  whether to defer the binding which requires developers to explicitly commit
+     * @param defer bind settings whether to defer the binding which requires developers to explicitly commit
      * the binding to perform the changes
+     * @param objectLead if set to true the UI property is initialized from values in the CloudObject, if false
+     * the cloud object property is initialized from the UI
      */
-    public void bindProperty(Component cmp, final String propertyName, final String attributeName, final boolean defer) {
+    public void bindProperty(Component cmp, final String propertyName, final String attributeName, final int defer, boolean objectLead) {
+        if(objectLead) {
+            Object val = values.get(attributeName);
+            Object cmpVal = cmp.getBoundPropertyValue(propertyName);
+            if(val == null) {
+                if(cmpVal != null) {
+                    cmp.setBoundPropertyValue(propertyName, null);
+                }
+            } else {
+                if(cmpVal == null || !(val.equals(cmpVal))) {
+                    cmp.setBoundPropertyValue(propertyName, val);
+                }
+            }
+        } else {
+            Object val = values.get(attributeName);
+            Object cmpVal = cmp.getBoundPropertyValue(propertyName);
+            if(cmpVal == null) {
+                if(val != null) {
+                    values.remove(attributeName);
+                    status = STATUS_MODIFIED;
+                }
+            } else {
+                if(val == null || !(val.equals(cmpVal))) {
+                    values.put(attributeName, cmpVal);
+                    status = STATUS_MODIFIED;
+                }
+            }
+        }
         BindTarget target = new BindTarget() {
             public void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue) {
-                if(defer) {
-                    deferedValues.put(attributeName, newValue);
-                } else {
-                    values.put(attributeName, newValue);
-                    status = STATUS_MODIFIED;
-                }                
+                switch(defer) {
+                    case BINDING_DEFERRED:
+                        if(deferedValues == null) {
+                            deferedValues = new Hashtable();
+                        }
+                        deferedValues.put(attributeName, newValue);
+                        break;
+                    case BINDING_IMMEDIATE:
+                        values.put(attributeName, newValue);
+                        status = STATUS_MODIFIED;
+                        break;
+                    case BINDING_AUTO_SAVE:
+                        values.put(attributeName, newValue);
+                        status = STATUS_MODIFIED;
+                        CloudStorage.getInstance().save(CloudObject.this);
+                        break;
+                }
             }
         };
         cmp.bindProperty(propertyName, target);
@@ -557,7 +745,7 @@ public final class CloudObject implements Externalizable {
      * @param cmp the component
      * @param propertyName the name of the property
      */
-    public void unbind(Component cmp, String propertyName) {
+    public void unbindProperty(Component cmp, String propertyName) {
         BindTarget t = (BindTarget)cmp.getClientProperty("CN1Bind" + propertyName);
         cmp.unbindProperty(propertyName, t);;
     }

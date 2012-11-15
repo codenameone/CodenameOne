@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.cloud.BindTarget;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -30,6 +31,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
@@ -185,7 +187,9 @@ public class TextArea extends Component {
 
     private boolean triggerClose;
 
-    private Vector actionListeners = null;
+    private EventDispatcher actionListeners = null;
+    private EventDispatcher bindListeners = null;
+    private String lastTextValue = "";
     
     /**
      * Indicates that the text area should "grow" in height based on the content beyond the
@@ -1009,11 +1013,9 @@ public class TextArea extends Component {
      */
     public void addActionListener(ActionListener a) {
         if(actionListeners == null) {
-            actionListeners = new Vector();
+            actionListeners = new EventDispatcher();
         }
-        if(!actionListeners.contains(a)) {
-            actionListeners.addElement(a);
-        }
+        actionListeners.addListener(a);
     }
 
     /**
@@ -1023,9 +1025,12 @@ public class TextArea extends Component {
      */
     public void removeActionListener(ActionListener a) {
         if(actionListeners == null) {
-            actionListeners = new Vector();
+            return;
         }
-        actionListeners.removeElement(a);
+        actionListeners.removeListener(a);
+        if(!actionListeners.hasListeners()) {
+            actionListeners = null;
+        }
     }
     
     /**
@@ -1034,10 +1039,12 @@ public class TextArea extends Component {
     void fireActionEvent() {
         if(actionListeners != null) {
             ActionEvent evt = new ActionEvent(this);
-            for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                ActionListener a = (ActionListener)actionListeners.elementAt(iter);
-                a.actionPerformed(evt);
-            }
+            actionListeners.fireActionEvent(evt);
+        }
+        if(bindListeners != null) {
+            String t = getText();
+            bindListeners.fireBindTargetChange(this, "text", lastTextValue, t);
+            lastTextValue = t;
         }
     }
     
@@ -1457,4 +1464,75 @@ public class TextArea extends Component {
     public int getVerticalAlignment(){
         return valign;
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getBindablePropertyNames() {
+        return new String[] {"text"};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Class[] getBindablePropertyTypes() {
+        return new Class[] {String.class};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void bindProperty(String prop, BindTarget target) {
+        if(prop.equals("text")) {
+            if(bindListeners == null) {
+                bindListeners = new EventDispatcher();
+            }
+            bindListeners.addListener(target);
+            return;
+        }
+        super.bindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void unbindProperty(String prop, BindTarget target) {
+        if(prop.equals("text")) {
+            if(bindListeners == null) {
+                return;
+            }
+            bindListeners.removeListener(target);
+            if(!bindListeners.hasListeners()) {
+                bindListeners = null;
+            }
+            return;
+        }
+        super.unbindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object getBoundPropertyValue(String prop) {
+        if(prop.equals("text")) {
+            return getText();
+        }
+        return super.getBoundPropertyValue(prop);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void setBoundPropertyValue(String prop, Object value) {
+        if(prop.equals("text")) {
+            if(value == null) {
+                setText("");
+            } else {
+                setText((String)value);
+            }
+            return;
+        }
+        super.setBoundPropertyValue(prop, value);
+    }
+    
 }

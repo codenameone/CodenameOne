@@ -261,7 +261,8 @@ public class ResourceEditorView extends FrameView {
             public String[] getEntries() {
                 List<String> images = new ArrayList<String>();
                 for(String i : loadedResources.getImageResourceNames()) {
-                    if(isImageInBorder(i) || isImageInTimeline(i)) {
+                    com.codename1.ui.Image img = loadedResources.getImage(i);
+                    if(img != null && (isImageInBorder(i) || isImageInTimeline(i))) {
                         continue;
                     }
                     images.add(i);
@@ -281,7 +282,8 @@ public class ResourceEditorView extends FrameView {
             public String[] getEntries() {
                 List<String> images = new ArrayList<String>();
                 for(String i : loadedResources.getImageResourceNames()) {
-                    if(loadedResources.getImage(i).isSVG()) {
+                    com.codename1.ui.Image img = loadedResources.getImage(i);
+                    if(img != null && img.isSVG()) {
                         images.add(i);
                     }
                 }
@@ -300,7 +302,8 @@ public class ResourceEditorView extends FrameView {
             public String[] getEntries() {
                 List<String> images = new ArrayList<String>();
                 for(String i : loadedResources.getImageResourceNames()) {
-                    if(loadedResources.getImage(i) != loadedResources.getResourceObject(i)) {
+                    com.codename1.ui.Image img = loadedResources.getImage(i);
+                    if(img != null && img != loadedResources.getResourceObject(i)) {
                         images.add(i);
                     }
                 }
@@ -319,7 +322,8 @@ public class ResourceEditorView extends FrameView {
             public String[] getEntries() {
                 List<String> images = new ArrayList<String>();
                 for(String i : loadedResources.getImageResourceNames()) {
-                    if(loadedResources.getImage(i) instanceof com.codename1.ui.animations.Timeline) {
+                    com.codename1.ui.Image img = loadedResources.getImage(i);
+                    if(img != null && img instanceof com.codename1.ui.animations.Timeline) {
                         images.add(i);
                     }
                 }

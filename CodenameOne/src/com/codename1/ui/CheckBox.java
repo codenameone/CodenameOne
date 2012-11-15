@@ -24,10 +24,12 @@
 
 package com.codename1.ui;
 
+import com.codename1.cloud.BindTarget;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.util.EventDispatcher;
 
 /**
  * Checkbox is a button that can be selected or deselected, and which displays
@@ -40,6 +42,7 @@ public class CheckBox extends Button {
     private boolean selected= false;
     
     private boolean oppositeSide;
+    private EventDispatcher bindListeners = null;
 
     /**
      * Constructs a checkbox with the given text
@@ -104,6 +107,17 @@ public class CheckBox extends Button {
     public void released(int x, int y) {
         selected = !isSelected();
         super.released(x, y);
+    }
+
+    void fireActionEvent(int x, int y) {
+        super.fireActionEvent(x, y);
+        if(bindListeners != null) {
+            if(isSelected()) {
+                bindListeners.fireBindTargetChange(this, "selected", Boolean.FALSE, Boolean.TRUE);
+            } else {
+                bindListeners.fireBindTargetChange(this, "selected", Boolean.TRUE, Boolean.FALSE);
+            }
+        }
     }
     
     /**
@@ -181,5 +195,74 @@ public class CheckBox extends Button {
      */
     public void setOppositeSide(boolean oppositeSide) {
         this.oppositeSide = oppositeSide;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getBindablePropertyNames() {
+        return new String[] {"selected"};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Class[] getBindablePropertyTypes() {
+        return new Class[] {Boolean.class};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void bindProperty(String prop, BindTarget target) {
+        if(prop.equals("selected")) {
+            if(bindListeners == null) {
+                bindListeners = new EventDispatcher();
+            }
+            bindListeners.addListener(target);
+            return;
+        }
+        super.bindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void unbindProperty(String prop, BindTarget target) {
+        if(prop.equals("selected")) {
+            if(bindListeners == null) {
+                return;
+            }
+            bindListeners.removeListener(target);
+            if(!bindListeners.hasListeners()) {
+                bindListeners = null;
+            }
+            return;
+        }
+        super.unbindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object getBoundPropertyValue(String prop) {
+        if(prop.equals("selected")) {
+            if(isSelected()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        return super.getBoundPropertyValue(prop);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void setBoundPropertyValue(String prop, Object value) {
+        if(prop.equals("selected")) {
+            setSelected(value != null && ((Boolean)value).booleanValue());
+            return;
+        }
+        super.setBoundPropertyValue(prop, value);
     }
 }
