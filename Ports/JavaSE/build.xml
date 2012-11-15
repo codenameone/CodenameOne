@@ -78,6 +78,7 @@
         <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone4" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/ipad3" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone3gs" />
+        <copy file="../../Themes/iPhoneTheme.res" todir="../../Skins/iphone5" />
         <copy file="../../Themes/blackberry_theme.res" todir="../../Skins/torch" />
         <copy file="../../Themes/android_holo_light.res" todir="../../Skins/xoom" />
         <copy file="../../Themes/winTheme.res" todir="../../Skins/lumia" />
@@ -107,6 +108,10 @@
         <zip basedir="../../Skins/iphone4" destfile="../../Skins/iphone4.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
+        <zip basedir="../../Skins/iphone5" destfile="../../Skins/iphone5.skin" compress="false">
+            <exclude name="**/svn/"/>
+            <exclude name="*.psd"/>
+        </zip>
         <zip basedir="../../Skins/xoom" destfile="../../Skins/xoom.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
@@ -124,6 +129,7 @@
         <copy file="../../Skins/nexus.skin" todir="src" />
         <copy file="../../Skins/iphone3gs.skin" todir="src" />
         <copy file="../../Skins/iphone4.skin" todir="src" />
+        <copy file="../../Skins/iphone5.skin" todir="src" />
         <copy file="../../Skins/xoom.skin" todir="src" />
     </target>
     

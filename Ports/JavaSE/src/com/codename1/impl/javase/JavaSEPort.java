@@ -176,7 +176,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
     }
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
 
     /**
      * @return the showEDTWarnings
@@ -1223,6 +1223,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenu skinMenu = new JMenu("Skins");
             String skinNames = pref.get("skins", DEFAULT_SKINS);
+            if(!skinNames.contains("iphone5")) {
+                skinNames = DEFAULT_SKINS;
+            }
             if (skinNames != null) {
                 if (skinNames.length() < DEFAULT_SKINS.length()) {
                     skinNames = DEFAULT_SKINS;
