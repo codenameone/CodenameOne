@@ -255,6 +255,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean showEDTWarnings = true;
     private static boolean showEDTViolationStacks = false;
     private boolean inInit;
+    private boolean showMenu = true;
 
     public static void blockMonitors() {
         blockMonitors = true;
@@ -1066,6 +1067,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
+            
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
             
@@ -1319,9 +1321,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.addSeparator();
             JMenuItem exit = new JMenuItem("Exit");
             simulatorMenu.add(exit);
-            bar.add(simulatorMenu);
-            bar.add(skinMenu);
-
+            
+            if(showMenu){
+                bar.add(simulatorMenu);
+                bar.add(skinMenu);
+            }
+            
             rotate.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
                     portrait = !portrait;
@@ -1551,6 +1556,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             Platform.setImplicitExit(false);
             fxExists = true;
         } catch (Throwable ex) {
+        }
+        
+        
+        String hide = System.getProperty("hideMenu", "false");
+        System.out.println("hide " + hide);
+        if(hide != null && hide.equals("true")){
+            showMenu = false;
         }
 
         URLConnection.setDefaultAllowUserInteraction(true);
