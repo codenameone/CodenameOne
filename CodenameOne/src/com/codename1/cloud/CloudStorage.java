@@ -55,8 +55,8 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class CloudStorage {
-    //static final String SERVER_URL = "https://codename-one.appspot.com"; 
-    static final String SERVER_URL = "http://127.0.0.1:8888"; 
+    static final String SERVER_URL = "https://codename-one.appspot.com"; 
+    //static final String SERVER_URL = "http://127.0.0.1:8888"; 
             
     /**
      * Return code for methods in this class indicating a successful operation
