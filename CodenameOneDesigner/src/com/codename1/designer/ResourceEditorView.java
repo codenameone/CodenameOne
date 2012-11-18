@@ -3202,6 +3202,11 @@ private void winNativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//GE
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
+        
+        // don't remove the last DPI!
+        if(dpis.length == 1) {
+            return;
+        }
         com.codename1.ui.EncodedImage[] imgs = multi.getInternalImages();
         for(int iter = 0 ; iter < dpis.length ; iter++) {
             if(dpis[iter] == dpi) {
