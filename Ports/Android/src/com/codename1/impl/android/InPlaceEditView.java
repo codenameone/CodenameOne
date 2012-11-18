@@ -252,7 +252,7 @@ public class InPlaceEditView extends FrameLayout {
         if (nativeFont == null) {
             nativeFont = impl.getDefaultFont();
         }
-        Paint p = (Paint) ((Object[]) nativeFont)[0];
+        Paint p = (Paint) ((AndroidImplementation.NativeFont) nativeFont).font;
         mEditText.setTypeface(p.getTypeface());
         mEditText.setTextScaleX(p.getTextScaleX());
         mEditText.setTextSize(TypedValue.COMPLEX_UNIT_PX, p.getTextSize());

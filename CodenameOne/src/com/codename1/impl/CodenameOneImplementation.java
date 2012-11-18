@@ -2313,15 +2313,16 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
-     * Loads the truetype font from the input stream without closing the stream,
-     * this method should return the native font.
+     * Creates a true type font with the given name/filename (font name might be different from the file name
+     * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
+     * order to be detectable. The file name should contain no slashes or any such value.
      *
-     * @param stream from which to load the font
+     * @param the name of the font
+     * @param the file name of the font as it appears in the src directory of the project 
      * @return the native font created from the stream
-     * @throws IOException will be thrown in case of an io error
      */
-    public Object loadTrueTypeFont(InputStream stream) throws IOException {
-        throw new IOException("Unsupported operation");
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        return null;
     }
 
     /**
@@ -2332,16 +2333,16 @@ public abstract class CodenameOneImplementation {
      * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
      * @return scaled font instance
      */
-    public Object deriveTrueTypeFont(Object font, int size, int weight) {
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
         throw new RuntimeException("Unsupported operation");
     }
     
     /**
      * Returns true if the system supports dynamically loading truetype fonts from
-     * a stream.
+     * a file.
      *
      * @return true if the system supports dynamically loading truetype fonts from
-     * a stream.
+     * a file.
      */
     public boolean isTrueTypeSupported() {
         return false;

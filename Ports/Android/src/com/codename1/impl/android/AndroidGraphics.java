@@ -60,7 +60,7 @@ class AndroidGraphics {
         this.canvas = canvas;
         this.paint = new Paint();
         paint.setAntiAlias(true);
-        this.font = (Paint) ((Object[])impl.getDefaultFont())[0];
+        this.font = (Paint) ((AndroidImplementation.NativeFont)impl.getDefaultFont()).font;
         if(canvas != null) {
             canvas.save();
         }

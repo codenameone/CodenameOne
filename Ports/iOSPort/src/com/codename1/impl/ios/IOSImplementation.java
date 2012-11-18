@@ -1507,13 +1507,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         int style;
         int face;
         int size;
+        String name;
+        int weight;
+        float height;
         
         public NativeFont() {
         }
         
         public boolean equals(Object o) {
             NativeFont f = (NativeFont)o;
-            return f.style == style && f.face == face && f.size == size;
+            if(name != null) {
+                return f.name != null && f.name.equals(name) && f.weight == weight && f.height == height;
+            }
+            return f.name == null && f.style == style && f.face == face && f.size == size;
         }
         
         public int hashCode() {
@@ -2094,21 +2100,36 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isTrueTypeSupported() {
         // TODO
-        return super.isTrueTypeSupported();
+        return true;
     }
 
     @Override
-    public Object loadNativeFont(String lookup) {
-        // TODO
-        return super.loadNativeFont(lookup);
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        NativeFont fnt = new NativeFont();
+        fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
+        fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
+        fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
+        fnt.name = fontName;
+        fnt.peer = IOSNative.createTruetypeFont(fontName);
+        return fnt;
     }
 
     @Override
-    public Object loadTrueTypeFont(InputStream stream) throws IOException {
-        // TODO
-        return super.loadTrueTypeFont(stream);
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        NativeFont original = (NativeFont)font;
+        NativeFont fnt = new NativeFont();
+        fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
+        fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
+        fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
+        fnt.name = original.name;
+        fnt.weight = weight;
+        fnt.height = size;
+        fnt.peer = IOSNative.deriveTruetypeFont(original.peer, 
+                (weight & com.codename1.ui.Font.STYLE_BOLD) == com.codename1.ui.Font.STYLE_BOLD, 
+                (weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC, size);
+        return fnt;
     }
-
+    
     @Override
     public void lockOrientation(boolean portrait) {
         IOSNative.lockOrientation(portrait);

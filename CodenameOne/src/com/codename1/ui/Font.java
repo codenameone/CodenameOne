@@ -121,6 +121,8 @@ public class Font {
 
     private Object font;
 
+    private boolean ttf;
+    
     /**
      * Creates a new Font
      */
@@ -143,6 +145,7 @@ public class Font {
      * @param fontName the font name is the logical name of the font 
      * @return the font object
      * @see #clearBitmapCache
+     * @deprecated bitmap font functionality is now deprecated
      */
     public static Font getBitmapFont(String fontName) {
         return (Font)bitmapCache.get(fontName);
@@ -152,6 +155,7 @@ public class Font {
     /**
      * Bitmap fonts are cached this method allows us to flush the cache thus allows
      * us to reload a font
+     * @deprecated bitmap font functionality is now deprecated
      */
     public static void clearBitmapCache() {
         bitmapCache.clear();
@@ -159,10 +163,10 @@ public class Font {
 
     /**
      * Returns true if the underlying platform supports loading truetype fonts from
-     * a file stream.
+     * a file.
      * 
      * @return true if the underlying platform supports loading truetype fonts from
-     * a file stream
+     * a file
      */
     public static boolean isTrueTypeFileSupported() {
         return Display.getInstance().getImplementation().isTrueTypeSupported();
@@ -180,15 +184,42 @@ public class Font {
     }
 
     /**
-     * Creates a true type font from the given stream if the underlying platform supports
-     * truetype font loading.
+     * Creates a true type font with the given name/filename (font name might be different from the file name
+     * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
+     * order to be detectable. The file name should contain no slashes or any such value.<br/>
+     * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!
      *
-     * @param stream input stream containing the font
-     * @return the font object to create
-     * @throws IOException if font loading fails
+     * @param the name of the font
+     * @param the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
+     * @return the font object created or null if true type fonts aren't supported on this platform
      */
-    public static Font createTrueTypeFont(InputStream stream) throws IOException {
-        return new Font(Display.getInstance().getImplementation().loadTrueTypeFont(stream));
+    public static Font createTrueTypeFont(String fontName, String fileName) {
+        if(fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf")) {
+            throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
+        }
+        Object font = Display.getInstance().getImplementation().loadTrueTypeFont(fontName, fileName);
+        if(font == null) {
+            return null;
+        }
+        Font f = new Font(font);
+        f.ttf = true;
+        return f;
+    }
+    
+    /**
+     * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
+     * will only work in the case of truetype fonts!<br/>
+     * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!
+     * @param sizePixels the size of the font in pixels
+     * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
+     * @return scaled font instance
+     */
+    public Font derive(float sizePixels, int weight) {
+        Font f = new Font(Display.getInstance().getImplementation().deriveTrueTypeFont(font, sizePixels, weight));
+        f.ttf = true;
+        return f;
     }
 
     /**
@@ -216,9 +247,11 @@ public class Font {
      * properly in a font and it should be cleared and reloaed with a Look and Feel switch.
      * 
      * @param value the value to increase 
+     * @deprecated bitmap font functionality is now deprecated
      */
     public void addContrast(byte value) {
     }
+
     /**
      * Creates a bitmap font with the given arguments and places said font in the cache
      * 
@@ -232,6 +265,7 @@ public class Font {
      *      bounds.
      * @param charsets the set of characters in the font
      * @return a font object to draw bitmap fonts
+     * @deprecated bitmap font functionality is now deprecated
      */
     public static Font createBitmapFont(String name, Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {
         Font f = createBitmapFont(bitmap, cutOffsets, charWidth, charsets);
@@ -251,6 +285,7 @@ public class Font {
      *      bounds.
      * @param charsets the set of characters in the font
      * @return a font object to draw bitmap fonts
+     * @deprecated bitmap font functionality is now deprecated
      */
     public static Font createBitmapFont(Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {
         return new CustomFont(bitmap, cutOffsets, charWidth, charsets);
@@ -446,9 +481,12 @@ public class Font {
     * @inheritDoc
     */
    public boolean equals(Object o) {
+       if(ttf) {
+           return ((Font)o).font != null && ((Font)o).ttf && ((Font)o).font.equals(font);
+       }
        if(o != null && o.getClass() == getClass()) {
            Font f = (Font)o;
-           return f.getFace() == getFace() && f.getSize() == getSize() && f.getStyle() == getStyle();
+           return !f.ttf && f.getFace() == getFace() && f.getSize() == getSize() && f.getStyle() == getStyle();
        }
        return false;
    }

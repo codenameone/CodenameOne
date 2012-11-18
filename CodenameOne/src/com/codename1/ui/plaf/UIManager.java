@@ -707,6 +707,9 @@ public class UIManager {
     public void addThemeProps(Hashtable themeProps) {
         if (accessible) {
             buildTheme(themeProps);
+            styles.clear();
+            selectedStyles.clear();
+            imageCache.clear();
             current.refreshTheme(false);
         }
     }

@@ -1046,7 +1046,7 @@ public class Resources {
         // do we have an emedded truetype font? Do we support embedded fonts?
         boolean trueTypeIncluded = input.readBoolean();
         Font font = null;
-        if(trueTypeIncluded) {
+        /*if(trueTypeIncluded) {
             int size = input.readInt();
             if(Font.isTrueTypeFileSupported()) {
                 font = Font.createTrueTypeFont(input);
@@ -1055,7 +1055,7 @@ public class Resources {
                     size -= input.skip(size);
                 }
             }
-        }
+        }*/
         boolean lookupIncluded = input.readBoolean();
         if(lookupIncluded) {
             String lookup = input.readUTF();

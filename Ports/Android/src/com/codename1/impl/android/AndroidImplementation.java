@@ -218,7 +218,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
 
 
-        this.defaultFont = (Paint) ((Object[]) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM))[0];
+        this.defaultFont = (Paint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         Display.getInstance().setTransitionYield(-1);
         activity.runOnUiThread(new Runnable() {
             @Override
@@ -546,7 +546,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public int charWidth(Object nativeFont, char ch) {
         this.tmpchar[0] = ch;
         float w = (nativeFont == null ? this.defaultFont
-                : (Paint) ((Object[]) nativeFont)[0]).measureText(this.tmpchar, 0, 1);
+                : (Paint) ((NativeFont) nativeFont).font).measureText(this.tmpchar, 0, 1);
         if (w - (int) w > 0) {
             return (int) (w + 1);
         }
@@ -556,7 +556,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
         float w = (nativeFont == null ? this.defaultFont
-                : (Paint) ((Object[]) nativeFont)[0]).measureText(ch, offset, length);
+                : (Paint) ((NativeFont) nativeFont).font).measureText(ch, offset, length);
         if (w - (int) w > 0) {
             return (int) (w + 1);
         }
@@ -566,7 +566,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int stringWidth(Object nativeFont, String str) {
         float w = (nativeFont == null ? this.defaultFont
-                : (Paint) ((Object[]) nativeFont)[0]).measureText(str);
+                : (Paint) ((NativeFont) nativeFont).font).measureText(str);
         if (w - (int) w > 0) {
             return (int) (w + 1);
         }
@@ -578,8 +578,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (font == null) {
             font = this.defaultFont;
         }
-        if (font instanceof Object[]) {
-            ((AndroidGraphics) graphics).setFont((Paint) ((Object[]) font)[0]);
+        if (font instanceof NativeFont) {
+            ((AndroidGraphics) graphics).setFont((Paint) ((NativeFont) font).font);
         } else {
             ((AndroidGraphics) graphics).setFont((Paint) font);
         }
@@ -588,7 +588,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int getHeight(Object nativeFont) {
         Paint font = (nativeFont == null ? this.defaultFont
-                : (Paint) ((Object[]) nativeFont)[0]);
+                : (Paint) ((NativeFont) nativeFont).font);
         return font.getFontMetricsInt(font.getFontMetricsInt());
     }
 
@@ -596,16 +596,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (nativeFont == null) {
             return Font.FACE_SYSTEM;
         }
-        int[] i = (int[]) ((Object[]) nativeFont)[1];
-        return i[0];
+        return ((NativeFont) nativeFont).face;
     }
 
     public int getStyle(Object nativeFont) {
         if (nativeFont == null) {
             return Font.STYLE_PLAIN;
         }
-        int[] i = (int[]) ((Object[]) nativeFont)[1];
-        return i[1];
+        return ((NativeFont) nativeFont).style;
     }
 
     @Override
@@ -613,8 +611,85 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (nativeFont == null) {
             return Font.SIZE_MEDIUM;
         }
-        int[] i = (int[]) ((Object[]) nativeFont)[1];
-        return i[2];
+        return ((NativeFont) nativeFont).size;
+    }
+    
+    @Override
+    public boolean isTrueTypeSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
+        if(t == null) {
+            throw new RuntimeException("Font not found: " + fileName);
+        }
+        TextPaint newPaint = new TextPaint();
+        newPaint.setAntiAlias(true);
+        newPaint.setTypeface(t);
+        return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
+                com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
+    }
+    
+    static class NativeFont {
+        int face;
+        int style;
+        int size;
+        Object font;
+        String fileName;
+        float height;
+        int weight;
+        
+        public NativeFont(int face, int style, int size, Object font, String fileName, float height, int weight) {
+            this(face, style, size, font);
+            this.fileName = fileName;
+            this.height = height;
+            this.weight = weight;
+        }
+        
+        public NativeFont(int face, int style, int size, Object font) {
+            this.face = face;
+            this.style = style;
+            this.size = size;
+            this.font = font;
+        }
+        
+        public boolean equals(Object o) {
+            if(o == null) {
+                return false;
+            }
+            NativeFont n = ((NativeFont)o);
+            if(fileName != null) {
+                return n.fileName != null && fileName.equals(n.fileName) && n.height == height && n.weight == weight;
+            }
+            return n.face == face && n.style == style && n.size == size && font.equals(n.font);
+        }
+        
+        public int hashCode() {
+            return face | style | size;
+        }
+    }
+
+    @Override
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        NativeFont fnt = (NativeFont)font;
+        TextPaint paint = (TextPaint)fnt.font;
+        paint.setAntiAlias(true);
+        Typeface type = paint.getTypeface();
+        int fontstyle = Typeface.NORMAL;
+        if ((weight & Font.STYLE_BOLD) != 0) {
+            fontstyle |= Typeface.BOLD;
+        }
+        if ((weight & Font.STYLE_ITALIC) != 0) {
+            fontstyle |= Typeface.ITALIC;
+        }
+        type = Typeface.create(type, fontstyle);
+        TextPaint newPaint = new TextPaint();
+        newPaint.setTypeface(type);
+        newPaint.setTextSize(size);
+        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
+        return n;
     }
 
     @Override
@@ -655,7 +730,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         font.setTypeface(Typeface.create(typeface, fontstyle));
         font.setUnderlineText((style & Font.STYLE_UNDERLINED) != 0);
         font.setTextSize(height);
-        return new Object[]{font, new int[]{face, style, size}};
+        return new NativeFont(face, style, size, font);
 
     }
 
@@ -686,7 +761,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             font.setTypeface(Typeface.create(familyName, typeface));
             font.setTextSize(Integer.parseInt(size));
-            return new Object[]{font, new int[]{0, 0, 0}};
+            return new NativeFont(0, 0, 0, font);
         } catch (Exception err) {
             return null;
         }
@@ -715,7 +790,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object getDefaultFont() {
         TextPaint paint = new TextPaint();
         paint.set(this.defaultFont);
-        return new Object[]{paint, new int[]{Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM}};
+        return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
 
     @Override

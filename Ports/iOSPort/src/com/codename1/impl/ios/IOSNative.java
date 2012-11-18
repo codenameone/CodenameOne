@@ -335,4 +335,7 @@ public class IOSNative {
     
     public static native void scanQRCode();
     public static native void scanBarCode();
+
+    public static native long createTruetypeFont(String name);
+    public static native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 }

@@ -2692,6 +2692,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new int[]{face, style, size};
     }
 
+    @Override
+    public boolean isTrueTypeSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        File fontFile = new File("src", fileName);
+        if(fontFile.exists()) {
+            try {
+                FileInputStream fs = new FileInputStream(fontFile);
+                java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
+                fs.close();
+                if(fnt != null) {
+                    if(!fontName.startsWith(fnt.getFamily())) {
+                        throw new RuntimeException("Invalid font name for " + fileName + " should be: " + fnt.getName());
+                    }
+                }
+                return fnt;
+            } catch(Exception err) {
+                err.printStackTrace();
+                throw new RuntimeException(err);
+            }
+        }
+        throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
+    }
+
+    @Override
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        java.awt.Font fnt = (java.awt.Font)font;
+        int style = java.awt.Font.PLAIN;
+        if((weight & com.codename1.ui.Font.STYLE_BOLD) == com.codename1.ui.Font.STYLE_BOLD) {
+            style = java.awt.Font.BOLD;
+        }
+        if((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
+            style = style | java.awt.Font.ITALIC;
+        }
+        return fnt.deriveFont(style, size);
+    }    
+    
     private java.awt.Font createAWTFont(int[] i) {
         checkEDT();
         int face = i[0];
