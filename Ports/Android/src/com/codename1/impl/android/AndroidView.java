@@ -464,15 +464,38 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
             return true;
         }
 
+        int[] x = null;
+        int[] y = null;
+        int size = event.getPointerCount();
+        if (size > 1) {
+            x = new int[size];
+            y = new int[size];
+            for (int i = 0; i < size; i++) {
+                x[i] = (int) event.getX(i);
+                y[i] = (int) event.getY(i);
+            }
+        }
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                this.implementation.pointerPressed((int) event.getX(), (int) event.getY());
+                if(x == null){
+                    this.implementation.pointerPressed((int) event.getX(), (int) event.getY());
+                }else{
+                    this.implementation.pointerPressed(x, y);                
+                }
                 break;
             case MotionEvent.ACTION_UP:
-                this.implementation.pointerReleased((int) event.getX(), (int) event.getY());
+                if(x == null){
+                    this.implementation.pointerReleased((int) event.getX(), (int) event.getY());
+                }else{
+                    this.implementation.pointerReleased(x, y);                
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
-                this.implementation.pointerDragged((int) event.getX(), (int) event.getY());
+                if(x == null){
+                    this.implementation.pointerDragged((int) event.getX(), (int) event.getY());
+                }else{
+                    this.implementation.pointerDragged(x, y);                
+                }
                 break;
         }
 
