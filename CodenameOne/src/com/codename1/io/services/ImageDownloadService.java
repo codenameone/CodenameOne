@@ -106,6 +106,8 @@ public class ImageDownloadService extends ConnectionRequest {
     private String destinationFile;
     private Dimension toScale;
     private String cacheId;
+    private boolean keep;
+    
     private static boolean fastScale = true;
     private Image placeholder;
     
@@ -252,7 +254,7 @@ public class ImageDownloadService extends ConnectionRequest {
         }
 
 
-        Image im = cacheImage(null, destFile, toScale, placeholderImage);
+        Image im = cacheImage(null, false, destFile, toScale, placeholderImage);
         if (im != null) {
             Hashtable h;
             ListModel model;
@@ -317,7 +319,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Dimension scale, byte priority) {
-        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, scale, priority, null);
+        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, false, scale, priority, null);
     }
 
     /**
@@ -336,7 +338,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Image placeholderImage, byte priority) {
-        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, null, priority, placeholderImage);
+        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
     }
     
     /**
@@ -351,21 +353,22 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param targetOffset the offset within the list to insert the image
      * @param targetKey the key for the hashtable in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
+     * @param keep if set to true keeps the file in RAM once loaded
      * @param scale the scale of the image to put in the List or null
      */
     private static void createImageToStorage(final String url, final Component targetList, final int targetOffset,
-            final String targetKey, final String cacheId, final Dimension scale, final byte priority, final Image placeholderImage) {
+            final String targetKey, final String cacheId, final boolean keep, final Dimension scale, final byte priority, final Image placeholderImage) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
                     createImageToStorage(url, targetList, targetOffset,
-                            targetKey, cacheId, scale, priority, placeholderImage);
+                            targetKey, cacheId, keep, scale, priority, placeholderImage);
                 }
             });
             return;
         }
-        Image im = cacheImage(cacheId, null, scale, placeholderImage);
+        Image im = cacheImage(cacheId, keep, null, scale, placeholderImage);
         if (im != null) {
             Hashtable h;
             ListModel model;
@@ -390,6 +393,7 @@ public class ImageDownloadService extends ConnectionRequest {
         ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
         i.cacheImages = true;
         i.cacheId = cacheId;
+        i.keep = keep;
         i.toScale = scale;
         i.placeholder = placeholderImage;
         i.setPriority(priority);
@@ -423,7 +427,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale,
             byte priority) {
-        createImageToStorage(url, l, cacheId, toScale, priority, null);
+        createImageToStorage(url, l, cacheId, false, toScale, priority, null);
     }
 
     /**
@@ -439,7 +443,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Label l, String cacheId, Image placeholder,
             byte priority) {
-        createImageToStorage(url, l, cacheId, null, priority, placeholder);
+        createImageToStorage(url, l, cacheId, false, null, priority, placeholder);
     }
     
     /**
@@ -453,20 +457,20 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param toScale the scale dimension or null
      * @param priority the priority for the task
      */
-    private static void createImageToStorage(final String url, final Label l, final String cacheId, final Dimension toScale,
+    private static void createImageToStorage(final String url, final Label l, final String cacheId, final boolean keep, final Dimension toScale,
             final byte priority, final Image placeholder) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
-                    createImageToStorage(url, l, cacheId, toScale,
+                    createImageToStorage(url, l, cacheId, keep, toScale,
                             priority, placeholder);
                 }
             });
             return;
         }
         
-        Image im = cacheImage(cacheId, null, toScale, placeholder);
+        Image im = cacheImage(cacheId, keep, null, toScale, placeholder);
         if (im != null) {
             if (!fastScale && toScale != null) {
                 im = im.scaled(toScale.getWidth(), toScale.getHeight());
@@ -496,7 +500,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, ActionListener callback, String destFile) {
 
-        Image im = cacheImage(null, destFile, null, null);
+        Image im = cacheImage(null, false, destFile, null, null);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -508,6 +512,9 @@ public class ImageDownloadService extends ConnectionRequest {
         NetworkManager.getInstance().addToQueue(i);
     }
 
+    public static void createImageToStorage(String url, ActionListener callback, String cacheId) {
+        createImageToStorage(url, callback, cacheId, false);
+    }
     /**
      * Constructs an image request that will automatically populate the given Label
      * when the response arrives, it will cache the file locally.
@@ -515,10 +522,11 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param url the image URL
      * @param callback the callback that should be updated when the data arrives
      * @param cacheId a unique identifier to be used to store the image into storage
+     * @param keep if set to true keeps the file in RAM once loaded
      */
-    public static void createImageToStorage(String url, ActionListener callback, String cacheId) {
+    public static void createImageToStorage(String url, ActionListener callback, String cacheId, boolean keep) {
 
-        Image im = cacheImage(cacheId, null, null, null);
+        Image im = cacheImage(cacheId, keep, null, null, null);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -530,7 +538,7 @@ public class ImageDownloadService extends ConnectionRequest {
         NetworkManager.getInstance().addToQueue(i);
     }
 
-    private static Image cacheImage(String cacheKey, String destFile, Dimension scale, Image placeholderImage) {
+    private static Image cacheImage(String cacheKey, boolean keep, String destFile, Dimension scale, Image placeholderImage) {
         
         if (destFile != null) {
             if (FileSystemStorage.getInstance().exists(destFile)) {
@@ -553,9 +561,9 @@ public class ImageDownloadService extends ConnectionRequest {
                     s = StorageImageAsync.create(cacheKey, placeholderImage);
                 } else {
                     if(fastScale && scale != null) {
-                        s = StorageImage.create(cacheKey, scale.getWidth(), scale.getHeight(), false);
+                        s = StorageImage.create(cacheKey, scale.getWidth(), scale.getHeight(), keep);
                     } else {
-                        s = StorageImage.create(cacheKey, -1, -1, false);
+                        s = StorageImage.create(cacheKey, -1, -1, keep);
                     }
                 }
                 return s;
@@ -585,7 +593,7 @@ public class ImageDownloadService extends ConnectionRequest {
                 result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);
             } else {
                 EncodedImage e = EncodedImage.create(input);
-                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, false);
+                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);
                 //if the storage has failed create the image from the stream
                 if(result == null){
                     result = e;

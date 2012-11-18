@@ -70,7 +70,7 @@ public class ProxyHttpTile extends Tile {
                         (Image) ne.getMetaData());
                 ProxyHttpTile.this.fireReady();
             }
-        }, cacheId);
+        }, cacheId, true);
 
 
     }

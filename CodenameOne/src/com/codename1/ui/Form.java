@@ -1867,6 +1867,29 @@ public class Form extends Container {
         }
     }
 
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+        if (pointerDraggedListeners != null) {
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
+        }
+
+        if (dragged != null) {
+            dragged.pointerDragged(x, y);
+            return;
+        }
+
+        Component cmp = contentPane.getComponentAt(x[0], y[0]);
+        if (cmp != null) {
+            if (cmp.isFocusable() && cmp.isEnabled()) {
+                setFocused(cmp);
+            }
+            cmp.pointerDragged(x, y);
+            cmp.repaint();
+        }
+    }
+    
+    
+
     /**
      * @inheritDoc
      */

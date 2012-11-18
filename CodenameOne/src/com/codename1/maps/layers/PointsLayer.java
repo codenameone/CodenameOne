@@ -42,7 +42,7 @@ public class PointsLayer extends AbstractLayer {
     private Vector points = new Vector();
     private Image icon;
     private EventDispatcher dispatcher = new EventDispatcher();
-
+    private Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
     /**
      * Constructor with default projection Mercator.
      */
@@ -78,7 +78,7 @@ public class PointsLayer extends AbstractLayer {
     public void paint(Graphics g, Tile tile) {
         int length = points.size();
         g.setColor(0);
-        g.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+        g.setFont(f);
         for (int i = 0; i < length; i++) {
             PointLayer point = (PointLayer) points.elementAt(i);
             if (tile.getBoundingBox().contains(point)) {

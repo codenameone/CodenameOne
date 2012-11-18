@@ -36,9 +36,7 @@ import com.codename1.maps.layers.AbstractLayer;
 import com.codename1.maps.layers.Layer;
 import com.codename1.maps.layers.PointsLayer;
 import com.codename1.maps.providers.OpenStreetMapProvider;
-import com.codename1.ui.Button;
-import com.codename1.ui.Container;
-import com.codename1.ui.Painter;
+import com.codename1.ui.*;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -65,7 +63,17 @@ public class MapComponent extends Container {
     private double latitude = Double.NaN;
     private double longitude = Double.NaN;
     private boolean drawMapPointer = false;
-
+    private double oldDistance = -1;
+    private Image buffer = null;
+    private boolean refreshTiles = false;
+    private int scaleX = 0;
+    private int scaleY = 0;
+    private int translateX;
+    private int translateY;
+    
+    
+    private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
+    
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last 
      * known Location of the LocationManager
@@ -125,8 +133,12 @@ public class MapComponent extends Container {
      * @param cacheEnabled is cache enabled
      */
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel, boolean cacheEnabled) {
-        _map = new CacheProviderProxy(provider);
-        
+        if (cacheEnabled) {
+            _map = new CacheProviderProxy(provider);
+        } else {
+            _map = provider;
+        }
+
         if (centerPosition == null) {
             Location l = LocationManager.getLocationManager().getLastKnownLocation();
             if (l != null) {
@@ -168,7 +180,20 @@ public class MapComponent extends Container {
         Painter bg = new Painter() {
 
             public void paint(Graphics g, Rectangle rect) {
-                paintmap(g);
+                if(buffer == null){
+                    buffer = Image.createImage(getWidth(), getHeight());
+                }
+                if(_needTiles || refreshTiles){
+                    paintmap(buffer.getGraphics());
+                    refreshTiles = false;
+                }
+                g.translate(-translateX, -translateY);
+                if(scaleX > 0){
+                    g.drawImage(buffer, (getWidth() - scaleX)/2, (getHeight() - scaleY)/2, scaleX, scaleY);
+                }else{
+                    g.drawImage(buffer, (getWidth() - buffer.getWidth())/2, (getHeight() - buffer.getHeight())/2);                    
+                }
+                g.translate(translateX, translateY);
             }
         };
         getUnselectedStyle().setBgTransparency(255);
@@ -178,12 +203,26 @@ public class MapComponent extends Container {
         drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);        
     }
 
+    @Override
+    protected void laidOut() {
+        super.laidOut();
+        if(buffer != null){
+            buffer.dispose();
+        }
+        buffer = null;
+        repaint();
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
     protected Dimension calcPreferredSize() {
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
+    
+   
 
     /**
      * @inheritDoc
@@ -191,17 +230,15 @@ public class MapComponent extends Container {
     protected void focusGained() {
         setHandlesInput(true);
     }
-
+    
     /**
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
-        Coord scale = _map.scale(_zoom);
-        int deltax = draggedx - x;
-        int deltay = draggedy - y;
-        _center = _center.translate(deltay * -scale.getLatitude(), deltax * scale.getLongitude());
-        _needTiles = true;
+        
+        translateX += (draggedx - x);
+        translateY += (draggedy - y);
         draggedx = x;
         draggedy = y;
         repaint();
@@ -217,19 +254,100 @@ public class MapComponent extends Container {
         draggedx = x;
         draggedy = y;
     }
-
+    
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+        if (x.length > 1) {
+            double currentDis = distance(x, y);
+            if(oldDistance == -1){
+                oldDistance = currentDis;
+                scaleX = getWidth();
+                scaleY = getHeight();
+            }
+            if (Math.abs(currentDis - oldDistance) > 10f) {
+                double scale = currentDis / oldDistance;
+                if(scale > 1){
+                    if(_zoom == getProvider().maxZoomLevel()){
+                        return;
+                    }
+                }else{
+                    if(_zoom == getProvider().minZoomLevel()){
+                        return;
+                    }                    
+                }
+                scaleX = (int) (scale * scaleX);
+                scaleY = (int) (scale * scaleY);
+                oldDistance = currentDis;
+                repaint();
+            }
+        } else {
+            super.pointerDragged(x, y);
+        }
+    }
+    
+    private double distance(int[] x, int[] y){
+            int disx = x[0] - x[1];
+            int disy = y[0] - y[1];
+            return Math.sqrt(disx*disx + disy*disy);    
+    }
     
     /**
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
-        int deltax = Math.abs(pressedx - x);
-        int deltay = Math.abs(pressedy - y);
         
-        if(deltax > 10 || deltay > 10){
+        if(oldDistance != -1){
+            double scale = (double)scaleX/(double)getWidth();
+            if(scale > 1){
+                if(scale < 1.2){
+                    //do nothing
+                }else if(scale < 1.6){
+                    zoomIn();                
+                }else if(scale < 2.0){
+                    zoomIn();                
+                    zoomIn();                
+                }else if(scale < 2.4){
+                    zoomIn();                
+                    zoomIn();                
+                    zoomIn();                                
+                }else{
+                    zoomIn();                
+                    zoomIn();                
+                    zoomIn();                                
+                    zoomIn();                                                
+                }
+            }else{
+                if(scale > 0.8){
+                    //do nothing
+                }else if(scale > 0.5){
+                    zoomOut();                
+                }else if(scale > 0.2){
+                    zoomOut();                
+                    zoomOut();                
+                }else{
+                    zoomOut();                
+                    zoomOut();                
+                    zoomOut();                                
+                }
+            }
+            translateX = 0;        
+            translateY = 0;        
+            scaleX = 0;
+            scaleY = 0;
+            oldDistance = -1;
+            if(buffer != null){
+                buffer.dispose();
+                buffer = null;
+            }
+            repaint();
             return;
         }
+        Coord scale = _map.scale(_zoom);
+        _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
+        _needTiles = true;
+        translateX = 0;        
+        translateY = 0;        
         
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
@@ -247,7 +365,7 @@ public class MapComponent extends Container {
                 ((PointsLayer) layer.layer).fireActionEvent(bbox);
             }
         }
-
+        repaint();
     }
     
     /**
@@ -301,6 +419,7 @@ public class MapComponent extends Container {
     }
 
     private void paintmap(Graphics g) {
+        
         g.translate(getX(), getY());
         if (_needTiles) {
             getTiles();
@@ -339,15 +458,13 @@ public class MapComponent extends Container {
                 Coord cur = _map.translate(_center, _zoom, posX - getWidth() / 2, getHeight() / 2 - posY);
                 if (_map.projection().extent().contains(cur)) {
                     tile = _map.tileFor(_map.bboxFor(cur, _zoom));
-//                    if (!tile.getBoundingBox().contains(cur)) {
-//                        throw new RuntimeException("Map returned bad tile (" + tile.getBoundingBox() + ") for: " + cur.toString());
-//                    }
                     if (_delta == null) {
                         _delta = tile.pointPosition(cur);
                     }
                     tile.setsTileReadyListener(new ActionListener() {
 
                         public void actionPerformed(ActionEvent evt) {
+                            refreshTiles = true;
                             repaint();
                         }
                     });
@@ -379,7 +496,7 @@ public class MapComponent extends Container {
             return;
         }
         g.setColor(0);
-        g.setFont(Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL));
+        g.setFont(attributionFont);
         Font f = g.getFont();
         g.drawString(attribution, getWidth() - f.stringWidth(attribution) - 2, getHeight() - f.getHeight() - 2);
     }

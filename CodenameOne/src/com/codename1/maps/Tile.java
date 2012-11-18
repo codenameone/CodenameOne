@@ -43,7 +43,7 @@ public class Tile {
     private static Image tileLoadingImage;    
     private static String tileLoadingText = "Loading...";
     private ActionListener listener;
-    
+    private static Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
     /**
      * Creates a new Tile.
      * 
@@ -156,7 +156,7 @@ public class Tile {
         g.setColor(0x707070);
         g.fillRect(0, 0, dimension().getWidth(), dimension().getHeight());
         g.setColor(0xFFFFFF);
-        g.setFont(Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE));
+        g.setFont(f);
         Font f = g.getFont();
         int strWidth = f.stringWidth(tileLoadingText);
         g.drawString(tileLoadingText, (dimension().getWidth() - strWidth) / 2, (dimension().getHeight() - f.getHeight()) / 2);
