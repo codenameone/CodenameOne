@@ -645,16 +645,41 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(JAVA_FLOAT x, JA
 }
 
 
+
 void pointerPressed(int* x, int* y, int length) {
-    com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(x[0], y[0]);
+    if(length == 1) {
+        com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(x[0], y[0]);
+    } else {
+        org_xmlvm_runtime_XMLVMArray* xArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(xArray->fields.org_xmlvm_runtime_XMLVMArray.array_, x, length * sizeof(JAVA_INT));
+        org_xmlvm_runtime_XMLVMArray* yArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
+        com_codename1_impl_ios_IOSImplementation_pointerPressed___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
+    }
 }
 
 void pointerDragged(int* x, int* y, int length) {
-    com_codename1_impl_ios_IOSImplementation_pointerDraggedCallback___int_int(x[0], y[0]);
+    if(length == 1) {
+        com_codename1_impl_ios_IOSImplementation_pointerDraggedCallback___int_int(x[0], y[0]);
+    } else {
+        org_xmlvm_runtime_XMLVMArray* xArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(xArray->fields.org_xmlvm_runtime_XMLVMArray.array_, x, length * sizeof(JAVA_INT));
+        org_xmlvm_runtime_XMLVMArray* yArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
+        com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
+    }
 }
 
 void pointerReleased(int* x, int* y, int length) {
-    com_codename1_impl_ios_IOSImplementation_pointerReleasedCallback___int_int(x[0], y[0]);
+    if(length == 1) {
+        com_codename1_impl_ios_IOSImplementation_pointerReleasedCallback___int_int(x[0], y[0]);
+    } else {
+        org_xmlvm_runtime_XMLVMArray* xArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(xArray->fields.org_xmlvm_runtime_XMLVMArray.array_, x, length * sizeof(JAVA_INT));
+        org_xmlvm_runtime_XMLVMArray* yArray = XMLVMArray_createSingleDimension(__CLASS_int, length);
+        memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
+        com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
+    }
 }
 
 void screenSizeChanged(int width, int height) {
@@ -1424,7 +1449,6 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(JAVA_LONG pe
         UIWebView* w = (UIWebView*)peer;
         NSString* theTitle = [w stringByEvaluatingJavaScriptFromString:@"document.title"];
         returnString = xmlvm_create_java_string(theTitle.UTF8String);
-        [w reload];
         [pool release];
     });
     return returnString;
@@ -1435,7 +1459,6 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_LONG peer
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
         returnString = xmlvm_create_java_string(w.request.URL.absoluteString.UTF8String);
-        [w reload];
         [pool release];
     });
     return returnString;
@@ -2379,3 +2402,103 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__() {
     com_codename1_impl_ios_IOSNative_scanBarCode__();
 }
 
+
+NSData* arrayToData(JAVA_OBJECT arr) {
+    org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
+    void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+    return d;
+}
+
+JAVA_OBJECT nsDataToByteArr(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];    
+}
+
+JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_boolean, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_OBJECT nsDataToCharArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_char, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_OBJECT nsDataToShortArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_short, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_OBJECT nsDataToIntArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_int, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_OBJECT nsDataToLongArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_long, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_OBJECT nsDataToFloatArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_float, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];            
+}
+
+JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* d = (NSData*)data;
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_double, [d length]);
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    memcpy(dtd, d.bytes, d.length);
+    [pool release];        
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(JAVA_OBJECT name) {
+    int pSize = 14;
+    
+    pSize *= scaleValue;
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString* str = toNSString(name);
+    UIFont* fnt = [UIFont fontWithName:str size:pSize];
+    [fnt retain];
+    [pool release];
+    return fnt;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boolean_float(JAVA_LONG uiFont, JAVA_BOOLEAN bold, JAVA_BOOLEAN italic, JAVA_FLOAT size) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    UIFont* original = (UIFont*)uiFont;
+    UIFont* fnt = [original fontWithSize:size];
+    [fnt retain];
+    [pool release];
+    return fnt;
+}

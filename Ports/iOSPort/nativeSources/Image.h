@@ -33,7 +33,7 @@
 #include <assert.h>
 #include <iterator>
 #include "Symbol.h"
-#include "Exception.h"
+#include "ZBARException.h"
 
 namespace zbar {
 

@@ -30,7 +30,7 @@
 # error "include zbar.h in your application, **not** zbar/Processor.h"
 #endif
 
-#include "Exception.h"
+#include "ZBARException.h"
 #include "Image.h"
 
 namespace zbar {

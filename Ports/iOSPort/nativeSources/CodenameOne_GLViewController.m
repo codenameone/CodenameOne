@@ -914,6 +914,7 @@ static CodenameOne_GLViewController *sharedSingleton;
             img = [UIImage imageNamed:@"Default.png"];
         }
     }
+    [self.view setMultipleTouchEnabled:YES];
     if(img != nil) {
         float scale = scaleValue;
         DrawImage* dr;
@@ -1442,12 +1443,23 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 static BOOL skipNextTouch = NO;
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * scaleValue;
-    yArray[0] = (int)point.y * scaleValue;
+    if([touches count] > 1) {
+        NSArray *ts = [touches allObjects];
+        for(int iter = 0 ; iter < [ts count] ; iter++) {
+            UITouch* currentTouch = [ts objectAtIndex:iter];
+            CGPoint currentPoint = [currentTouch locationInView:self.view];
+            xArray[iter] = (int)currentPoint.x * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
+        }
+    } else {
+        xArray[0] = (int)point.x * scaleValue;
+        yArray[0] = (int)point.y * scaleValue;
+    }
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
              editCompoentY + editCompoentH >= point.y)) {
@@ -1470,7 +1482,8 @@ static BOOL skipNextTouch = NO;
             //return;
         }
     }
-    pointerPressedC(xArray, yArray, 1);
+    pointerPressedC(xArray, yArray, [touches count]);
+    [pool release];
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -1478,13 +1491,25 @@ static BOOL skipNextTouch = NO;
         skipNextTouch = NO;
         return;
     }
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * scaleValue;
-    yArray[0] = (int)point.y * scaleValue;
-    pointerReleasedC(xArray, yArray, 1);
+    if([touches count] > 1) {
+        NSArray *ts = [touches allObjects];
+        for(int iter = 0 ; iter < [ts count] ; iter++) {
+            UITouch* currentTouch = [ts objectAtIndex:iter];
+            CGPoint currentPoint = [currentTouch locationInView:self.view];
+            xArray[iter] = (int)currentPoint.x * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
+        }
+    } else {
+        xArray[0] = (int)point.x * scaleValue;
+        yArray[0] = (int)point.y * scaleValue;
+    }
+    pointerReleasedC(xArray, yArray, [touches count]);
+    [pool release];
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -1492,28 +1517,51 @@ static BOOL skipNextTouch = NO;
         skipNextTouch = NO;
         return;
     }
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * scaleValue;
-    yArray[0] = (int)point.y * scaleValue;
-    pointerReleasedC(xArray, yArray, 1);
+    if([touches count] > 1) {
+        NSArray *ts = [touches allObjects];
+        for(int iter = 0 ; iter < [ts count] ; iter++) {
+            UITouch* currentTouch = [ts objectAtIndex:iter];
+            CGPoint currentPoint = [currentTouch locationInView:self.view];
+            xArray[iter] = (int)currentPoint.x * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
+        }
+    } else {
+        xArray[0] = (int)point.x * scaleValue;
+        yArray[0] = (int)point.y * scaleValue;
+    }
+    pointerReleasedC(xArray, yArray, [touches count]);
+    [pool release];
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
     if(skipNextTouch) {
         return;
     }
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    xArray[0] = (int)point.x * scaleValue;
-    yArray[0] = (int)point.y * scaleValue;
-    pointerDraggedC(xArray, yArray, 1);
+    if([touches count] > 1) {
+        NSArray *ts = [touches allObjects];
+        for(int iter = 0 ; iter < [ts count] ; iter++) {
+            UITouch* currentTouch = [ts objectAtIndex:iter];
+            CGPoint currentPoint = [currentTouch locationInView:self.view];
+            xArray[iter] = (int)currentPoint.x * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
+        }
+    } else {
+        xArray[0] = (int)point.x * scaleValue;
+        yArray[0] = (int)point.y * scaleValue;
+    }
+    pointerDraggedC(xArray, yArray, [touches count]);
+    [pool release];
 }
-
 
 - (void) locationManager:(CLLocationManager *)manager
      didUpdateToLocation:(CLLocation *)newLocation
