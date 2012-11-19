@@ -71,6 +71,7 @@ import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+import android.graphics.drawable.BitmapDrawable;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Environment;
@@ -230,7 +231,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
          * devices are extemely sensitive so dragging should start a little
          * later than suggested by default implementation.
          */
-        this.setDragStartPercentage(6);
+        this.setDragStartPercentage(5);
         VirtualKeyboardInterface vkb = new AndroidKeyboard(this);
         Display.getInstance().registerVirtualKeyboard(vkb);
         Display.getInstance().setDefaultVirtualKeyboard(vkb);
@@ -3630,6 +3631,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void run() {
             activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
             activity.getActionBar().setTitle(f.getTitle());
+            if(android.os.Build.VERSION.SDK_INT >= 14){
+                Image icon = f.getTitleComponent().getIcon();
+                if(icon != null){
+                    activity.getActionBar().setIcon(new BitmapDrawable((Bitmap)icon.getImage()));                                
+                }else{
+                    if(activity.getApplicationInfo().icon != 0){
+                        activity.getActionBar().setIcon(activity.getApplicationInfo().icon);          
+                    }
+                }
+            }
         }
         
     }
