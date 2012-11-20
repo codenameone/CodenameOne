@@ -1,5 +1,6 @@
 package com.codename1.impl.android;
 
+import android.app.ActionBar;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.view.MotionEvent;
 import com.codename1.codescan.ScanResult;
@@ -3636,16 +3637,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
+            ActionBar ab = activity.getActionBar();
             activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
             activity.getActionBar().setTitle(f.getTitle());
             if(android.os.Build.VERSION.SDK_INT >= 14){
                 Image icon = f.getTitleComponent().getIcon();
-                if(icon != null){
-                    activity.getActionBar().setIcon(new BitmapDrawable((Bitmap)icon.getImage()));                                
-                }else{
-                    if(activity.getApplicationInfo().icon != 0){
-                        activity.getActionBar().setIcon(activity.getApplicationInfo().icon);          
+                try {
+                    if(icon != null){
+                        ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable((Bitmap)icon.getImage()));
+                    }else{
+                        if(activity.getApplicationInfo().icon != 0){
+                            ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
+                        }
                     }
+                } catch(Throwable t) {
+                    t.printStackTrace();
                 }
             }
         }
