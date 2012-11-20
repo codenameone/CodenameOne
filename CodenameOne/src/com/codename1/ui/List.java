@@ -1296,11 +1296,20 @@ public class List extends Component {
         }
     }
 
+    /**
+     * Allows subclasses to override the selection rendering for the component, specifically the spinner
+     * in some themes
+     * @return true to render the selection, false otherwise.
+     */
+    protected boolean shouldRenderSelection() {
+        return Display.getInstance().shouldRenderSelection(this);
+    }
+    
     private void paintFocus(Graphics g, int width, Rectangle pos, Dimension rendererSize) {
         if(ignoreFocusComponentWhenUnfocused && !hasFocus()) {
             return;
         }
-        if(!Display.getInstance().shouldRenderSelection(this)) {
+        if(!shouldRenderSelection()) {
             return;
         }
         calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);

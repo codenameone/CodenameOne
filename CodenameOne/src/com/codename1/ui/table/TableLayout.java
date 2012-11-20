@@ -26,6 +26,7 @@ package com.codename1.ui.table;
 import com.codename1.ui.layouts.*;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import java.util.Vector;
@@ -175,7 +176,6 @@ public class TableLayout extends Layout {
     private int currentColumn;
 
     private static int minimumSizePerColumn = 10;
-
     private Constraint[] tablePositions;
 
     private int[] columnSizes;
@@ -451,6 +451,8 @@ public class TableLayout extends Layout {
         if(modifableColumnSize == null) {
             modifableColumnSize = new boolean[columns];
         }
+        
+        int availableSpaceColumn = -1;
 
         for(int iter = 0 ; iter < rows ; iter++) {
             Constraint c = tablePositions[iter * columns + column];
@@ -464,6 +466,11 @@ public class TableLayout extends Layout {
                 current = Math.max(current, c.width * percentageOf / 100);
                 modifableColumnSize[column] = false;
             } else {
+                // special case, width -2 gives the column the rest of the available space
+                if(c.width == -2) {
+                    availableSpaceColumn = iter;
+                    continue;
+                }
                 Style s = c.parent.getStyle();
                 current = Math.max(current, c.parent.getPreferredW()  + s.getMargin(false, Component.LEFT) + s.getMargin(false, Component.RIGHT));
                 modifableColumnSize[column] = true;
@@ -471,6 +478,10 @@ public class TableLayout extends Layout {
             if(available > -1) {
                 current = Math.min(available, current);
             }
+        }
+        if(availableSpaceColumn > -1) {
+            modifableColumnSize[availableSpaceColumn] = false;
+            return percentageOf - current;
         }
         return current;
     }
@@ -506,12 +517,18 @@ public class TableLayout extends Layout {
         int w = s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT);
         int h = s.getPadding(false, Component.TOP) + s.getPadding(false, Component.BOTTOM);
 
+        int maxW = Display.getInstance().getDisplayWidth();
+        int maxH = Display.getInstance().getDisplayHeight();
+        if(parent.isScrollableY()) {
+            maxW *= 30;
+            maxH *= 30;
+        }
         for(int iter = 0 ; iter < columns ; iter++) {
-            w += getColumnWidthPixels(iter, Integer.MAX_VALUE, -1);
+            w += getColumnWidthPixels(iter, maxW, -1);
         }
 
         for(int iter = 0 ; iter < rows ; iter++) {
-            h += getRowHeightPixels(iter, Integer.MAX_VALUE, -1);
+            h += getRowHeightPixels(iter, maxH, -1);
         }
 
         return new Dimension(w, h);

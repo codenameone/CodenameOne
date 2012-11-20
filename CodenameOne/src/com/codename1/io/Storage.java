@@ -82,6 +82,14 @@ public class Storage {
         return INSTANCE;
     }
 
+    /**
+     * Storage is cached for faster access, however this might cause a problem with refreshing
+     * objects since they are not cloned. Clearing the cache allows to actually reload from the
+     * storage file.
+     */
+    public void clearCache() {
+        cache.clearAllCache();
+    }
     
     /**
      * Flush the storage cache allowing implementations that cache storage objects

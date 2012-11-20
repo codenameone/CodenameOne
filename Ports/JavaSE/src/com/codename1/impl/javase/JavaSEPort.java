@@ -3404,6 +3404,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        ((HttpURLConnection) connection).setRequestMethod(method);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public void setPostRequest(Object connection, boolean p) {
         try {
             String mtd = "GET";

@@ -2560,6 +2560,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new BufferedInputStream(n);
     }
 
+
+    /**
+     * @inheritDoc
+     */
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        NetworkConnection n = (NetworkConnection)connection;
+        IOSNative.setMethod(n.peer, method);
+    }
+
     /**
      * @inheritDoc
      */

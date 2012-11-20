@@ -2015,6 +2015,14 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return new BufferedInputStream(((HttpConnection)connection).openInputStream(), ((HttpConnection)connection).getURL());
     }
 
+
+    /**
+     * @inheritDoc
+     */
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        ((HttpConnection)connection).setRequestMethod(method);
+    }
+
     /**
      * @inheritDoc
      */

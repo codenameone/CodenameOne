@@ -2115,6 +2115,13 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        ((HttpConnection)connection).setRequestMethod(method);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public void setPostRequest(Object connection, boolean p) {
         try {
             if (p) {

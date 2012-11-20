@@ -119,7 +119,7 @@ public class ConnectionRequest implements IOProgressListener {
     private Dialog disposeOnCompletion;
     private byte[] data;
     private int responseCode;
-
+    private String httpMethod;
     private int silentRetryCount = 0;
     private boolean failSilently;
 
@@ -129,6 +129,23 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public byte[] getResponseData() {
         return data;
+    }
+    
+    
+    /**
+     * Sets the http method for the request
+     * @param httpMethod the http method string
+     */
+    public void setHttpMethod(String httpMethod) {
+        this.httpMethod = httpMethod;
+    } 
+    
+    /**
+     * Returns the http method 
+     * @return the http method of the request
+     */
+    public String getHttpMethod() {
+        return httpMethod;
     }
     
     /**
@@ -210,6 +227,9 @@ public class ConnectionRequest implements IOProgressListener {
                 return;
             }
             initConnection(connection);
+            if(httpMethod != null) {
+                impl.setHttpMethod(connection, httpMethod);
+            }
             Vector v = impl.getCookiesForURL(actualUrl);
             if(v != null) {
                 int c = v.size();

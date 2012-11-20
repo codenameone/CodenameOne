@@ -221,6 +221,8 @@ class Spinner extends List {
      */
     protected void initComponent() {        
         getComponentForm().registerAnimated(this);
+        boolean n = UIManager.getInstance().isThemeConstant("spinnerFocusBool", false);
+        setIgnoreFocusComponentWhenUnfocused(!n);
     }
 
     /**
@@ -578,5 +580,15 @@ class Spinner extends List {
      */
     public static void setInputSkipDelay(int aInputSkipDelay) {
         inputSkipDelay = aInputSkipDelay;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected boolean shouldRenderSelection() {
+        if(!isIgnoreFocusComponentWhenUnfocused()) {
+            return true;
+        }
+        return super.shouldRenderSelection();
     }
 }

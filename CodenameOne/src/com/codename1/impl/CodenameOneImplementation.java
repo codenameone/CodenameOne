@@ -3402,6 +3402,14 @@ public abstract class CodenameOneImplementation {
     public abstract Object connect(String url, boolean read, boolean write) throws IOException;
 
     /**
+     * Requests special http method such as put or delete
+     * @param connection the connection object
+     * @param method the method string
+     */
+    public void setHttpMethod(Object connection, String method) throws IOException {
+    }
+    
+    /**
      * Indicates the HTTP header value for an HTTP connection
      *
      * @param connection the connection object
