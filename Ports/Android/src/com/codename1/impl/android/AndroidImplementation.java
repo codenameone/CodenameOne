@@ -126,6 +126,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -2197,7 +2198,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     is = getResourceAsStream(getClass(), "/android_holo_light.res");
                 }
                 Resources r = Resources.open(is);
-                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                h.put("@commandBehavior", "Native");
+                UIManager.getInstance().setThemeProps(h);
                 is.close();
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
             } catch (IOException ex) {
