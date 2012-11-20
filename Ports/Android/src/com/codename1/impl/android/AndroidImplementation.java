@@ -3650,6 +3650,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
                         }
                     }
+                    activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
                 } catch(Throwable t) {
                     t.printStackTrace();
                 }
