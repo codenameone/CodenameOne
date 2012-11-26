@@ -233,7 +233,7 @@ public class InPlaceEditView extends FrameLayout {
             nextDown = textArea.getComponentForm().findNextFocusVertical(true);
         }
         if (mTextArea.isSingleLineTextArea()) {
-            if (nextDown != null && nextDown instanceof TextArea) {
+            if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
             } else {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -356,7 +356,7 @@ public class InPlaceEditView extends FrameLayout {
                 next = mTextArea.getComponentForm().findNextFocusVertical(true);
             }
 
-            if (next instanceof TextArea) {
+            if (next != null && next instanceof TextArea && ((TextArea)next).isEditable() && ((TextArea)next).isEnabled()) {
                 nextTextArea = (TextArea) next;
             }
         }
