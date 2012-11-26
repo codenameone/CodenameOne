@@ -211,7 +211,7 @@ class PrettyPrinter {
         }
         try {
 	        if (value instanceof String) {
-	        	return (String)value;
+	        	return quote((String)value);
 	        }
         } catch (Exception e) {
         	/* forget about it */

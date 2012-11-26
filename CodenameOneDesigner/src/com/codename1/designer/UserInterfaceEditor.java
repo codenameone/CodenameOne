@@ -824,36 +824,60 @@ public class UserInterfaceEditor extends BaseForm {
                     JMenu eventsMenu = new JMenu("Events");
                     popup.add(eventsMenu);
                     eventsMenu.add(new AbstractAction("Action Event") {
+                        public boolean isEnabled() {
+                            return bindActionEvent.isEnabled();
+                        }
+                        
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindActionEventActionPerformed(ae);
                         }
                     });
                     eventsMenu.add(new AbstractAction("On Create") {
+                        public boolean isEnabled() {
+                            return bindOnCreate.isEnabled();
+                        }
+
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindOnCreateActionPerformed(ae);
                         }
                     });
                     eventsMenu.add(new AbstractAction("Before Show") {
+                        public boolean isEnabled() {
+                            return bindBeforeShow.isEnabled();
+                        }
+
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindBeforeShowActionPerformed(ae);
                         }
                     });
                     eventsMenu.add(new AbstractAction("Post Show") {
+                        public boolean isEnabled() {
+                            return bindPostShow.isEnabled();
+                        }
+
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindPostShowActionPerformed(ae);
                         }
                     });
                     eventsMenu.add(new AbstractAction("Exit Form") {
+                        public boolean isEnabled() {
+                            return bindExitForm.isEnabled();
+                        }
+
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindExitFormActionPerformed(ae);
                         }
                     });
                     eventsMenu.add(new AbstractAction("List Model") {
+                        public boolean isEnabled() {
+                            return bindListModel.isEnabled();
+                        }
+
                         @Override
                         public void actionPerformed(ActionEvent ae) {
                             bindListModelActionPerformed(ae);
@@ -2097,7 +2121,7 @@ public class UserInterfaceEditor extends BaseForm {
                         if(cmd == null) {
                             cmd = new ActionCommand("", null, ActionCommand.getCommandUniqueId(), null, false, "");
                         }
-                        CommandEditor cmdEdit = new CommandEditor(cmd, res, UserInterfaceEditor.this.name, getListOfAllCommands(), projectGeneratorSettings);
+                        CommandEditor cmdEdit = new CommandEditor(cmd, res, UserInterfaceEditor.this.name, getListOfAllCommands(), projectGeneratorSettings, getLanguageLevel() > 4);
                         if(showEditDialog(cmdEdit)) {
                             return cmdEdit.getResult();
                         }
@@ -2398,7 +2422,7 @@ public class UserInterfaceEditor extends BaseForm {
             if(a == null) {
                 a = new ActionCommand(b.getText(), b.getIcon(), ActionCommand.getCommandUniqueId(), null, false, "");
             }
-            ed = new CommandEditor(a, res, UserInterfaceEditor.this.name, getListOfAllCommands(), projectGeneratorSettings);
+            ed = new CommandEditor(a, res, UserInterfaceEditor.this.name, getListOfAllCommands(), projectGeneratorSettings, getLanguageLevel() > 4);
             if(JOptionPane.showConfirmDialog(UserInterfaceEditor.this, ed, "Edit", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
                     != JOptionPane.OK_OPTION) {
                 fireEditingCanceled();

@@ -297,7 +297,7 @@ public class Element {
             int i=0;
             while (i<children.size()) {
                 Element child=(Element)children.elementAt(i);
-                if (depth>0) {
+                if (depth>1) {
                     child.getDescendantsByTagNameInternal(v, name,depth-1);
                 }
                 if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {

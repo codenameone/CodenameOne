@@ -51,9 +51,11 @@ import javax.swing.SpinnerNumberModel;
 public class CommandEditor extends javax.swing.JPanel {
     private Properties projectGeneratorSettings;
     private String uiName;
+    private boolean java5;
 
     /** Creates new form CommandEditor */
-    public CommandEditor(ActionCommand cmd, EditableResources res, String uiName, List<com.codename1.ui.Command> commands, Properties projectGeneratorSettings) {
+    public CommandEditor(ActionCommand cmd, EditableResources res, String uiName, List<com.codename1.ui.Command> commands, Properties projectGeneratorSettings, boolean java5) {
+        this.java5 = java5;
         this.projectGeneratorSettings = projectGeneratorSettings;
         this.uiName = uiName;
         initComponents();
@@ -386,7 +388,7 @@ public class CommandEditor extends javax.swing.JPanel {
             }
         }
     }// </editor-fold>//GEN-END:initComponents
-
+    
     private void goToSourceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_goToSourceActionPerformed
         try {
             File destFile = new File(projectGeneratorSettings.getProperty("userClassAbs"));
@@ -414,14 +416,24 @@ public class CommandEditor extends javax.swing.JPanel {
                 pos = fileContent.lastIndexOf('}');
 
                 line = UserInterfaceEditor.charIndexToFileLine(pos, fileContent) + 4;
-                fileContent = fileContent.substring(0, pos) +
-                        "\n    protected boolean " + methodName + "() {\n" +
-                        "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
-                        "        boolean val = super." + methodName +"();\n" +
-                        "        \n" +
-                        "        return val;\n" +
-                        "    }\n" +
-                        fileContent.substring(pos);
+                if(java5) {
+                    fileContent = fileContent.substring(0, pos) +
+                            "\n    @Override\n" +
+                            "\n    protected boolean " + methodName + "() {\n" +
+                            "        \n" +
+                            "        return true;\n" +
+                            "    }\n" +
+                            fileContent.substring(pos);
+                } else {
+                    fileContent = fileContent.substring(0, pos) +
+                            "\n    protected boolean " + methodName + "() {\n" +
+                            "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
+                            "        boolean val = super." + methodName +"();\n" +
+                            "        \n" +
+                            "        return val;\n" +
+                            "    }\n" +
+                            fileContent.substring(pos);
+                }
                 Writer output = new FileWriter(destFile);
                 output.write(fileContent);
                 output.close();
