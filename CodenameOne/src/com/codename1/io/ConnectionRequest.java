@@ -122,6 +122,7 @@ public class ConnectionRequest implements IOProgressListener {
     private String httpMethod;
     private int silentRetryCount = 0;
     private boolean failSilently;
+    boolean retrying;
 
     /**
      * This method will return a valid value for only some of the responses and only after the response was processed
@@ -544,6 +545,7 @@ public class ConnectionRequest implements IOProgressListener {
      * Retry the current operation in case of an exception
      */
     public void retry() {
+        retrying = true;
         NetworkManager.getInstance().addToQueue(this, true);
     }
 

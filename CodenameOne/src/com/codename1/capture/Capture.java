@@ -143,7 +143,11 @@ public class Capture {
         private int targetWidth = -1;
         private int targetHeight = -1;
         public synchronized void actionPerformed(ActionEvent evt) {
-            url = (String)evt.getSource();
+            if(evt == null) {
+                url = null;
+            } else {
+                url = (String)evt.getSource();
+            }
             completed = true;
             notify();
         }

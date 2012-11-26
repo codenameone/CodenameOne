@@ -526,6 +526,10 @@ public class NetworkManager {
                 NetworkEvent e = (NetworkEvent)evt;
                  if(e.getConnectionRequest() == request) {
                      if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                         if(request.retrying) {
+                             request.retrying = false;
+                             return;
+                         }
                          finishedWaiting = true;
                          removeProgressListener(this);
                          return;

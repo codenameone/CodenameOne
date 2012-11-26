@@ -952,6 +952,7 @@ public class CloudStorage {
                     }
                 }
             }
+            d.writeInt(1);
         }
         
         protected void readResponse(InputStream input) throws IOException  {

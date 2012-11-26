@@ -3777,8 +3777,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setCloudBoundProperty(String cloudBoundProperty) {
         this.cloudBoundProperty = cloudBoundProperty;
-        if(cloudBoundProperty == null) {
+        if(cloudBoundProperty == null || this.cloudBoundProperty.length() == 0) {
             noBind = true;
+            this.cloudBoundProperty = null;
         }
     }
 
