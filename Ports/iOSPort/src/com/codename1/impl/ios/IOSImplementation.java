@@ -203,6 +203,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.currentEditing != null) {
             if(finished) {
                 instance.currentEditing.setText(s);
+                Display.getInstance().onEditingComplete(instance.currentEditing, s);
                 instance.currentEditing = null;
             } else {
                 instance.currentEditing.setText(s);
@@ -2294,6 +2295,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         return false;
     }
 
+    protected boolean cacheRadialGradients() {
+        return false;
+    }
+
+    protected boolean cacheLinearGradients() {
+        return false;
+    }
+
     public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
@@ -3136,6 +3145,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
         }
+    }
+    /**
+     * Indicates whether the application should handle the given URL, defaults to true
+     * @param url the URL to handle
+     * @param caller the invoking application
+     * @return true to handle the URL, false otherwise
+     */
+    public static boolean shouldApplicationHandleURL(String url, String caller) {
+        if(instance.life != null) {
+            instance.life.shouldApplicationHandleURL(url, caller);
+        }
+        return true;
     }
 
     /**

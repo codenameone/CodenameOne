@@ -20,54 +20,21 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.ios;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+package com.codename1.system;
 
 /**
- * Implements the output stream interface on top of NSData
+ * In platforms that support opening an application via URL this interface can be implemented
+ * by the main class to support such functionality. Notice that build argument must also
+ * include some information, for more details check out this issue: http://code.google.com/p/codenameone/issues/detail?id=379
  *
  * @author Shai Almog
  */
-public class NSDataOutputStream extends OutputStream {
-    private String file;
-    private boolean written;
-    public NSDataOutputStream(String file) {
-        this.file = file;
-    }
-
-    public NSDataOutputStream(String file, int offset) throws IOException {
-        this.file = file;
-        written = true;
-    }
-        
-    @Override
-    public void write(int b) throws IOException {
-        write(new byte[] {(byte)b});
-    }
-
-    @Override
-    public void write(byte[] b) throws IOException {
-        if(written) {
-            IOSNative.appendToFile(b, file);
-        } else {
-            IOSNative.writeToFile(b, file);
-        }
-        written = true;
-    }
-
-    @Override
-    public void write(byte[] b, int off, int len) throws IOException {
-        if(off == 0 && len == b.length) {
-            write(b);
-            return;
-        }
-        byte[] arr = new byte[len];
-        System.arraycopy(b, off, arr, 0, len);
-        write(arr);
-    }
-
-    
+public interface URLCallback {
+    /**
+     * Indicates whether the application should handle the given URL, defaults to true
+     * @param url the URL to handle
+     * @param caller the invoking application
+     * @return true to handle the URL, false otherwise
+     */
+    public boolean shouldApplicationHandleURL(String url, String caller);
 }

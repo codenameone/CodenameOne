@@ -22,8 +22,16 @@
  */
 package com.codename1.capture;
 
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.ImageIO;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * This is the main class for capturing media files from the device.
@@ -49,7 +57,54 @@ public class Capture {
     public static void capturePhoto(ActionListener response){    
         Display.getInstance().capturePhoto(response);
     }
+
+    /**
+     * Invokes the camera and takes a photo synchronously while blocking the EDT
+     * @return the photo file location or null if the user canceled
+     */
+    public static String capturePhoto() {
+        return capturePhoto(-1, -1);
+    }
     
+    /**
+     * Same as captureAudio only a blocking version that holds the EDT
+     * @return the photo file location or null if the user canceled
+     */
+    public static String captureAudio() {
+        CallBack c = new CallBack();
+        captureAudio(c);
+        Display.getInstance().invokeAndBlock(c);
+        return c.url;
+    }
+
+    
+    /**
+     * Same as captureVideo only a blocking version that holds the EDT
+     * @return the photo file location or null if the user canceled
+     */
+    public static String captureVideo() {
+        CallBack c = new CallBack();
+        captureVideo(c);
+        Display.getInstance().invokeAndBlock(c);
+        return c.url;
+    }
+
+    /**
+     * Invokes the camera and takes a photo synchronously while blocking the EDT
+     * 
+     * @param width the target width for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1
+     * @param height the target height for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1
+     * @return the photo file location or null if the user canceled
+     */
+    public static String capturePhoto(int width, int height) {
+        CallBack c = new CallBack();
+        c.targetWidth = width;
+        c.targetHeight = height;
+        capturePhoto(c);
+        Display.getInstance().invokeAndBlock(c);
+        return c.url;
+    }
+        
     /**
      * This method tries to invoke the device native hardware to capture audio.
      * The method returns immediately and the response will be sent asynchronously
@@ -82,5 +137,41 @@ public class Capture {
         Display.getInstance().captureVideo(response);
     }
     
-    
+    static class CallBack implements ActionListener, Runnable {
+        String url;
+        private boolean completed;
+        private int targetWidth = -1;
+        private int targetHeight = -1;
+        public synchronized void actionPerformed(ActionEvent evt) {
+            url = (String)evt.getSource();
+            completed = true;
+            notify();
+        }
+
+        public synchronized void run() {
+            while(!completed) {
+                try {
+                    wait();
+                } catch (InterruptedException ex) {
+                }
+            }
+            if(targetWidth > 0 || targetHeight > 0) {
+                ImageIO scale = Display.getInstance().getImageIO();
+                if(scale != null) {
+                    try {
+                        InputStream is = FileSystemStorage.getInstance().openInputStream(url);
+                        OutputStream os = FileSystemStorage.getInstance().openOutputStream(url + "s");
+                        scale.save(is, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
+                        Util.cleanup(os);
+                        Util.cleanup(is);
+                        FileSystemStorage.getInstance().delete(url);
+                        url = url + "s";
+                    } catch (IOException ex) {
+                        Log.e(ex);
+                    }
+                }
+            }
+        }
+        
+    }
 }

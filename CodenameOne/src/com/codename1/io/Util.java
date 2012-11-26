@@ -27,6 +27,7 @@ package com.codename1.io;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -54,6 +55,10 @@ public class Util {
     private static boolean xmlVMInstanceofBug;
     private static boolean xmlVMInstanceofBugTested;
 
+    static {
+        register("EncodedImage", EncodedImage.class);
+    }
+    
     /**
      * Fix for RFE 427: http://java.net/jira/browse/LWUIT-427
      * Allows determining chars that should not be encoded
@@ -269,6 +274,17 @@ public class Util {
             Boolean v = (Boolean)o;
             out.writeUTF("bool");
             out.writeBoolean(v.booleanValue());
+            return;
+        }
+        
+        if (o instanceof EncodedImage) {
+            EncodedImage e = (EncodedImage)o;
+            out.writeInt(e.getWidth());
+            out.writeInt(e.getHeight());
+            out.writeBoolean(e.isOpaque());
+            byte[] b = e.getImageData();
+            out.writeInt(b.length);
+            out.write(b);
             return;
         }
         
@@ -540,6 +556,14 @@ public class Util {
                     v.put(readObject(input), readObject(input));
                 }
                 return v;
+            }
+            if ("EncodedImage".equals(type)) {
+                int width = input.readInt();
+                int height = input.readInt();
+                boolean op = input.readBoolean();
+                byte[] data = new byte[input.readInt()];
+                input.readFully(data);
+                return EncodedImage.create(data, width, height, op);
             }
             Class cls = (Class) externalizables.get(type);
             if (cls != null) {

@@ -235,6 +235,7 @@ public class Component implements Animation, StyleListener {
 
     private String cloudBoundProperty;
     private String cloudDestinationProperty;
+    boolean noBind;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -1619,7 +1620,7 @@ public class Component implements Animation, StyleListener {
      * Returns true if the component has focus
      * 
      * @return true if the component has focus; otherwise false
-     * @see #setFocus
+     * @see #requestFocus
      */
     public boolean hasFocus() {
         return focused;
@@ -1634,6 +1635,7 @@ public class Component implements Animation, StyleListener {
      * Style should be used when painting a focused component
      * 
      * @see #requestFocus
+     * @deprecated this method shouldn't be invoked by user code, use requestFocus() instead
      */
     public void setFocus(boolean focused) {
         this.focused = focused;
@@ -3757,6 +3759,9 @@ public class Component implements Animation, StyleListener {
      * @return the cloudBoundProperty
      */
     public String getCloudBoundProperty() {
+        if(noBind && cloudBoundProperty == null) {
+            return null;
+        }
         if(cloudBoundProperty == null) {
             String[] props = getBindablePropertyNames();
             if(props != null && props.length > 0) {
@@ -3772,6 +3777,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setCloudBoundProperty(String cloudBoundProperty) {
         this.cloudBoundProperty = cloudBoundProperty;
+        if(cloudBoundProperty == null) {
+            noBind = true;
+        }
     }
 
     /**

@@ -3895,15 +3895,26 @@ public class JavaSEPort extends CodenameOneImplementation {
      *
      * @param response callback for the resulting image
      */
-    public void capturePhoto(com.codename1.ui.events.ActionListener response) {
-        JFileChooser fc = createImagesFileChooser();
+    public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                JFileChooser fc = createImagesFileChooser();
 
-        if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            File selected = fc.getSelectedFile();
-            response.actionPerformed(new com.codename1.ui.events.ActionEvent(selected.getAbsolutePath()));
-        } else {
-            response.actionPerformed(null);
-        }
+                com.codename1.ui.events.ActionEvent result;
+                if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File selected = fc.getSelectedFile();
+                    result = new com.codename1.ui.events.ActionEvent(selected.getAbsolutePath());
+                } else {
+                    result = null;
+                }
+                final com.codename1.ui.events.ActionEvent finalResult = result;
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        response.actionPerformed(finalResult);
+                    }
+                });
+            }
+        });
     }
 
     class CodenameOneMediaPlayer implements Media {

@@ -517,12 +517,8 @@ public class TableLayout extends Layout {
         int w = s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT);
         int h = s.getPadding(false, Component.TOP) + s.getPadding(false, Component.BOTTOM);
 
-        int maxW = Display.getInstance().getDisplayWidth();
-        int maxH = Display.getInstance().getDisplayHeight();
-        if(parent.isScrollableY()) {
-            maxW *= 30;
-            maxH *= 30;
-        }
+        int maxW = Display.getInstance().getDisplayWidth() * 2;
+        int maxH = Display.getInstance().getDisplayHeight() * 2;
         for(int iter = 0 ; iter < columns ; iter++) {
             w += getColumnWidthPixels(iter, maxW, -1);
         }

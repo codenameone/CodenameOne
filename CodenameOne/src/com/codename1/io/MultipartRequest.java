@@ -23,12 +23,10 @@
 package com.codename1.io;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -47,6 +45,7 @@ public class MultipartRequest extends ConnectionRequest {
     private Hashtable mimeTypes = new Hashtable();
     private static final String CRLF = "\r\n"; 
     private long contentLength = -1L;
+    private boolean manualRedirect = true;
     
     /**
      * Initialize variables
@@ -238,16 +237,33 @@ public class MultipartRequest extends ConnectionRequest {
     }
 
     /* (non-Javadoc)
-	 * @see com.codename1.io.ConnectionRequest#getContentLength()
-	 */
-	public int getContentLength() {
-		return (int)contentLength;
-	}
+     * @see com.codename1.io.ConnectionRequest#getContentLength()
+     */
+    public int getContentLength() {
+            return (int)contentLength;
+    }
 
-	/* (non-Javadoc)
-	 * @see com.codename1.io.ConnectionRequest#onRedirect(java.lang.String)
-	 */
-	public boolean onRedirect(String url) {
-		return true;
-	}
+    /* (non-Javadoc)
+     * @see com.codename1.io.ConnectionRequest#onRedirect(java.lang.String)
+     */
+    public boolean onRedirect(String url) {
+            return manualRedirect;
+    }
+
+    /**
+     * By default redirect responses (302 etc.) are handled manually in multipart requests
+     * @return the autoRedirect
+     */
+    public boolean isManualRedirect() {
+        return manualRedirect;
+    }
+
+    /**
+     * By default redirect responses (302 etc.) are handled manually in multipart requests, set this 
+     * to false to handle the redirect. Notice that a redirect converts a post to a get.
+     * @param autoRedirect the autoRedirect to set
+     */
+    public void setManualRedirect(boolean autoRedirect) {
+        this.manualRedirect = autoRedirect;
+    }
 }

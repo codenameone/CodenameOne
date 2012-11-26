@@ -820,6 +820,46 @@ public class UserInterfaceEditor extends BaseForm {
                     encloseIn.add(new EncloseIn("Tabs", ENCLOSE_IN_TABS));
                     encloseIn.add(new EncloseIn("Component Group", ENCLOSE_IN_COMPONENT_GROUP));
                     popup.add(encloseIn);
+
+                    JMenu eventsMenu = new JMenu("Events");
+                    popup.add(eventsMenu);
+                    eventsMenu.add(new AbstractAction("Action Event") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindActionEventActionPerformed(ae);
+                        }
+                    });
+                    eventsMenu.add(new AbstractAction("On Create") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindOnCreateActionPerformed(ae);
+                        }
+                    });
+                    eventsMenu.add(new AbstractAction("Before Show") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindBeforeShowActionPerformed(ae);
+                        }
+                    });
+                    eventsMenu.add(new AbstractAction("Post Show") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindPostShowActionPerformed(ae);
+                        }
+                    });
+                    eventsMenu.add(new AbstractAction("Exit Form") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindExitFormActionPerformed(ae);
+                        }
+                    });
+                    eventsMenu.add(new AbstractAction("List Model") {
+                        @Override
+                        public void actionPerformed(ActionEvent ae) {
+                            bindListModelActionPerformed(ae);
+                        }
+                    });
+
                     JMenu style = new JMenu("Style");
                     popup.add(style);
                     style.add(new EditStyle("Unselected", null));
@@ -942,6 +982,27 @@ public class UserInterfaceEditor extends BaseForm {
                     if(getSelectedComponents()[0] instanceof com.codename1.components.WebBrowser) {
                         if(table.getValueAt(row, 0).equals("body")) {
                             currentEditor = new HTMLBodyEditor();
+                            registerListeners();
+                            return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
+                        }
+                    }
+                    if(em.getRowId(row) == PROPERTY_CLOUD_BOUND_PROPERTY) {
+                        com.codename1.ui.Component[] cmps = em.getComponents();
+                        if(cmps != null) {
+                            String[] values = cmps[0].getBindablePropertyNames();
+                            String[] arr = new String[values.length + 1];
+                            System.arraycopy(values, 0, arr, 1, values.length);
+                            values = arr;
+                            JComboBox cb = new JComboBox(arr);
+                            cb.setRenderer(new DefaultListCellRenderer() {
+                                public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                                    if(value == null || index < 0) {
+                                        value = "[null]";
+                                    }
+                                    return super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                                }
+                            });
+                            currentEditor = new DefaultCellEditor(cb);
                             registerListeners();
                             return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
                         }
@@ -3476,6 +3537,10 @@ public class UserInterfaceEditor extends BaseForm {
         private List<Integer> propertyIds = new ArrayList<Integer>();
         private List<String> customProperties = new ArrayList<String>();
 
+        public com.codename1.ui.Component[] getComponents() {
+            return cmps;
+        }
+        
         private void refreshLocaleTable() {
             LocalizationTableModel lt = (LocalizationTableModel)localizeTable.getModel();
             if(cmps.length == 1 && cmps[0] instanceof com.codename1.ui.Label) {

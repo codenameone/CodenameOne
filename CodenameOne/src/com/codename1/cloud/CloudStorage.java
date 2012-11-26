@@ -529,6 +529,9 @@ public class CloudStorage {
     }
     
     private Object queryImpl(String type, String value, int index, int page, int limit, int visibilityScope, int operator, int sort, boolean asc, boolean countQuery, boolean keyQuery, CloudResponse response) throws CloudException {
+        if(CloudPersona.getCurrentPersona().getToken() == null) {
+            CloudPersona.createAnonymous();
+        }
         QueryRequest queryRequest = new QueryRequest();
         queryRequest.response = response;
         queryRequest.countQuery = countQuery;
@@ -786,6 +789,9 @@ public class CloudStorage {
     }
     
     private String uploadCloudFileImpl(String mimeType, String file, InputStream data, int dataSize) throws CloudException, IOException {
+        if(CloudPersona.getCurrentPersona().getToken() == null) {
+            CloudPersona.createAnonymous();
+        }
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
         req.setUrl(SERVER_URL + "/fileStoreURLRequest");
@@ -803,6 +809,7 @@ public class CloudStorage {
         String d = new String(req.getResponseData());
         MultipartRequest uploadReq = new MultipartRequest();
         uploadReq.setUrl(d);
+        uploadReq.setManualRedirect(false);
         uploadReq.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
         uploadReq.addArgument("t", CloudPersona.getCurrentPersona().getToken());
         uploadReq.addArgument("pk", Display.getInstance().getProperty("package_name", null));
@@ -820,7 +827,11 @@ public class CloudStorage {
         if(uploadReq.getResposeCode() != 200) {
             throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
         }
-        return new String(uploadReq.getResponseData());
+        String r = new String(uploadReq.getResponseData());
+        if("ERROR".equals(r)) {
+            throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
+        }
+        return r;
     }
     
     /**
@@ -830,6 +841,9 @@ public class CloudStorage {
      * @return true if the operation was successful
      */
     public boolean deleteCloudFile(String fileId) {
+        if(CloudPersona.getCurrentPersona().getToken() == null) {
+            CloudPersona.createAnonymous();
+        }
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
         req.setUrl(SERVER_URL + "/CloudFileStorageDelete");
@@ -861,7 +875,7 @@ public class CloudStorage {
     public synchronized int commit() {
         if(storageQueue.size() > 0) { 
             if(CloudPersona.getCurrentPersona().getToken() == null) {
-                CloudPersona.getCurrentPersona().createAnonymous();
+                CloudPersona.createAnonymous();
             }
             StorageRequest req = new StorageRequest();
             req.setContentType("multipart/form-data");
@@ -887,7 +901,7 @@ public class CloudStorage {
     public void commit(CloudResponse<Integer> response) {
         if(storageQueue.size() > 0) { 
             if(CloudPersona.getCurrentPersona().getToken() == null) {
-                CloudPersona.getCurrentPersona().createAnonymous();
+                CloudPersona.createAnonymous();
             }
             StorageRequest req = new StorageRequest();
             req.response = response;

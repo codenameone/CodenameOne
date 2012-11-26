@@ -210,6 +210,7 @@ public class IOSNative {
     // IO methods
 
     public static native int writeToFile(byte[] data, String path);
+    public static native int appendToFile(byte[] data, String path);
     public static native int getFileSize(String path);
     public static native void readFile(String path, byte[] bytes);
 

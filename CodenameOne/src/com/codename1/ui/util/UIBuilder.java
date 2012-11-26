@@ -497,7 +497,7 @@ public class UIBuilder {
      * @param rootComponent the root container
      * @return the component matching the given name or null if its not found
      */
-    public Component findByName(String name, Container rootComponent) {
+    public Component findByName(String name, Component rootComponent) {
         Component c = (Component)rootComponent.getClientProperty("%" + name + "%");
         if(c == null) {
             Container newRoot = getRootAncestor(rootComponent);

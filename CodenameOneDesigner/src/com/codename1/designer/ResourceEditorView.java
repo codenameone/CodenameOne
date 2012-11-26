@@ -2283,12 +2283,15 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("import com.codename1.ui.events.*;\n\n");
             w.write("public abstract class " + className  +
                     " extends UIBuilder {\n");
+            w.write("    private Container aboutToShowThisContainer;\n");
 
             w.write("    /**\n");
             w.write("     * this method should be used to initialize variables instead of\n");
             w.write("     * the constructor/class scope to avoid race conditions\n");
             w.write("     */\n");
+            w.write("    /**\n    * @deprecated use the version that accepts a resource as an argument instead\n    \n**/\n");
             w.write("    protected void initVars() {}\n\n");
+            w.write("    protected void initVars(Resources res) {}\n\n");
             w.write("    public " + className + "(Resources res, String resPath, boolean loadTheme) {\n");
             w.write("        startApp(res, resPath, loadTheme);\n");
             w.write("    }\n\n");
@@ -2317,9 +2320,11 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("        if(res != null) {\n");
             w.write("            setResourceFilePath(resPath);\n");
             w.write("            setResourceFile(res);\n");
+            w.write("            initVars(res);\n");
             w.write("            return showForm(\"" + uiResourceName + "\", null);\n");
             w.write("        } else {\n");
             w.write("            Form f = (Form)createContainer(resPath, \"" + uiResourceName + "\");\n");
+            w.write("            initVars(fetchResourceFile());\n");
             w.write("            beforeShow(f);\n");
             w.write("            f.show();\n");
             w.write("            postShow(f);\n");
@@ -2381,11 +2386,15 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 // exists without a space might trigger this situation and thus code that won't compile
                 if(!createdMethodNames.contains(methodName)) {
                     createdMethodNames.add(methodName);
-                    w.write("    public " + componentType + methodName + "(Container root) {\n");
+                    w.write("    public " + componentType + methodName + "(Component root) {\n");
                     w.write("        return (" + componentType + ")" + "findByName(\"" + componentName + "\", root);\n");
                     w.write("    }\n\n");
                     w.write("    public " + componentType + methodName + "() {\n");
-                    w.write("        return (" + componentType + ")" + "findByName(\"" + componentName + "\", Display.getInstance().getCurrent());\n");
+                    w.write("        " + componentType + " cmp = (" + componentType + ")" + "findByName(\"" + componentName + "\", Display.getInstance().getCurrent());\n");
+                    w.write("        if(cmp == null && aboutToShowThisContainer != null) {\n");
+                    w.write("            cmp = (" + componentType + ")" + "findByName(\"" + componentName + "\", aboutToShowThisContainer);\n");
+                    w.write("        }\n");
+                    w.write("        return cmp;\n");
                     w.write("    }\n\n");
                 }
             }
@@ -2427,8 +2436,10 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             }
 
             writeFormCallbackCode(w, "    protected void exitForm(Form f) {\n", "f.getName()", "exit", "f", "Form f");
-            writeFormCallbackCode(w, "    protected void beforeShow(Form f) {\n", "f.getName()", "before", "f", "Form f");
-            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n", "c.getName()", "beforeContainer", "c", "Container c");
+            writeFormCallbackCode(w, "    protected void beforeShow(Form f) {\n    aboutToShowThisContainer = f;\n", 
+                    "f.getName()", "before", "f", "Form f");
+            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n    aboutToShowThisContainer = c;\n", 
+                    "c.getName()", "beforeContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void postShow(Form f) {\n", "f.getName()", "post", "f", "Form f");
             writeFormCallbackCode(w, "    protected void postShowContainer(Container c) {\n", "c.getName()", "postContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void onCreateRoot(String rootName) {\n", "rootName", "onCreate", "", "");
@@ -2524,7 +2535,8 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write(normalizeFormName(ui));
             w.write("(");
             w.write(args);
-            w.write(");\n");
+            w.write(");\n");    
+            w.write("            aboutToShowThisContainer = null;\n");
             w.write("            return;\n");
             w.write("        }\n\n");
         }
@@ -2763,37 +2775,6 @@ public static void helpVideo(String url) {
         ioErr.printStackTrace();
     }
 }
-
-    /**
-     * Try to find a JDE instance automatically
-     */
-    private String pickBlackberryJDE() {
-        File baseDir = new File("C:\\Program Files (x86)\\Research In Motion");
-        if(!baseDir.exists()) {
-            baseDir = new File("C:\\Program Files\\Research In Motion");
-            if(!baseDir.exists()) {
-                return null;
-            }
-        }
-        File[] options = baseDir.listFiles(new java.io.FileFilter() {
-            public boolean accept(File pathname) {
-                return pathname.getName().indexOf("JDE") > -1;
-            }
-        });
-        if(options.length == 0) {
-            return null;
-        }
-        if(options.length == 1) {
-            return options[0].getAbsolutePath();
-        }
-        String[] optionStrings = new String[options.length];
-        for(int iter = 0 ; iter < options.length ; iter++) {
-            optionStrings[iter] = options[iter].getName();
-        }
-        JComboBox cb = new JComboBox(optionStrings);
-        JOptionPane.showMessageDialog(mainPanel, cb, "Pick JDE", JOptionPane.PLAIN_MESSAGE);
-        return options[cb.getSelectedIndex()].getAbsolutePath();
-    }
 
 private void addMultiImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addMultiImagesActionPerformed
     new AddAndScaleMultiImage().selectFiles(mainPanel, loadedResources);

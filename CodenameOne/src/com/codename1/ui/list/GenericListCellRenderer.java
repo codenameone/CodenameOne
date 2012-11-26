@@ -537,15 +537,24 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
          * @inheritDoc
          */
         public boolean animate() {
+            boolean hasAnimations = false;
             if(parentList != null) {
                 boolean repaint = false;
-                if(pendingAnimations != null) {
+                if(pendingAnimations != null && pendingAnimations.size() > 0) {
                     int s = pendingAnimations.size();
+                    hasAnimations = true;
                     for(int iter = 0 ; iter < s ; iter++) {
                         Image i = (Image)pendingAnimations.elementAt(iter);
                         repaint = i.animate() || repaint;
                     }
-                    pendingAnimations.removeAllElements();
+                    if(repaint) {
+                        pendingAnimations.removeAllElements();
+                    } else {
+                        // flush the queue if we have too many animations
+                        if(pendingAnimations.size() > 20) {
+                            repaint = true;
+                        }
+                    }
                 }
                 Form f = parentList.getComponentForm();
                 if(f != null) {
@@ -573,7 +582,9 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     if(repaint) {
                         parentList.repaint();
                     } else {
-                        f.deregisterAnimated(this);
+                        if(!hasAnimations) {
+                            f.deregisterAnimated(this);
+                        }
                     }
                     return false;
                 }

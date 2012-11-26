@@ -23,11 +23,13 @@
  */
 package com.codename1.ui;
 
+import com.codename1.cloud.BindTarget;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
 
 /**
  * Allows displaying labels and images with different alignment options, this class
@@ -66,6 +68,7 @@ public class Label extends Component {
     private Object mask;
     
     private String maskName;
+    private EventDispatcher textBindListeners = null;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -73,6 +76,7 @@ public class Label extends Component {
      * @param text the string that the label presents.
      */
     public Label(String text) {
+        noBind = true;
         setUIID("Label");
         this.text = text;
         localize();
@@ -81,6 +85,7 @@ public class Label extends Component {
     }
 
     Label(String text, String uiid) {
+        noBind = true;
         this.text = text;
         localize();
         setFocusable(false);
@@ -610,5 +615,71 @@ public class Label extends Component {
             }
         }
         return icon;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getBindablePropertyNames() {
+        return new String[] {"text"};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Class[] getBindablePropertyTypes() {
+        return new Class[] {String.class};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void bindProperty(String prop, BindTarget target) {
+        if(prop.equals("text")) {
+            if(textBindListeners == null) {
+                textBindListeners = new EventDispatcher();
+            }
+            textBindListeners.addListener(target);
+            return;
+        }
+        super.bindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void unbindProperty(String prop, BindTarget target) {
+        if(prop.equals("text")) {
+            if(textBindListeners == null) {
+                return;
+            }
+            textBindListeners.removeListener(target);
+            if(!textBindListeners.hasListeners()) {
+                textBindListeners = null;
+            }
+            return;
+        }
+        super.unbindProperty(prop, target);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object getBoundPropertyValue(String prop) {
+        if(prop.equals("text")) {
+            return getText();
+        }
+        return super.getBoundPropertyValue(prop);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void setBoundPropertyValue(String prop, Object value) {
+        if(prop.equals("text")) {
+            setText((String)value);
+            return;
+        }
+        super.setBoundPropertyValue(prop, value);
     }
 }

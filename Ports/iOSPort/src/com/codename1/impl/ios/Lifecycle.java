@@ -72,5 +72,14 @@ public class Lifecycle {
      */
     public void applicationWillTerminate() {
     }
-    
+
+    /**
+     * Indicates whether the application should handle the given URL, defaults to true
+     * @param url the URL to handle
+     * @param caller the invoking application
+     * @return true to handle the URL, false otherwise
+     */
+    public boolean shouldApplicationHandleURL(String url, String caller) {
+        return true;
+    }
 }

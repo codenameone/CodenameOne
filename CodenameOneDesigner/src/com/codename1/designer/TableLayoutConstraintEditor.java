@@ -45,14 +45,14 @@ public class TableLayoutConstraintEditor extends javax.swing.JPanel {
         if(con == null) {
             row.setModel(new SpinnerNumberModel(-1, -1, 1000, 1));
             column.setModel(new SpinnerNumberModel(-1, -1, 1000, 1));
-            width.setModel(new SpinnerNumberModel(-1, -1, 100, 1));
+            width.setModel(new SpinnerNumberModel(-2, -1, 100, 1));
             height.setModel(new SpinnerNumberModel(-1, -1, 100, 1));
             hspan.setModel(new SpinnerNumberModel(1, 1, 20, 1));
             vspan.setModel(new SpinnerNumberModel(1, 1, 20, 1));
         } else {
             row.setModel(new SpinnerNumberModel(con.getRow(), -1, l.getRows() - 1, 1));
             column.setModel(new SpinnerNumberModel(con.getColumn(), -1, l.getColumns() - 1, 1));
-            width.setModel(new SpinnerNumberModel(con.getWidthPercentage(), -1, 100, 1));
+            width.setModel(new SpinnerNumberModel(con.getWidthPercentage(), -2, 100, 1));
             height.setModel(new SpinnerNumberModel(con.getHeightPercentage(), -1, 100, 1));
             hspan.setModel(new SpinnerNumberModel(con.getHorizontalSpan(), 1, 20, 1));
             vspan.setModel(new SpinnerNumberModel(con.getVerticalSpan(), 1, 20, 1));
