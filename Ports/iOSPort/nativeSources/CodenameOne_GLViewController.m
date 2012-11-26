@@ -419,12 +419,12 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
+    CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
+    CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl

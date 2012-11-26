@@ -719,6 +719,20 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     return 0;
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT n1, JAVA_OBJECT path) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    const char* chrs = stringToUTF8(path);
+    NSString* ns = [NSString stringWithUTF8String:chrs];
+    org_xmlvm_runtime_XMLVMArray* byteArray = n1;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+    NSFileHandle* outputFile = [NSFileHandle fileHandleForWritingAtPath:ns];
+    [outputFile seekToEndOfFile];
+    [outputFile writeData:d];
+    [pool release];
+    return 0;
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);

@@ -43,6 +43,22 @@
     return YES;
 }
 
+// required for URL opening
+- (BOOL)application:(UIApplication *)application willFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    return YES;
+}
+
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
+    java_lang_String* str1 = fromNSString(url);
+    java_lang_String* str2 = fromNSString(sourceApplication);
+    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(str1, str2);
+}
+
+- (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
+{
+  return [self application:application openURL:url sourceApplication:nil annotation:nil];
+}
+
 - (void)applicationWillResignActive:(UIApplication *)application
 {
     /*
