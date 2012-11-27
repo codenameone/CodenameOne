@@ -1484,42 +1484,63 @@
                   <Group type="102" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="deriveTextDecoration" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Group type="102" alignment="1" attributes="0">
+                          <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="1" attributes="0">
                                   <Component id="deriveFont" alignment="0" min="-2" max="-2" attributes="0"/>
                                   <Group type="102" alignment="0" attributes="0">
-                                      <Component id="jLabel7" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="textDecorationCombo" pref="464" max="32767" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="fontFace" pref="203" max="32767" attributes="0"/>
-                                      <EmptySpace min="-2" max="-2" attributes="0"/>
-                                      <Component id="fontStyle" pref="173" max="32767" attributes="0"/>
-                                      <EmptySpace min="-2" pref="18" max="-2" attributes="0"/>
-                                      <Component id="fontSize" pref="174" max="32767" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="bitmapFontValue" pref="489" max="32767" attributes="1"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="addNewBitmapFont" min="-2" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="bitmapFont" linkSize="3" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
                                       <Component id="systemFont" linkSize="3" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="187" pref="187" max="187" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="bitmapFont" linkSize="3" min="-2" max="-2" attributes="0"/>
                                   </Group>
                               </Group>
-                              <EmptySpace max="-2" attributes="0"/>
+                              <EmptySpace pref="178" max="32767" attributes="0"/>
                               <Group type="103" groupAlignment="1" attributes="0">
                                   <Component id="fontHelp" linkSize="12" min="-2" max="-2" attributes="0"/>
                                   <Component id="deriveHelp7" linkSize="12" alignment="1" min="-2" max="-2" attributes="0"/>
                               </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Group type="103" groupAlignment="1" attributes="0">
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Group type="103" groupAlignment="0" attributes="0">
+                                          <Component id="jLabel13" alignment="0" min="-2" max="-2" attributes="0"/>
+                                          <Component id="jLabel12" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" attributes="0">
+                                          <Component id="trueTypeFontSizeOption" pref="145" max="32767" attributes="0"/>
+                                          <Component id="trueTypeFont" alignment="0" pref="145" max="32767" attributes="0"/>
+                                      </Group>
+                                  </Group>
+                                  <Component id="fontFace" alignment="0" pref="241" max="32767" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="trueTypeFontSizeValue" pref="212" max="32767" attributes="0"/>
+                                  <Component id="fontStyle" alignment="0" pref="212" max="32767" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="fontSize" pref="210" max="32767" attributes="0"/>
+                              <EmptySpace min="-2" pref="33" max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="deriveTextDecoration" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Group type="102" alignment="1" attributes="0">
+                                      <Component id="jLabel7" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="textDecorationCombo" pref="458" max="32767" attributes="0"/>
+                                  </Group>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="bitmapFontValue" pref="483" max="32767" attributes="1"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="addNewBitmapFont" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                              <EmptySpace min="-2" pref="146" max="-2" attributes="0"/>
                           </Group>
                       </Group>
-                      <EmptySpace max="-2" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1527,26 +1548,44 @@
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" alignment="0" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="deriveFont" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="deriveHelp7" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="1" attributes="0">
+                          <Group type="102" attributes="0">
+                              <Component id="deriveFont" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="3" attributes="0">
+                                  <Component id="bitmapFont" alignment="3" min="-2" max="-2" attributes="0"/>
+                                  <Component id="systemFont" alignment="3" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                          </Group>
+                          <Group type="102" attributes="0">
+                              <Component id="deriveHelp7" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="fontHelp" min="-2" max="-2" attributes="0"/>
+                          </Group>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="bitmapFont" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="systemFont" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="fontHelp" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="fontFace" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="fontStyle" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="fontSize" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel12" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="trueTypeFont" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace min="-2" pref="9" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="103" groupAlignment="3" attributes="0">
+                              <Component id="jLabel13" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="trueTypeFontSizeOption" alignment="3" min="-2" max="-2" attributes="0"/>
+                          </Group>
+                          <Component id="trueTypeFontSizeValue" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="addNewBitmapFont" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="bitmapFontValue" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace min="-2" max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="fontSize" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="fontFace" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="fontStyle" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
                       <Component id="deriveTextDecoration" min="-2" max="-2" attributes="0"/>
@@ -1555,7 +1594,7 @@
                           <Component id="textDecorationCombo" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel7" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="178" max="32767" attributes="0"/>
+                      <EmptySpace pref="108" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1566,7 +1605,7 @@
                 <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
                   <ComponentRef name="buttonGroup1"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="New Font"/>
+                <Property name="text" type="java.lang.String" value="Bitmap Fonts (deprecated!)"/>
                 <Property name="enabled" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="bitmapFont" noResource="true"/>
               </Properties>
@@ -1580,7 +1619,7 @@
                   <ComponentRef name="buttonGroup1"/>
                 </Property>
                 <Property name="selected" type="boolean" value="true"/>
-                <Property name="text" type="java.lang.String" value="Legacy Font"/>
+                <Property name="text" type="java.lang.String" value="Standard Font"/>
                 <Property name="enabled" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="systemFont" noResource="true"/>
               </Properties>
@@ -1719,6 +1758,60 @@
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="fontHelpActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel12">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="True Type"/>
+                <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&#xa;Truetype fonts are only supported on some platforms (iOS/Android)&lt;br&gt;&#xa;to use them you need to place the file in the src directory next to the&lt;br&gt;&#xa;resource file and make sure the name of the font is correct in the&lt;br&gt;&#xa;text field (for iOS). When unavailable the standard fonts will be used.&lt;br&gt;&#xa;&lt;b&gt;Important&lt;/b&gt; the file name must have a .ttf extension!"/>
+                <Property name="name" type="java.lang.String" value="jLabel12" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JComboBox" name="trueTypeFont">
+              <Properties>
+                <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&#xa;Truetype fonts are only supported on some platforms (iOS/Android)&lt;br&gt;&#xa;to use them you need to place the file in the src directory next to the&lt;br&gt;&#xa;resource file and make sure the name of the font is correct in the&lt;br&gt;&#xa;text field (for iOS). When unavailable the standard fonts will be used.&lt;br&gt;&#xa;&lt;b&gt;Important&lt;/b&gt; the file name must have a .ttf extension!"/>
+                <Property name="enabled" type="boolean" value="false"/>
+                <Property name="name" type="java.lang.String" value="trueTypeFont" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="trueTypeFontActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel13">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="True Type Size"/>
+                <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&#xa;Truetype fonts are only supported on some platforms (iOS/Android)&lt;br&gt;&#xa;to use them you need to place the file in the src directory next to the&lt;br&gt;&#xa;resource file and make sure the name of the font is correct in the&lt;br&gt;&#xa;text field (for iOS). When unavailable the standard fonts will be used.&lt;br&gt;&#xa;&lt;b&gt;Important&lt;/b&gt; the file name must have a .ttf extension!" noResource="true"/>
+                <Property name="name" type="java.lang.String" value="jLabel13" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JComboBox" name="trueTypeFontSizeOption">
+              <Properties>
+                <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
+                  <StringArray count="5">
+                    <StringItem index="0" value="Small"/>
+                    <StringItem index="1" value="Medium"/>
+                    <StringItem index="2" value="Large"/>
+                    <StringItem index="3" value="Millimeters"/>
+                    <StringItem index="4" value="Pixels"/>
+                  </StringArray>
+                </Property>
+                <Property name="selectedIndex" type="int" value="1"/>
+                <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&#xa;Truetype fonts are only supported on some platforms (iOS/Android)&lt;br&gt;&#xa;to use them you need to place the file in the src directory next to the&lt;br&gt;&#xa;resource file and make sure the name of the font is correct in the&lt;br&gt;&#xa;text field (for iOS). When unavailable the standard fonts will be used.&lt;br&gt;&#xa;&lt;b&gt;Important&lt;/b&gt; the file name must have a .ttf extension!"/>
+                <Property name="enabled" type="boolean" value="false"/>
+                <Property name="name" type="java.lang.String" value="trueTypeFontSizeOption" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="trueTypeFontSizeOptionActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="trueTypeFontSizeValue">
+              <Properties>
+                <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&#xa;Truetype fonts are only supported on some platforms (iOS/Android)&lt;br&gt;&#xa;to use them you need to place the file in the src directory next to the&lt;br&gt;&#xa;resource file and make sure the name of the font is correct in the&lt;br&gt;&#xa;text field (for iOS). When unavailable the standard fonts will be used.&lt;br&gt;&#xa;&lt;b&gt;Important&lt;/b&gt; the file name must have a .ttf extension!"/>
+                <Property name="enabled" type="boolean" value="false"/>
+                <Property name="name" type="java.lang.String" value="trueTypeFontSizeValue" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="trueTypeFontSizeValueStateChanged"/>
               </Events>
             </Component>
           </SubComponents>

@@ -3835,6 +3835,8 @@ public static void openInIDE(File f, int lineNumber) {
             platformOverrides.setSelectedIndex(0);
             if(selection != null) {
                 try {
+                    JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
+                    loadedFile = selection;
                     loadedResources.openFile(new FileInputStream(selection));
                     File codenameone_settings = new File(selection.getParentFile().getParentFile(), "codenameone_settings.properties");
                     if(codenameone_settings.exists()) {
@@ -3848,7 +3850,6 @@ public static void openInIDE(File f, int lineNumber) {
                             if(projectGeneratorSettings.containsKey("netbeans")) {
                                 manualIDESettings = projectGeneratorSettings.getProperty("netbeans");
                             }
-                            JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
                         } else {
                             projectGeneratorSettings = null;                        
                         }
@@ -3856,13 +3857,13 @@ public static void openInIDE(File f, int lineNumber) {
                         projectGeneratorSettings = null;
                     }
                     addToRecentMenu(selection);
-                    loadedFile = selection;
                     updateLoadedFile();
                     Preferences.userNodeForPackage(getClass()).put("lastDir", selection.getParentFile().getAbsolutePath());
                     result = loadedResources;
                     platformOverrides.setEnabled(true);
                     return;
                 } catch (Exception ex) {
+                    loadedFile = null;
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(mainPanel, "Fatal Error Loading the Resource File: " + ex, "Error", JOptionPane.ERROR_MESSAGE);
                     result = ex;
@@ -4197,31 +4198,33 @@ public static void openInIDE(File f, int lineNumber) {
 
                 if(loadedResources.getFontResourceNames().length > 0) {
                     for(String s : loadedResources.getFontResourceNames()) {
-                        EditorFont f = (EditorFont)loadedResources.getFont(s);
-                        buildXML.append("   <font ");
-                        buildXML.append("name=\"");
-                        buildXML.append(s);
-                        buildXML.append("\" ");
-
-                        buildXML.append("system=\"");
-                        buildXML.append(generateSystemString(f.getSystemFallback()));
-                        buildXML.append("\" ");
-
-                        buildXML.append("createBitmap=\"");
-                        buildXML.append(f.isIncludesBitmap());
-                        buildXML.append("\" ");
-
-                        if(f.isIncludesBitmap()) {
-                            buildXML.append("charset=\"");
-                            buildXML.append(toXMLString(f.getBitmapFont().getCharset()));
+                        if(loadedResources.getFont(s) instanceof EditorFont) {
+                            EditorFont f = (EditorFont)loadedResources.getFont(s);
+                            buildXML.append("   <font ");
+                            buildXML.append("name=\"");
+                            buildXML.append(s);
                             buildXML.append("\" ");
+
+                            buildXML.append("system=\"");
+                            buildXML.append(generateSystemString(f.getSystemFallback()));
+                            buildXML.append("\" ");
+
+                            buildXML.append("createBitmap=\"");
+                            buildXML.append(f.isIncludesBitmap());
+                            buildXML.append("\" ");
+                            
+                            if(f.isIncludesBitmap()) {
+                                buildXML.append("charset=\"");
+                                buildXML.append(toXMLString(f.getBitmapFont().getCharset()));
+                                buildXML.append("\" ");
+                            }
+
+                            buildXML.append("logicalName=\"");
+                            buildXML.append(f.getLookupFont());
+                            buildXML.append("\" ");
+
+                            buildXML.append("/>\n");
                         }
-
-                        buildXML.append("logicalName=\"");
-                        buildXML.append(f.getLookupFont());
-                        buildXML.append("\" ");
-
-                        buildXML.append("/>\n");
                     }
                 }
                 if(loadedResources.getDataResourceNames().length > 0) {

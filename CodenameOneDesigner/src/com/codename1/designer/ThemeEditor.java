@@ -27,7 +27,6 @@ package com.codename1.designer;
 import com.codename1.designer.PickMIDlet;
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.Display;
-import com.codename1.ui.EditorFont;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;

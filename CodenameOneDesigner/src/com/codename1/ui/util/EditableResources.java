@@ -36,6 +36,7 @@ import com.codename1.designer.ThemeEditor;
 import com.codename1.designer.TimelineEditor;
 import com.codename1.designer.UserInterfaceEditor;
 import com.codename1.ui.EditorFont;
+import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.CodenameOneAccessor;
@@ -84,7 +85,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 4;
+    private static final short MINOR_VERSION = 5;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -752,6 +753,10 @@ public class EditableResources extends Resources implements TreeModel {
         return super.getDataResourceNames();
     }
     
+    com.codename1.ui.Font createTrueTypeFont(com.codename1.ui.Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
+        return new EditorTTFFont(new File(ResourceEditorView.getLoadedFile().getParentFile(), fileName), 
+                sizeSetting, fontSize, f);
+    }
     
     private void saveTheme(DataOutputStream output, Hashtable theme, boolean newVersion) throws IOException {
         theme.remove("name");
@@ -825,6 +830,16 @@ public class EditableResources extends Resources implements TreeModel {
                     output.writeByte(f.getFace());
                     output.writeByte(f.getStyle());
                     output.writeByte(f.getSize());
+                    if(f instanceof EditorTTFFont && ((EditorTTFFont)f).getFontFile() != null) {
+                        output.writeBoolean(true);
+                        EditorTTFFont ed = (EditorTTFFont)f;
+                        output.writeUTF(ed.getFontFile().getName());
+                        output.writeUTF(((java.awt.Font)ed.getNativeFont()).getName());
+                        output.writeInt(ed.getSizeSetting());
+                        output.writeFloat(ed.getActualSize());
+                    } else {
+                        output.writeBoolean(false);
+                    }
                 }
                 continue;
             } 

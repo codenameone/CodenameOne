@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
@@ -1039,7 +1040,7 @@ public class Resources {
             }
             return Font.createBitmapFont(id, bitmap, cutOffsets, charWidth, charset);
         }
-
+ 
         // read a system font fallback
         int fallback = input.readByte() & 0xff;
 
@@ -1104,6 +1105,24 @@ public class Resources {
             }
         }
         return font;
+    }
+    
+    Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
+        switch(sizeSetting) {
+            case 0:
+                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
+                break;
+            case 1:
+                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM).getHeight();
+                break;
+            case 2:
+                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight();
+                break;
+            case 3:
+                fontSize = Display.getInstance().convertToPixels((int)(fontSize * 10), true) / 10.0f;
+                break;
+        }
+        return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }
 
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
@@ -1196,6 +1215,18 @@ public class Resources {
                     }
                 } else {
                     f = Font.createSystemFont(input.readByte(), input.readByte(), input.readByte());
+                    if(minorVersion > 4) {
+                        boolean hasTTF = input.readBoolean();
+                        if(hasTTF) {
+                            String fileName = input.readUTF();
+                            String fontName = input.readUTF();
+                            int sizeSetting = input.readInt();
+                            float fontSize = input.readFloat();
+                            if(Font.isTrueTypeFileSupported()) {
+                                f = createTrueTypeFont(f, fontName, fileName, fontSize, sizeSetting);
+                            }
+                        }
+                    }
                 }
                 theme.put(key, f);
                 continue;

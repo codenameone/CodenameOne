@@ -28,6 +28,8 @@ import com.codename1.ui.resource.util.CodenameOneComponentWrapper;
 import com.codename1.designer.AddResourceDialog;
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.Display;
+import com.codename1.ui.EditorFont;
+import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Accessor;
@@ -38,6 +40,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -156,10 +160,27 @@ public class AddThemeEntry extends javax.swing.JPanel {
         this.resources = resources;
         this.view = view;
         this.themeHash = themeHash;
-
+        
         originalTheme = new Hashtable();
         originalTheme.putAll(themeHash);
         initComponents();
+        
+        trueTypeFontSizeValue.setModel(new SpinnerNumberModel(12.0, 5, 200, 0.5));
+        String[] fontFiles = ResourceEditorView.getLoadedFile().getParentFile().list(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String string) {
+                return string.endsWith(".ttf");
+            }
+        });
+        if(fontFiles == null) {
+            fontFiles = new String[0];
+        } else {
+            String[] arr = new String[fontFiles.length + 1];
+            System.arraycopy(fontFiles, 0, arr, 1, fontFiles.length);
+            fontFiles = arr;
+        }
+        trueTypeFont.setModel(new DefaultComboBoxModel(fontFiles));
+        
         try {
             help.setPage(getClass().getResource("/help/themePropertyHelp.html"));
         } catch (IOException ex) {
@@ -568,9 +589,20 @@ public class AddThemeEntry extends javax.swing.JPanel {
             fontFace.setEnabled(true);
             fontSize.setEnabled(true);
             fontStyle.setEnabled(true);
+            trueTypeFont.setEnabled(trueTypeFont.getModel().getSize() > 0);
+            trueTypeFontSizeOption.setEnabled(trueTypeFont.getModel().getSize() > 0);
+            trueTypeFontSizeValue.setEnabled(trueTypeFont.getModel().getSize() > 0);
             fontFace.setSelectedIndex(getSystemFontOffset(font.getFace(), FONT_FACE_VALUES));
             fontSize.setSelectedIndex(getSystemFontOffset(font.getSize(), FONT_SIZE_VALUES));
             fontStyle.setSelectedIndex(getSystemFontOffset(font.getStyle(), FONT_STYLE_VALUES));
+            if(font instanceof EditorTTFFont) {
+                EditorTTFFont ed = (EditorTTFFont)font;
+                if(ed.getFontFile() != null) {
+                    trueTypeFont.setSelectedItem(ed.getFontFile().getName());
+                    trueTypeFontSizeOption.setSelectedIndex(ed.getSizeSetting());
+                    trueTypeFontSizeValue.setValue(new Float(ed.getActualSize()));
+                }
+            }
             return;
         }
         if(attr.indexOf("bgImage") > -1) {
@@ -836,8 +868,15 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     v = Font.getDefaultFont();
                 }
             } else {
-                v = Font.createSystemFont(FONT_FACE_VALUES[fontFace.getSelectedIndex()],
-                    FONT_STYLE_VALUES[fontStyle.getSelectedIndex()], FONT_SIZE_VALUES[fontSize.getSelectedIndex()]);
+                if(trueTypeFont.getSelectedIndex() > 0) {
+                    Font sys = Font.createSystemFont(FONT_FACE_VALUES[fontFace.getSelectedIndex()],
+                            FONT_STYLE_VALUES[fontStyle.getSelectedIndex()], FONT_SIZE_VALUES[fontSize.getSelectedIndex()]);
+                    v = new EditorTTFFont(new File(ResourceEditorView.getLoadedFile().getParentFile(), (String)trueTypeFont.getSelectedItem()), 
+                            trueTypeFontSizeOption.getSelectedIndex(), ((Number)trueTypeFontSizeValue.getValue()).floatValue(), sys);
+                } else {
+                    v = Font.createSystemFont(FONT_FACE_VALUES[fontFace.getSelectedIndex()],
+                            FONT_STYLE_VALUES[fontStyle.getSelectedIndex()], FONT_SIZE_VALUES[fontSize.getSelectedIndex()]);
+                }
             }
             themeRes.put(uiid + "font", v);
         }
@@ -1099,6 +1138,11 @@ public class AddThemeEntry extends javax.swing.JPanel {
         jLabel7 = new javax.swing.JLabel();
         deriveHelp7 = new javax.swing.JButton();
         fontHelp = new javax.swing.JButton();
+        jLabel12 = new javax.swing.JLabel();
+        trueTypeFont = new javax.swing.JComboBox();
+        jLabel13 = new javax.swing.JLabel();
+        trueTypeFontSizeOption = new javax.swing.JComboBox();
+        trueTypeFontSizeValue = new javax.swing.JSpinner();
         jScrollPane2 = new javax.swing.JScrollPane();
         help = new javax.swing.JTextPane();
         styleType = new javax.swing.JLabel();
@@ -1911,14 +1955,14 @@ public class AddThemeEntry extends javax.swing.JPanel {
         jPanel7.setOpaque(false);
 
         buttonGroup1.add(bitmapFont);
-        bitmapFont.setText("New Font");
+        bitmapFont.setText("Bitmap Fonts (deprecated!)");
         bitmapFont.setEnabled(false);
         bitmapFont.setName("bitmapFont"); // NOI18N
         bitmapFont.addActionListener(formListener);
 
         buttonGroup1.add(systemFont);
         systemFont.setSelected(true);
-        systemFont.setText("Legacy Font");
+        systemFont.setText("Standard Font");
         systemFont.setEnabled(false);
         systemFont.setName("systemFont"); // NOI18N
         systemFont.addActionListener(formListener);
@@ -1974,6 +2018,31 @@ public class AddThemeEntry extends javax.swing.JPanel {
         fontHelp.setName("fontHelp"); // NOI18N
         fontHelp.addActionListener(formListener);
 
+        jLabel12.setText("True Type");
+        jLabel12.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!");
+        jLabel12.setName("jLabel12"); // NOI18N
+
+        trueTypeFont.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!");
+        trueTypeFont.setEnabled(false);
+        trueTypeFont.setName("trueTypeFont"); // NOI18N
+        trueTypeFont.addActionListener(formListener);
+
+        jLabel13.setText("True Type Size");
+        jLabel13.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!"); // NOI18N
+        jLabel13.setName("jLabel13"); // NOI18N
+
+        trueTypeFontSizeOption.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Small", "Medium", "Large", "Millimeters", "Pixels" }));
+        trueTypeFontSizeOption.setSelectedIndex(1);
+        trueTypeFontSizeOption.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!");
+        trueTypeFontSizeOption.setEnabled(false);
+        trueTypeFontSizeOption.setName("trueTypeFontSizeOption"); // NOI18N
+        trueTypeFontSizeOption.addActionListener(formListener);
+
+        trueTypeFontSizeValue.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!");
+        trueTypeFontSizeValue.setEnabled(false);
+        trueTypeFontSizeValue.setName("trueTypeFontSizeValue"); // NOI18N
+        trueTypeFontSizeValue.addChangeListener(formListener);
+
         org.jdesktop.layout.GroupLayout jPanel7Layout = new org.jdesktop.layout.GroupLayout(jPanel7);
         jPanel7.setLayout(jPanel7Layout);
         jPanel7Layout.setHorizontalGroup(
@@ -1981,34 +2050,48 @@ public class AddThemeEntry extends javax.swing.JPanel {
             .add(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
                 .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(deriveTextDecoration)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel7Layout.createSequentialGroup()
+                    .add(jPanel7Layout.createSequentialGroup()
                         .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                             .add(org.jdesktop.layout.GroupLayout.LEADING, deriveFont)
                             .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel7Layout.createSequentialGroup()
-                                .add(jLabel7)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(textDecorationCombo, 0, 464, Short.MAX_VALUE))
-                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel7Layout.createSequentialGroup()
-                                .add(fontFace, 0, 203, Short.MAX_VALUE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(fontStyle, 0, 173, Short.MAX_VALUE)
-                                .add(18, 18, 18)
-                                .add(fontSize, 0, 174, Short.MAX_VALUE))
-                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel7Layout.createSequentialGroup()
-                                .add(bitmapFontValue, 0, 489, Short.MAX_VALUE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(addNewBitmapFont))
-                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel7Layout.createSequentialGroup()
-                                .add(bitmapFont)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(systemFont)
-                                .add(187, 187, 187)))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(bitmapFont)))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 178, Short.MAX_VALUE)
                         .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                             .add(fontHelp)
-                            .add(deriveHelp7))))
-                .addContainerGap())
+                            .add(deriveHelp7))
+                        .addContainerGap())
+                    .add(jPanel7Layout.createSequentialGroup()
+                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel7Layout.createSequentialGroup()
+                                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(jLabel13)
+                                    .add(jLabel12))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(trueTypeFontSizeOption, 0, 145, Short.MAX_VALUE)
+                                    .add(trueTypeFont, 0, 145, Short.MAX_VALUE)))
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, fontFace, 0, 241, Short.MAX_VALUE))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(trueTypeFontSizeValue, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 212, Short.MAX_VALUE)
+                            .add(fontStyle, 0, 212, Short.MAX_VALUE))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(fontSize, 0, 210, Short.MAX_VALUE)
+                        .add(33, 33, 33))
+                    .add(jPanel7Layout.createSequentialGroup()
+                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(deriveTextDecoration)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel7Layout.createSequentialGroup()
+                                .add(jLabel7)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(textDecorationCombo, 0, 458, Short.MAX_VALUE))
+                            .add(jPanel7Layout.createSequentialGroup()
+                                .add(bitmapFontValue, 0, 483, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(addNewBitmapFont)))
+                        .add(146, 146, 146))))
         );
 
         jPanel7Layout.linkSize(new java.awt.Component[] {bitmapFont, systemFont}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -2019,30 +2102,43 @@ public class AddThemeEntry extends javax.swing.JPanel {
             jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
-                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(deriveFont)
-                    .add(deriveHelp7))
+                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                    .add(jPanel7Layout.createSequentialGroup()
+                        .add(deriveFont)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                            .add(bitmapFont)
+                            .add(systemFont)))
+                    .add(jPanel7Layout.createSequentialGroup()
+                        .add(deriveHelp7)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(fontHelp)))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(bitmapFont)
-                    .add(systemFont)
-                    .add(fontHelp))
+                    .add(fontFace, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(fontStyle, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(fontSize, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel12)
+                    .add(trueTypeFont, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(9, 9, 9)
+                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                        .add(jLabel13)
+                        .add(trueTypeFontSizeOption, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(trueTypeFontSizeValue, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(addNewBitmapFont)
                     .add(bitmapFontValue, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(fontSize, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(fontFace, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(fontStyle, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                 .add(deriveTextDecoration)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                 .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(textDecorationCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel7))
-                .addContainerGap(178, Short.MAX_VALUE))
+                .addContainerGap(108, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Font", jPanel7);
@@ -2279,6 +2375,12 @@ public class AddThemeEntry extends javax.swing.JPanel {
             else if (evt.getSource() == videoTutorial) {
                 AddThemeEntry.this.videoTutorialActionPerformed(evt);
             }
+            else if (evt.getSource() == trueTypeFontSizeOption) {
+                AddThemeEntry.this.trueTypeFontSizeOptionActionPerformed(evt);
+            }
+            else if (evt.getSource() == trueTypeFont) {
+                AddThemeEntry.this.trueTypeFontActionPerformed(evt);
+            }
         }
 
         public void stateChanged(javax.swing.event.ChangeEvent evt) {
@@ -2318,6 +2420,9 @@ public class AddThemeEntry extends javax.swing.JPanel {
             else if (evt.getSource() == marginBottom) {
                 AddThemeEntry.this.marginBottomStateChanged(evt);
             }
+            else if (evt.getSource() == trueTypeFontSizeValue) {
+                AddThemeEntry.this.trueTypeFontSizeValueStateChanged(evt);
+            }
         }
     }// </editor-fold>//GEN-END:initComponents
     
@@ -2355,6 +2460,9 @@ private void bitmapFontActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
         fontFace.setEnabled(false);
         fontSize.setEnabled(false);
         fontStyle.setEnabled(false);
+        trueTypeFont.setEnabled(false);
+        trueTypeFontSizeOption.setEnabled(false);
+        trueTypeFontSizeValue.setEnabled(false);
         bitmapFontValue.setEnabled(true);
         addNewBitmapFont.setEnabled(true);
         updateThemePreview();
@@ -2364,6 +2472,9 @@ private void systemFontActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
         fontFace.setEnabled(true);
         fontSize.setEnabled(true);
         fontStyle.setEnabled(true);
+        trueTypeFont.setEnabled(trueTypeFont.getModel().getSize() > 0);
+        trueTypeFontSizeOption.setEnabled(trueTypeFont.getModel().getSize() > 0);
+        trueTypeFontSizeValue.setEnabled(trueTypeFont.getModel().getSize() > 0);
         bitmapFontValue.setEnabled(false);
         addNewBitmapFont.setEnabled(false);
         updateThemePreview();
@@ -2563,11 +2674,16 @@ private void defineAttributeActionPerformed(java.awt.event.ActionEvent evt) {//G
 private void deriveFontActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deriveFontActionPerformed
     bitmapFont.setEnabled(!deriveFont.isSelected());
     systemFont.setEnabled(!deriveFont.isSelected());
-    bitmapFontValue.setEnabled(!deriveFont.isSelected());
-    addNewBitmapFont.setEnabled(!deriveFont.isSelected());
-    fontFace.setEnabled(!deriveFont.isSelected());
-    fontSize.setEnabled(!deriveFont.isSelected());
-    fontStyle.setEnabled(!deriveFont.isSelected());
+    boolean enableBitmap = bitmapFont.isSelected() && !deriveFont.isSelected();
+    boolean enableSystem = !bitmapFont.isSelected() && !deriveFont.isSelected();
+    bitmapFontValue.setEnabled(enableBitmap);
+    addNewBitmapFont.setEnabled(enableBitmap);
+    fontFace.setEnabled(enableSystem);
+    fontSize.setEnabled(enableSystem);
+    fontStyle.setEnabled(enableSystem);
+    trueTypeFont.setEnabled(enableSystem && trueTypeFont.getModel().getSize() > 0);
+    trueTypeFontSizeOption.setEnabled(enableSystem && trueTypeFont.getModel().getSize() > 0);
+    trueTypeFontSizeValue.setEnabled(enableSystem && trueTypeFont.getModel().getSize() > 0 && trueTypeFontSizeOption.getSelectedIndex() > 2);
     updateThemePreview();
 }//GEN-LAST:event_deriveFontActionPerformed
 
@@ -2710,6 +2826,19 @@ private void paddingBottomUnitActionPerformed(java.awt.event.ActionEvent evt) {/
     updateThemePreview();
 }//GEN-LAST:event_paddingBottomUnitActionPerformed
 
+private void trueTypeFontSizeOptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_trueTypeFontSizeOptionActionPerformed
+    trueTypeFontSizeValue.setEnabled(trueTypeFontSizeOption.getSelectedIndex() > 2);
+    updateThemePreview();
+}//GEN-LAST:event_trueTypeFontSizeOptionActionPerformed
+
+private void trueTypeFontActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_trueTypeFontActionPerformed
+        updateThemePreview();
+}//GEN-LAST:event_trueTypeFontActionPerformed
+
+private void trueTypeFontSizeValueStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_trueTypeFontSizeValueStateChanged
+    updateThemePreview();
+}//GEN-LAST:event_trueTypeFontSizeValueStateChanged
+
     private void updateThemePreview() {
         if(disableRefresh) {
             return;
@@ -2825,6 +2954,8 @@ private void paddingBottomUnitActionPerformed(java.awt.event.ActionEvent evt) {/
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
+    private javax.swing.JLabel jLabel12;
+    private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel16;
     private javax.swing.JLabel jLabel17;
     private javax.swing.JLabel jLabel18;
@@ -2877,6 +3008,9 @@ private void paddingBottomUnitActionPerformed(java.awt.event.ActionEvent evt) {/
     private javax.swing.JRadioButton systemFont;
     private javax.swing.JComboBox textDecorationCombo;
     private javax.swing.JSpinner transparencyValue;
+    private javax.swing.JComboBox trueTypeFont;
+    private javax.swing.JComboBox trueTypeFontSizeOption;
+    private javax.swing.JSpinner trueTypeFontSizeValue;
     private javax.swing.JButton videoTutorial;
     // End of variables declaration//GEN-END:variables
 }

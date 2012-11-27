@@ -58,10 +58,12 @@ import com.codename1.ui.list.CellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.TableLayout;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -508,6 +510,23 @@ public class UIBuilder {
         return c;
     }
 
+    /**
+     * Finds the given component by its name
+     * 
+     * @param name the name of the component as defined in the resource editor
+     * @param rootComponent the root container
+     * @return the component matching the given name or null if its not found
+     */
+    public Component findByName(String name, Container rootComponent) {
+        Component c = (Component)rootComponent.getClientProperty("%" + name + "%");
+        if(c == null) {
+            Container newRoot = getRootAncestor(rootComponent);
+            if(newRoot != null && rootComponent != newRoot) {
+                return findByName(name, newRoot);
+            }
+        }
+        return c;
+    }
 
     /**
      * This method can be overriden to create custom components in a custom way, the component
@@ -1701,9 +1720,68 @@ public class UIBuilder {
                 h.put(FORM_STATE_KEY_TITLE, f.getTitle());
             }
         }
+        storeComponentState(f, h);
         return h;
     }
 
+    private void restoreComponentState(Component c, Hashtable destination) {
+        if(shouldAutoStoreState()) {
+            Enumeration e = destination.keys();
+            while(e.hasMoreElements()) {
+                String currentKey = (String)e.nextElement();
+                Component cmp = findByName(currentKey, c);
+                if(cmp != null) {
+                    Object value = destination.get(currentKey);
+                    if(value instanceof Integer) {
+                        if(cmp instanceof List) {
+                            ((List)cmp).setSelectedIndex(((Integer)value).intValue());
+                            continue;
+                        }
+                        if(cmp instanceof Tabs) {
+                            ((Tabs)cmp).setSelectedIndex(((Integer)value).intValue());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private void storeComponentState(Component c, Hashtable destination) {
+        if(shouldAutoStoreState()) {
+            storeComponentStateImpl(c, destination);
+        }
+    }
+        
+    private void storeComponentStateImpl(Component c, Hashtable destination) {
+        if(c instanceof Tabs) {
+            destination.put(c.getName(), new Integer(((Tabs)c).getSelectedIndex()));
+        }
+        if(c instanceof Container) {
+            Container cnt = (Container)c;
+            int count = cnt.getComponentCount();
+            for(int iter = 0 ; iter < count ; iter++) {
+                storeComponentStateImpl(cnt.getComponentAt(iter), destination);
+            }
+            return;
+        }
+        if(c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty("CN1IgnoreStore") != null) {
+            return;
+        }
+        if(c instanceof List) {
+            destination.put(c.getName(), new Integer(((List)c).getSelectedIndex()));
+            return;
+        }
+    }
+    
+    /**
+     * Indicates whether the UIBuilder should try storing states for forms on its own
+     * by seeking lists, tabs and other statefull elements and keeping their selection
+     * @return true to handle state automatically, false otherwise
+     */
+    protected boolean shouldAutoStoreState() {
+        return true;
+    }
+    
     /**
      * Sets the state of the current form to which we are returing as part
      * of the navigation logic. When a back command is pressed this form
@@ -1751,11 +1829,13 @@ public class UIBuilder {
             }
             return h;
         }
+        storeComponentState(cnt, h);
         return h;
     }
 
     private void setContainerStateImpl(Container cnt, Hashtable state) {
         if(state != null) {
+            restoreComponentState(cnt, state);
             String cmpName = (String)state.get(FORM_STATE_KEY_FOCUS);
             if(cmpName == null) {
                 return;
@@ -2074,6 +2154,9 @@ public class UIBuilder {
             if(formNavigationStack != null && formNavigationStack.size() > 0) {
                 String name = f.getName();
                 if(name != null && name.equals(homeForm)) {
+                    if(formNavigationStack.size() > 0) {
+                        setFormState(f, (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1));
+                    }
                     formNavigationStack.clear();
                 } else {
                     initBackForm(f);
