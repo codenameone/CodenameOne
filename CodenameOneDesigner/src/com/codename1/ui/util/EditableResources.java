@@ -834,7 +834,7 @@ public class EditableResources extends Resources implements TreeModel {
                         output.writeBoolean(true);
                         EditorTTFFont ed = (EditorTTFFont)f;
                         output.writeUTF(ed.getFontFile().getName());
-                        output.writeUTF(((java.awt.Font)ed.getNativeFont()).getName());
+                        output.writeUTF(((java.awt.Font)ed.getNativeFont()).getFamily());
                         output.writeInt(ed.getSizeSetting());
                         output.writeFloat(ed.getActualSize());
                     } else {
