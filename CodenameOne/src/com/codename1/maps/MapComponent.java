@@ -565,8 +565,36 @@ public class MapComponent extends Container {
             }
         }
         _layers.removeElementAt(no);
+        repaint();
+    }
+    
+    /**
+     * Removes all layers from the map
+     */
+    public void removeAllLayers() {
+        _layers.removeAllElements();
+        repaint();
+    }
+    
+    /**
+     * Returns layers count
+     */
+    public int getLayersConut(){
+        return _layers.size();
     }
 
+    /**
+     * Returns Layer at index
+     * 
+     * @param index the index of the layer
+     * @throws ArrayIndexOutOfBoundsException - if the index is out of range 
+     * (index < 0 || index >= size())
+     */
+    public Layer getLayerAt(int index){
+        Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
+        return l;
+    }
+    
     /**
      * Gets the map provider
      * @return the map provider
