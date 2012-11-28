@@ -136,8 +136,9 @@ public class IntentIntegrator {
     public static final Collection<String> TARGET_ALL_KNOWN = list(
             BS_PACKAGE, // Barcode Scanner
             BSPLUS_PACKAGE, // Barcode Scanner+
-            BSPLUS_PACKAGE + ".simple" // Barcode Scanner+ Simple
-            // What else supports this intent?
+            BSPLUS_PACKAGE + ".simple", // Barcode Scanner+ Simple
+            "la.droid.qr",
+            "la.droid.qr.priva"
             );
     private final Activity activity;
     private String title;
