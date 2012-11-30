@@ -585,18 +585,6 @@ public class Form extends Container {
     }
 
     /**
-     * Returns the first scrollable ancestor for this component or null if no
-     * such ancestor exists
-     */
-    private Component findScrollableAncestor(Component c) {
-        c = c.getParent();
-        if (c == null || c.isScrollable()) {
-            return c;
-        }
-        return findScrollableAncestor(c);
-    }
-
-    /**
      * Returns true if the given dest component is in the column of the source component
      */
     private boolean isInSameColumn(Component source, Component dest) {
@@ -2460,7 +2448,14 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void setScrollable(boolean scrollable) {
-        contentPane.setScrollable(scrollable);
+        getContentPane().setScrollable(scrollable);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean isScrollable() {
+        return getContentPane().isScrollable();
     }
 
     /**
