@@ -1086,6 +1086,11 @@ public class Container extends Component {
                 scrollRectToVisible(x, y, w, h, this);
                 return false;
             }
+            //if we are on the edge and this is a non cyclic Form.
+            if(!cyclic && direction == Display.GAME_DOWN && edge){
+                scrollRectToVisible(x, y, w, h, this);
+                return false;
+            }
             
             boolean nextIntersects = contains(next) && Rectangle.intersects(next.getAbsoluteX(),
                     next.getAbsoluteY(),
