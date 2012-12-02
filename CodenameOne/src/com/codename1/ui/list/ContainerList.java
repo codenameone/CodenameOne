@@ -332,6 +332,9 @@ public class ContainerList extends Container {
             cmp.setY(getY());
             cmp.setWidth(getWidth());
             cmp.setHeight(getHeight());
+            if(cmp instanceof Container) {
+                ((Container)cmp).revalidate();
+            }
             cmp.paintComponent(g);
         }
 
@@ -374,7 +377,7 @@ public class ContainerList extends Container {
                 dispatcher.fireActionEvent(new ActionEvent(ContainerList.this, x, y));
             }
         }
-
+        
         /**
          * @inheritDoc
          */
@@ -386,7 +389,19 @@ public class ContainerList extends Container {
         }
         
         public Dimension calcPreferredSize() {
-            return renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus()).getPreferredSize();
+            Component c = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
+            if(getWidth() <= 0) {
+                c.setWidth(Display.getInstance().getDisplayWidth());
+                c.setHeight(Display.getInstance().getDisplayHeight());
+            } else {
+                c.setWidth(getWidth());
+                c.setHeight(getHeight());
+            }
+            if(c instanceof Container) {
+                ((Container)c).revalidate();
+            }
+            Dimension d = c.getPreferredSize();
+            return d;
         }
     }
 

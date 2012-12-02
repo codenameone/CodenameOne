@@ -38,7 +38,7 @@ import java.util.Hashtable;
  * When adding a component to a container with a border layout, use one of 
  * these five constants.
  *
- * @author Nir Shabi
+ * @author Nir Shabi, Shai Almog
  */
 public class BorderLayout extends Layout {
     private boolean scaleEdges = true;

@@ -55,6 +55,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.CellRenderer;
+import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.plaf.UIManager;
@@ -1297,7 +1298,11 @@ public class UIBuilder {
                     break;
 
                 case PROPERTY_LIST_RENDERER:
-                    ((List)cmp).setRenderer(readRendererer(res, in));
+                    if(cmp instanceof ContainerList) {
+                        ((ContainerList)cmp).setRenderer(readRendererer(res, in));
+                    } else {
+                        ((List)cmp).setRenderer(readRendererer(res, in));
+                    }
                     break;
 
                 case PROPERTY_NEXT_FORM:

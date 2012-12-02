@@ -255,25 +255,36 @@ public class Slider extends Label {
             prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);
             prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);
         }
+        if(thumbImage != null) {
+            prefW = Math.max(thumbImage.getWidth(), prefW);
+            prefH = Math.max(thumbImage.getHeight(), prefH);
+        }
         // we don't really need to be in the font height but this provides
         // a generally good indication for size expectations
         if(Display.getInstance().isTouchScreenDevice() && isEditable()) {
             if(vertical) {
-                return new Dimension(Math.max(prefW, Font.getDefaultFont().charWidth('X') * 2),
-                        Math.max(prefH, Display.getInstance().getDisplayHeight() / 2));
+                prefW = Math.max(prefW, Font.getDefaultFont().charWidth('X') * 2);
+                prefH = Math.max(prefH, Display.getInstance().getDisplayHeight() / 2);
             } else {
-                return new Dimension(Math.max(prefW, Display.getInstance().getDisplayWidth() / 2),
-                        Math.max(prefH, Font.getDefaultFont().getHeight() * 2));
+                prefW = Math.max(prefW, Display.getInstance().getDisplayWidth() / 2);
+                prefH = Math.max(prefH, Font.getDefaultFont().getHeight() * 2);
             }
         } else {
             if(vertical) {
-                return new Dimension(Math.max(prefW, Font.getDefaultFont().charWidth('X')),
-                        Math.max(prefH, Display.getInstance().getDisplayHeight() / 2));
+                prefW = Math.max(prefW, Font.getDefaultFont().charWidth('X'));
+                prefH = Math.max(prefH, Display.getInstance().getDisplayHeight() / 2);
             } else {
-                return new Dimension(Math.max(prefW, Display.getInstance().getDisplayWidth() / 2),
-                        Math.max(prefH, Font.getDefaultFont().getHeight()));
+                prefW = Math.max(prefW, Display.getInstance().getDisplayWidth() / 2);
+                prefH = Math.max(prefH, Font.getDefaultFont().getHeight());
             }
         }
+        if (prefH != 0) {
+            prefH += (style.getPadding(false, Component.TOP) + style.getPadding(false, Component.BOTTOM));
+        }
+        if (prefW != 0) {
+            prefW += (style.getPadding(isRTL(), Component.RIGHT) + style.getPadding(isRTL(), Component.LEFT));
+        }
+        return new Dimension(prefW, prefH);
     }
 
     /**

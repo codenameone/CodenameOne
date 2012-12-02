@@ -735,8 +735,13 @@ public class TextArea extends Component {
         widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
         // single line text area is essentially a text field, we call the method
         // to allow subclasses to override it
-        if ((isSingleLineTextArea()) || (widthForRowCalculations<=0)) {
+        if (isSingleLineTextArea()) {
             rowStrings.addElement(getText());
+            return;
+        }
+        if (widthForRowCalculations <= 0) {
+            rowStrings.addElement(getText());
+            setShouldCalcPreferredSize(true);
             return;
         }
         if(text == null || text.equals("")){
