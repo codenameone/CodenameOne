@@ -1033,7 +1033,7 @@ public class TextField extends TextArea {
      */
     protected void showSymbolDialog() {
         Command cancel = new Command(getUIManager().localize("cancel", "Cancel"));
-        Command r = Dialog.show(null, createSymbolTable(), new Command[] {cancel});
+        Command r = Dialog.show("", createSymbolTable(), new Command[] {cancel});
         if(r != null && r != cancel) {
             insertChars(r.getCommandName());
         }
