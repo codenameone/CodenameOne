@@ -117,6 +117,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     private Canvas canvas;
     private ActionListener captureResponse;
     
+    private LocationManager location = null;
+    
+    // if JSR 179 isn't supported then null already is the initialized state
+    private boolean locationInitialized = System.getProperty("microedition.location.version") == null;
+    
     private class C extends GameCanvas implements CommandListener, Runnable {
         private boolean done;
         private Command[] currentCommands;
@@ -1449,7 +1454,13 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        return new MIDPLocationManager();
+        if(!locationInitialized) {
+            locationInitialized = true;
+            try {
+                location = LocationHider.createLocationManager();
+            } catch(Throwable t) {}
+        }
+        return location;
     }
 
     
