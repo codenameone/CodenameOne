@@ -32,6 +32,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.plaf.UIManager;
 import java.util.Vector;
 import net.rim.device.api.system.Bitmap;
 import net.rim.device.api.system.Characters;
@@ -193,7 +194,8 @@ class BlackBerryCanvas extends FullScreen {
             if(commands != null){
                 for (int iter = 0; iter < commands.size(); iter++) {
                     final Command cmd = (Command) commands.elementAt(iter);
-                    MenuItem i = new MenuItem(cmd.getCommandName(), iter, iter) {
+                    String txt = UIManager.getInstance().localize(cmd.getCommandName(), cmd.getCommandName());
+                    MenuItem i = new MenuItem(txt, iter, iter) {
                         public void run() {
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
