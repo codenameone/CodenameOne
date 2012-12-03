@@ -416,7 +416,8 @@ public class CodenameOneActivity extends Activity {
         // Build menu items from commands
         for (int n = 0; n < numCommands; n++) {
             Command command = currentForm.getCommand(n);
-            MenuItem item = menu.add(Menu.NONE, n, Menu.NONE, command.getCommandName());
+            String txt = currentForm.getUIManager().localize(command.getCommandName(), command.getCommandName());
+            MenuItem item = menu.add(Menu.NONE, n, Menu.NONE, txt);
             
             Image icon = command.getIcon();
             if (icon != null) {
