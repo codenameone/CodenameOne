@@ -70,6 +70,9 @@ import net.rim.device.api.system.EventInjector;
 import net.rim.device.api.system.JPEGEncodedImage;
 import net.rim.device.api.system.PNGEncodedImage;
 import net.rim.device.api.ui.Field;
+import net.rim.device.api.ui.Font;
+import net.rim.device.api.ui.FontFamily;
+import net.rim.device.api.ui.FontManager;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.UiApplication;
 
@@ -486,4 +489,30 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return new CodeScannerImpl(new AdvancedMultimediaManager());
     }
         
+    public boolean isTrueTypeSupported() {
+        return true;
+    }
+
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        if (FontManager.getInstance().load(fileName, fontName, FontManager.APPLICATION_FONT) == FontManager.SUCCESS) {
+            FontFamily typeface;
+            try {
+                typeface = FontFamily.forName(fontName);
+                Font font =  typeface.getFont(Font.PLAIN, 50);
+                return font;
+            } catch (ClassNotFoundException ex) {
+                ex.printStackTrace();
+                return null;
+            }
+        } else{
+            return Font.getDefault();
+        }
+    }
+
+
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        return ((Font)font).derive(weight, (int)size);
+    }  
+    
+    
 }
