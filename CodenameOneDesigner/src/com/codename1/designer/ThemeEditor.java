@@ -378,23 +378,27 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
-            
-            com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
-            com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
-            if(c instanceof com.codename1.ui.Form) {
-                ((com.codename1.ui.Form)c).refreshTheme();
-                if(c instanceof com.codename1.ui.Dialog) {
-                    ((com.codename1.ui.Dialog)c).showModeless();
-                } else {
-                    ((com.codename1.ui.Form)c).show();
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
+                    final com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
+                    if(c instanceof com.codename1.ui.Form) {
+                        if(c instanceof com.codename1.ui.Dialog) {
+                            ((com.codename1.ui.Dialog)c).showModeless();
+                        } else {
+                            ((com.codename1.ui.Form)c).refreshTheme();
+                            ((com.codename1.ui.Form)c).show();
+                        }
+                    } else {
+                        com.codename1.ui.Form f = new Form();
+                        f.setLayout(new com.codename1.ui.layouts.BorderLayout());
+                        f.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, c);
+                        f.refreshTheme();
+                        f.show();
+                    }
                 }
-            } else {
-                com.codename1.ui.Form f = new Form();
-                f.setLayout(new com.codename1.ui.layouts.BorderLayout());
-                f.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, c);
-                f.refreshTheme();
-                f.show();
-            }
+            });
         }
     }
     
@@ -1439,7 +1443,9 @@ private void pressedStylesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIR
 }//GEN-LAST:event_pressedStylesMouseClicked
 
 private void uiPreviewContentActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_uiPreviewContentActionPerformed
-    initMIDlet();
+    if(initialized) {
+        initMIDlet();
+    }
 }//GEN-LAST:event_uiPreviewContentActionPerformed
 
 private void constantsTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_constantsTableMouseClicked
