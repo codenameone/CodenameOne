@@ -154,6 +154,8 @@
         <ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="jar" />
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="jar" />
+        <ant inheritall="false" antfile="../../CodenameOne/CLDC11/build.xml" target="clean" />
+        <ant inheritall="false" antfile="../../CodenameOne/CLDC11/build.xml" target="jar" />
         <ant inheritall="false" antfile="../Ports/JavaSEWithSVGSupport/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSEWithSVGSupport/build.xml" target="jar" />
 
@@ -189,6 +191,18 @@
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Chrome/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/SocialBoo/lib" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Mapper/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/TZoneFriends" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/NativeDemo/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/CameraDemo/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Tipster/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/KitchenSink/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/MapsDemo/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/ZXing/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/SQLSample/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/FacebookDemo/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Chrome/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/SocialBoo/lib" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Mapper/lib" />
         <zip basedir="src" destfile="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
@@ -221,6 +235,7 @@
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
         <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
         <zip basedir="build/tmp" compress="true" file="/Users/user2/Dropbox/updatedLibs.zip" />
         <copy file="/Users/user2/Dropbox/updatedLibs.zip" todir="/Users/user2/dev/cn1/CodenameOne/repo" overwrite="true"/>
         <deltree dir="build/tmp"/>
@@ -251,7 +266,7 @@
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
-        <zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" />
+        <!-- zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" / -->
 
         <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" />
         <!-- ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="build" / -->
@@ -263,7 +278,7 @@
         <!-- Copy loses Unix permissions which are essential for this tool hence we need to use cp -->
         <!-- copydir src="../CodenameOneDesigner/Designer.app" dest="build/CodenameOneDist/Designer.app" / -->
         
-        <deltree dir="build/designerMac" />
+        <!-- deltree dir="build/designerMac" />
         <mkdir dir="build/designerMac" />
         <exec executable="cp">
             <arg value="-R" />
@@ -277,6 +292,6 @@
             <arg value="-srcfolder" />
             <arg value="build/designerMac" />
             <arg value="../nightly_builds/CodenameOneDesignerMac_${tstamp}.dmg" />
-        </exec>
+        </exec -->
     </target>
 </project>
