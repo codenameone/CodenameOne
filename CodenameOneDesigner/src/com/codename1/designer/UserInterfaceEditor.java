@@ -2743,7 +2743,7 @@ public class UserInterfaceEditor extends BaseForm {
             out.writeInt(PROPERTY_CLOUD_DESTINATION_PROPERTY);
             out.writeUTF(cmp.getCloudDestinationProperty());
         }
-        if(isActualContainer(cmp)) {
+        if(isActualContainer(cmp) || cmp instanceof com.codename1.ui.list.ContainerList) {
             com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
             if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_X)) {
                 out.writeInt(PROPERTY_SCROLLABLE_X);
@@ -2953,10 +2953,29 @@ public class UserInterfaceEditor extends BaseForm {
                         }
                     }
                 } else {
-                    out.writeInt(PROPERTY_COMPONENTS);
-                    out.writeInt(cnt.getComponentCount());
-                    for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                        persistComponent(cnt.getComponentAt(iter), out);
+                    if(!(cmp instanceof com.codename1.ui.list.ContainerList)) {
+                        out.writeInt(PROPERTY_COMPONENTS);
+                        out.writeInt(cnt.getComponentCount());
+                        for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                            persistComponent(cnt.getComponentAt(iter), out);
+                        }
+                    } else {
+                        com.codename1.ui.list.ContainerList lst = ((com.codename1.ui.list.ContainerList)cmp);
+                        if(isPropertyModified(cmp, PROPERTY_LIST_RENDERER) && lst.getRenderer() instanceof com.codename1.ui.list.GenericListCellRenderer) {
+                            out.writeInt(PROPERTY_LIST_RENDERER);
+                            com.codename1.ui.list.GenericListCellRenderer g = (com.codename1.ui.list.GenericListCellRenderer)lst.getRenderer();
+                            if(g.getSelectedEven() == null) {
+                                out.writeByte(2);
+                                out.writeUTF(g.getSelected().getName());
+                                out.writeUTF(g.getUnselected().getName());
+                            } else {
+                                out.writeByte(4);
+                                out.writeUTF(g.getSelected().getName());
+                                out.writeUTF(g.getUnselected().getName());
+                                out.writeUTF(g.getSelectedEven().getName());
+                                out.writeUTF(g.getUnselectedEven().getName());
+                            }
+                        }                        
                     }
                 }
             }

@@ -1879,6 +1879,11 @@ public class EditableResources extends Resources implements TreeModel {
                             com.codename1.ui.Image img = images[iter];
                             if(img != null) {
                                 String id = findId(img);
+                                if(id == null) {
+                                    JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0],
+                                            "Missing image from border: " + key, "Error", JOptionPane.ERROR_MESSAGE);
+                                    continue;
+                                }
                                 if(isMultiImage(id)) {
                                     images[iter] = ((MultiImage)getResourceObject(id)).getBest();
                                 }

@@ -385,13 +385,20 @@ public class ThemeEditor extends BaseForm {
                     final com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
                     if(c instanceof com.codename1.ui.Form) {
                         if(c instanceof com.codename1.ui.Dialog) {
+                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Dialog)c).getTransitionInAnimator();
+                            ((com.codename1.ui.Dialog)c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
                             ((com.codename1.ui.Dialog)c).showModeless();
+                            ((com.codename1.ui.Dialog)c).setTransitionInAnimator(t);
                         } else {
                             ((com.codename1.ui.Form)c).refreshTheme();
+                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Dialog)c).getTransitionInAnimator();
+                            ((com.codename1.ui.Form)c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
                             ((com.codename1.ui.Form)c).show();
+                            ((com.codename1.ui.Form)c).setTransitionInAnimator(t);
                         }
                     } else {
                         com.codename1.ui.Form f = new Form();
+                        f.setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
                         f.setLayout(new com.codename1.ui.layouts.BorderLayout());
                         f.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, c);
                         f.refreshTheme();

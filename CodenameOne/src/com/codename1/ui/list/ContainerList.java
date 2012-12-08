@@ -97,7 +97,12 @@ public class ContainerList extends Container {
      */
     public void setRenderer(CellRenderer r) {
         renderer = r;
-        repaint();
+        for(int iter = 0 ; iter < getComponentCount() ; iter++) {
+            getComponentAt(iter).setShouldCalcPreferredSize(true);
+        }
+        if(isInitialized()) {
+            revalidate();
+        }
     }
 
     /**

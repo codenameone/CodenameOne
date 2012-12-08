@@ -75,7 +75,7 @@
                           </Group>
                       </Group>
                   </Group>
-                  <Component id="jScrollPane1" alignment="0" pref="745" max="32767" attributes="0"/>
+                  <Component id="jScrollPane1" alignment="0" pref="750" max="32767" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
           </Group>
@@ -306,7 +306,7 @@
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel10">
       <Properties>
-        <Property name="text" type="java.lang.String" value="Geneate Multi Image"/>
+        <Property name="text" type="java.lang.String" value="Generate Multi Image"/>
         <Property name="name" type="java.lang.String" value="jLabel10" noResource="true"/>
       </Properties>
     </Component>

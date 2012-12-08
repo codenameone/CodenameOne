@@ -187,7 +187,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         multiImageCombo.setName("multiImageCombo"); // NOI18N
         multiImageCombo.addActionListener(formListener);
 
-        jLabel10.setText("Geneate Multi Image");
+        jLabel10.setText("Generate Multi Image");
         jLabel10.setName("jLabel10"); // NOI18N
 
         jLabel11.setText("Auto Scale To DPI");
@@ -263,7 +263,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                                     .add(hdDPI)
                                     .add(veryHighDPI)))))
-                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 745, Short.MAX_VALUE))
+                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 750, Short.MAX_VALUE))
                 .addContainerGap())
         );
         layout.setVerticalGroup(

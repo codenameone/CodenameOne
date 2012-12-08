@@ -35,7 +35,7 @@ import java.io.IOException;
 class DatabaseImpl extends Database {
     private long peer;
     public DatabaseImpl(String dbName) {
-        peer = IOSNative.sqlDbCreateAndOpen(dbName);
+        peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(dbName);
     }
     
     @Override
@@ -64,29 +64,29 @@ class DatabaseImpl extends Database {
     @Override
     public void close() throws IOException {
         if(peer != 0) {
-            IOSNative.sqlDbClose(peer);
+            IOSImplementation.nativeInstance.sqlDbClose(peer);
             peer = 0;
         }
     }
 
     @Override
     public void execute(String sql) throws IOException {
-        IOSNative.sqlDbExec(peer, sql, null);
+        IOSImplementation.nativeInstance.sqlDbExec(peer, sql, null);
     }
 
     @Override
     public void execute(String sql, String[] params) throws IOException {
-        IOSNative.sqlDbExec(peer, sql, params);
+        IOSImplementation.nativeInstance.sqlDbExec(peer, sql, params);
     }
 
     @Override
     public Cursor executeQuery(String sql, String[] params) throws IOException {
-        return new CursorImpl(IOSNative.sqlDbExecQuery(peer, sql, params));
+        return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, params));
     }
 
     @Override
     public Cursor executeQuery(String sql) throws IOException {
-        return new CursorImpl(IOSNative.sqlDbExecQuery(peer, sql, null));
+        return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null));
     }
 
     class CursorImpl implements Cursor, Row {
@@ -99,7 +99,7 @@ class DatabaseImpl extends Database {
         @Override
         public boolean first() throws IOException {
             position = -1;
-            return IOSNative.sqlCursorFirst(peer);
+            return IOSImplementation.nativeInstance.sqlCursorFirst(peer);
         }
 
         @Override
@@ -109,7 +109,7 @@ class DatabaseImpl extends Database {
 
         @Override
         public boolean next() throws IOException {
-            if(IOSNative.sqlCursorNext(peer)) {
+            if(IOSImplementation.nativeInstance.sqlCursorNext(peer)) {
                 position++;
                 return true;
             }
@@ -136,7 +136,7 @@ class DatabaseImpl extends Database {
 
         @Override
         public String getColumnName(int columnIndex) throws IOException {
-            return IOSNative.sqlGetColName(peer, columnIndex);
+            return IOSImplementation.nativeInstance.sqlGetColName(peer, columnIndex);
         }
 
         @Override
@@ -152,7 +152,7 @@ class DatabaseImpl extends Database {
         @Override
         public void close() throws IOException {
             if(peer != 0) {
-                IOSNative.sqlCursorCloseStatement(peer);
+                IOSImplementation.nativeInstance.sqlCursorCloseStatement(peer);
                 peer = 0;
             }
         }
@@ -172,42 +172,42 @@ class DatabaseImpl extends Database {
 
         @Override
         public byte[] getBlob(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnBlob(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnBlob(peer, index);
         }
 
         @Override
         public double getDouble(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnDouble(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnDouble(peer, index);
         }
 
         @Override
         public float getFloat(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnFloat(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnFloat(peer, index);
         }
 
         @Override
         public int getInteger(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnInteger(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnInteger(peer, index);
         }
 
         @Override
         public long getLong(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnLong(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnLong(peer, index);
         }
 
         @Override
         public short getShort(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnShort(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnShort(peer, index);
         }
 
         @Override
         public String getString(int index) throws IOException {
-            return IOSNative.sqlCursorValueAtColumnString(peer, index);
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
         }
 
         @Override
         public int getColumnCount() throws IOException {
-            return IOSNative.sqlCursorGetColumnCount(peer);
+            return IOSImplementation.nativeInstance.sqlCursorGetColumnCount(peer);
         }
     }
 }

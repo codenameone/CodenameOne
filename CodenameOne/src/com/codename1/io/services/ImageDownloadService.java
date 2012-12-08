@@ -565,6 +565,11 @@ public class ImageDownloadService extends ConnectionRequest {
                     } else {
                         s = StorageImage.create(cacheKey, -1, -1, keep);
                     }
+                    
+                    // due to the way the storage image works the data might be corrupted!
+                    if(((StorageImage)s).getImageData() == null) {
+                        return null;
+                    }
                 }
                 return s;
             }

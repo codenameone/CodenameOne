@@ -308,9 +308,7 @@ public class Util {
             out.writeUTF("ByteArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
-                out.writeByte(v[iter]);
-            }
+            out.write(v);
             return;
         }
         if(instanceofShortArray(o)) {
@@ -501,9 +499,7 @@ public class Util {
             }
             if ("ByteArray".equals(type)) {
                 byte[] v = new byte[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
-                    v[iter] = input.readByte();
-                }
+                input.readFully(v);
                 return v;
             }
             if ("LongArray".equals(type)) {

@@ -22,8 +22,11 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
@@ -40,7 +43,18 @@ public class NSDataOutputStream extends OutputStream {
 
     public NSDataOutputStream(String file, int offset) throws IOException {
         this.file = file;
-        written = true;
+        if(offset > 0) {
+            long l = FileSystemStorage.getInstance().getLength(file);
+            if(l < offset) {
+                byte[] data = new byte[offset];
+                InputStream is = FileSystemStorage.getInstance().openInputStream(file);
+                Util.readAll(is, data);
+                is.close();
+                write(data);
+            } else {
+                written = true;
+            }
+        }
     }
         
     @Override
@@ -51,9 +65,9 @@ public class NSDataOutputStream extends OutputStream {
     @Override
     public void write(byte[] b) throws IOException {
         if(written) {
-            IOSNative.appendToFile(b, file);
+            IOSImplementation.nativeInstance.appendToFile(b, file);
         } else {
-            IOSNative.writeToFile(b, file);
+            IOSImplementation.nativeInstance.writeToFile(b, file);
         }
         written = true;
     }

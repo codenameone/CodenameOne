@@ -716,7 +716,7 @@ public class Border {
                 (isSame(borderTitle, b.borderTitle)) &&
                 (isSame(outerBorder, b.outerBorder))
                 );
-            if(v && type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED) {
+            if(v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
                 for(int iter = 0 ; iter < images.length ; iter++) {
                     if(images[iter] != b.images[iter]) {
                         return false;

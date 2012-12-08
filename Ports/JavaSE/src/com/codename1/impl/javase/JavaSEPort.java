@@ -2699,7 +2699,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        File fontFile = new File("src", fileName);
+        File fontFile;
+        if(baseResourceDir != null) {
+            fontFile = new File(baseResourceDir, fileName);
+        } else {
+            fontFile = new File("src", fileName);
+        }
         if(fontFile.exists()) {
             try {
                 FileInputStream fs = new FileInputStream(fontFile);

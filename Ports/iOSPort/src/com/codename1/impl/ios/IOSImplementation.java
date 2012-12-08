@@ -86,6 +86,7 @@ import java.util.logging.Logger;
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
+    static IOSNative nativeInstance = new IOSNative();
     private static PurchaseCallback purchaseCallback;
     private int timeout = 120000;
     private static Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
@@ -99,6 +100,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private boolean editingText;
     private Lifecycle life;
     private static CodeScannerImpl scannerInstance;
+    private static boolean minimized;
     
     public void initEDT() {
         while(!initialized) {
@@ -118,7 +120,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void postInit() {
-        IOSNative.initVM();
+        IOSImplementation.nativeInstance.initVM();
     }
     
     public void init(Object m) {
@@ -135,18 +137,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public int getDisplayWidth() {
-        return IOSNative.getDisplayWidth();
+        return IOSImplementation.nativeInstance.getDisplayWidth();
     }
 
     public int getDisplayHeight() {
         if(editingText) {
-            return IOSNative.getDisplayHeight() / 2; 
+            return IOSImplementation.nativeInstance.getDisplayHeight() / 2; 
         }
-        return IOSNative.getDisplayHeight();
+        return IOSImplementation.nativeInstance.getDisplayHeight();
     }
 
     public int getActualDisplayHeight() {
-        return IOSNative.getDisplayHeight();
+        return IOSImplementation.nativeInstance.getDisplayHeight();
     }
 
     public boolean isNativeInputImmediate() {
@@ -162,7 +164,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return IOSNative.isTablet();
+        return IOSImplementation.nativeInstance.isTablet();
     }
     
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
@@ -217,7 +219,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text) {
-        IOSNative.editStringAt(x, y, w, h, peer, singleLine, rows, maxSize, constraint, text);
+        IOSImplementation.nativeInstance.editStringAt(x, y, w, h, peer, singleLine, rows, maxSize, constraint, text);
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
@@ -281,7 +283,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void flushBuffer(long peer, int x, int y, int width, int height) {
-        IOSNative.flushBuffer(peer, x, y, width, height);
+        IOSImplementation.nativeInstance.flushBuffer(peer, x, y, width, height);
     }
 
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
@@ -296,11 +298,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height) {
-        IOSNative.imageRgbToIntArray(imagePeer, arr, x, y, width, height);
+        IOSImplementation.nativeInstance.imageRgbToIntArray(imagePeer, arr, x, y, width, height);
     }
 
     private long createImageFromARGB(int[] argb, int width, int height) {
-        return IOSNative.createImageFromARGB(argb, width, height);
+        return IOSImplementation.nativeInstance.createImageFromARGB(argb, width, height);
     }
 
     public Object createImage(int[] rgb, int width, int height) {
@@ -376,7 +378,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private long createImage(byte[] data, int[] widthHeight) {
-        return IOSNative.createImage(data, widthHeight);
+        return IOSImplementation.nativeInstance.createImage(data, widthHeight);
     }
 
     public int getImageWidth(Object i) {
@@ -393,12 +395,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         n.peer = original.peer;
         n.width = width;
         n.height = height;
-        IOSNative.retainPeer(n.peer);
+        IOSImplementation.nativeInstance.retainPeer(n.peer);
         return n;
     }
 
     private long scale(long peer, int width, int height) {
-        return IOSNative.scale(peer, width, height);
+        return IOSImplementation.nativeInstance.scale(peer, width, height);
     }
 
     public int getSoftkeyCount() {
@@ -498,10 +500,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip) {
-        IOSNative.setNativeClippingMutable(x, y, width, height, firstClip);
+        IOSImplementation.nativeInstance.setNativeClippingMutable(x, y, width, height, firstClip);
     }
     private static void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip) {
-        IOSNative.setNativeClippingGlobal(x, y, width, height, firstClip);
+        IOSImplementation.nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
 
     public void clipRect(Object graphics, int x, int y, int width, int height) {
@@ -528,10 +530,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2) {
-        IOSNative.nativeDrawLineMutable(color, alpha, x1, y1, x2, y2);
+        IOSImplementation.nativeInstance.nativeDrawLineMutable(color, alpha, x1, y1, x2, y2);
     }
     private static void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2) {
-        IOSNative.nativeDrawLineGlobal(color, alpha, x1, y1, x2, y2);
+        IOSImplementation.nativeInstance.nativeDrawLineGlobal(color, alpha, x1, y1, x2, y2);
     }
 
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
@@ -542,10 +544,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeFillRectMutable(color, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeFillRectMutable(color, alpha, x, y, width, height);
     }
     private static void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeFillRectGlobal(color, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeFillRectGlobal(color, alpha, x, y, width, height);
     }
 
     public void fillRect(Object graphics, int x, int y, int width, int height) {
@@ -556,10 +558,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeDrawRectMutable(color, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeDrawRectMutable(color, alpha, x, y, width, height);
     }
     private static void nativeDrawRectGlobal(int color, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeDrawRectGlobal(color, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeDrawRectGlobal(color, alpha, x, y, width, height);
     }
 
     public void drawRect(Object graphics, int x, int y, int width, int height) {
@@ -577,10 +579,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeDrawRoundRectMutable(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        IOSNative.nativeDrawRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
+        IOSImplementation.nativeInstance.nativeDrawRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
     }
     private static void nativeDrawRoundRectGlobal(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        IOSNative.nativeDrawRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);        
+        IOSImplementation.nativeInstance.nativeDrawRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);        
     }
 
 
@@ -592,10 +594,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeFillRoundRectMutable(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        IOSNative.nativeFillRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
+        IOSImplementation.nativeInstance.nativeFillRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
     }
     private static void nativeFillRoundRectGlobal(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        IOSNative.nativeFillRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
+        IOSImplementation.nativeInstance.nativeFillRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
     }
 
     public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
@@ -606,16 +608,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeFillArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        IOSNative.nativeFillArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
+        IOSImplementation.nativeInstance.nativeFillArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
     private static void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        IOSNative.nativeDrawArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
+        IOSImplementation.nativeInstance.nativeDrawArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
     private static void nativeFillArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        IOSNative.nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+        IOSImplementation.nativeInstance.nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
     private static void nativeDrawArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        IOSNative.nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+        IOSImplementation.nativeInstance.nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
 
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
@@ -626,10 +628,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y) {
-        IOSNative.nativeDrawStringMutable(color, alpha, fontPeer, str, x, y);
+        IOSImplementation.nativeInstance.nativeDrawStringMutable(color, alpha, fontPeer, str, x, y);
     }
     private static void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y) {
-        IOSNative.nativeDrawStringGlobal(color, alpha, fontPeer, str, x, y);
+        IOSImplementation.nativeInstance.nativeDrawStringGlobal(color, alpha, fontPeer, str, x, y);
     }
 
     public void drawString(Object graphics, String str, int x, int y) {
@@ -646,7 +648,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.checkControl();
             ng.applyClip();
             NativeImage nm = (NativeImage)img;
-            IOSNative.nativeTileImageGlobal(nm.peer, ng.alpha, x, y, w, h);
+            IOSImplementation.nativeInstance.nativeTileImageGlobal(nm.peer, ng.alpha, x, y, w, h);
         } else {
             super.tileImage(graphics, img, x, y, w, h);
         }
@@ -662,10 +664,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeDrawImageMutable(peer, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height);
     }
     private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height) {
-        IOSNative.nativeDrawImageGlobal(peer, alpha, x, y, width, height);
+        IOSImplementation.nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height);
     }
 
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
@@ -724,11 +726,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(i != null) {
                 return i.intValue();
             }
-            int val = IOSNative.stringWidthNative(peer, str);
+            int val = IOSImplementation.nativeInstance.stringWidthNative(peer, str);
             stringWidthCache.put(c, new Integer(val));
             return val;
         }
-        return IOSNative.stringWidthNative(peer, str);
+        return IOSImplementation.nativeInstance.stringWidthNative(peer, str);
     }
 
     public int charWidth(Object nativeFont, char ch) {
@@ -736,7 +738,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private int charWidthNative(long peer, char ch) {
-        return IOSNative.charWidthNative(peer, ch);
+        return IOSImplementation.nativeInstance.charWidthNative(peer, ch);
     }
 
     public int getHeight(Object nativeFont) {
@@ -745,7 +747,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
 
     private int getFontHeightNative(long peer) {
-        return IOSNative.getFontHeightNative(peer);
+        return IOSImplementation.nativeInstance.getFontHeightNative(peer);
     }
 
     public Object getDefaultFont() {
@@ -756,7 +758,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private long createSystemFont(int face, int style, int size) {
-        return IOSNative.createSystemFont(face, style, size);
+        return IOSImplementation.nativeInstance.createSystemFont(face, style, size);
     }
 
     Map<NativeFont, Long> fontMap = new HashMap<NativeFont, Long>();
@@ -779,7 +781,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void setImageName(Object nativeImage, String name) { 
-        IOSNative.setImageName(((NativeImage)nativeImage).peer, name);
+        IOSImplementation.nativeInstance.setImageName(((NativeImage)nativeImage).peer, name);
     }
 
     public InputStream getResourceAsStream(Class cls, String resource) {
@@ -835,7 +837,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void finalize() throws Throwable {
             super.finalize();
             if(peer != 0) {
-                IOSNative.releasePeer(peer);
+                IOSImplementation.nativeInstance.releasePeer(peer);
             }
         }
 
@@ -844,7 +846,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return peer;
             }
             if(peer == 0) {
-                peer = IOSNative.createCLLocation();
+                peer = IOSImplementation.nativeInstance.createCLLocation();
             }
             if(peer == 0) {
                 peer = -1;
@@ -864,20 +866,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             bindListener();
             Location l = new Location();
-            long c = IOSNative.getCurrentLocationObject(p);
-            l.setAccuracy((float)IOSNative.getLocationAccuracy(c));
-            l.setAltitude(IOSNative.getLocationAltitude(c));
-            l.setDirection((float)IOSNative.getLocationDirection(c));
-            l.setLatitude(IOSNative.getLocationLatitude(c));
-            l.setLongitude(IOSNative.getLocationLongtitude(c));
-            if(IOSNative.isGoodLocation(p)) {
+            long c = IOSImplementation.nativeInstance.getCurrentLocationObject(p);
+            l.setAccuracy((float)IOSImplementation.nativeInstance.getLocationAccuracy(c));
+            l.setAltitude(IOSImplementation.nativeInstance.getLocationAltitude(c));
+            l.setDirection((float)IOSImplementation.nativeInstance.getLocationDirection(c));
+            l.setLatitude(IOSImplementation.nativeInstance.getLocationLatitude(c));
+            l.setLongitude(IOSImplementation.nativeInstance.getLocationLongtitude(c));
+            if(IOSImplementation.nativeInstance.isGoodLocation(p)) {
                 l.setStatus(LocationManager.AVAILABLE);
             } else {
                 l.setStatus(LocationManager.TEMPORARILY_UNAVAILABLE);
             }
-            l.setTimeStamp(IOSNative.getLocationTimeStamp(c));
-            l.setVelocity((float)IOSNative.getLocationVelocity(c));
-            IOSNative.releasePeer(c);
+            l.setTimeStamp(IOSImplementation.nativeInstance.getLocationTimeStamp(c));
+            l.setVelocity((float)IOSImplementation.nativeInstance.getLocationVelocity(c));
+            IOSImplementation.nativeInstance.releasePeer(c);
             return l;
         }
 
@@ -889,7 +891,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 locationUpdating = true;
-                IOSNative.startUpdatingLocation(p);
+                IOSImplementation.nativeInstance.startUpdatingLocation(p);
             }
         }
 
@@ -901,7 +903,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 locationUpdating = false;
-                IOSNative.stopUpdatingLocation(p);
+                IOSImplementation.nativeInstance.stopUpdatingLocation(p);
             }
         }
 
@@ -974,22 +976,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void capturePhoto(ActionListener response) {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        IOSNative.captureCamera(false);
+        IOSImplementation.nativeInstance.captureCamera(false);
     }
 
     public Media createMediaRecorder(String path) throws IOException{
-        final long[] peer = new long[] { IOSNative.createAudioRecorder(path) };
+        final long[] peer = new long[] { IOSImplementation.nativeInstance.createAudioRecorder(path) };
         return new Media() {
             private boolean playing;
             @Override
             public void play() {
-                IOSNative.startAudioRecord(peer[0]);
+                IOSImplementation.nativeInstance.startAudioRecord(peer[0]);
                 playing = true;
             }
 
             @Override
             public void pause() {
-                IOSNative.pauseAudioRecord(peer[0]);
+                IOSImplementation.nativeInstance.pauseAudioRecord(peer[0]);
                 playing = false;
             }
             
@@ -1002,9 +1004,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             @Override
             public void cleanup() {
                 if(playing) {
-                    IOSNative.pauseAudioRecord(peer[0]);
+                    IOSImplementation.nativeInstance.pauseAudioRecord(peer[0]);
                 }
-                IOSNative.cleanupAudioRecord(peer[0]);
+                IOSImplementation.nativeInstance.cleanupAudioRecord(peer[0]);
                 peer[0] = 0;
             }
 
@@ -1073,7 +1075,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void captureVideo(ActionListener response) {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        IOSNative.captureCamera(true);
+        IOSImplementation.nativeInstance.captureCamera(true);
     }
 
     class IOSMedia implements Media {
@@ -1092,7 +1094,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             this.isVideo = isVideo;
             this.onCompletion = onCompletion;
             if(!isVideo) {
-                moviePlayerPeer = IOSNative.createAudio(uri, onCompletion);
+                moviePlayerPeer = IOSImplementation.nativeInstance.createAudio(uri, onCompletion);
             }
         }
 
@@ -1103,7 +1105,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             isVideo = mimeType.indexOf("video") > -1;
             if(!isVideo) {
                 try {
-                    moviePlayerPeer = IOSNative.createAudio(Util.readInputStream(stream), onCompletion);
+                    moviePlayerPeer = IOSImplementation.nativeInstance.createAudio(Util.readInputStream(stream), onCompletion);
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
@@ -1115,24 +1117,24 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(isVideo) {
                 if(nativePlayer) {
                     if(uri != null) {
-                        moviePlayerPeer = IOSNative.createVideoComponent(uri);
+                        moviePlayerPeer = IOSImplementation.nativeInstance.createVideoComponent(uri);
                     } else {
                         try {
                             byte[] data = Util.readInputStream(stream);
                             Util.cleanup(stream);
-                            moviePlayerPeer = IOSNative.createVideoComponent(data);
+                            moviePlayerPeer = IOSImplementation.nativeInstance.createVideoComponent(data);
                         } catch (IOException ex) {
                             ex.printStackTrace();
                         }
                     }
-                    IOSNative.showNativePlayerController(moviePlayerPeer);
+                    IOSImplementation.nativeInstance.showNativePlayerController(moviePlayerPeer);
                     return;
                 }
                 if(moviePlayerPeer != 0) {
-                    IOSNative.startVideoComponent(moviePlayerPeer);
+                    IOSImplementation.nativeInstance.startVideoComponent(moviePlayerPeer);
                 }
             } else {
-                IOSNative.playAudio(moviePlayerPeer);                
+                IOSImplementation.nativeInstance.playAudio(moviePlayerPeer);                
             }
         }
 
@@ -1140,9 +1142,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void pause() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    IOSNative.stopVideoComponent(moviePlayerPeer);
+                    IOSImplementation.nativeInstance.stopVideoComponent(moviePlayerPeer);
                 } else {
-                    IOSNative.pauseAudio(moviePlayerPeer);
+                    IOSImplementation.nativeInstance.pauseAudio(moviePlayerPeer);
                 }
             }
         }
@@ -1151,9 +1153,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void cleanup() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    IOSNative.releasePeer(moviePlayerPeer);
+                    IOSImplementation.nativeInstance.releasePeer(moviePlayerPeer);
                 } else {
-                    IOSNative.cleanupAudio(moviePlayerPeer);                    
+                    IOSImplementation.nativeInstance.cleanupAudio(moviePlayerPeer);                    
                 }
                 moviePlayerPeer = 0;
             }
@@ -1167,9 +1169,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         public int getTime() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    return IOSNative.getMediaTimeMS(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.getMediaTimeMS(moviePlayerPeer);
                 } else {
-                    return IOSNative.getAudioTime(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.getAudioTime(moviePlayerPeer);
                 }
             }
             return 0;
@@ -1179,9 +1181,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void setTime(int time) {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    IOSNative.setMediaTimeMS(moviePlayerPeer, time);
+                    IOSImplementation.nativeInstance.setMediaTimeMS(moviePlayerPeer, time);
                 } else {
-                    IOSNative.setAudioTime(moviePlayerPeer, time);
+                    IOSImplementation.nativeInstance.setAudioTime(moviePlayerPeer, time);
                 }
             }
         }
@@ -1190,9 +1192,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         public int getDuration() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    return IOSNative.getMediaDuration(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.getMediaDuration(moviePlayerPeer);
                 } else {
-                    return IOSNative.getAudioDuration(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.getAudioDuration(moviePlayerPeer);
                 }
             }
             return 0;
@@ -1200,21 +1202,21 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public void setVolume(int vol) {
-            IOSNative.setVolume(((float)vol) / 100);
+            IOSImplementation.nativeInstance.setVolume(((float)vol) / 100);
         }
 
         @Override
         public int getVolume() {
-            return (int)(IOSNative.getVolume() * 100);
+            return (int)(IOSImplementation.nativeInstance.getVolume() * 100);
         }
 
         @Override
         public boolean isPlaying() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    return IOSNative.isVideoPlaying(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.isVideoPlaying(moviePlayerPeer);
                 } else {
-                    return IOSNative.isAudioPlaying(moviePlayerPeer);
+                    return IOSImplementation.nativeInstance.isAudioPlaying(moviePlayerPeer);
                 }
             }
             return false;
@@ -1223,14 +1225,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public Component getVideoComponent() {
             if(uri != null) {
-                moviePlayerPeer = IOSNative.createVideoComponent(uri);
-                component = PeerComponent.create(new long[] { IOSNative.getVideoViewPeer(moviePlayerPeer) });
+                moviePlayerPeer = IOSImplementation.nativeInstance.createVideoComponent(uri);
+                component = PeerComponent.create(new long[] { IOSImplementation.nativeInstance.getVideoViewPeer(moviePlayerPeer) });
             } else {
                 try {
                     byte[] data = Util.readInputStream(stream);
                     Util.cleanup(stream);
-                    moviePlayerPeer = IOSNative.createVideoComponent(data);
-                    component = PeerComponent.create(new long[] { IOSNative.getVideoViewPeer(moviePlayerPeer) });
+                    moviePlayerPeer = IOSImplementation.nativeInstance.createVideoComponent(data);
+                    component = PeerComponent.create(new long[] { IOSImplementation.nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                 } catch (IOException ex) {
                     ex.printStackTrace();
                     return new Label("Error loading video " + ex);
@@ -1248,7 +1250,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public boolean isFullScreen() {
             long p = get(component);
             if(p != 0) {
-                return IOSNative.isVideoFullScreen(p);
+                return IOSImplementation.nativeInstance.isVideoFullScreen(p);
             }
             return false;
         }
@@ -1258,7 +1260,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             this.fullScreen = fullScreen;
             long p = get(component);
             if(p != 0) {
-                IOSNative.setVideoFullScreen(p, fullScreen);
+                IOSImplementation.nativeInstance.setVideoFullScreen(p, fullScreen);
             }
         }
 
@@ -1283,23 +1285,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     private static byte[] loadResource(String name, String type) {
-        return IOSNative.loadResource(name, type);
+        return IOSImplementation.nativeInstance.loadResource(name, type);
     }
     
     private static long createNativeMutableImage(int w, int h, int color) {
-        return IOSNative.createNativeMutableImage(w, h, color);
+        return IOSImplementation.nativeInstance.createNativeMutableImage(w, h, color);
     }
 
     // should delete the old peer!
     private static void startDrawingOnImage(int w, int h, long peer) {
-        IOSNative.startDrawingOnImage(w, h, peer);
+        IOSImplementation.nativeInstance.startDrawingOnImage(w, h, peer);
     }
     private static long finishDrawingOnImage() {
-        return IOSNative.finishDrawingOnImage();
+        return IOSImplementation.nativeInstance.finishDrawingOnImage();
     }
 
     private static void deleteNativePeer(long peer) {
-        IOSNative.deleteNativePeer(peer);
+        IOSImplementation.nativeInstance.deleteNativePeer(peer);
     }
     
     public boolean isAffineSupported() {
@@ -1416,11 +1418,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
-            IOSNative.fillRectRadialGradientMutable(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+            IOSImplementation.nativeInstance.fillRectRadialGradientMutable(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
     
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
-            IOSNative.fillLinearGradientMutable(startColor, endColor, x, y, width, height, horizontal);
+            IOSImplementation.nativeInstance.fillLinearGradientMutable(startColor, endColor, x, y, width, height, horizontal);
         }
     }
 
@@ -1435,23 +1437,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void resetAffine() {
-            IOSNative.resetAffineGlobal();
+            IOSImplementation.nativeInstance.resetAffineGlobal();
         }
 
         public void scale(float x, float y) {
-            IOSNative.scaleGlobal(x, y);
+            IOSImplementation.nativeInstance.scaleGlobal(x, y);
         }
 
         public void rotate(float angle) {
-            IOSNative.rotateGlobal(angle);
+            IOSImplementation.nativeInstance.rotateGlobal(angle);
         }
 
         public void rotate(float angle, int x, int y) {
-            IOSNative.rotateGlobal(angle, x, y);
+            IOSImplementation.nativeInstance.rotateGlobal(angle, x, y);
         }
 
         public void shear(float x, float y) {
-            IOSNative.shearGlobal(x, y);
+            IOSImplementation.nativeInstance.shearGlobal(x, y);
         }
 
         void setNativeClipping(int x, int y, int width, int height, boolean firstClip) {
@@ -1495,11 +1497,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
-            IOSNative.fillRectRadialGradientGlobal(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+            IOSImplementation.nativeInstance.fillRectRadialGradientGlobal(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
     
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
-            IOSNative.fillLinearGradientGlobal(startColor, endColor, x, y, width, height, horizontal);
+            IOSImplementation.nativeInstance.fillLinearGradientGlobal(startColor, endColor, x, y, width, height, horizontal);
         }
     }
 
@@ -1571,22 +1573,22 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void browserBack(PeerComponent browserPeer) {
-        IOSNative.browserBack(get(browserPeer));
+        IOSImplementation.nativeInstance.browserBack(get(browserPeer));
     }
 
     @Override
     public void browserStop(PeerComponent browserPeer) {
-        IOSNative.browserStop(get(browserPeer));
+        IOSImplementation.nativeInstance.browserStop(get(browserPeer));
     }
     
     @Override
     public void browserClearHistory(PeerComponent browserPeer) {
-        IOSNative.browserClearHistory(get(browserPeer));
+        IOSImplementation.nativeInstance.browserClearHistory(get(browserPeer));
     }
 
     @Override
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
-        IOSNative.browserExecute(get(browserPeer), javaScript);
+        IOSImplementation.nativeInstance.browserExecute(get(browserPeer), javaScript);
     }
 
     @Override
@@ -1596,22 +1598,22 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void browserForward(PeerComponent browserPeer) {
-        IOSNative.browserForward(get(browserPeer));
+        IOSImplementation.nativeInstance.browserForward(get(browserPeer));
     }
 
     @Override
     public boolean browserHasBack(PeerComponent browserPeer) {
-        return IOSNative.browserHasBack(get(browserPeer));
+        return IOSImplementation.nativeInstance.browserHasBack(get(browserPeer));
     }
 
     @Override
     public boolean browserHasForward(PeerComponent browserPeer) {
-        return IOSNative.browserHasForward(get(browserPeer));
+        return IOSImplementation.nativeInstance.browserHasForward(get(browserPeer));
     }
 
     @Override
     public void browserReload(PeerComponent browserPeer) {
-        IOSNative.browserReload(get(browserPeer));
+        IOSImplementation.nativeInstance.browserReload(get(browserPeer));
     }
 
     @Override
@@ -1625,7 +1627,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(l[0] == 0) {
             return;
         }
-        IOSNative.playAudio(l[0]);
+        IOSImplementation.nativeInstance.playAudio(l[0]);
     }
 
     @Override
@@ -1635,7 +1637,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         l[0] = 0;
-        IOSNative.cleanupAudio(l[0]);
+        IOSImplementation.nativeInstance.cleanupAudio(l[0]);
     }*/
 
     @Override
@@ -1664,7 +1666,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object createAudio(String uri, Runnable onCompletion) throws IOException {
         RunnableCleanup c = new RunnableCleanup();
-        long[] p = new long[] {IOSNative.createAudio(uri, c)};
+        long[] p = new long[] {IOSImplementation.nativeInstance.createAudio(uri, c)};
         c.peer = p;
         c.onCompletion = onCompletion;
         return p;
@@ -1683,7 +1685,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         bo.close();
         stream.close();
         RunnableCleanup c = new RunnableCleanup();
-        long[] p = new long[] {IOSNative.createAudio(bo.toByteArray(), c)};
+        long[] p = new long[] {IOSImplementation.nativeInstance.createAudio(bo.toByteArray(), c)};
         c.peer = p;
         c.onCompletion = onCompletion;
         return p;
@@ -1691,15 +1693,15 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        long browserPeer = IOSNative.createBrowserComponent(browserComponent);
+        long browserPeer = IOSImplementation.nativeInstance.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
-        IOSNative.releasePeer(browserPeer);
+        IOSImplementation.nativeInstance.releasePeer(browserPeer);
         return pc;
     }
 
     /*@Override
     public VideoComponent createVideoPeer(String url) throws IOException {
-        return new NativeIPhoneVideoPeer(new long[] {IOSNative.createVideoComponent(url)});
+        return new NativeIPhoneVideoPeer(new long[] {IOSImplementation.nativeInstance.createVideoComponent(url)});
     }
 
     @Override
@@ -1714,12 +1716,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         public NativeIPhoneVideoPeer(Object nativePeer) {
             super(nativePeer);
             this.nativePeer = (long[])nativePeer;
-            IOSNative.retainPeer(this.nativePeer[0]);
+            IOSImplementation.nativeInstance.retainPeer(this.nativePeer[0]);
         }
         
         public void finalize() {
             if(nativePeer[0] != 0) {
-                IOSNative.releasePeer(nativePeer[0]);            
+                IOSImplementation.nativeInstance.releasePeer(nativePeer[0]);            
             }
         }
         
@@ -1735,39 +1737,39 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return new Dimension();
             }
             int[] p = new int[2];
-            IOSNative.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
+            IOSImplementation.nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
 
         protected void onPositionSizeChange() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                IOSImplementation.nativeInstance.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void initComponent() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                IOSImplementation.nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void deinitialize() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.peerDeinitialized(nativePeer[0]);
+                IOSImplementation.nativeInstance.peerDeinitialized(nativePeer[0]);
             }
         }
 
         @Override
         public void start() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.startVideoComponent(nativePeer[0]);
+                IOSImplementation.nativeInstance.startVideoComponent(nativePeer[0]);
             }
         }
 
         @Override
         public void stop() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.startVideoComponent(nativePeer[0]);
+                IOSImplementation.nativeInstance.startVideoComponent(nativePeer[0]);
             }
         }
 
@@ -1778,7 +1780,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int getMediaTimeMS() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                return IOSNative.getMediaTimeMS(nativePeer[0]);
+                return IOSImplementation.nativeInstance.getMediaTimeMS(nativePeer[0]);
             }
             return -1;
         }
@@ -1786,7 +1788,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int setMediaTimeMS(int now) {
             if(nativePeer != null && nativePeer[0] != 0) {
-                return IOSNative.setMediaTimeMS(nativePeer[0], now);
+                return IOSImplementation.nativeInstance.setMediaTimeMS(nativePeer[0], now);
             }
             return -1;
         }
@@ -1794,7 +1796,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int getMediaDuration() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                return IOSNative.getMediaDuration(nativePeer[0]);
+                return IOSImplementation.nativeInstance.getMediaDuration(nativePeer[0]);
             }
             return -1;
         }
@@ -1802,7 +1804,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public boolean isPlaying() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                return IOSNative.isVideoPlaying(nativePeer[0]);
+                return IOSImplementation.nativeInstance.isVideoPlaying(nativePeer[0]);
             }
             return false;
         }
@@ -1810,14 +1812,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void setFullScreen(boolean fullscreen) {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.setVideoFullScreen(nativePeer[0], fullscreen);
+                IOSImplementation.nativeInstance.setVideoFullScreen(nativePeer[0], fullscreen);
             }
         }
 
         @Override
         public boolean isFullScreen() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                return IOSNative.isVideoFullScreen(nativePeer[0]);
+                return IOSImplementation.nativeInstance.isVideoFullScreen(nativePeer[0]);
             }
             return false;
         }
@@ -1853,12 +1855,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void execute(String url) {
-        IOSNative.execute(url);
+        IOSImplementation.nativeInstance.execute(url);
     }
 
     @Override
     public void flashBacklight(int duration) {
-        IOSNative.flashBacklight(duration);
+        IOSImplementation.nativeInstance.flashBacklight(duration);
     }
 
     /*@Override
@@ -1867,7 +1869,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(l[0] == 0) {
             return -1;
         }
-        return IOSNative.getAudioDuration(l[0]);
+        return IOSImplementation.nativeInstance.getAudioDuration(l[0]);
     }
 
     @Override
@@ -1876,17 +1878,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(l[0] == 0) {
             return -1;
         }
-        return IOSNative.getAudioTime(l[0]);
+        return IOSImplementation.nativeInstance.getAudioTime(l[0]);
     }*/
 
     @Override
     public String getBrowserTitle(PeerComponent browserPeer) {
-        return IOSNative.getBrowserTitle(get(browserPeer));
+        return IOSImplementation.nativeInstance.getBrowserTitle(get(browserPeer));
     }
 
     @Override
     public String getBrowserURL(PeerComponent browserPeer) {
-        return IOSNative.getBrowserURL(get(browserPeer));
+        return IOSImplementation.nativeInstance.getBrowserURL(get(browserPeer));
     }
 
 
@@ -1948,7 +1950,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";
         }
         if(key.equalsIgnoreCase("UDID")) {
-            return IOSNative.getUDID();
+            return IOSImplementation.nativeInstance.getUDID();
         }
         return super.getProperty(key, defaultValue);
     }
@@ -1965,7 +1967,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /*@Override
     public int getVolume() {
-        return (int)(IOSNative.getVolume() * 100);
+        return (int)(IOSImplementation.nativeInstance.getVolume() * 100);
     }*/
 
     @Override
@@ -2009,7 +2011,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isMinimized() {
-        return IOSNative.isMinimized();
+        return minimized || IOSImplementation.nativeInstance.isMinimized();
     }
 
     @Override
@@ -2040,13 +2042,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
-        IOSNative.sendEmailMessage(recieptents[0], subject, msg.getContent(), msg.getAttachment(), msg.getMimeType());
+        IOSImplementation.nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(), msg.getAttachment(), msg.getMimeType());
     }
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {
-        int[] c = new int[IOSNative.getContactCount(withNumbers)];
-        IOSNative.getContactRefIds(c, withNumbers);
+        int[] c = new int[IOSImplementation.nativeInstance.getContactCount(withNumbers)];
+        IOSImplementation.nativeInstance.getContactRefIds(c, withNumbers);
         String[] r = new String[c.length];
         for(int iter = 0 ; iter < c.length ; iter++) {
             r[iter] = "" + c[iter];
@@ -2059,43 +2061,43 @@ public class IOSImplementation extends CodenameOneImplementation {
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId("" + id);
-        long person = IOSNative.getPersonWithRecordID(recId);
-        c.setFirstName(IOSNative.getPersonFirstName(person));
-        c.setFamilyName(IOSNative.getPersonSurnameName(person));
+        long person = IOSImplementation.nativeInstance.getPersonWithRecordID(recId);
+        c.setFirstName(IOSImplementation.nativeInstance.getPersonFirstName(person));
+        c.setFamilyName(IOSImplementation.nativeInstance.getPersonSurnameName(person));
         
-        c.setPrimaryEmail(IOSNative.getPersonEmail(person));
+        c.setPrimaryEmail(IOSImplementation.nativeInstance.getPersonEmail(person));
         
-        int phones = IOSNative.getPersonPhoneCount(person);
+        int phones = IOSImplementation.nativeInstance.getPersonPhoneCount(person);
         Hashtable h = new Hashtable();
         for(int iter = 0 ; iter < phones ; iter++) {
-            String t = IOSNative.getPersonPhoneType(person, iter);
+            String t = IOSImplementation.nativeInstance.getPersonPhoneType(person, iter);
             if(t == null) {
                 t = "work";
             }
-            String phone = IOSNative.getPersonPhone(person, iter);
+            String phone = IOSImplementation.nativeInstance.getPersonPhone(person, iter);
             if(phone != null) {
                 h.put(t, phone);
             }
         }
         c.setPhoneNumbers(h);
         
-        c.setPrimaryPhoneNumber(IOSNative.getPersonPrimaryPhone(person));
+        c.setPrimaryPhoneNumber(IOSImplementation.nativeInstance.getPersonPrimaryPhone(person));
         
         //h = new Hashtable();
         //h.put("Work", h);
         c.setAddresses(h);
-        IOSNative.releasePeer(person);
+        IOSImplementation.nativeInstance.releasePeer(person);
         return c;
     }
     
     @Override
     public void dial(String phoneNumber) {        
-        IOSNative.dial("tel:" + phoneNumber);
+        IOSImplementation.nativeInstance.dial("tel:" + phoneNumber);
     }
 
     @Override
     public void sendSMS(String phoneNumber, String message) throws IOException{
-        IOSNative.sendSMS(phoneNumber, message);
+        IOSImplementation.nativeInstance.sendSMS(phoneNumber, message);
     }
 
     @Override
@@ -2111,7 +2113,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
         fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
         fnt.name = fontName;
-        fnt.peer = IOSNative.createTruetypeFont(fontName);
+        fnt.peer = IOSImplementation.nativeInstance.createTruetypeFont(fontName);
         return fnt;
     }
 
@@ -2125,7 +2127,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.name = original.name;
         fnt.weight = weight;
         fnt.height = size;
-        fnt.peer = IOSNative.deriveTruetypeFont(original.peer, 
+        fnt.peer = IOSImplementation.nativeInstance.deriveTruetypeFont(original.peer, 
                 (weight & com.codename1.ui.Font.STYLE_BOLD) == com.codename1.ui.Font.STYLE_BOLD, 
                 (weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC, size);
         return fnt;
@@ -2133,12 +2135,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void lockOrientation(boolean portrait) {
-        IOSNative.lockOrientation(portrait);
+        IOSImplementation.nativeInstance.lockOrientation(portrait);
     }
 
     @Override
     public boolean minimizeApplication() {
-        return IOSNative.minimizeApplication();
+        return IOSImplementation.nativeInstance.minimizeApplication();
     }
 
     /*@Override
@@ -2147,12 +2149,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(l[0] == 0) {
             return;
         }
-        IOSNative.pauseAudio(l[0]);
+        IOSImplementation.nativeInstance.pauseAudio(l[0]);
     }*/
 
     @Override
     public void restoreMinimizedApplication() {
-        IOSNative.restoreMinimizedApplication();
+        IOSImplementation.nativeInstance.restoreMinimizedApplication();
     }
 
     @Override
@@ -2173,7 +2175,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(l[0] == 0) {
             return;
         }
-        IOSNative.setAudioTime(l[0], time);
+        IOSImplementation.nativeInstance.setAudioTime(l[0], time);
     }*/
 
     private long get(PeerComponent p) {
@@ -2185,9 +2187,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setBrowserPage(PeerComponent browserPeer, String html, String baseUrl) {
         if(baseUrl != null && baseUrl.startsWith("jar://")) {
-            baseUrl = "file://localhost" + IOSNative.getResourcesDir().replace(" ", "%20") + baseUrl.substring(6);
+            baseUrl = "file://localhost" + IOSImplementation.nativeInstance.getResourcesDir().replace(" ", "%20") + baseUrl.substring(6);
         }
-        IOSNative.setBrowserPage(get(browserPeer), html, baseUrl);
+        IOSImplementation.nativeInstance.setBrowserPage(get(browserPeer), html, baseUrl);
     }
 
     @Override
@@ -2197,9 +2199,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         if(url.startsWith("jar://")) {
-            url = "file://localhost" + IOSNative.getResourcesDir().replace(" ", "%20") + url.substring(6);
+            url = "file://localhost" + IOSImplementation.nativeInstance.getResourcesDir().replace(" ", "%20") + url.substring(6);
         }
-        IOSNative.setBrowserURL(get(browserPeer), url);
+        IOSImplementation.nativeInstance.setBrowserURL(get(browserPeer), url);
     }
 
     @Override
@@ -2210,7 +2212,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /*@Override
     public void setVolume(int vol) {
-        IOSNative.setVolume(((float)vol) / 100.0f);
+        IOSImplementation.nativeInstance.setVolume(((float)vol) / 100.0f);
     }*/
 
     @Override
@@ -2221,7 +2223,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void vibrate(int duration) {
-        IOSNative.vibrate(duration);
+        IOSImplementation.nativeInstance.vibrate(duration);
     }
     
     @Override
@@ -2236,12 +2238,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         public NativeIPhoneView(Object nativePeer) {
             super(nativePeer);
             this.nativePeer = (long[])nativePeer;
-            IOSNative.retainPeer(this.nativePeer[0]);
+            IOSImplementation.nativeInstance.retainPeer(this.nativePeer[0]);
         }
         
         public void finalize() {
             if(nativePeer[0] != 0) {
-                IOSNative.releasePeer(nativePeer[0]);            
+                IOSImplementation.nativeInstance.releasePeer(nativePeer[0]);            
             }
         }
         
@@ -2257,25 +2259,25 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return new Dimension();
             }
             int[] p = new int[2];
-            IOSNative.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
+            IOSImplementation.nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
 
         protected void onPositionSizeChange() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                IOSImplementation.nativeInstance.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void initComponent() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                IOSImplementation.nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void deinitialize() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                IOSNative.peerDeinitialized(nativePeer[0]);
+                IOSImplementation.nativeInstance.peerDeinitialized(nativePeer[0]);
             }
         }
         
@@ -2283,7 +2285,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(nativePeer != null && nativePeer[0] != 0) {
                 if(lightweightMode != l) {
                     lightweightMode = l;
-                    IOSNative.peerSetVisible(nativePeer[0], !lightweightMode);
+                    IOSImplementation.nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
                     getComponentForm().repaint();
                 }
             }
@@ -2374,10 +2376,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
-                    IOSNative.setBody(peer, body.toByteArray());
+                    IOSImplementation.nativeInstance.setBody(peer, body.toByteArray());
                     body = null;
                 }
-                IOSNative.connect(peer);
+                IOSImplementation.nativeInstance.connect(peer);
                 while(!connected) {
                     try {
                         LOCK.wait();
@@ -2463,7 +2465,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 completed = true;
                 pendingData = null;
                 super.close();
-                IOSNative.closeConnection(peer);
+                IOSImplementation.nativeInstance.closeConnection(peer);
                 connections.remove(peer);
             }
         }
@@ -2525,14 +2527,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
-        return new NetworkConnection(IOSNative.openConnection(url, timeout));
+        return new NetworkConnection(IOSImplementation.nativeInstance.openConnection(url, timeout));
     }
 
     /**
      * @inheritDoc
      */
     public void setHeader(Object connection, String key, String val) {
-        IOSNative.addHeader(((NetworkConnection)connection).peer, key, val);
+        IOSImplementation.nativeInstance.addHeader(((NetworkConnection)connection).peer, key, val);
     }
 
     /**
@@ -2575,7 +2577,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public void setHttpMethod(Object connection, String method) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
-        IOSNative.setMethod(n.peer, method);
+        IOSImplementation.nativeInstance.setMethod(n.peer, method);
     }
 
     /**
@@ -2584,9 +2586,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setPostRequest(Object connection, boolean p) {
         NetworkConnection n = (NetworkConnection)connection;
         if(p) {
-            IOSNative.setMethod(n.peer, "POST");
+            IOSImplementation.nativeInstance.setMethod(n.peer, "POST");
         } else {
-            IOSNative.setMethod(n.peer, "GET");
+            IOSImplementation.nativeInstance.setMethod(n.peer, "GET");
         }
     }
 
@@ -2596,7 +2598,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public int getResponseCode(Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        return IOSNative.getResponseCode(n.peer);
+        return IOSImplementation.nativeInstance.getResponseCode(n.peer);
     }
 
     /**
@@ -2605,7 +2607,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String getResponseMessage(Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        return IOSNative.getResponseMessage(n.peer);
+        return IOSImplementation.nativeInstance.getResponseMessage(n.peer);
     }
 
     /**
@@ -2614,7 +2616,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public int getContentLength(Object connection) {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        return IOSNative.getContentLength(n.peer);
+        return IOSImplementation.nativeInstance.getContentLength(n.peer);
     }
 
     /**
@@ -2623,7 +2625,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String getHeaderField(String name, Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        return IOSNative.getResponseHeader(n.peer, name);
+        return IOSImplementation.nativeInstance.getResponseHeader(n.peer, name);
     }
 
     /**
@@ -2632,9 +2634,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String[] getHeaderFieldNames(Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        String[] s = new String[IOSNative.getResponseHeaderCount(n.peer)];
+        String[] s = new String[IOSImplementation.nativeInstance.getResponseHeaderCount(n.peer)];
         for(int iter = 0 ; iter < s.length ; iter++) {
-            s[iter] = IOSNative.getResponseHeaderName(n.peer, iter);
+            s[iter] = IOSImplementation.nativeInstance.getResponseHeaderName(n.peer, iter);
         }
         return s;
     }
@@ -2645,7 +2647,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
-        String s = IOSNative.getResponseHeader(n.peer, name);
+        String s = IOSImplementation.nativeInstance.getResponseHeader(n.peer, name);
         if(s == null) {
             return null;
         }
@@ -2682,37 +2684,37 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
-        IOSNative.deleteFile(IOSNative.getCachesDir() + "/" + name);
+        IOSImplementation.nativeInstance.deleteFile(IOSImplementation.nativeInstance.getCachesDir() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        return new NSDataOutputStream(IOSNative.getCachesDir() + "/" + name);
+        return new NSDataOutputStream(IOSImplementation.nativeInstance.getCachesDir() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public InputStream createStorageInputStream(String name) throws IOException {
-        return new NSDataInputStream(IOSNative.getCachesDir() + "/" + name);
+        return new NSDataInputStream(IOSImplementation.nativeInstance.getCachesDir() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
-        return IOSNative.fileExists(IOSNative.getCachesDir() + "/" + name);
+        return IOSImplementation.nativeInstance.fileExists(IOSImplementation.nativeInstance.getCachesDir() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public String[] listStorageEntries() {
-        String c = IOSNative.getCachesDir();
-        String[] a = new String[IOSNative.fileCountInDir(c)];
-        IOSNative.listFilesInDir(c, a);
+        String c = IOSImplementation.nativeInstance.getCachesDir();
+        String[] a = new String[IOSImplementation.nativeInstance.fileCountInDir(c)];
+        IOSImplementation.nativeInstance.listFilesInDir(c, a);
         return a;
     }
 
@@ -2721,9 +2723,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public String[] listFilesystemRoots() {
         String[] roots = new String[] {
-            IOSNative.getCachesDir(),
-            IOSNative.getDocumentsDir(),
-            IOSNative.getResourcesDir()
+            IOSImplementation.nativeInstance.getCachesDir(),
+            IOSImplementation.nativeInstance.getDocumentsDir(),
+            IOSImplementation.nativeInstance.getResourcesDir()
         };
         return roots;
     }
@@ -2739,8 +2741,8 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFiles(String directory) throws IOException {
-        String[] a = new String[IOSNative.fileCountInDir(directory)];
-        IOSNative.listFilesInDir(directory, a);
+        String[] a = new String[IOSImplementation.nativeInstance.fileCountInDir(directory)];
+        IOSImplementation.nativeInstance.listFilesInDir(directory, a);
         return a;
     }
 
@@ -2762,14 +2764,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void mkdir(String directory) {
-        IOSNative.createDirectory(directory);
+        IOSImplementation.nativeInstance.createDirectory(directory);
     }
 
     /**
      * @inheritDoc
      */
     public void deleteFile(String file) {
-        IOSNative.deleteFile(file);
+        IOSImplementation.nativeInstance.deleteFile(file);
     }
 
     /**
@@ -2789,14 +2791,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public long getFileLength(String file) {
-        return IOSNative.getFileSize(file);
+        return IOSImplementation.nativeInstance.getFileSize(file);
     }
 
     /**
      * @inheritDoc
      */
     public boolean isDirectory(String file) {
-        return IOSNative.isDirectory(file);
+        return IOSImplementation.nativeInstance.isDirectory(file);
     }
 
     /**
@@ -2827,14 +2829,21 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean exists(String file) {
-        return IOSNative.fileExists(file);
+        if(file.startsWith("file:")) {
+            int slash = file.indexOf('/');
+            while(file.charAt(slash + 1) == '/') {
+                slash++;
+            }
+            file = file.substring(slash - 1);
+        }
+        return IOSImplementation.nativeInstance.fileExists(file);
     }
 
     /**
      * @inheritDoc
      */
     public void rename(String file, String newName) {
-        IOSNative.moveFile(file, newName);
+        IOSImplementation.nativeInstance.moveFile(file, newName);
     }
 
     /**
@@ -2872,12 +2881,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void registerPush(String id, boolean noFallback) {
-        IOSNative.registerPush();
+        IOSImplementation.nativeInstance.registerPush();
     }
 
     @Override
     public void deregisterPush() {
-        IOSNative.deregisterPush();
+        IOSImplementation.nativeInstance.deregisterPush();
     }
 
     private static PushCallback pushCallback;
@@ -2938,39 +2947,39 @@ public class IOSImplementation extends CodenameOneImplementation {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 public String format(int number) {
-                    return IOSNative.formatInt(number);
+                    return IOSImplementation.nativeInstance.formatInt(number);
                 }
 
                 public String format(double number) {
-                    return IOSNative.formatDouble(number);
+                    return IOSImplementation.nativeInstance.formatDouble(number);
                 }
 
                 public String formatCurrency(double currency) {
-                    return IOSNative.formatCurrency(currency);
+                    return IOSImplementation.nativeInstance.formatCurrency(currency);
                 }
 
                 public String formatDateLongStyle(Date d) {
-                    return IOSNative.formatDate(d.getTime());
+                    return IOSImplementation.nativeInstance.formatDate(d.getTime());
                 }
 
                 public String formatDateShortStyle(Date d) {
-                    return IOSNative.formatDateShort(d.getTime());
+                    return IOSImplementation.nativeInstance.formatDateShort(d.getTime());
                 }
 
                 public String formatDateTime(Date d) {
-                    return IOSNative.formatDateTime(d.getTime());
+                    return IOSImplementation.nativeInstance.formatDateTime(d.getTime());
                 }
                 
                 public String formatDateTimeMedium(Date d) {
-                    return IOSNative.formatDateTimeMedium(d.getTime());
+                    return IOSImplementation.nativeInstance.formatDateTimeMedium(d.getTime());
                 }
 
                 public String formatDateTimeShort(Date d) {
-                    return IOSNative.formatDateTimeShort(d.getTime());
+                    return IOSImplementation.nativeInstance.formatDateTimeShort(d.getTime());
                 }
 
                 public String getCurrencySymbol() {
-                    return IOSNative.getCurrencySymbol();
+                    return IOSImplementation.nativeInstance.getCurrencySymbol();
                 }
 
                 public void setLocale(String locale, String language) {
@@ -2993,21 +3002,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Image img = Image.createImage(image);
                     NativeImage ni = (NativeImage)img.getImage();
-                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, width, height, quality);
+                    long p = IOSImplementation.nativeInstance.createImageFile(ni.peer, format == FORMAT_JPEG, width, height, quality);
                     writeNSData(p, response);
                 }
 
                 private void writeNSData(long p, OutputStream os) throws IOException {
-                    byte[] b = new byte[IOSNative.getNSDataSize(p)];
-                    IOSNative.nsDataToByteArray(p, b);
-                    IOSNative.releasePeer(p);
+                    byte[] b = new byte[IOSImplementation.nativeInstance.getNSDataSize(p)];
+                    IOSImplementation.nativeInstance.nsDataToByteArray(p, b);
+                    IOSImplementation.nativeInstance.releasePeer(p);
                     os.write(b);
                 }
                 
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     NativeImage ni = (NativeImage)img.getImage();
-                    long p = IOSNative.createImageFile(ni.peer, format == FORMAT_JPEG, img.getWidth(), img.getHeight(), quality);
+                    long p = IOSImplementation.nativeInstance.createImageFile(ni.peer, format == FORMAT_JPEG, img.getWidth(), img.getHeight(), quality);
                     writeNSData(p, response);
                 }
 
@@ -3112,12 +3121,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void deleteDB(String databaseName) throws IOException{
-        IOSNative.sqlDbDelete(databaseName);
+        IOSImplementation.nativeInstance.sqlDbDelete(databaseName);
     }
     
     @Override
     public boolean existsDB(String databaseName){
-        return IOSNative.sqlDbExists(databaseName);
+        return IOSImplementation.nativeInstance.sqlDbExists(databaseName);
     }
 
     /**
@@ -3129,6 +3138,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * OpenGL ES frame rates. Games should use this method to pause the game.
      */
     public static void applicationWillResignActive() {
+        minimized = true;
         if(instance.life != null) {
             instance.life.applicationWillResignActive();
         }
@@ -3142,6 +3152,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * instead of applicationWillTerminate: when the user quits.
      */
     public static void applicationDidEnterBackground() {
+        minimized = true;
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
         }
@@ -3167,6 +3178,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * instead of applicationWillTerminate: when the user quits.
      */
     public static void applicationWillEnterForeground() {
+        minimized = false;
         if(instance.life != null) {
             instance.life.applicationWillEnterForeground();
         }
@@ -3177,12 +3189,20 @@ public class IOSImplementation extends CodenameOneImplementation {
      * here you can undo many of the changes made on entering the background.
      */
     public static void applicationDidBecomeActive() {
+        minimized = false;
         if(instance.life != null) {
             instance.life.applicationDidBecomeActive();
         }
-        Form f = Display.getInstance().getCurrent();
-        if(f != null) {
-            f.revalidate();
+        if(Display.getInstance() != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    Form f = Display.getInstance().getCurrent();
+                    if(f != null) {
+                        f.revalidate();
+                    }
+                }
+            });
         }
     }
     
@@ -3270,7 +3290,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                 public Product[] getProducts(String[] skus) {
                     final Product[] p = new Product[skus.length];
-                    IOSNative.fetchProducts(skus, p);
+                    IOSImplementation.nativeInstance.fetchProducts(skus, p);
                     
                     // wait for request to complete
                     Display.getInstance().invokeAndBlock(new Runnable() {
@@ -3292,7 +3312,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
 
                 public void purchase(String sku) {
-                    IOSNative.purchase(sku);
+                    IOSImplementation.nativeInstance.purchase(sku);
                 }
 
 
@@ -3342,13 +3362,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void scanQRCode(ScanResult callback) {
             this.callback = callback;
-            IOSNative.scanQRCode();
+            IOSImplementation.nativeInstance.scanQRCode();
         }
 
         @Override
         public void scanBarCode(ScanResult callback) {
             this.callback = callback;
-            IOSNative.scanBarCode();
+            IOSImplementation.nativeInstance.scanBarCode();
         }
     }
 }
