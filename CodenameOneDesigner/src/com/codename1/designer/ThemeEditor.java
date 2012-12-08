@@ -390,7 +390,7 @@ public class ThemeEditor extends BaseForm {
                             ((com.codename1.ui.Dialog)c).showModeless();
                             ((com.codename1.ui.Dialog)c).setTransitionInAnimator(t);
                         } else {
-                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Dialog)c).getTransitionInAnimator();
+                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Form)c).getTransitionInAnimator();
                             ((com.codename1.ui.Form)c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
                             ((com.codename1.ui.Form)c).show();
                             ((com.codename1.ui.Form)c).setTransitionInAnimator(t);
