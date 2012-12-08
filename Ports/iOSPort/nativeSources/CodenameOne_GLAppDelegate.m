@@ -26,6 +26,7 @@
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
+extern UIView *editingComponent;
 
 
 @implementation CodenameOne_GLAppDelegate
@@ -71,6 +72,12 @@
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
+    if(editingComponent != nil) {
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+        [editingComponent release];
+        editingComponent = nil;
+    }
     /*
      Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
      If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.

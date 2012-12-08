@@ -197,7 +197,7 @@ const char* stringToUTF8(JAVA_OBJECT str) {
     return cs;
 }
 
-void com_codename1_impl_ios_IOSNative_initVM__()
+void com_codename1_impl_ios_IOSNative_initVM__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_initVM__]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -217,21 +217,26 @@ void com_codename1_impl_ios_IOSNative_initVM__()
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_deinitializeVM__()
+void xmlvm_init_native_com_codename1_impl_ios_IOSNative()
+{
+}
+
+
+void com_codename1_impl_ios_IOSNative_deinitializeVM__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_deinitializeVM__]
     deinitVMImpl();
     //XMLVM_END_WRAPPER
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted__()
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isPainted__]
     return isPainted();
     //XMLVM_END_WRAPPER
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth__()
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getDisplayWidth__]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -241,7 +246,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth__()
     //XMLVM_END_WRAPPER
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__()
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getDisplayHeight__]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -251,7 +256,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__()
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10)
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -260,7 +265,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -270,7 +275,7 @@ void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(JAVA_LO
 }
 
 
-void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_int_int_int(JAVA_LONG n1, JAVA_OBJECT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_OBJECT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -281,7 +286,7 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
     //XMLVM_END_WRAPPER
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_int(JAVA_OBJECT n1, JAVA_INT n2, JAVA_INT n3)
+JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_int(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -293,7 +298,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_
     //XMLVM_END_WRAPPER
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(JAVA_OBJECT n1, JAVA_OBJECT n2)
+JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT n2)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -308,7 +313,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(
     //XMLVM_END_WRAPPER
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
+JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_scale___long_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -318,7 +323,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(JAVA_LONG n1, JA
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
+void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -327,7 +332,7 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_boolean(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
+void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_boolean]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -336,7 +341,7 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -345,7 +350,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -354,7 +359,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -363,7 +368,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -372,7 +377,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -381,7 +386,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawRectGlobal___int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawRectGlobal___int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawRectGlobal___int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -390,7 +395,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawRectGlobal___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectMutable___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectMutable___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawRoundRectMutable___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -399,7 +404,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectMutable___int_int_int_i
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectGlobal___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectGlobal___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawRoundRectGlobal___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -408,7 +413,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawRoundRectGlobal___int_int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillRoundRectMutable___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeFillRoundRectMutable___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRoundRectMutable___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -417,7 +422,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillRoundRectMutable___int_int_int_i
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillRoundRectGlobal___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeFillRoundRectGlobal___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRoundRectGlobal___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -426,7 +431,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillRoundRectGlobal___int_int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillArcMutable___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeFillArcMutable___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillArcMutable___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -435,7 +440,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillArcMutable___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -444,7 +449,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -453,7 +458,7 @@ void com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
+void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -462,7 +467,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -472,7 +477,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_jav
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -482,7 +487,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int_int(JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -491,7 +496,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int_int(JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -500,7 +505,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_i
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_int_int(JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -510,7 +515,7 @@ void com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_i
 }
 
 
-JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_String(JAVA_LONG n1, JAVA_OBJECT n2)
+JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_OBJECT n2)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -521,7 +526,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_Str
     //XMLVM_END_WRAPPER
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char(JAVA_LONG n1, JAVA_CHAR n2)
+JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_CHAR n2)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_charWidthNative___long_char]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -531,7 +536,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char(JAVA_LONG 
     //XMLVM_END_WRAPPER
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getFontHeightNative___long(JAVA_LONG n1)
+JAVA_INT com_codename1_impl_ios_IOSNative_getFontHeightNative___long(JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getFontHeightNative___long]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -541,7 +546,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFontHeightNative___long(JAVA_LONG n
     //XMLVM_END_WRAPPER
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
+JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -551,7 +556,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int(JAVA_I
     //XMLVM_END_WRAPPER
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String(JAVA_OBJECT n1, JAVA_OBJECT n2)
+JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT n2)
 {
     //XMLVM_BEGIN_NATIVE[com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -561,7 +566,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_jav
     //XMLVM_END_NATIVE
 }
 
-void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_String_byte_1ARRAY(JAVA_OBJECT n1, JAVA_OBJECT n2, JAVA_OBJECT n3)
+void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_String_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT n2, JAVA_OBJECT n3)
 {
     //XMLVM_BEGIN_NATIVE[com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_String_byte_1ARRAY]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -573,7 +578,7 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
 }
 
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -583,7 +588,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_in
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long(JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3)
+void com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -592,7 +597,7 @@ void com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long(JAVA_IN
     //XMLVM_END_WRAPPER
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__()
+JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_finishDrawingOnImage__]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -602,7 +607,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__()
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(JAVA_LONG n1)
+void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_deleteNativePeer___long]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -611,7 +616,7 @@ void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(JAVA_LONG n1)
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_deleteNativeFontPeer___long(JAVA_LONG n1)
+void com_codename1_impl_ios_IOSNative_deleteNativeFontPeer___long(JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_deleteNativePeer___long]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -620,27 +625,27 @@ void com_codename1_impl_ios_IOSNative_deleteNativeFontPeer___long(JAVA_LONG n1)
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_resetAffineGlobal__()
+void com_codename1_impl_ios_IOSNative_resetAffineGlobal__(JAVA_OBJECT instanceObject)
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_scaleGlobal___float_float(JAVA_FLOAT x, JAVA_FLOAT y) {
+void com_codename1_impl_ios_IOSNative_scaleGlobal___float_float(JAVA_OBJECT instanceObject, JAVA_FLOAT x, JAVA_FLOAT y) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     Java_com_codename1_impl_ios_IOSImplementation_scale(x, y);
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_rotateGlobal___float(JAVA_FLOAT angle) {
+void com_codename1_impl_ios_IOSNative_rotateGlobal___float(JAVA_OBJECT instanceObject, JAVA_FLOAT angle) {
 }
 
-void com_codename1_impl_ios_IOSNative_rotateGlobal___float_int_int(JAVA_FLOAT angle, JAVA_INT x, JAVA_INT y) {
+void com_codename1_impl_ios_IOSNative_rotateGlobal___float_int_int(JAVA_OBJECT instanceObject, JAVA_FLOAT angle, JAVA_INT x, JAVA_INT y) {
     
 }
 
-void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(JAVA_FLOAT x, JAVA_FLOAT y) {
+void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(JAVA_OBJECT instanceObject, JAVA_FLOAT x, JAVA_FLOAT y) {
     
 }
 
@@ -692,7 +697,7 @@ void stringEdit(int finished, int cursorPos, NSString* text) {
                                                                                           );
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__()
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isPainted__]
     return isIPad();
@@ -707,7 +712,7 @@ NSString* toNSString(JAVA_OBJECT str) {
     return [NSString stringWithUTF8String:chrs];
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT n1, JAVA_OBJECT path) {
+JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
@@ -719,7 +724,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     return 0;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT n1, JAVA_OBJECT path) {
+JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
@@ -729,11 +734,12 @@ JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_S
     NSFileHandle* outputFile = [NSFileHandle fileHandleForWritingAtPath:ns];
     [outputFile seekToEndOfFile];
     [outputFile writeData:d];
+    [outputFile synchronizeFile];
     [pool release];
     return 0;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OBJECT path) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
@@ -749,7 +755,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OB
     return result;
 }
 
-void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(JAVA_OBJECT path, JAVA_OBJECT n1) {
+void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_OBJECT n1) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
@@ -760,7 +766,7 @@ void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(JA
     [pool release];
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsDir__() {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsDir__(JAVA_OBJECT instanceObject) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
@@ -769,7 +775,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsDir__() {
     return str;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCachesDir__() {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCachesDir__(JAVA_OBJECT instanceObject) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
@@ -778,7 +784,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCachesDir__() {
     return str;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResourcesDir__() {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResourcesDir__(JAVA_OBJECT instanceObject) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSBundle *bundle = [NSBundle mainBundle];
     NSString *bundlePath = [bundle bundlePath];
@@ -787,7 +793,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResourcesDir__() {
     return str;
 }
 
-void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT file) {
+void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(file);
@@ -801,7 +807,7 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT 
     [pool release];
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(JAVA_OBJECT file) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(file);
@@ -812,7 +818,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(JAVA
     return b;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(JAVA_OBJECT file) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(file);
@@ -825,7 +831,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(JAV
     return b;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA_OBJECT dir) {
+JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT dir) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
@@ -841,7 +847,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA
     return i;   
 }
 
-void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lang_String_1ARRAY(JAVA_OBJECT dir, JAVA_OBJECT files) {
+void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lang_String_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT dir, JAVA_OBJECT files) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
@@ -865,7 +871,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OBJECT dir) {
+void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT dir) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(dir);
@@ -875,7 +881,7 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(JAVA_OB
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_String(JAVA_OBJECT src, JAVA_OBJECT dest) {
+void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dest) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(src);
@@ -894,14 +900,14 @@ void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_Stri
 extern void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImage, const char* name);
 
 
-void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(JAVA_LONG nativeImage, JAVA_OBJECT name) {
+void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG nativeImage, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(name);
     Java_com_codename1_impl_ios_IOSImplementation_setImageName(nativeImage, chrs);
     [pool release];    
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int(JAVA_OBJECT url, JAVA_INT timeout) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int(JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_INT timeout) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = [[NetworkConnectionImpl alloc] init];
     const char* chrs = stringToUTF8(url);
@@ -911,14 +917,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int
     return response;
 }
 
-void com_codename1_impl_ios_IOSNative_connect___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_connect___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     [impl connect];
     [pool release];    
 }
 
-void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT mtd) {
+void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT mtd) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     const char* chrs = stringToUTF8(mtd);
@@ -927,12 +933,12 @@ void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(JAVA_LON
     [pool release];    
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getResponseCode___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getResponseCode___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     return [impl getResponseCode];
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseMessage___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseMessage___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     java_lang_String* str = xmlvm_create_java_string([impl getResponseMessage].UTF8String);
@@ -940,12 +946,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseMessage___long(JAVA_LONG
     return str;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getContentLength___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getContentLength___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     return [impl getContentLength];
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT name) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     const char* chrs = stringToUTF8(name);
@@ -955,7 +961,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_
     return str;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     JAVA_INT i = [impl getResponseHeaderCount]; 
@@ -963,7 +969,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(JAVA_LON
     return i;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(JAVA_LONG peer, JAVA_INT offset) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     JAVA_OBJECT j = fromNSString([impl getResponseHeaderName:offset]);
@@ -971,7 +977,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(JA
     return j;
 }
 
-void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lang_String(JAVA_LONG peer, JAVA_OBJECT key, JAVA_OBJECT value) {
+void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT key, JAVA_OBJECT value) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     const char* chrs = stringToUTF8(key);
@@ -982,7 +988,7 @@ void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lan
     [pool release];    
 }
 
-void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(JAVA_LONG peer, JAVA_OBJECT arr) {
+void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     org_xmlvm_runtime_XMLVMArray* byteArray = arr;
@@ -1011,12 +1017,12 @@ void connectionError(void* peer, NSString* message) {
 }
 
 
-void com_codename1_impl_ios_IOSNative_closeConnection___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_closeConnection___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NetworkConnectionImpl* impl = (NetworkConnectionImpl*)peer;
     [impl release];
 }
 
-void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT n1)
+void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_execute___java_lang_String]
     const char* chrs = stringToUTF8(n1);
@@ -1025,33 +1031,33 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT n1)
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_flashBacklight___int(JAVA_INT n1)
+void com_codename1_impl_ios_IOSNative_flashBacklight___int(JAVA_OBJECT instanceObject, JAVA_INT n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_flashBacklight___int]
     //XMLVM_END_WRAPPER
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized__()
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isMinimized__]
     return false;
     //XMLVM_END_WRAPPER
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_minimizeApplication__()
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_minimizeApplication__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_minimizeApplication__]
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_restoreMinimizedApplication__()
+void com_codename1_impl_ios_IOSNative_restoreMinimizedApplication__(JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_restoreMinimizedApplication__]
     //XMLVM_END_WRAPPER
 }
 
 extern int orientationLock;
-void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(JAVA_BOOLEAN n1)
+void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(JAVA_OBJECT instanceObject, JAVA_BOOLEAN n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_lockOrientation___boolean]
     if(n1) {
@@ -1064,13 +1070,13 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(JAVA_BOOLEAN n1)
 
 
 extern void vibrateDevice();
-void com_codename1_impl_ios_IOSNative_vibrate___int(JAVA_INT duration) {
+void com_codename1_impl_ios_IOSNative_vibrate___int(JAVA_OBJECT instanceObject, JAVA_INT duration) {
     vibrateDevice();
 }
 
 // Peer Component methods
 
-void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
+void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1085,7 +1091,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 
 extern float scaleValue;
 
-void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1100,7 +1106,7 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
     });
 }
 
-void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_LONG peer, JAVA_BOOLEAN b) {
+void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN b) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1117,7 +1123,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_LONG pe
     });
 }
 
-void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAVA_LONG peer, int x, int y, int w, int h) {
+void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1145,7 +1151,7 @@ void repaintUI() {
     com_codename1_ui_Component_repaint__(f);
 }
 
-void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1158,7 +1164,7 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_LONG peer) {
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration = 0;
-JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1168,7 +1174,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getAudioDuration___long(JAVA_LONG peer
     return com_codename1_impl_ios_IOSNative_getAudioDuration;
 }
 
-void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1178,7 +1184,7 @@ void com_codename1_impl_ios_IOSNative_playAudio___long(JAVA_LONG peer) {
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying = 0;
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1189,7 +1195,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAudioPlaying___long(JAVA_LONG pe
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime = 0;
-JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1199,7 +1205,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getAudioTime___long(JAVA_LONG peer) {
     return com_codename1_impl_ios_IOSNative_getAudioTime;
 }
 
-void com_codename1_impl_ios_IOSNative_pauseAudio___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_pauseAudio___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1208,7 +1214,7 @@ void com_codename1_impl_ios_IOSNative_pauseAudio___long(JAVA_LONG peer) {
     });
 }
 
-void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(JAVA_LONG peer, JAVA_INT time) {
+void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1217,7 +1223,7 @@ void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(JAVA_LONG peer, JA
     });
 }
 
-void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
@@ -1227,7 +1233,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_LONG peer) {
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(JAVA_OBJECT instanceObject, JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         const char* chrs = stringToUTF8(uri);
@@ -1238,7 +1244,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_l
     return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_Runnable(JAVA_OBJECT b, JAVA_OBJECT onCompletion) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_Runnable(JAVA_OBJECT instanceObject, JAVA_OBJECT b, JAVA_OBJECT onCompletion) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         org_xmlvm_runtime_XMLVMArray* byteArray = b;
@@ -1250,15 +1256,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
     return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
-JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__() {
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__(JAVA_OBJECT instanceObject) {
     return [AudioPlayer getVolume];    
 }
 
-void com_codename1_impl_ios_IOSNative_setVolume___float(JAVA_FLOAT vol) {
+void com_codename1_impl_ios_IOSNative_setVolume___float(JAVA_OBJECT instanceObject, JAVA_FLOAT vol) {
     [AudioPlayer setVolume:vol];    
 }
 
-void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int_int_int_int_float_float_float(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9) {
+void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int_int_int_int_float_float_float(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     DrawGradient* d = [[DrawGradient alloc] initWithArgs:1 startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:n7 relativeYA:n8 relativeSizeA:n9];
     [CodenameOne_GLViewController upcoming:d];
@@ -1266,7 +1272,7 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
+void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     int horizontal = 2;
     if(n7) {
@@ -1278,7 +1284,7 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
+void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     
     CGFloat components[8] = { 
@@ -1305,7 +1311,7 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
+void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     CGFloat components[8] = { 
         ((float)((n1 & 0xFF0000) >> 16))/255.0, 
@@ -1332,14 +1338,14 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_releasePeer___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_releasePeer___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSObject* o = (NSObject*)peer;
         [o release];
     });
 }
 
-void com_codename1_impl_ios_IOSNative_retainPeer___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_retainPeer___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSObject* o = (NSObject*)peer;
         [o retain];
@@ -1347,7 +1353,7 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(JAVA_LONG peer) {
 }
 
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(JAVA_OBJECT obj) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor whiteColor];
@@ -1363,7 +1369,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
     return r;
 }
 
-void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
+void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1375,7 +1381,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
     });
 }
 
-void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT url) {
+void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1387,7 +1393,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(JAVA
     });
 }
 
-void com_codename1_impl_ios_IOSNative_browserBack___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_browserBack___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1396,7 +1402,7 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(JAVA_LONG peer) {
     });
 }
 
-void com_codename1_impl_ios_IOSNative_browserStop___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_browserStop___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1405,10 +1411,10 @@ void com_codename1_impl_ios_IOSNative_browserStop___long(JAVA_LONG peer) {
     });
 }
 
-void com_codename1_impl_ios_IOSNative_browserClearHistory___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_browserClearHistory___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 }
 
-void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(JAVA_LONG peer, JAVA_OBJECT javaScript) {
+void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1417,7 +1423,7 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(JAV
     });
 }
 
-void com_codename1_impl_ios_IOSNative_browserForward___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_browserForward___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1427,7 +1433,7 @@ void com_codename1_impl_ios_IOSNative_browserForward___long(JAVA_LONG peer) {
 }
 
 JAVA_BOOLEAN booleanResponse = 0;
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1437,7 +1443,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(JAVA_LONG pe
     return booleanResponse;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1447,7 +1453,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(JAVA_LONG
     return booleanResponse;
 }
 
-void com_codename1_impl_ios_IOSNative_browserReload___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_browserReload___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1457,7 +1463,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(JAVA_LONG peer) {
 }
 
 java_lang_String* returnString;
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1468,7 +1474,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(JAVA_LONG pe
     return returnString;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIWebView* w = (UIWebView*)peer;
@@ -1479,7 +1485,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_LONG peer
 }
 
 MPMoviePlayerController* moviePlayerInstance;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(JAVA_OBJECT str) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSURL* u = [NSURL URLWithString:toNSString(str)];
@@ -1491,7 +1497,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
     return mp;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JAVA_OBJECT dataObject) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
@@ -1519,7 +1525,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JA
 
 
 
-void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(
+void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject,
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
@@ -1546,7 +1552,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
     });
 }
 
-void com_codename1_impl_ios_IOSNative_startVideoComponent___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_startVideoComponent___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1555,7 +1561,7 @@ void com_codename1_impl_ios_IOSNative_startVideoComponent___long(JAVA_LONG peer)
     });
 }
 
-void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1564,18 +1570,18 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(JAVA_LONG peer) 
     });
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     // unsupported by API for some reason???
     return 0;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(JAVA_LONG peer, JAVA_INT time) {
+JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
     // unsupported by API for some reason???
     return 0;
 }
 
 int responseGetMediaDuration = 0;
-JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1586,7 +1592,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(JAVA_LONG peer
 }
 
 JAVA_BOOLEAN responseIsVideoPlaying = 0;
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1596,7 +1602,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(JAVA_LONG pe
     return responseIsVideoPlaying;
 }
 
-void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
+void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1606,7 +1612,7 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(JAVA_LON
 }
 
 JAVA_BOOLEAN responseIsVideoFullScreen = 0;
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -1617,12 +1623,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(JAVA_LONG
     return responseIsVideoFullScreen;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(JAVA_LONG peer) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
     return m.view;
 }
 
-void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
@@ -1633,7 +1639,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_LON
 
 
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__() {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(JAVA_OBJECT instanceObject) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
     });
@@ -1642,7 +1648,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__() {
     return c;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(JAVA_LONG peer) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         CLLocationManager* l = (CLLocationManager*)peer;
@@ -1655,44 +1661,44 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(JAVA_
     return c;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLatitude___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLatitude___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.coordinate.latitude;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAltitude___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAltitude___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.altitude;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLongtitude___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLongtitude___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.coordinate.longitude;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAccuracy___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAccuracy___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.horizontalAccuracy;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationDirection___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationDirection___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.course;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationVelocity___long(JAVA_LONG peer) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationVelocity___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     return loc.speed;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(JAVA_LONG peer) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocation* loc = (CLLocation*)peer;
     NSTimeInterval t = [loc.timestamp timeIntervalSince1970];
     return (JAVA_LONG)(t * 1000.0);
 }
 
 UIPopoverController* popoverController;
-void com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_BOOLEAN movie) {
+void com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
@@ -1735,11 +1741,11 @@ int popoverSupported()
 	return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__() {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(JAVA_OBJECT instanceObject) {
     return fromNSString([OpenUDID value]);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_LONG peer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     CLLocationManager* l = (CLLocationManager*)peer;
     CLLocation* loc = l.location;
@@ -1759,13 +1765,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_LONG pe
     return 1;    
 }
 
-void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocationManager* l = (CLLocationManager*)peer;
     l.delegate = [CodenameOne_GLViewController instance];
     [l startUpdatingLocation];
 }
 
-void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_LONG peer) {
+void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocationManager* l = (CLLocationManager*)peer;
     [l stopUpdatingLocation];    
 }
@@ -1779,7 +1785,7 @@ ABAddressBookRef getAddressBook() {
 }
 
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_BOOLEAN includeNumbers) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_OBJECT instanceObject, JAVA_BOOLEAN includeNumbers) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABAddressBookRef addressBook = getAddressBook();
     CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
@@ -1787,7 +1793,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_BOOLEAN
     return nPeople;
 }
 
-void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
+void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA_OBJECT instanceObject, JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     org_xmlvm_runtime_XMLVMArray* iArray = intArray;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
@@ -1801,7 +1807,7 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
     [pool release];
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);    
@@ -1810,7 +1816,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(JAVA_LONG
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);    
@@ -1819,7 +1825,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(JAVA_LO
     return ret;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(JAVA_LONG peer) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     //NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     //[pool release];
     return 1;
@@ -1834,7 +1840,7 @@ JAVA_OBJECT copyValueAsString(ABMultiValueRef r) {
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_LONG peer, JAVA_INT offset) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
@@ -1843,7 +1849,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(JAVA_LONG
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_LONG peer, JAVA_INT offset) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     //ABRecordRef i = (ABRecordRef)peer;
     //ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneMainLabel);    
@@ -1853,7 +1859,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(JAVA_
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
@@ -1862,7 +1868,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(JAVA_L
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);    
@@ -1871,7 +1877,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(JAVA_LONG pee
     return ret;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(JAVA_LONG peer) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (NSString*)ABRecordCopyValue(i,kABPersonAddressProperty);    
@@ -1880,7 +1886,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(JAVA_LONG p
     return ret;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_LONG peer) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = (ABRecordRef)peer;
     GLUIImage* g = nil;
@@ -1892,7 +1898,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_LO
     return g;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_INT recId) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_OBJECT instanceObject, JAVA_INT recId) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
     [i retain];
@@ -1900,13 +1906,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_INT 
     return i;
 }
 
-void com_codename1_impl_ios_IOSNative_dial___java_lang_String(JAVA_OBJECT phone) {
+void com_codename1_impl_ios_IOSNative_dial___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(phone)]];
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(
+void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, 
     JAVA_OBJECT  number, JAVA_OBJECT  text) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -1933,12 +1939,12 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
 }
 
 
-void com_codename1_impl_ios_IOSNative_registerPush__() {
+void com_codename1_impl_ios_IOSNative_registerPush__(JAVA_OBJECT instanceObject) {
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
 		(UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
 }
 
-void com_codename1_impl_ios_IOSNative_deregisterPush__() {
+void com_codename1_impl_ios_IOSNative_deregisterPush__(JAVA_OBJECT instanceObject) {
     [[UIApplication sharedApplication] unregisterForRemoteNotifications];
 }
 
@@ -1979,7 +1985,7 @@ UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
     return scaled;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(JAVA_OBJECT instanceObject, JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UIImage* i = [(GLUIImage*)imagePeer getImage];
     if(width == -1) {
@@ -2003,12 +2009,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
     return data;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long(JAVA_LONG nsData) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long(JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
     NSData* d = (NSData*)nsData;
     return d.length;
 } 
 
-void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_LONG nsData, JAVA_OBJECT dataArray) {
+void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT dataArray) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSData* d = (NSData*)nsData;
     org_xmlvm_runtime_XMLVMArray* byteArray = dataArray;
@@ -2019,7 +2025,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_
 
 
 AVAudioRecorder* recorder = nil;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(JAVA_OBJECT instanceObject, 
     JAVA_OBJECT  destinationFile) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2044,7 +2050,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
     return r;
 }
 
-void com_codename1_impl_ios_IOSNative_startAudioRecord___long(
+void com_codename1_impl_ios_IOSNative_startAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2056,7 +2062,7 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(
     });
 }
 
-void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(
+void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2066,7 +2072,7 @@ void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(
     });
 }
 
-void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(
+void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2119,7 +2125,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___j
     return arr->fields.org_xmlvm_runtime_XMLVMArray.type_ == __CLASS_double_1ARRAY;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(JAVA_OBJECT name) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
@@ -2133,7 +2139,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(JAV
     return fileExists;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(JAVA_OBJECT name) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
@@ -2150,7 +2156,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String
     return db;
 }
 
-void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(JAVA_OBJECT name) {
+void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
@@ -2163,11 +2169,11 @@ void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(JAVA_OBJECT
     [pool release];    
 }
 
-void com_codename1_impl_ios_IOSNative_sqlDbClose___long(JAVA_LONG db) {
+void com_codename1_impl_ios_IOSNative_sqlDbClose___long(JAVA_OBJECT instanceObject, JAVA_LONG db) {
     sqlite3_free((sqlite3*)db);
 }
 
-void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lang_String_1ARRAY(JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
+void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lang_String_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(sql);
     if(args != nil) {
@@ -2189,7 +2195,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
     }
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_String_java_lang_String_1ARRAY(JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_String_java_lang_String_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(sql);
     sqlite3_stmt *addStmt = nil;
@@ -2208,48 +2214,48 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
     return addStmt;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(JAVA_LONG statementPeer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
     sqlite3_reset((sqlite3_stmt *)statementPeer);
     return YES;
 }
     
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(JAVA_LONG statementPeer) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
     return sqlite3_step((sqlite3_stmt *)statementPeer) == SQLITE_ROW;    
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(JAVA_LONG statementPeer, JAVA_INT index) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
     return xmlvm_create_java_string(sqlite3_column_name((sqlite3_stmt*)statementPeer, index));
 }
 
-void com_codename1_impl_ios_IOSNative_sqlCursorCloseStatement___long(JAVA_LONG statement) {
+void com_codename1_impl_ios_IOSNative_sqlCursorCloseStatement___long(JAVA_OBJECT instanceObject, JAVA_LONG statement) {
     sqlite3_finalize((sqlite3_stmt*)statement);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnBlob___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnBlob___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return nil;
 }
 
-JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnDouble___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnDouble___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return sqlite3_column_double((sqlite3_stmt*)statement, col);
 }
 
-JAVA_FLOAT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnFloat___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnFloat___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return sqlite3_column_double((sqlite3_stmt*)statement, col);
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnInteger___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnInteger___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return sqlite3_column_int((sqlite3_stmt*)statement, col);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return sqlite3_column_int64((sqlite3_stmt*)statement, col);
 }
 
-JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return sqlite3_column_int((sqlite3_stmt*)statement, col);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_LONG statement, JAVA_INT col) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return xmlvm_create_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
 }
 
@@ -2260,7 +2266,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_LO
 
 JAVA_OBJECT productsArrayPending = nil;
 
-void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(JAVA_OBJECT skus, JAVA_OBJECT products) {
+void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT skus, JAVA_OBJECT products) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     org_xmlvm_runtime_XMLVMArray* strArray = skus;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -2279,31 +2285,31 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     [pool release];
 }
 
-void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT sku) {
+void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
     SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
     [[SKPaymentQueue defaultQueue] addPayment:payment];
 }
 
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(JAVA_INT i) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(JAVA_OBJECT instanceObject, JAVA_INT i) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
-    [formatter setNumberStyle:NSNumberFormatterNoStyle];
+    [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     JAVA_OBJECT o = fromNSString([formatter stringFromNumber:[NSNumber numberWithInt:i]]);
     [pool release];
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(JAVA_DOUBLE d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(JAVA_OBJECT instanceObject, JAVA_DOUBLE d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
-    [formatter setNumberStyle:NSNumberFormatterNoStyle];
+    [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     JAVA_OBJECT o = fromNSString([formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
     [pool release];
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(JAVA_DOUBLE d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(JAVA_OBJECT instanceObject, JAVA_DOUBLE d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
     [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
@@ -2312,7 +2318,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(JAVA_DOUBLE
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(JAVA_LONG d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(JAVA_OBJECT instanceObject, JAVA_LONG d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
@@ -2322,7 +2328,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(JAVA_LONG d) {
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(JAVA_LONG d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(JAVA_OBJECT instanceObject, JAVA_LONG d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
@@ -2332,7 +2338,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(JAVA_LONG d)
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(JAVA_LONG d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(JAVA_OBJECT instanceObject, JAVA_LONG d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
@@ -2343,7 +2349,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(JAVA_LONG d) 
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(JAVA_LONG d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(JAVA_OBJECT instanceObject, JAVA_LONG d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
@@ -2354,7 +2360,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(JAVA_LO
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(JAVA_LONG d) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(JAVA_OBJECT instanceObject, JAVA_LONG d) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
@@ -2365,7 +2371,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(JAVA_LON
     return o;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__() {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(JAVA_OBJECT instanceObject) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
     JAVA_OBJECT c = fromNSString([formatter currencyCode]);
@@ -2373,7 +2379,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__() {
     return c;
 }
 
-void com_codename1_impl_ios_IOSNative_scanBarCode__() {
+void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         ZBarReaderViewController *reader = [ZBarReaderViewController new];
@@ -2396,7 +2402,7 @@ void com_codename1_impl_ios_IOSNative_scanBarCode__() {
     });
 }
 
-void com_codename1_impl_ios_IOSNative_scanQRCode__() {
+void com_codename1_impl_ios_IOSNative_scanQRCode__(JAVA_OBJECT instanceObject) {
     /*dispatch_sync(dispatch_get_main_queue(), ^{
      ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
      ZXingWidgetController *widController = [[ZXingWidgetController alloc] initWithDelegate:scanCall showCancel:YES OneDMode:NO];
@@ -2413,7 +2419,7 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__() {
      [[CodenameOne_GLViewController instance] presentModalViewController:widController animated:YES];
      [widController release];
      });*/
-    com_codename1_impl_ios_IOSNative_scanBarCode__();
+    com_codename1_impl_ios_IOSNative_scanBarCode__(instanceObject);
 }
 
 
@@ -2496,7 +2502,7 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     [pool release];        
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(JAVA_OBJECT name) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     int pSize = 14;
     
     pSize *= scaleValue;
@@ -2508,7 +2514,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     return fnt;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boolean_float(JAVA_LONG uiFont, JAVA_BOOLEAN bold, JAVA_BOOLEAN italic, JAVA_FLOAT size) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boolean_float(JAVA_OBJECT instanceObject, JAVA_LONG uiFont, JAVA_BOOLEAN bold, JAVA_BOOLEAN italic, JAVA_FLOAT size) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UIFont* original = (UIFont*)uiFont;
     UIFont* fnt = [original fontWithSize:size];

@@ -144,6 +144,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             UITextField* utf = [[UITextField alloc] initWithFrame:rect];
             editingComponent = utf;
             
+            if((constraint & 0x80000) == 0x80000) {
+                utf.autocorrectionType = UITextAutocorrectionTypeNo;
+            }
+            
             // PASSWORD
             if((constraint & 0x10000) == 0x10000) {
                 utf.secureTextEntry = YES;
