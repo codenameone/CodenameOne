@@ -1448,9 +1448,7 @@ private void pressedStylesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIR
 }//GEN-LAST:event_pressedStylesMouseClicked
 
 private void uiPreviewContentActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_uiPreviewContentActionPerformed
-    if(initialized) {
-        initMIDlet();
-    }
+
 }//GEN-LAST:event_uiPreviewContentActionPerformed
 
 private void constantsTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_constantsTableMouseClicked
