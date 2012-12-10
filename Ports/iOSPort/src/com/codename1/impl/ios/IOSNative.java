@@ -339,4 +339,6 @@ final class IOSNative {
 
     native long createTruetypeFont(String name);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
+
+    native void log(String text);
 }
