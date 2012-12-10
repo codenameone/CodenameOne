@@ -595,7 +595,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextMoveToPoint(context, x1, y1);
-    CGContextAddLineToPoint(context, x2, y1);
+    CGContextAddLineToPoint(context, x2, y2);
+    CGContextStrokePath(context);
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl finished");
 }
 
@@ -671,9 +672,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
 (int width, int height, int argb) {
-    if((argb & 0xff000000) == 0) {
-        return NULL;
-    }
     //NSLog(@"createNativeMutableImageImpl");
     BOOL opaque = ((argb & 0xff000000) == 0xff000000);
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), opaque, 1.0);
@@ -691,8 +689,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 (int width, int height, void *peer) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
     UIImage* original = [(GLUIImage*)peer getImage];
-    // TODO!!! Pass information on whether the image is opaque!
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), true, 1.0);
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
         [original drawAtPoint:CGPointZero];
     }
