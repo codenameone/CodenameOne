@@ -2259,7 +2259,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
     return xmlvm_create_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_LONG statement) {
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_OBJECT instanceObject, JAVA_LONG statement) {
     sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
     return sqlite3_column_count(stmt);
 }
@@ -2521,4 +2521,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_b
     [fnt retain];
     [pool release];
     return fnt;
+}
+
+void com_codename1_impl_ios_IOSNative_log___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSLog(toNSString(name));
+    [pool release];
 }
