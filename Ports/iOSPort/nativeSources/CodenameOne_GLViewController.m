@@ -1586,6 +1586,13 @@ extern int popoverSupported();
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
 		UIImage* image = [info objectForKey:UIImagePickerControllerOriginalImage];
+
+        if (image.imageOrientation != UIImageOrientationUp) {
+            UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+            [image drawInRect:(CGRect){0, 0, image.size}];
+            image = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+        }
         
         NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
         
@@ -1671,6 +1678,18 @@ extern JAVA_OBJECT productsArrayPending;
                 break;
         }
         [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+    }
+}
+
+- (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
+    NSLog(@"audioRecorderDidFinishRecording: %i", (int)flag);        
+}
+
+- (void)audioRecorderEncodeErrorDidOccur:(AVAudioRecorder *)recorder error:(NSError *)error {
+    if(error != nil) {  
+        NSLog(@"audioRecorderEncodeErrorDidOccur: %@", [error localizedDescription]);        
+    } else {
+        NSLog(@"audioRecorderEncodeErrorDidOccur with null argument");        
     }
 }
 
