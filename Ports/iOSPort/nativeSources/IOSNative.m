@@ -2043,6 +2043,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         if(error != nil) {  
             NSLog(@"Error in recording: %@", [error localizedDescription]);        
         }
+        recorder.delegate = [CodenameOne_GLViewController instance];
         [pool release];
     });
     AVAudioRecorder* r = recorder;
@@ -2255,8 +2256,21 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
     return sqlite3_column_int((sqlite3_stmt*)statement, col);
 }
 
+JAVA_OBJECT xmlvm_create_UTF8_java_string(const char* s) {
+    if(s == 0) {
+        return 0;
+    }
+    java_lang_String* str = __NEW_java_lang_String();
+    int len = strlen(s);
+    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, len);
+    memcpy(byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_, s, len);
+    java_lang_String___INIT____byte_1ARRAY_java_lang_String(str, byteArray, utf8String);
+    return XMLVMUtil_getFromStringPool(str);
+}
+
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return xmlvm_create_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
+    return xmlvm_create_UTF8_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(JAVA_OBJECT instanceObject, JAVA_LONG statement) {
