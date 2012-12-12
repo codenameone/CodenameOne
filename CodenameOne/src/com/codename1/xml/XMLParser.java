@@ -410,6 +410,11 @@ public class XMLParser {
                     }
                     if(eventParser) {
                         endTag(closingTag);
+			if (!isEmptyTag(closingTag)) {
+			    // patch from http://code.google.com/p/codenameone/issues/detail?id=428 
+                            // not really sure if this is the best approach but if it solves a bug...
+			    return;
+			}
                     }
 
                     if(element != null) {
