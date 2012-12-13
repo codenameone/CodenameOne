@@ -103,6 +103,14 @@ public class SEBrowserComponent extends PeerComponent {
         super.initComponent();
     }
 
+    public void execute(final String js) {
+        Platform.runLater(new Runnable() {
+            public void run() {
+                web.getEngine().executeScript(js);
+            }
+        });
+    }
+    
     @Override
     protected void deinitialize() {
         super.deinitialize();

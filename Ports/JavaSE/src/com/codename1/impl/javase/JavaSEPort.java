@@ -2712,7 +2712,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fs.close();
                 if(fnt != null) {
                     if(!fontName.startsWith(fnt.getFamily())) {
-                        throw new RuntimeException("Invalid font name for " + fileName + " should be: " + fnt.getName());
+                        System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
                     }
                 }
                 return fnt;
@@ -4458,6 +4458,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public String getBrowserURL(PeerComponent browserPeer) {
         return ((SEBrowserComponent) browserPeer).getURL();
+    }
+
+    public void browserExecute(PeerComponent browserPeer, String javaScript) {
+        ((SEBrowserComponent) browserPeer).execute(javaScript);
     }
 
     public void setBrowserURL(final PeerComponent browserPeer, final String url) {
