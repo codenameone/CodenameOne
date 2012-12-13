@@ -737,6 +737,13 @@ public class MapComponent extends Container {
     }
 
     /**
+     * Returns the center location of the map in WGS84 format.
+     */
+    public Coord getCenter() {
+        return _map.projection().toWGS84(_center);
+    }
+   
+    /**
      * Returns the current zoom level of the map.
      * 
      * @return zoom level
