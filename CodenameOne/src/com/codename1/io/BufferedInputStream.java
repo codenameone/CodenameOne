@@ -40,6 +40,7 @@ public class BufferedInputStream extends InputStream {
     private IOProgressListener progressListener;
     private boolean disableBuffering;
     private boolean closed;
+    
 
     /**
      * The index one greater than the index of the last valid byte in 
@@ -266,6 +267,14 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
+    /**
+     * Allows access to the underlying input stream if desired
+     * @return the internal input stream
+     */
+    public InputStream getInternal() {
+        return in;
+    }
+    
     /**
      * See
      * the general contract of the <code>read</code>
