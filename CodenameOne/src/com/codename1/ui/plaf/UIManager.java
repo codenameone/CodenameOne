@@ -600,6 +600,7 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("VKB.derive")) {
             themeProps.put("VKB.bgColor", "666666");
             themeProps.put("VKB.padding", "3,6,3,3");
+            themeProps.put("VKB.transparency", "255");            
         }
 
         if(installedTheme == null || !installedTheme.containsKey("VKBtooltip.derive")) {
@@ -610,6 +611,7 @@ public class UIManager {
             themeProps.put("VKBtooltip.bgColor", "FFFFFF");
             themeProps.put("VKBtooltip.fgColor", "0");
             themeProps.put("VKBtooltip.border", Border.createRoundBorder(8, 8));
+            themeProps.put("VKBtooltip.transparency", "255");            
         }
 
         if(installedTheme == null || !installedTheme.containsKey("VKBButton.derive")) {
@@ -621,6 +623,7 @@ public class UIManager {
             themeProps.put("VKBButton.font",
                     Font.createSystemFont(Font.FACE_SYSTEM,
                     Font.STYLE_BOLD, Font.SIZE_MEDIUM));
+            themeProps.put("VKBButton.transparency", "255");            
         }
         if(installedTheme == null || !installedTheme.containsKey("VKBButton.sel#derive")) {
             themeProps.put("VKBButton.sel#derive", "VKBButton");
@@ -628,6 +631,7 @@ public class UIManager {
             themeProps.put("VKBButton.sel#bgGradient", new Object[]{new Integer(0x666666),
                         new Integer(0), new Float(0), new Float(0), new Float(0)
                     });
+            themeProps.put("VKBButton.sel#transparency", "255");            
         }
 
         if(installedTheme == null || !installedTheme.containsKey("VKBButton.press#derive")) {
@@ -636,6 +640,7 @@ public class UIManager {
             themeProps.put("VKBButton.press#bgGradient", new Object[]{new Integer(0),
                         new Integer(0x666666), new Float(0), new Float(0), new Float(0)
                     });
+            themeProps.put("VKBButton.press#transparency", "255");            
         }
 
         if(installedTheme == null || !installedTheme.containsKey("VKBSpecialButton.derive")) {
@@ -671,6 +676,7 @@ public class UIManager {
                     Font.STYLE_BOLD, Font.SIZE_MEDIUM));
             themeProps.put("VKBTextInput.border",
                     Border.getDefaultBorder());
+            themeProps.put("VKBTextInput.transparency", "255");            
         }
 
         themeProps.put("VKBTextInput.sel#derive", "VKBTextInput");
