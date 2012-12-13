@@ -65,7 +65,7 @@ public class MapComponent extends Container {
     private boolean drawMapPointer = false;
     private double oldDistance = -1;
     private Image buffer = null;
-    private boolean refreshTiles = false;
+    private boolean refreshLayers = false;
     private int scaleX = 0;
     private int scaleY = 0;
     private int translateX;
@@ -183,9 +183,9 @@ public class MapComponent extends Container {
                 if(buffer == null){
                     buffer = Image.createImage(getWidth(), getHeight());
                 }
-                if(_needTiles || refreshTiles){
+                if(_needTiles || refreshLayers){
                     paintmap(buffer.getGraphics());
-                    refreshTiles = false;
+                    refreshLayers = false;
                 }
                 g.translate(-translateX, -translateY);
                 if(scaleX > 0){
@@ -464,7 +464,7 @@ public class MapComponent extends Container {
                     tile.setsTileReadyListener(new ActionListener() {
 
                         public void actionPerformed(ActionEvent evt) {
-                            refreshTiles = true;
+                            refreshLayers = true;
                             repaint();
                         }
                     });
@@ -549,6 +549,7 @@ public class MapComponent extends Container {
      */
     public void addLayer(Layer layer, int minZoomLevel, int maxZoomLevel) {
         _layers.addElement(new LayerWithZoomLevels(layer, minZoomLevel, maxZoomLevel));
+        refreshLayers = true;
         repaint();
     }
 
@@ -565,6 +566,7 @@ public class MapComponent extends Container {
             }
         }
         _layers.removeElementAt(no);
+        refreshLayers = true;
         repaint();
     }
     
@@ -573,6 +575,7 @@ public class MapComponent extends Container {
      */
     public void removeAllLayers() {
         _layers.removeAllElements();
+        refreshLayers = true;
         repaint();
     }
     
@@ -684,6 +687,7 @@ public class MapComponent extends Container {
         Tile tile = new Tile(dimension, projectedBBOX, null);
         _zoom = _map.maxZoomFor(tile);
         _center = tile.position(tile.dimension().getWidth() / 2, tile.dimension().getHeight() / 2);
+        _needTiles = true;
         repaint();
     }
 
