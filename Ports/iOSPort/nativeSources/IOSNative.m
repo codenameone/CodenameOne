@@ -716,10 +716,19 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
-    [d writeToFile:ns atomically:YES];
+    NSError *error = nil;
+    [d writeToFile:ns options:NSAtomicWrite error:&error];
+    if(error != nil) {
+        NSLog(@"Error writeToFile: %@ for the file %@", [error localizedDescription], ns);
+        [pool release];
+        return 1;
+    }
     [pool release];
     return 0;
 }
@@ -728,6 +737,9 @@ JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_S
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
@@ -798,10 +810,13 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(JAVA_OBJECT 
     NSFileManager* fm = [[NSFileManager alloc] init];
     const char* chrs = stringToUTF8(file);
     NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
     NSError *error = nil;
     [fm removeItemAtPath:ns error:&error];
     if(error != nil) {  
-        NSLog(@"Error in deleteFile: %@", [error localizedDescription]);        
+        NSLog(@"Error in deleteFile: %@ for the file %@", [error localizedDescription], ns);
     }
     [fm release];
     [pool release];
@@ -1989,10 +2004,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UIImage* i = [(GLUIImage*)imagePeer getImage];
     if(width == -1) {
-        width = (int)i.size.width;
+        float aspect = height / i.size.height;
+        width = (int)(i.size.width * aspect);
     }
     if(height == -1) {
-        height = (int)i.size.width;
+        float aspect = width / i.size.width;
+        height = (int)(i.size.height * aspect);
     }
     NSData* data;
     if(width != ((int)i.size.width) || height != ((int)i.size.height)) {

@@ -342,15 +342,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }        
     }
 
-    public Object createImage(InputStream i) throws IOException {
-        byte[] buffer = new byte[8192];
-        int size = i.read(buffer);
-        ByteArrayOutputStream bo = new ByteArrayOutputStream();
-        while(size > -1) {
-            bo.write(buffer, 0, size);
-            size = i.read(buffer);
+    private byte[] toByteArray(InputStream i) throws IOException {
+        if(i instanceof BufferedInputStream) {
+            InputStream inp = ((BufferedInputStream)i).getInternal();
+            if(inp instanceof NSDataInputStream) {
+                return ((NSDataInputStream)inp).getArray();
+            }
         }
-        buffer = bo.toByteArray();
+        return Util.readInputStream(i);
+    }
+    
+    public Object createImage(InputStream i) throws IOException {
+        byte[] buffer = toByteArray(i);
         return createImage(buffer, 0, buffer.length);
     }
 

@@ -34,8 +34,10 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import <CoreLocation/CoreLocation.h>
 #import "StoreKit/StoreKit.h"
+#import <AudioToolbox/AudioServices.h>
+#import <AVFoundation/AVFoundation.h>
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate> {
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate> {
 @private
     EAGLContext *context;
     GLuint program;

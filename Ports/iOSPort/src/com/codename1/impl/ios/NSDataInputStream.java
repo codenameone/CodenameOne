@@ -36,6 +36,10 @@ public class NSDataInputStream extends ByteArrayInputStream {
         super(read(file));
     }
     
+    public byte[] getArray() {
+        return buf;
+    }
+    
     private static byte[] read(String file) {
         byte[] b = new byte[IOSImplementation.nativeInstance.getFileSize(file)];
         IOSImplementation.nativeInstance.readFile(file, b);
