@@ -96,7 +96,7 @@ public class ImageDownloadService extends ConnectionRequest {
     public static void setAlwaysRevalidate(boolean aAlwaysRevalidate) {
         alwaysRevalidate = aAlwaysRevalidate;
     }
-
+        
     private Label parentLabel;
     private EncodedImage result;
     private Component targetList;
@@ -282,6 +282,7 @@ public class ImageDownloadService extends ConnectionRequest {
         i.toScale = toScale;
         i.placeholder = placeholderImage;
         i.setPriority(priority);
+        i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
     /**
@@ -397,6 +398,7 @@ public class ImageDownloadService extends ConnectionRequest {
         i.toScale = scale;
         i.placeholder = placeholderImage;
         i.setPriority(priority);
+        i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
 
@@ -486,6 +488,7 @@ public class ImageDownloadService extends ConnectionRequest {
         i.cacheId = cacheId;
         i.placeholder = placeholder;
         i.setPriority(priority);
+        i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
 
@@ -509,6 +512,7 @@ public class ImageDownloadService extends ConnectionRequest {
         ImageDownloadService i = new ImageDownloadService(url, callback);
         i.cacheImages = true;
         i.destinationFile = destFile;
+        i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
 
@@ -535,6 +539,7 @@ public class ImageDownloadService extends ConnectionRequest {
         ImageDownloadService i = new ImageDownloadService(url, callback);
         i.cacheImages = true;
         i.cacheId = cacheId;
+        i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
 
