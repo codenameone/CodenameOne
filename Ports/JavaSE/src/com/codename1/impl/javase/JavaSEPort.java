@@ -1999,7 +1999,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(int[] rgb, final int width, final int height) {
-        checkEDT();
         BufferedImage i = createTrackableBufferedImage(width, height);
         i.setRGB(0, 0, width, height, rgb, 0, width);
         if (perfMonitor != null) {
@@ -2031,7 +2030,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(String path) throws IOException {
-        checkEDT();
         if (exists(path)) {
             InputStream is = null;
             try {
@@ -2064,7 +2062,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(InputStream i) throws IOException {
-        checkEDT();
         try {
             BufferedImage b = ImageIO.read(i);
             if (perfMonitor != null) {
@@ -2119,7 +2116,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object createImage(byte[] bytes, int offset, int len) {
-        checkEDT();
         try {
             BufferedImage b = ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
             if (perfMonitor != null) {
