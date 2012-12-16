@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -444,6 +445,8 @@ public class ConnectionRequest implements IOProgressListener {
      * @return the cookie object
      */
     private Cookie parseCookieHeader(String h) {
+        String lowerH = h.toLowerCase();
+        
         Cookie c = new Cookie();
         int edge = h.indexOf(';');
         int equals = h.indexOf('=');
@@ -459,7 +462,7 @@ public class ConnectionRequest implements IOProgressListener {
             c.setValue(h.substring(equals + 1, edge));
         }
         
-        int index = h.indexOf("domain=");
+        int index = lowerH.indexOf("domain=");
         if (index != -1) {
             String domain = h.substring(index + 7);
             index = domain.indexOf(';');
@@ -476,6 +479,43 @@ public class ConnectionRequest implements IOProgressListener {
         } else {
             c.setDomain(Util.getImplementation().getURLDomain(url));
         }
+        
+        index = lowerH.indexOf("path=");
+        if (index != -1) {
+            String path = h.substring(index + 5);
+            index = path.indexOf(';');
+            if (index!=-1) {
+                path = path.substring(0, index);
+            }
+            
+            if (Util.getImplementation().getURLPath(url).indexOf(path) != 0) { //if (!hc.getHost().endsWith(domain)) {
+                System.out.println("Warning: Cookie tried to set to another path");
+                c.setPath(path);
+            } else {
+                // Don't set the path explicitly
+            }
+        } else {
+            // Don't set the path explicitly
+        }
+        
+        // Check for secure and httponly.
+        // SJH NOTE:  It would be better to rewrite this whole method to 
+        // split it up this way, rather than do the domain and path 
+        // separately.. but this is a patch job to just get secure
+        // path, and httponly working... don't want to break any existing
+        // code for now.
+        Vector parts = StringUtil.tokenizeString(lowerH, ';');
+        for ( int i=0; i<parts.size(); i++){
+            String part = (String) parts.elementAt(i);
+            part = part.trim();
+            if ( part.indexOf("secure") == 0 ){
+                c.setSecure(true);
+            } else if ( part.indexOf("httponly") == 0 ){
+                c.setHttpOnly(true);
+            }
+        }
+        
+        
 
         return c;
     }

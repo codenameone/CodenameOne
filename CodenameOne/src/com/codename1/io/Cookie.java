@@ -37,6 +37,10 @@ public class Cookie implements Externalizable {
     private String name;
     private String value;
     private String domain;
+    private String path="/";
+    private boolean secure=false;
+    private boolean httpOnly=false;
+    
     private long expires;
 
     private static boolean autoStored = true;
@@ -60,6 +64,30 @@ public class Cookie implements Externalizable {
         this.name = name;
     }
 
+    public void setSecure(boolean secure){
+        this.secure = secure;
+    }
+    
+    public boolean isSecure(){
+        return this.secure;
+    }
+    
+    public void setHttpOnly(boolean httpOnly){
+        this.httpOnly = httpOnly;
+    }
+    
+    public boolean isHttpOnly(){
+        return this.httpOnly;
+    }
+    
+    public void setPath(String path){
+        this.path = path;
+    }
+    
+    public String getPath(){
+        return this.path;
+    }
+    
     /**
      * @return the value
      */

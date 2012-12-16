@@ -57,6 +57,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
+
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -3355,6 +3356,25 @@ public abstract class CodenameOneImplementation {
         }
         return domain;
     }
+    
+    public String getURLPath(String url){
+        String path = url.substring(url.indexOf("//") + 2);
+        int i = path.indexOf('/');
+        if(i > -1) {
+            path = path.substring(i);
+        }
+        i = path.indexOf('?');
+        if ( i > -1 ){
+            path = path.substring(0, i);
+        }
+        
+        i = path.indexOf('#');
+        if ( i > -1 ){
+            path = path.substring(0, i);
+        }
+        
+        return path; 
+    }
 
     /**
      * Returns the cookies for this URL
@@ -3367,7 +3387,17 @@ public abstract class CodenameOneImplementation {
         if (Cookie.isAutoStored()) {
             cookies = (Hashtable) Storage.getInstance().readObject(Cookie.STORAGE_NAME);
         }
-
+        
+        String protocol = "";
+        int pos = -1;
+        if ( (pos = url.indexOf(":")) >= 0 ){
+            protocol = url.substring(0, pos);
+        }
+        boolean isHttp = ("http".equals(protocol) || "https".equals(protocol) );
+        boolean isSecure = "https".equals(protocol);
+        String path = getURLPath(url);
+                
+        
         if(cookies != null && cookies.size() > 0) {
             String domain = getURLDomain(url);
             Enumeration e = cookies.keys();
@@ -3381,7 +3411,17 @@ public abstract class CodenameOneImplementation {
                             response = new Vector();
                         }
                         while (enumCookies.hasMoreElements()) {
-                            response.addElement(enumCookies.nextElement());
+                            Cookie nex = (Cookie)enumCookies.nextElement();
+                            if ( nex.isHttpOnly() && !isHttp ){
+                                continue;
+                            }
+                            if ( nex.isSecure() && !isSecure ){
+                                continue;
+                            }
+                            if ( path.indexOf(nex.getPath()) != 0 ){
+                                continue;
+                            }
+                            response.addElement(nex);
                         }
                     }
                 }
