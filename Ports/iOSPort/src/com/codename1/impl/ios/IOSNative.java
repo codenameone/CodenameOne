@@ -120,6 +120,7 @@ final class IOSNative {
     native void restoreMinimizedApplication();
 
     native void lockOrientation(boolean portrait);
+    native void unlockOrientation();
 
     native void vibrate(int duration);
 

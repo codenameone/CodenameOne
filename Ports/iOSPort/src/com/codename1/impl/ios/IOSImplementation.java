@@ -1621,7 +1621,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean canForceOrientation() {
-        return super.canForceOrientation();
+        return true;
     }
 
     /*@Override
@@ -2143,6 +2143,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void lockOrientation(boolean portrait) {
         nativeInstance.lockOrientation(portrait);
+    }
+
+    @Override
+    public void unlockOrientation() {
+        nativeInstance.unlockOrientation();
     }
 
     @Override

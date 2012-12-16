@@ -3051,6 +3051,12 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * This is the reverse method for lock orientation allowing orientation lock to be disabled
+     */
+    public void unlockOrientation() {   
+    }
+
+    /**
      * An implementation can return true if it supports embedding a native browser widget
      *
      * @return true if the implementation supports embedding a native browser widget

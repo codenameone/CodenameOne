@@ -2566,6 +2566,13 @@ public final class Display {
     }
 
     /**
+     * This is the reverse method for lock orientation allowing orientation lock to be disabled
+     */
+    public void unlockOrientation() {
+        impl.unlockOrientation();
+    }
+    
+    /**
      * Indicates whether the device is a tablet, notice that this is often a guess
      *
      * @return true if the device is assumed to be a tablet
