@@ -501,15 +501,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     
                     
-                    for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
-                        JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
-                        if(m.isPopupMenuVisible()){
-                            JPopupMenu pop = m.getPopupMenu();
-                            pop.getInvoker().getX();
-                            g.translate(pop.getInvoker().getX(), 0);
-                            pop.update(g);
-                            g.translate(-pop.getInvoker().getX(), 0);
-                        }                        
+                    if(window.getJMenuBar() != null) {
+                        for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
+                            JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
+                            if(m.isPopupMenuVisible()){
+                                JPopupMenu pop = m.getPopupMenu();
+                                pop.getInvoker().getX();
+                                g.translate(pop.getInvoker().getX(), 0);
+                                pop.update(g);
+                                g.translate(-pop.getInvoker().getX(), 0);
+                            }                        
+                        }
                     }
                 }
                 g.dispose();
