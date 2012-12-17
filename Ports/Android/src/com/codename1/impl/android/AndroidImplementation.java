@@ -1645,8 +1645,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         final File temp = File.createTempFile("mtmp", "dat");
-        temp.deleteOnExit();
-        FileOutputStream out = new FileOutputStream(temp);
+        FileOutputStream out = new FileOutputStream(temp){
+
+            public void close() throws IOException {
+                super.close();
+                temp.delete();
+            }
+        };
+       
         byte buf[] = new byte[256];
         int len = 0;
         while ((len = stream.read(buf, 0, buf.length)) > -1) {
