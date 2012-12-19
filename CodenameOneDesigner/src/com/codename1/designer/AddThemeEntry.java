@@ -166,20 +166,24 @@ public class AddThemeEntry extends javax.swing.JPanel {
         initComponents();
         
         trueTypeFontSizeValue.setModel(new SpinnerNumberModel(12.0, 5, 200, 0.5));
-        String[] fontFiles = ResourceEditorView.getLoadedFile().getParentFile().list(new FilenameFilter() {
-            @Override
-            public boolean accept(File file, String string) {
-                return string.endsWith(".ttf");
+        if(ResourceEditorView.getLoadedFile() != null) {
+            String[] fontFiles = ResourceEditorView.getLoadedFile().getParentFile().list(new FilenameFilter() {
+                @Override
+                public boolean accept(File file, String string) {
+                    return string.endsWith(".ttf");
+                }
+            });
+            if(fontFiles == null) {
+                fontFiles = new String[0];
+            } else {
+                String[] arr = new String[fontFiles.length + 1];
+                System.arraycopy(fontFiles, 0, arr, 1, fontFiles.length);
+                fontFiles = arr;
             }
-        });
-        if(fontFiles == null) {
-            fontFiles = new String[0];
+            trueTypeFont.setModel(new DefaultComboBoxModel(fontFiles));
         } else {
-            String[] arr = new String[fontFiles.length + 1];
-            System.arraycopy(fontFiles, 0, arr, 1, fontFiles.length);
-            fontFiles = arr;
+            trueTypeFont.setModel(new DefaultComboBoxModel(new String[0]));
         }
-        trueTypeFont.setModel(new DefaultComboBoxModel(fontFiles));
         
         try {
             help.setPage(getClass().getResource("/help/themePropertyHelp.html"));
@@ -825,10 +829,8 @@ public class AddThemeEntry extends javax.swing.JPanel {
             }
         }
         if(!deriveBackground.isSelected()) {
-            // scaled image is the default so there is no need to define the bgType
-            if(backgroundType.getSelectedIndex() != 0) {
-                themeRes.put(uiid + "bgType", new Byte(BACKGROUND_VALUES[backgroundType.getSelectedIndex()]));
-            }
+            int index = backgroundType.getSelectedIndex();
+            themeRes.put(uiid + "bgType", new Byte(BACKGROUND_VALUES[index]));
             if(backgroundType.getSelectedIndex() >= BACKGROUND_VALUES_GRADIENT_ARRAY_OFFSET) {
                 // this is a gradient related type
                 themeRes.put(uiid + "bgGradient", new Object[] {
