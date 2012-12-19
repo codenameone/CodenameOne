@@ -2607,7 +2607,7 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
                     toNSString(domain), NSHTTPCookieDomain,
                     toNSString(path), NSHTTPCookiePath,
                     (secure ? @"1" : @""), NSHTTPCookieSecure,
-                    NSHTTPCookieExpires, [NSDate dateWithTimeIntervalSince1970:expires], Nil];
+                    [NSDate dateWithTimeIntervalSince1970:expires], NSHTTPCookieExpires, Nil];
     NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties: stringProps];
     [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
 
