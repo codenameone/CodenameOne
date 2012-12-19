@@ -46,8 +46,10 @@ public class DateTimeSpinner extends TimeSpinner {
             date = Spinner.createDate(startDate.getTime(), endDate.getTime(), currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);
             if(includeYear) {
                 date.setRenderingPrototype("XXX XXX 99 9999");
+                ((DateTimeRenderer)date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD_YY);
             } else {
                 date.setRenderingPrototype("XXX XXX 99");
+                ((DateTimeRenderer)date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD);
             }
             if(markToday) {
                 ((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime());
