@@ -1083,6 +1083,10 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(JAVA_OBJECT inst
     //XMLVM_END_WRAPPER
 }
 
+void com_codename1_impl_ios_IOSNative_unlockOrientation__(JAVA_OBJECT instanceObject)
+{
+    orientationLock = 0;
+}
 
 extern void vibrateDevice();
 void com_codename1_impl_ios_IOSNative_vibrate___int(JAVA_OBJECT instanceObject, JAVA_INT duration) {
