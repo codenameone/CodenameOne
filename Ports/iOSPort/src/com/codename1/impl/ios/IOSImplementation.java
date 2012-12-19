@@ -78,8 +78,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.codename1.io.Cookie;
 
 /**
  *
@@ -166,6 +165,26 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean isTablet() {
         return nativeInstance.isTablet();
     }
+    
+    @Override
+    public void addCookie(Cookie c) {
+        nativeInstance.addCookie(c.getName(), c.getValue(), c.getDomain(), c.getPath(), c.isSecure(), c.isHttpOnly(), c.getExpires());
+    }
+
+    @Override
+    public void addCookie(Cookie[] cookiesArray) {
+        int len = cookiesArray.length;
+        for(int i = 0 ; i < len ; i++){
+            addCookie(cookiesArray[i]);
+        }
+    }
+
+    @Override
+    public Vector getCookiesForURL(String url) {
+        Vector v = new Vector();
+        nativeInstance.getCookiesForURL(url, v);
+        return v;
+    }    
     
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
         /*if(cmp.getAbsoluteY() > getDisplayHeight() / 3) {
@@ -1232,7 +1251,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
             } else {
                 try {
-                    byte[] data = Util.readInputStream(stream);
+                    byte[] data = toByteArray(stream);
                     Util.cleanup(stream);
                     moviePlayerPeer = nativeInstance.createVideoComponent(data);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });

@@ -1128,6 +1128,26 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
 }
 
+- (BOOL)shouldAutorotate {
+    UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];    
+    switch (orientationLock) {
+        case 0:
+            return YES;
+            
+        case 1:
+            if(interfaceOrientation == UIInterfaceOrientationPortrait) {
+                return YES;
+            }
+            return NO;
+            
+        default:
+            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
+                return YES;
+            }
+    }
+    return NO;
+}
+
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
     switch (orientationLock) {

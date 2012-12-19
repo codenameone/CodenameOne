@@ -2566,3 +2566,51 @@ void com_codename1_impl_ios_IOSNative_log___java_lang_String(JAVA_OBJECT instanc
     NSLog(toNSString(name));
     [pool release];
 }
+
+void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_util_Vector(JAVA_OBJECT receiver, JAVA_OBJECT urlStr, JAVA_OBJECT outVector) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSHTTPCookieStorage *cstore = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+
+    NSURL *url = [NSURL URLWithString:toNSString(urlStr)];
+    NSArray *cookies = [cstore cookiesForURL:url];
+    int count = cookies.count;
+    for(int iter = 0 ; iter < count ; iter++) {
+        NSHTTPCookie *cookie = [cookies objectAtIndex:iter];
+        java_lang_String* name = xmlvm_create_java_string([cookie name].UTF8String);
+        java_lang_String* domain = xmlvm_create_java_string([cookie domain].UTF8String);
+        java_lang_String* path = xmlvm_create_java_string([cookie path].UTF8String);
+        java_lang_String* value = xmlvm_create_java_string([cookie value].UTF8String);
+        JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970];
+        JAVA_BOOLEAN secure = [cookie isSecure];
+        JAVA_BOOLEAN httpOnly = [cookie isHTTPOnly];
+
+        JAVA_OBJECT jcookie = __NEW_INSTANCE_com_codename1_io_Cookie();
+        com_codename1_io_Cookie_setName___java_lang_String(jcookie, name);
+        com_codename1_io_Cookie_setSecure___boolean(jcookie, secure);
+        com_codename1_io_Cookie_setHttpOnly___boolean(jcookie, httpOnly);
+        com_codename1_io_Cookie_setPath___java_lang_String(jcookie, path);
+        com_codename1_io_Cookie_setValue___java_lang_String(jcookie, value);
+        com_codename1_io_Cookie_setDomain___java_lang_String(jcookie, domain);
+        com_codename1_io_Cookie_setExpires___long(jcookie, expires);
+
+        java_util_Vector_add___java_lang_Object(outVector, jcookie);
+    }
+
+    [pool release];
+}
+
+void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_String_java_lang_String_java_lang_String_boolean_boolean_long(JAVA_OBJECT receiver, JAVA_OBJECT key, JAVA_OBJECT value,JAVA_OBJECT domain, JAVA_OBJECT path, JAVA_BOOLEAN secure, JAVA_BOOLEAN httpOnly, JAVA_LONG expires) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSDictionary *stringProps = [[NSDictionary alloc] initWithObjectsAndKeys:
+                    toNSString(key), NSHTTPCookieName,
+                    toNSString(value), NSHTTPCookieValue,
+                    toNSString(domain), NSHTTPCookieDomain,
+                    toNSString(path), NSHTTPCookiePath,
+                    (secure ? @"1" : @""), NSHTTPCookieSecure,
+                    NSHTTPCookieExpires, [NSDate dateWithTimeIntervalSince1970:expires], Nil];
+    NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties: stringProps];
+    [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
+
+    [pool release];
+}
+

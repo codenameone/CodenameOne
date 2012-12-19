@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
 import com.codename1.payment.Product;
+import java.util.Vector;
 
 /**
  * Abstraction of the underlying native API's
@@ -342,4 +343,7 @@ final class IOSNative {
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);
+
+    native void addCookie(String key, String value, String domain, String path, boolean secure, boolean httpOnly, long expires);
+    native void getCookiesForURL(String url, Vector out);
 }
