@@ -4481,7 +4481,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneCalendar.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneCalendar.setText("Calendar");
-        codenameOneCalendar.setToolTipText("<html><body><b>Tabs</b><br> \n<p>\nTabs is a type of container that arranges the components/containers within it in named tabs<br>\nallowing the user to page or swipe between them. \n</p> </body> </html>"); // NOI18N
+        codenameOneCalendar.setToolTipText("<html><body><b>Calendar</b><br> \n<p>\nThe calendar component contains a month view and ability to select a specific day within<br>\nsaid view. It is very good for feature phones but on touch devices you might be better off<br>\nusing a date spinner.\n</p> </body> </html>"); // NOI18N
         codenameOneCalendar.setBorder(null);
         codenameOneCalendar.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneCalendar.setName("codenameOneCalendar"); // NOI18N
@@ -4919,6 +4919,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == embedContainer) {
                 UserInterfaceEditor.this.embedContainerActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneCalendar) {
+                UserInterfaceEditor.this.codenameOneCalendarActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneTable) {
                 UserInterfaceEditor.this.codenameOneTableActionPerformed(evt);
             }
@@ -5002,9 +5005,6 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneCalendar) {
-                UserInterfaceEditor.this.codenameOneCalendarActionPerformed(evt);
             }
         }
 

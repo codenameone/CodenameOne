@@ -376,7 +376,7 @@
                                           <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                         </Property>
                                         <Property name="text" type="java.lang.String" value="Calendar"/>
-                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Tabs&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Tabs is a type of container that arranges the components/containers within it in named tabs&lt;br&gt;&#xa;allowing the user to page or swipe between them. &#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Calendar&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;The calendar component contains a month view and ability to select a specific day within&lt;br&gt;&#xa;said view. It is very good for feature phones but on touch devices you might be better off&lt;br&gt;&#xa;using a date spinner.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                         <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                           <Border info="null"/>
                                         </Property>
