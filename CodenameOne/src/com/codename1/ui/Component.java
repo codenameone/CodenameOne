@@ -4011,6 +4011,11 @@ public class Component implements Animation, StyleListener {
                             g.fillRect(x, y, width, height, s.getBgTransparency());
                             g.drawImage(s.getBgImage(), x + width - iW, y + (height - iH));
                             return;
+                        case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                        case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                        case Style.BACKGROUND_GRADIENT_RADIAL:
+                            drawGradientBackground(s, g, x, y, width, height);
+                            return;
                     }
                 }
             }
