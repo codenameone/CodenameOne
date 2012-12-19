@@ -755,11 +755,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OB
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
     NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
     NSFileManager *man = [[NSFileManager alloc] init];
     NSError *error = nil;
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
     if(error != nil) {  
-        NSLog(@"Error getFileSize: %@", [error localizedDescription]);        
+        NSLog(@"Error getFileSize: %@ for the file %@", [error localizedDescription], ns);        
     }
     UInt32 result = [attrs fileSize];
     [man release];
