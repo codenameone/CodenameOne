@@ -3066,6 +3066,16 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Some platforms require that you enable pinch to zoom explicitly. This method has no
+     * effect if pinch to zoom isn't supported by the platform
+     * 
+     * @param browserPeer browser instance
+     * @param e true to enable pinch to zoom, false to disable it
+     */
+    public void setPinchToZoomEnabled(PeerComponent browserPeer, boolean e) {
+    }
+    
+    /**
      * If the implementation supports the creation of a browser component it should be returned in this
      * method
      *

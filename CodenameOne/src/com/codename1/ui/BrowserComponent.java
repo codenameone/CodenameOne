@@ -146,6 +146,16 @@ public class BrowserComponent extends Container {
     }
 
     /**
+     * Some platforms require that you enable pinch to zoom explicitly. This method has no
+     * effect if pinch to zoom isn't supported by the platform
+     * 
+     * @param e true to enable pinch to zoom, false to disable it
+     */
+    public void setPinchToZoomEnabled(boolean e) {
+        Display.getInstance().getImplementation().setPinchToZoomEnabled(internal, e);
+    }
+
+    /**
      * Shows the given HTML in the native viewer
      *
      * @param html HTML web page

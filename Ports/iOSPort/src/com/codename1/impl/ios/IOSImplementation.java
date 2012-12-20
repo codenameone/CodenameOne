@@ -2047,6 +2047,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void setPinchToZoomEnabled(PeerComponent browserComponent, boolean e) {
+        nativeInstance.setPinchToZoomEnabled(get(browserComponent), e);
+    }
+
+    @Override
     public boolean isOpaque(Image codenameOneImage, Object nativeImage) {
         // TODO
         return super.isOpaque(codenameOneImage, nativeImage);

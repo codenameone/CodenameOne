@@ -1099,7 +1099,7 @@ void com_codename1_impl_ios_IOSNative_vibrate___int(JAVA_OBJECT instanceObject, 
 // Peer Component methods
 
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
         CGSize s = [v sizeThatFits:CGSizeMake(w, h)];
@@ -1399,6 +1399,17 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
         
         // passing anything other than nil crashes the app, no idea why???
         [w loadHTMLString:toNSString(html) baseURL:nil];
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setBrowserPage___long_boolean(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIWebView* w = (UIWebView*)peer;
+        
+        w.scalesPageToFit=enabled;
+        
         [pool release];
     });
 }
