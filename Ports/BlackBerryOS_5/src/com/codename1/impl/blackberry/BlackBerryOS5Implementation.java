@@ -69,12 +69,7 @@ import net.rim.device.api.system.DeviceInfo;
 import net.rim.device.api.system.EventInjector;
 import net.rim.device.api.system.JPEGEncodedImage;
 import net.rim.device.api.system.PNGEncodedImage;
-import net.rim.device.api.ui.Field;
-import net.rim.device.api.ui.Font;
-import net.rim.device.api.ui.FontFamily;
-import net.rim.device.api.ui.FontManager;
-import net.rim.device.api.ui.Keypad;
-import net.rim.device.api.ui.UiApplication;
+import net.rim.device.api.ui.*;
 
 /**
  * Implementation class for newer blackberry devices
@@ -150,6 +145,14 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             ue.setAcceptableDirections(net.rim.device.api.system.Display.DIRECTION_LANDSCAPE);
         }
     }
+
+    public void unlockOrientation() {
+        net.rim.device.api.ui.UiEngineInstance ue;
+        ue = net.rim.device.api.ui.Ui.getUiEngineInstance();
+        ue.setAcceptableDirections(net.rim.device.api.system.Display.DIRECTION_PORTRAIT | net.rim.device.api.system.Display.DIRECTION_LANDSCAPE);        
+    }
+    
+    
 
     public boolean isNativeBrowserComponentSupported() {
         return BlackBerryImplementation.nativeBrowser;
@@ -482,10 +485,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
 	}
         
         
-    public CodeScanner getCodeScanner() {
-        
-        systemOut("AdvancedMultimediaManager");
-
+    public CodeScanner getCodeScanner() {        
         return new CodeScannerImpl(new AdvancedMultimediaManager());
     }
         
