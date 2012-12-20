@@ -2351,6 +2351,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);        
         }
     }
+
+    public void unlockOrientation() {
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+    }
+    
+    
     
     public boolean isAffineSupported() {
         return true;
