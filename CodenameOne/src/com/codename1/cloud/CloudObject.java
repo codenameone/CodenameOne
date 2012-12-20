@@ -85,17 +85,17 @@ public final class CloudObject implements Externalizable {
     public static final int ACCESS_PUBLIC = 1;
 
     /**
-     * A world visible/modifiable object!
+     * A world visible object! Can only be modified by its creator.
      */
     public static final int ACCESS_PUBLIC_READ_ONLY = 2;
 
     /**
-     * A world visible/modifiable object!
+     * An application visible/modifiable object!
      */
     public static final int ACCESS_APPLICATION = 3;
 
     /**
-     * A world visible object! Can only be modified by its creator
+     * An application scope readable object! Can only be modified by its creator
      */
     public static final int ACCESS_APPLICATION_READ_ONLY = 4;
     

@@ -109,6 +109,7 @@ import java.awt.TextComponent;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
+import java.awt.event.WindowAdapter;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -178,6 +179,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
 
+    private TestRecorder testRecorder;
+    
     /**
      * @return the showEDTWarnings
      */
@@ -630,7 +633,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
             }
-            JavaSEPort.this.keyPressed(getCode(e));
+            int code = getCode(e);
+            if(testRecorder != null) {
+                testRecorder.eventKeyPressed(code);
+            }
+            JavaSEPort.this.keyPressed(code);
         }
 
         public void keyReleased(KeyEvent e) {
@@ -638,7 +645,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
             }
-            JavaSEPort.this.keyReleased(getCode(e));
+            int code = getCode(e);
+            if(testRecorder != null) {
+                testRecorder.eventKeyReleased(code);
+            }
+            JavaSEPort.this.keyReleased(code);
         }
 
         public void mouseClicked(MouseEvent e) {
@@ -668,6 +679,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
+                        if(testRecorder != null) {
+                            testRecorder.eventPointerPressed(x, y);
+                        }
                         JavaSEPort.this.pointerPressed(x, y);
                     }
                 } else {
@@ -695,7 +709,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 }
                             }
                             triggeredKeyCode = keyCode;
-                            JavaSEPort.this.keyPressed(getCode(keyCode.intValue()));
+                            int code = getCode(keyCode.intValue());
+                            if(testRecorder != null) {
+                                testRecorder.eventKeyPressed(code);
+                            }
+                            JavaSEPort.this.keyPressed(code);
                         }
                     }
                 }
@@ -710,11 +728,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
+                        if(testRecorder != null) {
+                            testRecorder.eventPointerReleased(x, y);
+                        }
                         JavaSEPort.this.pointerReleased(x, y);
                     }
                 }
                 if (triggeredKeyCode != null) {
-                    JavaSEPort.this.keyReleased(getCode(triggeredKeyCode.intValue()));
+                    int code = getCode(triggeredKeyCode.intValue());
+                    if(testRecorder != null) {
+                        testRecorder.eventKeyReleased(code);
+                    }
+                    JavaSEPort.this.keyReleased(code);
                     triggeredKeyCode = null;
                 }
             }
@@ -735,6 +760,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     if (touchDevice) {
+                        if(testRecorder != null && hasDragStarted(x, y)) {
+                            testRecorder.eventPointerDragged(x, y);
+                        }
                         JavaSEPort.this.pointerDragged(x, y);
                     }
                 } else {
@@ -742,6 +770,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     x = Math.max(x, 0);
                     y = Math.min(y, getDisplayHeightImpl());
                     y = Math.max(y, 0);
+                    if(testRecorder != null) {
+                        testRecorder.eventPointerReleased(x, y);
+                    }
                     JavaSEPort.this.pointerReleased(x, y);
                     releaseLock = true;
                 }
@@ -1212,6 +1243,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             simulatorMenu.add(networkMonitor);
 
+            JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
+            testRecorderMenu.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    if (testRecorder == null) {
+                        showTestRecorder();
+                    }
+                }
+            });
+            simulatorMenu.add(testRecorderMenu);
+            
             JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
             performanceMonitor.addActionListener(new ActionListener() {
                 @Override
@@ -1437,6 +1480,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void showTestRecorder() {
+        if(testRecorder == null) {
+            testRecorder = new TestRecorder();
+            testRecorder.pack();
+            testRecorder.setLocationByPlatform(true);
+            testRecorder.setVisible(true);
+            testRecorder.addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent e) {
+                    testRecorder = null;
+                }
+            });
+        }
+    }
+    
     private void showNetworkMonitor() {
         if (netMonitor == null) {
             netMonitor = new NetworkMonitor();
@@ -1501,7 +1558,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
     }
-
+    
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
@@ -1845,7 +1902,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void actionPerformed(ActionEvent e) {
-                Display.getInstance().onEditingComplete(cmp, getText(tf));
+                String txt = getText(tf);
+                if(testRecorder != null) {
+                    testRecorder.editTextFieldCompleted(cmp, txt);
+                }
+                Display.getInstance().onEditingComplete(cmp, txt);
                 if (tf instanceof java.awt.TextField) {
                     ((java.awt.TextField) tf).removeActionListener(this);
                 }
@@ -4125,6 +4186,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void deinitialize() {
             super.deinitialize();
+            if(testRecorder != null) {
+                testRecorder.dispose();
+                testRecorder = null;
+            }
             SwingUtilities.invokeLater(new Runnable() {
 
                 @Override
