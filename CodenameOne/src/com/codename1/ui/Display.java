@@ -810,10 +810,10 @@ public final class Display {
         com.codename1.ui.VirtualKeyboard vkb = new com.codename1.ui.VirtualKeyboard();
         INSTANCE.registerVirtualKeyboard(vkb);
         try {
-            synchronized(lock){
-                // when there is no current form the EDT is useful only
-                // for features such as call serially
-                while(impl.getCurrentForm() == null) {
+            // when there is no current form the EDT is useful only
+            // for features such as call serially
+            while(impl.getCurrentForm() == null) {
+                synchronized(lock){
                     if(shouldEDTSleep()) {
                         lock.wait();
                     }
@@ -824,8 +824,8 @@ public final class Display {
                         paintTransitionAnimation();
                         continue;
                     }
-                    processSerialCalls();
                 }
+                processSerialCalls();
             }
         } catch(Throwable err) {
             err.printStackTrace();

@@ -2297,15 +2297,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return new Dimension();
             }
             int[] p = new int[2];
-            p[0] = -1;
-            p[1] = -1;
             nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
-            while(p[0] < 0 || p[1] < 0) {
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException ex) {
-                }
-            }
             return new Dimension(p[0], p[1]);
         }
 

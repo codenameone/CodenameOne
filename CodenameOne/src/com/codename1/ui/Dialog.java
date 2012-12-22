@@ -1226,6 +1226,18 @@ public class Dialog extends Form {
      * @param modal whether the dialog should be modal or modaless
      * @return the command selected if the dialog is modal and disposed via a command
      */
+    public Command showStretched(String position, boolean modal) {
+        return showPackedImpl(position, modal, true);
+    }
+
+    /**
+     * Convenience method to show a dialog stretched to one of the sides
+     * 
+     * @param position one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+     * @param modal whether the dialog should be modal or modaless
+     * @return the command selected if the dialog is modal and disposed via a command
+     * @deprecated due to typo use showStretched instead
+     */
     public Command showStetched(String position, boolean modal) {
         return showPackedImpl(position, modal, true);
     }
