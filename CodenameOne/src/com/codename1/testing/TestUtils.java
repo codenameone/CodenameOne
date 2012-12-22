@@ -22,7 +22,6 @@
  */
 package com.codename1.testing;
 
-import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.Button;
@@ -288,7 +287,7 @@ public class TestUtils {
         try {
             ImageIO io = ImageIO.getImageIO();
             if(io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                Log.p("screenshot test skipped due to no image IO support for PNG format", Log.WARNING);
+                log("screenshot test skipped due to no image IO support for PNG format");
                 return true;
             }
             
@@ -302,7 +301,7 @@ public class TestUtils {
                 orig = null;
                 for(int iter = 0 ; iter < rgba.length ; iter++) {
                     if(rgba[iter] != origRgba[iter]) {
-                        Log.p("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail", Log.ERROR);
+                        log("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail");
                         io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
                         return false;
                     }
@@ -312,10 +311,27 @@ public class TestUtils {
             }
             return true;
         } catch(IOException err) {
-            Log.e(err);
+            log(err);
             return false;
         }
     }
+
+    /**
+     * Log to the test log
+     * @param t the string to log
+     */
+    public static void log(String t) {
+        TestReporting.getInstance().logMessage(t);
+    }
+    
+    /**
+     * Log to the test log
+     * @param t exception to log
+     */
+    public static void log(Throwable t) {
+        TestReporting.getInstance().logException(t);
+    }
+    
 
     /**
      * Simulates a device key press

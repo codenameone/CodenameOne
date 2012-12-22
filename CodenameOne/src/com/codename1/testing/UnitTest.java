@@ -37,7 +37,7 @@ public interface UnitTest {
      * @throws Exception thrown if it failed
      */
     public boolean runTest() throws Exception;
-    
+        
     /**
      * Prepares the unit test for execution
      */

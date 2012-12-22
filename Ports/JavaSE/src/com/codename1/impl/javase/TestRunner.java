@@ -22,9 +22,9 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.testing.TestReporting;
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.StringTokenizer;
@@ -147,16 +147,13 @@ public class TestRunner {
 
             if(cleanMode) {
                 for(String currentTestClass : tests) {
-                    System.out.println("Executing " + currentTestClass);
                     ClassLoader ldr = new ClassPathLoader(files);
                     Class c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
                     Method m = c.getDeclaredMethod("runTest", String.class, String.class, Boolean.TYPE);
                     Boolean passed = (Boolean)m.invoke(null, mainClass, currentTestClass, quietMode);
                     if(passed.booleanValue()) {
-                        System.out.println(currentTestClass + " passed!");
                         passedTests++;
                     } else {
-                        System.out.println(currentTestClass + " failed!");
                         failedTests++;
                         if(stopOnFail) {
                             System.exit(100);
@@ -168,7 +165,6 @@ public class TestRunner {
                 ClassLoader ldr = new ClassPathLoader(files);
                 Class c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
                 for(String currentTestClass : tests) {
-                    System.out.println("Executing " + currentTestClass);
                     Method m = c.getDeclaredMethod("runTest", String.class, String.class, Boolean.TYPE);
                     Boolean passed = (Boolean)m.invoke(null, mainClass, currentTestClass, quietMode);
                     if(passed.booleanValue()) {
@@ -184,6 +180,7 @@ public class TestRunner {
                     }
                 }
             }      
+            TestReporting.getInstance().testExecutionFinished();
             if(failedTests > 0) {
                 System.out.println("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
             } else {

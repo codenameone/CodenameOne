@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.io.Log;
+import com.codename1.testing.TestReporting;
 import com.codename1.testing.UnitTest;
 import com.codename1.ui.Display;
 import java.util.Timer;
@@ -53,7 +53,7 @@ public class TestExecuter {
                         main.getClass().getMethod("start").invoke(main);
                     } catch(Exception err) {
                         failed = true;
-                        Log.e(err);
+                        TestReporting.getInstance().logException(err);
                     }
                 }
             });
@@ -64,12 +64,13 @@ public class TestExecuter {
                     Display.getInstance().callSeriallyAndWait(new Runnable() {
                         public void run() {
                             try {
+                                TestReporting.getInstance().startingTestCase(test);
                                 test.prepare();
                                 failed = !test.runTest();
                                 test.cleanup();
                             } catch(Exception err) {
                                 failed = true;
-                                Log.e(err);
+                                TestReporting.getInstance().logException(err);
                             }
                         }
                     }, timeout);
@@ -78,7 +79,7 @@ public class TestExecuter {
                     final Thread currentThread = Thread.currentThread();
                     TimerTask timeoutTask = new TimerTask() {
                         public void run() {
-                            Log.p("Test timeout occured: " + timeout + " milliseconds");
+                            TestReporting.getInstance().logMessage("Test timeout occured: " + timeout + " milliseconds");
                             failed = true;
                             currentThread.stop();
                         }
@@ -87,11 +88,12 @@ public class TestExecuter {
                     test.prepare();
                     failed = !test.runTest();
                     test.cleanup();
+                    TestReporting.getInstance().finishedTestCase(test, !failed);
                     timeoutTask.cancel();
                 }
             } catch(Exception err) {
                 failed = true;
-                Log.e(err);
+                TestReporting.getInstance().logException(err);
             }
             Display.deinitialize();
             for(java.awt.Frame f : java.awt.Frame.getFrames()) {

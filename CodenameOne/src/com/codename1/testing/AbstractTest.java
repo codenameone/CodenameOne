@@ -22,9 +22,7 @@
  */
 package com.codename1.testing;
 
-import com.codename1.io.Log;
 import com.codename1.ui.Component;
-import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 
@@ -178,13 +176,21 @@ public abstract class AbstractTest implements UnitTest {
     }
     
     /**
-     * A "shortcut" for Log.p(String)
-     * @param t the string to log
+     * This method just invokes the test utils method, it is here for convenience
+     * @see TestUtils
      */
     public void log(String t) {
-        Log.p(t);
+        TestUtils.log(t);
     }
 
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     * @see TestUtils
+     */
+    public void log(Throwable t) {
+        TestUtils.log(t);
+    }
+    
     /**
      * This method just invokes the test utils method, it is here for convenience
      * @see TestUtils
