@@ -66,7 +66,7 @@ public class NSDataInputStream extends InputStream {
         if(offset + len > length) {
             len = length - offset;
         }
-        IOSImplementation.nativeInstance.read(nsData, b, off, length, offset);
+        IOSImplementation.nativeInstance.read(nsData, b, off, len, offset);
         return len;
     }
 
@@ -114,6 +114,7 @@ public class NSDataInputStream extends InputStream {
     public void close() {
         if(nsData != 0) {
             IOSImplementation.nativeInstance.releasePeer(nsData);
+            nsData = 0;
         }        
     }
         
