@@ -971,6 +971,7 @@ public class Resources {
         int bestFitDPI = 0;
         int[] lengths = new int[dpiCount];
         int[] dpis = new int[dpiCount];
+        boolean found = false;
         for(int iter = 0 ; iter < dpiCount ; iter++) {
             int currentDPI = input.readInt();
             lengths[iter] = input.readInt();
@@ -978,9 +979,22 @@ public class Resources {
             if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
                 bestFitDPI = currentDPI;
                 bestFitOffset = iter;
+                found = true;
             }
         }
-
+        if(!found) {
+            // special case for low DPI devices when running with high resolution resources
+            // we want to pick the loweset resolution possible
+            bestFitDPI = dpis[0];
+            bestFitOffset = 0;
+            for(int iter = 1 ; iter < dpiCount ; iter++) {
+                if(dpis[iter] < bestFitDPI) {
+                    bestFitDPI = dpis[iter];
+                    bestFitOffset = iter;
+                }
+            }
+        }
+        
         if(runtimeMultiImages && !skipAll) {
             byte[][] data = new byte[dpiCount][];
             for(int iter = 0 ; iter < lengths.length ; iter++) {
