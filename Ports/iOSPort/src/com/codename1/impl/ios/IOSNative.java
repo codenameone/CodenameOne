@@ -300,6 +300,10 @@ final class IOSNative {
     native int getNSDataSize(long nsData);
     native void nsDataToByteArray(long nsData, byte[] data);
 
+    native long createNSData(String file);
+    native int read(long nsData, int pointer);
+    native void read(long nsData, byte[] destination, int offset, int length, int pointer);
+    
     native boolean sqlDbExists(String name);
     native long sqlDbCreateAndOpen(String name);
     native void sqlDbDelete(String name);

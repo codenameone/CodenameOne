@@ -31,19 +31,90 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-public class NSDataInputStream extends ByteArrayInputStream {
+public class NSDataInputStream extends InputStream {
+    private long nsData;
+    private int offset = 0;
+    private int length;
+    private int markOffset = 0;
     public NSDataInputStream(String file) {
-        super(read(file));
+        nsData = IOSImplementation.nativeInstance.createNSData(file);
+        length = IOSImplementation.nativeInstance.getNSDataSize(nsData);
+    }
+
+    @Override
+    public int available() throws IOException {
+        return length - offset;
+    }
+
+    @Override
+    public int read(byte[] b) throws IOException {
+        return read(b, 0, b.length);
     }
     
-    public byte[] getArray() {
-        return buf;
+    byte[] getArray() {
+        byte[] bytes = new byte[length];
+        IOSImplementation.nativeInstance.nsDataToByteArray(nsData, bytes);
+        close();
+        return bytes;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+        if(offset >= length) {
+            return -1;
+        }
+        if(offset + len > length) {
+            len = length - offset;
+        }
+        IOSImplementation.nativeInstance.read(nsData, b, off, length, offset);
+        return len;
+    }
+
+    @Override
+    public int read() throws IOException {
+        if(offset >= length) {
+            return -1;
+        }
+        int val = IOSImplementation.nativeInstance.read(nsData, offset);
+        offset++;
+        return val;
+    }
+
+    @Override
+    public void reset() throws IOException {
+        offset = markOffset;
+    }
+
+    @Override
+    public long skip(long n) throws IOException {
+        if(offset + n >= length) {
+            n = n - (offset + n - length);
+            offset = length;
+        } else {
+            offset += (int)n;
+        }
+        
+        return n;
+    }
+
+    @Override
+    public void mark(int readlimit) {
+        markOffset = offset;
+    }
+
+    @Override
+    public boolean markSupported() {
+        return true;
     }
     
-    private static byte[] read(String file) {
-        byte[] b = new byte[IOSImplementation.nativeInstance.getFileSize(file)];
-        IOSImplementation.nativeInstance.readFile(file, b);
-        return b;
+    public void finalize() {
+        close();
+    }
+    
+    public void close() {
+        if(nsData != 0) {
+            IOSImplementation.nativeInstance.releasePeer(nsData);
+        }        
     }
         
 }

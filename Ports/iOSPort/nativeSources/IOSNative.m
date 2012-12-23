@@ -712,6 +712,40 @@ NSString* toNSString(JAVA_OBJECT str) {
     return [NSString stringWithUTF8String:chrs];
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    const char* chrs = stringToUTF8(file);
+    NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
+    NSData* d = [NSData dataWithContentsOfFile:ns];
+    [d retain];
+    [pool release];
+    return d;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_read___long_int(JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_LONG pointer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* n = (NSData*)nsData;
+    int val;
+    [n getBytes:&val range:NSMakeRange(pointer, 1)];
+    [pool release];
+    return val;
+}
+
+void com_codename1_impl_ios_IOSNative_read___long_byte_1ARRAY_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT destination, JAVA_INT offset, JAVA_INT length, JAVA_INT pointer) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSData* n = (NSData*)nsData;
+
+    org_xmlvm_runtime_XMLVMArray* byteArray = destination;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* actual = data + offset;
+    [n getBytes:actual range:NSMakeRange(pointer, length)];
+    
+    [pool release];
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT path) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
