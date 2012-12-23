@@ -1162,65 +1162,65 @@ public final class Display {
             newForm.layoutContainer();
         }
 
+        boolean transitionExists = false;
+        if(animationQueue != null && animationQueue.size() > 0) {
+            Object o = animationQueue.lastElement();
+            if(o instanceof Transition) {
+                current = (Form)((Transition)o).getDestination();
+                impl.setCurrentForm(current);
+            }
+        }
+
+        if(current != null) {
+            // make sure the fold menu occurs as expected then set the current
+            // to the correct parent!
+            if(current instanceof Dialog && ((Dialog)current).isMenu()) {
+                Transition t = current.getTransitionOutAnimator();
+                if(t != null) {
+                    // go back to the parent form first
+                    if(((Dialog)current).getPreviousForm() != null) {
+                        initTransition(t.copy(false), current, ((Dialog)current).getPreviousForm());
+                    }
+                }
+                current = ((Dialog)current).getPreviousForm();
+                impl.setCurrentForm(current);
+            }
+
+            // prevent the transition from occurring from a form into itself
+            if(newForm != current) {
+                if((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
+                    if(animationQueue == null) {
+                        animationQueue = new Vector();
+                    }
+                    // prevent form transitions from breaking our dialog based
+                    // transitions which are a bit sensitive
+                    if(current != null && (!(newForm instanceof Dialog))) {
+                        Transition t = current.getTransitionOutAnimator();
+                        if(current != null && t != null) {
+                            transitionExists = initTransition(t.copy(reverse), current, newForm);
+                        }
+                    }
+                    if(current != null && !(current instanceof Dialog)) {
+                        Transition t = newForm.getTransitionInAnimator();
+                        if(t != null) {
+                            transitionExists = initTransition(t.copy(reverse), current, newForm);
+                        }
+                    }
+                }
+            }
+        }
         synchronized(lock) {
-            boolean transitionExists = false;
-            if(animationQueue != null && animationQueue.size() > 0) {
-                Object o = animationQueue.lastElement();
-                if(o instanceof Transition) {
-                    current = (Form)((Transition)o).getDestination();
-                    impl.setCurrentForm(current);
-                }
-            }
-
-            if(current != null) {
-                // make sure the fold menu occurs as expected then set the current
-                // to the correct parent!
-                if(current instanceof Dialog && ((Dialog)current).isMenu()) {
-                    Transition t = current.getTransitionOutAnimator();
-                    if(t != null) {
-                        // go back to the parent form first
-                        if(((Dialog)current).getPreviousForm() != null) {
-                            initTransition(t.copy(false), current, ((Dialog)current).getPreviousForm());
-                        }
-                    }
-                    current = ((Dialog)current).getPreviousForm();
-                    impl.setCurrentForm(current);
-                }
-
-                // prevent the transition from occurring from a form into itself
-                if(newForm != current) {
-                    if((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
-                        if(animationQueue == null) {
-                            animationQueue = new Vector();
-                        }
-                        // prevent form transitions from breaking our dialog based
-                        // transitions which are a bit sensitive
-                        if(current != null && (!(newForm instanceof Dialog))) {
-                            Transition t = current.getTransitionOutAnimator();
-                            if(current != null && t != null) {
-                                transitionExists = initTransition(t.copy(reverse), current, newForm);
-                            }
-                        }
-                        if(current != null && !(current instanceof Dialog)) {
-                            Transition t = newForm.getTransitionInAnimator();
-                            if(t != null) {
-                                transitionExists = initTransition(t.copy(reverse), current, newForm);
-                            }
-                        }
-                    }
-                }
-            }
             lock.notify();
+        }
 
-            if(!transitionExists) {
-                if(animationQueue == null || animationQueue.size() == 0) {
-                    setCurrentForm(newForm);
-                } else {
-                    // we need to add an empty transition to "serialize" this
-                    // screen change...
-                    Transition t = CommonTransitions.createEmpty();
-                    initTransition(t, current, newForm);
-                }
+        if(!transitionExists) {
+            if(animationQueue == null || animationQueue.size() == 0) {
+                setCurrentForm(newForm);
+            } else {
+                // we need to add an empty transition to "serialize" this
+                // screen change...
+                Transition t = CommonTransitions.createEmpty();
+                initTransition(t, current, newForm);
             }
         }
     }
