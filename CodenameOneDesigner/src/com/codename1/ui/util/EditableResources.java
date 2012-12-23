@@ -754,8 +754,11 @@ public class EditableResources extends Resources implements TreeModel {
     }
     
     com.codename1.ui.Font createTrueTypeFont(com.codename1.ui.Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
-        return new EditorTTFFont(new File(ResourceEditorView.getLoadedFile().getParentFile(), fileName), 
-                sizeSetting, fontSize, f);
+        File fontFile = new File(ResourceEditorView.getLoadedFile().getParentFile(), fileName);
+        if(fontFile.exists()) {
+            return new EditorTTFFont(fontFile, sizeSetting, fontSize, f);
+        }
+        return f;
     }
     
     private void saveTheme(DataOutputStream output, Hashtable theme, boolean newVersion) throws IOException {
