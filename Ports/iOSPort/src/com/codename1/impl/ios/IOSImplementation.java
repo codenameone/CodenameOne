@@ -363,6 +363,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         }        
     }
 
+    private long getNSData(InputStream i) {
+        if(i instanceof BufferedInputStream) {
+            InputStream inp = ((BufferedInputStream)i).getInternal();
+            return getNSData(inp);
+        }
+        if(i instanceof NSDataInputStream) {
+            return ((NSDataInputStream)i).getNSData();
+        }
+        return 0;
+    }
+    
     private byte[] toByteArray(InputStream i) throws IOException {
         if(i instanceof BufferedInputStream) {
             InputStream inp = ((BufferedInputStream)i).getInternal();
@@ -816,11 +827,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         String name = t.nextToken();
         String type = t.nextToken();
-        byte[] b = loadResource(name, type);
-        if(b == null) {
+        int val = nativeInstance.getResourceSize(name, type);
+        if(val <= 0) {
             return null;
         }
-        return new ByteArrayInputStream(b);
+        return new BufferedInputStream(new NSDataInputStream(name, type), resource);
     }
 
     private static Map softReferenceMap = new HashMap();
@@ -1144,9 +1155,15 @@ public class IOSImplementation extends CodenameOneImplementation {
                         moviePlayerPeer = nativeInstance.createVideoComponent(uri);
                     } else {
                         try {
-                            byte[] data = Util.readInputStream(stream);
-                            Util.cleanup(stream);
-                            moviePlayerPeer = nativeInstance.createVideoComponent(data);
+                            long val = getNSData(stream);
+                            if(val > 0) {
+                                moviePlayerPeer = nativeInstance.createVideoComponentNSData(val);
+                                Util.cleanup(stream);
+                            } else {
+                                byte[] data = Util.readInputStream(stream);
+                                Util.cleanup(stream);
+                                moviePlayerPeer = nativeInstance.createVideoComponent(data);
+                            }
                         } catch (IOException ex) {
                             ex.printStackTrace();
                         }
@@ -1307,11 +1324,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return new IOSMedia(stream, mimeType, onCompletion);
     }
-    
-    private static byte[] loadResource(String name, String type) {
-        return nativeInstance.loadResource(name, type);
-    }
-    
+        
     private static long createNativeMutableImage(int w, int h, int color) {
         return nativeInstance.createNativeMutableImage(w, h, color);
     }
@@ -2729,14 +2742,16 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        return new NSDataOutputStream(nativeInstance.getCachesDir() + "/" + name);
+        name = nativeInstance.getCachesDir() + "/" + name;
+        return new BufferedOutputStream(new NSDataOutputStream(name) , name);
     }
 
     /**
      * @inheritDoc
      */
     public InputStream createStorageInputStream(String name) throws IOException {
-        return new NSDataInputStream(nativeInstance.getCachesDir() + "/" + name);
+        name = nativeInstance.getCachesDir() + "/" + name;
+        return new BufferedInputStream(new NSDataInputStream(nativeInstance.getCachesDir() + "/" + name), name);
     }
 
     /**
@@ -2850,7 +2865,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
-        return new NSDataOutputStream(file);
+        return new BufferedOutputStream(new NSDataOutputStream(file), file);
     }
 
     /**
@@ -2860,7 +2875,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(file.startsWith("file:/")) {
             file = file.substring(5);
         }
-        return new NSDataInputStream(file);
+        return new BufferedInputStream(new NSDataInputStream(file), file);
     }
 
     /**

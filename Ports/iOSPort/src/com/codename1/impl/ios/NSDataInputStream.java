@@ -22,15 +22,19 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.io.Util;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Simple input stream that wraps an NSData object
  *
  * @author Shai Almog
  */
+
 public class NSDataInputStream extends InputStream {
     private long nsData;
     private int offset = 0;
@@ -39,6 +43,15 @@ public class NSDataInputStream extends InputStream {
     public NSDataInputStream(String file) {
         nsData = IOSImplementation.nativeInstance.createNSData(file);
         length = IOSImplementation.nativeInstance.getNSDataSize(nsData);
+    }
+
+    public NSDataInputStream(String name, String type) {
+        nsData = IOSImplementation.nativeInstance.createNSDataResource(name, type);
+        length = IOSImplementation.nativeInstance.getNSDataSize(nsData);
+    }
+    
+    long getNSData() {
+        return nsData;
     }
 
     @Override
@@ -58,6 +71,7 @@ public class NSDataInputStream extends InputStream {
         return bytes;
     }
 
+    
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if(offset >= length) {
@@ -67,6 +81,7 @@ public class NSDataInputStream extends InputStream {
             len = length - offset;
         }
         IOSImplementation.nativeInstance.read(nsData, b, off, len, offset);
+        offset += len;
         return len;
     }
 

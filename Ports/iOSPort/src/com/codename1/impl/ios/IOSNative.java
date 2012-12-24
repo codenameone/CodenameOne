@@ -189,6 +189,7 @@ final class IOSNative {
     native long createVideoComponent(String url);
 
     native long createVideoComponent(byte[] video);
+    native long createVideoComponentNSData(long video);
 
     native void startVideoComponent(long peer); 
     
@@ -301,6 +302,7 @@ final class IOSNative {
     native void nsDataToByteArray(long nsData, byte[] data);
 
     native long createNSData(String file);
+    native long createNSDataResource(String name, String type);
     native int read(long nsData, int pointer);
     native void read(long nsData, byte[] destination, int offset, int length, int pointer);
     

@@ -725,6 +725,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(JAVA_
     return d;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSDataResource___java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_OBJECT type) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    const char* chrs = stringToUTF8(name);
+    NSString* nameNS = [NSString stringWithUTF8String:chrs];
+    const char* chrs2 = stringToUTF8(type);
+    NSString* typeNS = [NSString stringWithUTF8String:chrs2];
+    NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
+    NSData* iData = [NSData dataWithContentsOfFile:path];
+    [iData retain];
+    [pool release];
+    return iData;
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_read___long_int(JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_LONG pointer) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSData* n = (NSData*)nsData;
@@ -740,7 +753,7 @@ void com_codename1_impl_ios_IOSNative_read___long_byte_1ARRAY_int_int_int(JAVA_O
 
     org_xmlvm_runtime_XMLVMArray* byteArray = destination;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
-    void* actual = data + offset;
+    JAVA_ARRAY_BYTE* actual = &(data[offset]);
     [n getBytes:actual range:NSMakeRange(pointer, length)];
     
     [pool release];
@@ -1590,6 +1603,29 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JA
     return mp;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(JAVA_OBJECT instanceObject, long nsData) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSData* d = (NSData*)nsData;
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+        
+        [d writeToFile:path atomically:YES];
+        NSURL *u = [NSURL fileURLWithPath:path];        
+        
+        moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        moviePlayerInstance.useApplicationAudioSession = NO;
+        [moviePlayerInstance retain];
+        [moviePlayerInstance prepareToPlay];
+        [moviePlayerInstance play];
+        [pool release];
+    });
+    MPMoviePlayerController* mp = moviePlayerInstance;
+    moviePlayerInstance = nil;
+    return mp;
+}
 
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject,

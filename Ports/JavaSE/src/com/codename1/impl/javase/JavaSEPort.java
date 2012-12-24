@@ -2779,7 +2779,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 err.printStackTrace();
                 throw new RuntimeException(err);
             }
-        }
+        } 
         throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
     }
 
