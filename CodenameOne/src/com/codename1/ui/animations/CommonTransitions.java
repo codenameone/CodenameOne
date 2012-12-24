@@ -54,6 +54,7 @@ public final class CommonTransitions extends Transition {
     private static final int TYPE_TIMELINE = 4;
     private static final int TYPE_SLIDE_AND_FADE = 5;
     private static final int TYPE_PULSATE_DIALOG = 6;
+    private static final int TYPE_COVER = 7;
     
     /**
      * Slide the transition horizontally
@@ -189,6 +190,27 @@ public final class CommonTransitions extends Transition {
         t.drawDialogMenu = drawDialogMenu;
         return t;
     }
+
+    /**
+     * Creates a cover transition with the given duration and direction
+     * 
+     * @param type type can be either vertically or horizontally, which means 
+     * the movement direction of the transition
+     * @param forward forward is a boolean value, represent the directions of 
+     * switching forms, for example for a horizontally type, true means 
+     * horizontally movement to right.
+     * @param duration represent the time the transition should take in millisecond
+     * @return a transition object
+     */
+    public static CommonTransitions createCover(int type, boolean forward, int duration) {
+        CommonTransitions t = new CommonTransitions(TYPE_COVER);
+        t.slideType = type;
+        t.forward = forward;
+        t.speed = duration;
+        t.position = 0;
+        return t;
+    }
+
 
     /**
      * Creates a slide transition with the given duration and direction, this differs from the
@@ -359,7 +381,7 @@ public final class CommonTransitions extends Transition {
             return;
         }
 
-        if (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) {
+        if (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE || transitionType == TYPE_COVER) {
             int dest;
             int startOffset = 0;
             boolean direction = forward;
@@ -552,6 +574,13 @@ public final class CommonTransitions extends Transition {
                         paintFastSlideAtPosition(g, position, 0);
                     } else {
                         paintFastSlideAtPosition(g, 0, position);
+                    }
+                    return;
+                case TYPE_COVER:
+                    if (slideType == SLIDE_HORIZONTAL) {
+                        paintCoverAtPosition(g, position, 0);
+                    } else {
+                        paintCoverAtPosition(g, 0, position);
                     }
                     return;
                 case TYPE_FADE:
@@ -816,6 +845,64 @@ public final class CommonTransitions extends Transition {
         
     }
 
+    private void paintCoverAtPosition(Graphics g, int slideX, int slideY) {
+        Component source = getSource();
+        
+        // if this is the first form we can't do a slide transition since we have no source form
+        if (source == null) { 
+            return;           
+        }
+        
+        Component dest = getDestination();                
+        int w = source.getWidth();
+        int h = source.getHeight();
+                    
+        if (slideType == SLIDE_HORIZONTAL) {
+            h = 0;
+        } else {
+            w = 0;
+        }
+
+        if(forward) {
+            w = -w;
+            h = -h;
+        } else {
+            slideX = -slideX;
+            slideY = -slideY;
+        }
+        g.setClip(source.getAbsoluteX()+source.getScrollX(), source.getAbsoluteY()+source.getScrollY(), source.getWidth(), source.getHeight());
+            
+        // dialog animation is slightly different... 
+        if(source instanceof Dialog) {
+            if(buffer != null) {
+                g.drawImage(buffer, 0, 0);
+            } else {
+                paint(g, dest, 0, 0);
+            }
+            paint(g, source, -slideX, -slideY);
+            return;
+        } 
+        
+        if(dest instanceof Dialog) {
+            if(buffer != null) {
+                g.drawImage(buffer, 0, 0);
+            } else {
+                paint(g, source, 0, 0);
+            }
+            paint(g, dest, -slideX - w, -slideY - h);
+            return;
+        } 
+        
+        if(source.getParent() != null || buffer == null) {
+            source.paintBackgrounds(g);
+            paint(g, source, 0 , 0 );
+        } else {
+            g.drawImage(buffer, 0, 0);        
+        }
+        paint(g, dest, slideX + w, slideY + h);
+        
+    }
+
     private void paintFastSlideAtPosition(Graphics g, int slideX, int slideY) {
         if(secondaryBuffer != null) {
             Component source = getSource();
@@ -978,6 +1065,16 @@ public final class CommonTransitions extends Transition {
                     retVal = CommonTransitions.createSlide(slideType, !fwd, speed, drawDialogMenu);
                 } else {
                     retVal = CommonTransitions.createSlide(slideType, fwd, speed, drawDialogMenu);
+                }
+                break;
+            }
+            case TYPE_COVER: {
+                boolean fwd=forward;
+
+                if(reverse) {
+                    retVal = CommonTransitions.createCover(slideType, !fwd, speed);
+                } else {
+                    retVal = CommonTransitions.createCover(slideType, fwd, speed);
                 }
                 break;
             }
