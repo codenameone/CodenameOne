@@ -76,8 +76,10 @@
         <copy file="../../Themes/android_holo_light.res" todir="src" />
     </target>
 
-    <target name="-post-compile">
-        <delete file="build/classes/com/vending/billing/IMarketBuillingService.class" />
+    <target name="-pre-jar">
+        <delete file="build/classes/com/android/vending/billing/IMarketBillingService.class" />
+        <delete file="build/classes/com/android/vending/billing/IMarketBillingService$Stub$Proxy.class" />
+        <delete file="build/classes/com/android/vending/billing/IMarketBillingService$Stub.class" />
     </target>
 
     <target name="-pre-clean">
@@ -108,6 +110,9 @@
             classpath="${javac.classpath}:build/tmp">
             <src path="${src.dir}" />
         </javac>        
+        <delete file="build/tmp/com/android/vending/billing/IMarketBillingService.class" />
+        <delete file="build/tmp/com/android/vending/billing/IMarketBillingService$Stub$Proxy.class" />
+        <delete file="build/tmp/com/android/vending/billing/IMarketBillingService$Stub.class" />
         <jar jarfile="${dist.jar}" basedir="build/tmp">
             <fileset dir="src" includes="*.res" />
             <fileset dir="../../CodenameOne/src" includes="*.res" />
