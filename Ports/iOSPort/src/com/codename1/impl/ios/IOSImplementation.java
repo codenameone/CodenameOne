@@ -2751,7 +2751,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream createStorageInputStream(String name) throws IOException {
         name = nativeInstance.getCachesDir() + "/" + name;
-        return new BufferedInputStream(new NSDataInputStream(nativeInstance.getCachesDir() + "/" + name), name);
+        return new BufferedInputStream(new NSDataInputStream(name), name);
     }
 
     /**
