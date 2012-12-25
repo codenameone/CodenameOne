@@ -40,8 +40,25 @@ import java.io.InputStream;
  */
 public class AnalyticsService {
     private static AnalyticsService instance;
+
+    /**
+     * Indicates whether analytics server failures should brodcast an error event
+     * @return the failSilently
+     */
+    public static boolean isFailSilently() {
+        return failSilently;
+    }
+
+    /**
+     * Indicates whether analytics server failures should brodcast an error event
+     * @param aFailSilently the failSilently to set
+     */
+    public static void setFailSilently(boolean aFailSilently) {
+        failSilently = aFailSilently;
+    }
     private String agent;
     private String domain;
+    private static boolean failSilently = true;
     
     /**
      * Indicates whether analytics is enabled for this application
@@ -79,6 +96,7 @@ public class AnalyticsService {
         ConnectionRequest r = new ConnectionRequest();
         r.setUrl(url);
         r.setPost(false);
+        r.setFailSilently(failSilently);
         r.addArgument("guid", "ON");
         r.addArgument("utmac", instance.agent);
         r.addArgument("utmn", Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));
