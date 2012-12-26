@@ -66,7 +66,9 @@ public abstract class Purchase {
      * 
      * @param amount the amount to pay
      * @param currency the three letter currency type
-     * @return a token representing the pending transaction which will be matched when receiving a callback from the platform
+     * @return a token representing the pending transaction which will be matched 
+     * when receiving a callback from the platform or a null if the payment as 
+     * failed or canceled
      * @throws RuntimeException This method is a part of the manual payments API and will fail if
      * isManualPaymentSupported() returns false
      */
