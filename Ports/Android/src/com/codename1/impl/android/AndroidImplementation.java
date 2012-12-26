@@ -3306,6 +3306,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        
+        if (requestCode == ZOOZ_PAYMENT) {
+            ((ZoozPurchase) pur).onActivityResult(requestCode, resultCode, intent);
+            return;
+        }
+
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
@@ -3679,6 +3685,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public Purchase getInAppPurchase(boolean physicalGoods) {
+        if(physicalGoods && Display.getInstance().getProperty("ZoozAppKey", "").length() > 0){
+            pur = new ZoozPurchase(activity);
+            return pur;
+        }
+        
         if(physicalGoods || !((CodenameOneActivity)activity).isInAppBillingSupported()) {
             return new Purchase() {
                 @Override
