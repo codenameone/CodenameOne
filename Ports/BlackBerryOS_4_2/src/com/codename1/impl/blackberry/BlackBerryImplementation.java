@@ -124,16 +124,7 @@ import net.rim.device.api.io.IOUtilities;
 import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
-import net.rim.device.api.system.ApplicationDescriptor;
-import net.rim.device.api.system.ApplicationManager;
-import net.rim.device.api.system.ApplicationManagerException;
-import net.rim.device.api.system.Characters;
-import net.rim.device.api.system.CodeModuleManager;
-import net.rim.device.api.system.EventInjector;
-import net.rim.device.api.system.GlobalEventListener;
-import net.rim.device.api.system.JPEGEncodedImage;
-import net.rim.device.api.system.RadioInfo;
-import net.rim.device.api.system.SystemListener2;
+import net.rim.device.api.system.*;
 
 /**
  * The implementation of the blackberry platform delegates the work to the underlying UI
@@ -1336,7 +1327,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         protected EditPopup(TextArea lightweightEdit, int maxSize) {
             super(new VerticalFieldManager(VerticalFieldManager.VERTICAL_SCROLL), Field.FOCUSABLE | Field.EDITABLE | Screen.DEFAULT_MENU);
-
+            
             UIManager m = UIManager.getInstance();
             okString = m.localize("ok", "OK");
             cancelString = m.localize("cancel", "Cancel");
@@ -1758,7 +1749,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
         
         if ("IMEI".equals(key)) {
-            return GPRSInfo.imeiToString(GPRSInfo.getIMEI());
+            if(RadioInfo.getNetworkType() == RadioInfo.NETWORK_CDMA) {
+                // Do something specific for CDMA
+                return new String(CDMAInfo.getIMSI());
+            }else{
+                return GPRSInfo.imeiToString(GPRSInfo.getIMEI());            
+            }
         }
         
         //requires signing
