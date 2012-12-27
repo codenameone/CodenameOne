@@ -79,6 +79,19 @@ class DatabaseImpl extends Database {
         IOSImplementation.nativeInstance.sqlDbExec(peer, sql, params);
     }
 
+    public void execute(String sql, Object [] params) throws IOException{
+        // temporary workaround, this will probably fail with blobs
+        String[] val = new String[params.length];
+        for(int iter = 0 ; iter < val.length ; iter++) {
+            if(params[iter] == null) {
+                val[iter] = null;
+            } else {
+                val[iter] = "" + params[iter];
+            }
+        }
+        execute(sql, val);
+    }
+
     @Override
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, params));
