@@ -83,6 +83,9 @@ import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.view.View.MeasureSpec;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
+import android.webkit.WebChromeClient;
 import android.widget.MediaController;
 import android.widget.VideoView;
 import com.codename1.codescan.CodeScanner;
@@ -91,6 +94,7 @@ import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Cookie;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
@@ -117,6 +121,7 @@ import java.io.RandomAccessFile;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.DateFormat;
@@ -2429,6 +2434,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.act = act;
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
+                    try {
+                        URI uri = new URI(url);
+                        CookieManager mgr = CookieManager.getInstance();
+                        String cookieStr = mgr.getCookie(url);
+                        if (cookieStr!=null){
+                            String[] cookies = cookieStr.split(";");
+                            int len = cookies.length;
+                            Vector out = new Vector();
+                            String domain = uri.getHost();
+                            for ( int i=0; i<len; i++){
+                                Cookie c = new Cookie();
+                                String[] parts = cookies[i].split("=");
+                                c.setName(parts[0].trim());
+                                c.setValue(parts[1].trim());
+                                c.setDomain(domain);
+                                out.add(c);
+
+                            }
+                            Cookie[] cookiesArr = new Cookie[out.size()];
+                            out.toArray(cookiesArr);
+                            AndroidImplementation.this.addCookie(cookiesArr, false);
+                        }
+
+                    } catch (URISyntaxException ex) {
+
+                    }
+                    
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
                     super.onLoadResource(view, url);
                     setShouldCalcPreferredSize(true);
@@ -2468,6 +2500,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     return super.shouldOverrideUrlLoading(view, url);
                 }
+                
+                
+            });
+            
+            web.setWebChromeClient(new WebChromeClient(){
+
+                @Override
+                public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                    com.codename1.io.Log.p(consoleMessage.message());
+                    return true;
+                }
+                
             });
         }
 
@@ -3751,6 +3795,79 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return scannerInstance;
     }
+
+    @Override
+    public Vector getCookiesForURL(String url) {
+        try {
+            URI uri = new URI(url);
+            CookieManager mgr = CookieManager.getInstance();
+            if ( !mgr.hasCookies() ) return null;
+            String cookieStr = mgr.getCookie(url);
+            if ( cookieStr == null ) return null;
+            String[] cookies = cookieStr.split(";");
+            int len = cookies.length;
+            Vector out = new Vector();
+            String domain = uri.getHost();
+            for ( int i=0; i<len; i++){
+                Cookie c = new Cookie();
+                String[] parts = cookies[i].split("=");
+                c.setName(parts[0].trim());
+                c.setValue(parts[1].trim());
+                c.setDomain(domain);
+                out.add(c);
+                
+            }
+            
+            return out;
+        } catch (URISyntaxException ex) {
+            return null;
+        }
+        
+        
+    }
+
+    public void addCookie(Cookie c, boolean addToWebViewCookieManager) {
+        if ( addToWebViewCookieManager ){
+            CookieManager mgr = CookieManager.getInstance();
+
+            
+            //hc.setMaxAge((c.getExpires()*1000)-System.currentTimeMillis());
+            String cookieString = c.getName()+"="+c.getValue()+
+                    "; Domain="+c.getDomain()+
+                    "; Path="+c.getPath()+
+                    "; "+(c.isSecure()?"Secure;":"")
+                    +(c.isHttpOnly()?"httpOnly;":"");
+            mgr.setCookie("http"+
+                    (c.isSecure()?"s":"")+"://"+
+                    c.getDomain()+
+                    c.getPath(), cookieString);
+        }
+        super.addCookie(c);
+            
+        
+        
+    }
+
+    @Override
+    public void addCookie(Cookie c) {
+        this.addCookie(c, true);
+    }
+    
+    
+
+    @Override
+    public void addCookie(Cookie[] cookiesArray) {
+        this.addCookie(cookiesArray, true);
+    }
+    
+    public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){
+        int len = cookiesArray.length;
+        for ( int i=0; i< len; i++){
+            this.addCookie(cookiesArray[i], addToWebViewCookieManager);
+        }
+    }
+    
+    
     
     class CodeScannerImpl extends CodeScanner implements IntentResultListener {
         private ScanResult callback;
