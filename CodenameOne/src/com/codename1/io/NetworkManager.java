@@ -608,7 +608,7 @@ public class NetworkManager {
                         return;
                     }
                     ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();
-                    if(currentRequest != null && currentRequest.equals(request)) {
+                    if(currentRequest != null && !currentRequest.retrying && currentRequest.equals(request)) {
                         System.out.println("Duplicate entry detected");
                         return;
                     }
