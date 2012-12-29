@@ -102,7 +102,7 @@ import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
 import com.codename1.push.PushCallback;
-import com.codename1.ui.Form;
+import com.codename1.ui.*;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -1383,23 +1383,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
         if (hasActionBar()) {
-            activity.runOnUiThread(new NotifyCommandBehaviorImpl(activity, commandBehavior));
+            activity.runOnUiThread(new NotifyActionBar(activity, commandBehavior));
         }
     }
     
-    private static class NotifyCommandBehaviorImpl implements Runnable {
+    private static class NotifyActionBar implements Runnable {
         private Activity activity;
-        private int commandBehavior;
+        private boolean show;
         
-        public NotifyCommandBehaviorImpl(Activity activity, int commandBehavior) {
+        public NotifyActionBar(Activity activity, int commandBehavior) {
             this.activity = activity;
-            this.commandBehavior = commandBehavior;
+            show = commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE;
+        }
+        
+        public NotifyActionBar(Activity activity, boolean show) {
+            this.activity = activity;
+            this.show = show;
         }
         
         @Override
         public void run() {
             activity.invalidateOptionsMenu();
-            if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
+            if (show) {
                 activity.getActionBar().show();
             } else {
                 activity.getActionBar().hide();
@@ -1650,13 +1655,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         final File temp = File.createTempFile("mtmp", "dat");
-        FileOutputStream out = new FileOutputStream(temp){
-
-            public void close() throws IOException {
-                super.close();
-                temp.delete();
-            }
-        };
+        temp.deleteOnExit();
+        FileOutputStream out = new FileOutputStream(temp);
        
         byte buf[] = new byte[256];
         int len = 0;
@@ -1664,7 +1664,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             out.write(buf, 0, len);
         }
         stream.close();
+        
+        final Runnable finish = new Runnable() {
 
+            @Override
+            public void run() {
+                if(onCompletion != null){
+                    onCompletion.run();
+                }
+                temp.delete();                
+            }
+        };
 
         if (isVideo) {
             final AndroidImplementation.Video[] retVal = new AndroidImplementation.Video[1];
@@ -1676,7 +1686,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     VideoView v = new VideoView(activity);
                     v.setZOrderMediaOverlay(true);
                     v.setVideoURI(Uri.fromFile(temp));
-                    retVal[0] = new AndroidImplementation.Video(v, activity, onCompletion);
+                    retVal[0] = new AndroidImplementation.Video(v, activity, finish);
                     flag[0] = true;
                     synchronized (flag) {
                         flag.notify();
@@ -1694,7 +1704,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             return retVal[0];
         } else {
-            return createMedia(new FileInputStream(temp), mimeType, onCompletion);
+            return createMedia(new FileInputStream(temp), mimeType, finish);
         }
 
     }
@@ -3687,7 +3697,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void setCurrentForm(final Form f) {
         super.setCurrentForm(f);
-        if (isNativeTitle()) {
+        if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
         }
     }
@@ -3704,8 +3714,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void run() {
             ActionBar ab = activity.getActionBar();
-            activity.getActionBar().setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
-            activity.getActionBar().setTitle(f.getTitle());
+            String title = f.getTitle();
+            if(title == null || title.length() == 0){
+                activity.runOnUiThread(new NotifyActionBar(activity, false));
+                return;
+            }else{
+                activity.runOnUiThread(new NotifyActionBar(activity, true));
+            }
+            
+            ab.setTitle(title);
+            ab.setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
             if(android.os.Build.VERSION.SDK_INT >= 14){
                 Image icon = f.getTitleComponent().getIcon();
                 try {
