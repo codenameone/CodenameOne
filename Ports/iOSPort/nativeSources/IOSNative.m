@@ -953,6 +953,12 @@ void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_Stri
     NSString* nsSrc = [NSString stringWithUTF8String:chrs];
     const char* chrsDest = stringToUTF8(dest);
     NSString* nsDst = [NSString stringWithUTF8String:chrsDest];
+    if([nsSrc hasPrefix:@"file:"]) {
+        nsSrc = [nsSrc substringFromIndex:5];
+    }
+    if([nsDst hasPrefix:@"file:"]) {
+        nsDst = [nsDst substringFromIndex:5];
+    }
     NSError *error = nil;
     [fm moveItemAtPath:nsSrc toPath:nsDst error:&error];
     if(error != nil) {  
