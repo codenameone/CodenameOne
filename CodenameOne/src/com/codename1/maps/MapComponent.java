@@ -180,20 +180,37 @@ public class MapComponent extends Container {
         Painter bg = new Painter() {
 
             public void paint(Graphics g, Rectangle rect) {
-                if(buffer == null){
-                    buffer = Image.createImage(getWidth(), getHeight());
-                }
-                if(_needTiles || refreshLayers){
-                    paintmap(buffer.getGraphics());
-                    refreshLayers = false;
-                }
-                g.translate(-translateX, -translateY);
-                if(scaleX > 0){
-                    g.drawImage(buffer, (getWidth() - scaleX)/2, (getHeight() - scaleY)/2, scaleX, scaleY);
+                if (Display.getInstance().areMutableImagesFast()) {
+                    if (buffer == null) {
+                        buffer = Image.createImage(getWidth(), getHeight());
+                    }
+                    if (_needTiles || refreshLayers) {
+                        paintmap(buffer.getGraphics());
+                        refreshLayers = false;
+                    }
+                    g.translate(-translateX, -translateY);
+                    if (scaleX > 0) {
+                        g.drawImage(buffer, (getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2, scaleX, scaleY);
+                    } else {
+                        g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);
+                    }
+
+                    g.translate(translateX, translateY);
                 }else{
-                    g.drawImage(buffer, (getWidth() - buffer.getWidth())/2, (getHeight() - buffer.getHeight())/2);                    
+                    
+                    g.translate(-translateX, -translateY);
+                    if (scaleX > 0) {
+                        g.translate(-(getWidth() - scaleX) / 2, -(getHeight() - scaleY) / 2);
+                        g.scale(scaleX, scaleY);
+                        paintmap(g);
+                        g.translate((getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2);
+                    }else{
+                        paintmap(g);                    
+                    }
+
+                    g.translate(translateX, translateY);
+                
                 }
-                g.translate(translateX, translateY);
             }
         };
         getUnselectedStyle().setBgTransparency(255);
