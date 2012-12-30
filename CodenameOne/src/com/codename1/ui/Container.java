@@ -1309,7 +1309,11 @@ public class Container extends Component {
      * @param scrollableX whether the component should/could scroll on the X axis
      */
     public void setScrollableX(boolean scrollableX) {
-        this.scrollableX = scrollableX;
+        if(layout instanceof BorderLayout) {
+            this.scrollableX = false;
+        } else {
+            this.scrollableX = scrollableX;
+        }
     }
 
     /**
@@ -1318,7 +1322,11 @@ public class Container extends Component {
      * @param scrollableY whether the component should/could scroll on the Y axis
      */
     public void setScrollableY(boolean scrollableY) {
-        this.scrollableY = scrollableY;
+        if(layout instanceof BorderLayout) {
+            this.scrollableY = false;
+        } else {
+            this.scrollableY = scrollableY;
+        }
     }
 
     /**
