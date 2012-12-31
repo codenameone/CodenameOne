@@ -1,0 +1,69 @@
+/* 
+ Localizable.strings
+ ZooZSDK
+ 
+ Created by Ronen Morecki on 12/18/11.
+ Copyright (c) 2011 ronen@zooz.com. All rights reserved.
+ */
+"CVV is missing" = "CVV szám megadása kötelező!";
+"Close"="Bezár";
+"Continue"="Tovább";
+"Pay now"="Fizetés";
+"- Pay with:" = "- Fizetés";
+"Pay with:" = "Fizetés a következővel:";
+"Total:"="Összesen:";
+"Not Accepted"="Nem elfogadott";
+"Thank You"="Köszönjük!";
+"Payment is confirmed"="A fizetés visszaigazolva";
+"Remember me in ZooZ mobile payment service."="Emlékezzen rám a Zooz mobil fizetés.";
+"Excellent"="Tökéletes";
+"Card owner full name"="Kártya tulajdonos neve";
+"Enter card number"="Írja be a bankkártya számát";
+"Expiration"="Lejárati dátum";
+"CVV"="CVV";
+"Zip Code"="Irányítószám";
+"Email"="E-mail cím";
+"Missing Email"="E-mail cím megadása kötelező";
+"ID Number"="Személyigazolvány szám";
+"ZooZ Mobile Gateway"="ZooZ - Fizetés";
+"Card number is incorrect"="A bankkártyaszám hibás";
+"CVV is missing"="CVV kódot kötelező kitölteni";
+"Missing ZIP Code"="Az irányítószám mezőt kötelező kitölteni";
+"Missing ID Number"="A személyigazolvány számot kötelező kitölteni";
+"Invalid expiration date"="Hibás lejárati dátum";
+"Missing card owner name"="A bankkártya tulajdonos nevét kötelező kitölteni";
+"Credit Card"="Bankkártya";
+"PayPal Warning"="PayPal hiba";
+"Cannot connect to PayPal, please try again later"="Nem lehet kapcsolódni a PayPal-hez! Kérjük próbálja meg később!";
+"Ok"="Ok";
+"4 Digits passcode"="4 számjegyű PIN";
+"4 Digits"="4 számjegy";
+"Retype"="Megerősítés";
+"Code does not match"="A PIN kódok nem egyeznek";
+"Please create your passcode:"="Kérjük írjon be egy PIN kódot:";
+"Save"="Mentés";
+"Wrong Passcode"="Rossz PIN kód";
+"Please Enter your ZooZ Passcode"="Kérjük írja be Zooz PIN kódját";
+"Forgot passcode? Click here to enter card details"="Elfelejtette PIN kódját? Kattintson ide és adja meg a bankkártya adait";
+"Not Accepted"="Visszautasítva";
+"Warning"="Hiba";
+"Some network error occured"="Hálózati hiba történt";
+"Some general service error occured, please try again later"="Hiba történt, kérjük próbálja meg később";
+"Network Error"="Hálózati hiba";
+"We identified that you have the ZooZ app installed on your phone. Please enter the passcode as used in ZooZ app ,or as saved in previous ZooZ payments on this device."="Észleltük, hogy Önnek fel van telepítve a Zooz applikáció. Kérjük írja be a PIN kódját, amelyet egy korábbi fizetésénél használt.";
+"This passcode will be used for future payments from this device for all apps that uses the ZooZ mobile payment checkout."="Ezt a PIN kódot fogja tudni a jövőben használni a fizetések egyszerűsítéséhez.";
+"Secure Payment"="Biztonságos fizetés";
+"Personal Passcode"="PIN kód";
+"Enhance Security"="Kiterjesztett biztonság";
+"Create personal passcode"="Készítse el a PIN kódját";
+"Invalid email"="Hibás e-mail cím.";
+"Invalid"="Hibás"; 
+"Invalid Number"="Hibás szám";
+"Invalid CVV"="Hibás CVV";
+"Invalid ZIP"="Hibás ZIP";
+"Invalid ID"="Hibás személyigazolvány szám.";
+"Secure connection..."="Biztonságos kapcsolat...";
+"Add a Card"="Add a kártya";
+"Verify"="Ellenőrzése";
+"Add +"="Hozzáad +";
+"Authorization completed"="Felhatalmazott";

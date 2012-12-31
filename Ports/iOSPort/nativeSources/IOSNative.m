@@ -45,6 +45,7 @@
 #import "StoreKit/StoreKit.h"
 #import "ScanCodeImpl.h"
 //#import "QRCodeReaderOC.h"
+#import "ZooZ.h"
 
 extern void initVMImpl();
 
@@ -2701,3 +2702,15 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
     [pool release];
 }
 
+void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_java_lang_String_boolean_java_lang_String(JAVA_OBJECT instanceObject, JAVA_DOUBLE amount, JAVA_OBJECT currency, JAVA_OBJECT appKey, JAVA_BOOLEAN sandbox, JAVA_OBJECT invoiceNumber) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        ZooZ *zooz = [ZooZ sharedInstance];
+        zooz.sandbox = sandbox;//set this if working in Sandbox mode
+        ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:toNSString(invoiceNumber) delegate:[CodenameOne_GLViewController instance]];
+        req.currencyCode = toNSString(currency);
+//        req.payerDetails.email = @"test@test.com";
+        [zooz openPayment:req forAppKey:toNSString(appKey)];
+        [pool release];
+    });
+}

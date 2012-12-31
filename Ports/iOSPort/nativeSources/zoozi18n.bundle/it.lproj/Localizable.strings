@@ -1,0 +1,76 @@
+
+
+
+
+
+
+"CVV is missing" = "CVV mancante";
+"Close"="Chiudi";
+"Continue"="Continua";
+"Pay now"="Paga adesso";
+"- Pay with:" = "";
+"Pay with:" = "Paga con";
+"Total:"="Totale:";
+"Not Accepted"="Rifiutato";
+"Thank You"="Grazie";
+"Payment is confirmed"="Pagamento confermato";
+"Remember me in ZooZ mobile payment service."="Ricorda i miei dati nel servizio di pagamento ZooZ";
+"Excellent"="Eccellente!";
+"Card owner full name"="Intestatario carta";
+"Enter card number"="Numero di carta";
+"Expiration"="Data di scadenza";
+"CVV"="CVV";
+"Zip Code"="CAP";
+"Email"="Indirizzo e-mail";
+"Missing Email"="Indirizzo e-mail mancante";
+"ID Number"="Numero ID";
+"ZooZ Mobile Gateway"="ZooZ - Pagamento";
+"Card number is incorrect"="Numero di carta non corretto";
+"CVV is missing"="CVV mancante";
+"Missing ZIP Code"="CAP mancante";
+"Missing ID Number"="Numero ID mancante";
+"Invalid expiration date"="Data di scadenza mancante";
+"Missing card owner name"="Titolare della carta mancante";
+"Credit Card"="Carta di credito";
+"PayPal Warning"="PayPal";
+"Cannot connect to PayPal, please try again later"="Impossibile connettersi a PayPal, provare pi tardi";
+"Ok"="Ok";
+
+"4 Digits passcode"="Codice di 4 cifre";
+"4 Digits"="4 cifre";
+
+"Please create your passcode:"="Crea il tuo codice d'accesso";
+"Save"="Registra";
+"Wrong Passcode"="Codice errato";
+"Please Enter your ZooZ Passcode"="Inserisci il tuo codice d'accesso ZooZ";
+
+"Forgot passcode? Click here to enter card details"="Codice d'acceso dimenticato? Clicca qui per inserire i dati della carta";
+"Not Accepted"="Rifiutato";
+"Warning"="Attenzione";
+"Some network error occured"="Errore di connessione";
+"Some general service error occured, please try again later"="Errore di servizio, riprovare pi tardi";
+"Network Error"="Errore di connessione";
+"We identified that you have the ZooZ app installed on your phone. Please enter the passcode as used in ZooZ app ,or as saved in previous ZooZ payments on this device."="Abbiamo identificato l'applicazione ZooZ sul tuo dispositivo. Inserisci il codice di accesso utilizzato per l'applicazione ZooZ";
+"This passcode will be used for future payments from this device for all apps that uses the ZooZ mobile payment checkout."="Questo codice sar‡ utilizzato per i pagamenti futuri tramite questo dispositivo e tutte le applicazioni che adottano ZooZ";
+"Secure Payment"="Pagamento sicuro";
+
+"Personal Passcode"="Codice d'accesso personale";
+"Enhance Security"="Migliorare la sicurezza";
+"Create personal passcode"="Creare il proprio codice d'accesso";
+"Invalid email"="Indirizzo e-mail non valido";
+"Invalid"="Non valido"; 
+"Invalid Number"="Numero di carta non corretto";
+"Invalid CVV"="CVV non valido";
+"Invalid ZIP"="CAP non valido";
+"Invalid ID"="ID non valido";
+"Secure connection..."="Connessione sicura ...";
+
+"Retype"="Conferma";
+"Code does not match"="Il codice non corrisponde";
+
+"Authentication code is missing." = "Codice di sicurezza mancante";
+"Cannot complete transaction, your passcode is incorrect, please try again." = "Non Ë possibile completare la transazione, il codice di sicurezza Ë errato.";
+"Add a Card"="Aggiungi una scheda";
+"Verify"="Verificare";
+"Add +"="Aggiungere +";
+"Authorization completed"="Autorizzazione completata";

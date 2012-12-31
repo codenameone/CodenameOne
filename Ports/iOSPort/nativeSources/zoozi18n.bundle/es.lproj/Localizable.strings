@@ -1,0 +1,70 @@
+/* 
+ Localizable.strings
+ ZooZSDK
+ 
+ Created by Ronen Morecki on 12/18/11.
+ Copyright (c) 2011 ronen@zooz.com. All rights reserved.
+ */
+"CVV is missing" = "Falta el código CVV";
+"Close"="Cerrar";
+"Continue"="Continuar";
+"Pay now"="Pagar ahora";
+"- Pay with:" = "";
+"Pay with:" = "Pagar con";
+"Total:"="Total:";
+"Not Accepted"="Rechazada";
+"Thank You"="Gracias";
+"Payment is confirmed"="Pago confirmado";
+"Remember me in ZooZ mobile payment service."="Guarda mis datos en el servicio de pago móvil ZooZ";
+"Excellent"="¡Excelente!";
+"Card owner full name"="Nombre y apellidos del titular";
+"Enter card number"="Número de tarjeta";
+"Expiration"="Fecha de caducidad";
+"CVV"="CVV";
+"Zip Code"="Cód. Postal";
+"Email"="Email";
+"Missing Email"="Falta el Email";
+"ID Number"="Numero de ID";
+"ZooZ Mobile Gateway"="ZooZ - Pasarela de Pago";
+"Card number is incorrect"="El número de tarjeta es incorrecto";
+"CVV is missing"="Falta el código CVV";
+"Missing ZIP Code"="Falta el código postal";
+"Missing ID Number"="Falta el número de ID";
+"Invalid expiration date"="Falta la fecha de expiración";
+"Missing card owner name"="Falta el titular de la tarjeta";
+"Credit Card"="Tarjeta de crédito";
+"PayPal Warning"="PayPal";
+"Cannot connect to PayPal, please try again later"="No ha sido posible conectarse a Paypal, por favor, inténtalo más tarde.";
+"Ok"="Ok";
+"4 Digits passcode"="Codigo de 4 cifras";
+"4 Digits"="4 cifras";
+"Retype"="Confirmar";
+"Code does not match"="Codigo erróneo";
+"Please create your passcode:"="Cree su contraseña";
+"Save"="Guardar";
+"Wrong Passcode"="Contraseña incorrecta";
+"Please Enter your ZooZ Passcode"="Introduzca su contraseña de ZooZ";
+"Forgot passcode? Click here to enter card details"="¿Has olvidado tu contraseña? pulsa aquí para introducir los datos de tu tarjeta de crédito";
+"Not Accepted"="Rechazada";
+"Warning"="Atención";
+"Some network error occured"="Error de conexión";
+"Some general service error occured, please try again later"="Ha ocurrido un error interno, por favor inténtelo más adelante";
+"Network Error"="Error de conexión";
+"We identified that you have the ZooZ app installed on your phone. Please enter the passcode as used in ZooZ app ,or as saved in previous ZooZ payments on this device."="Hemos detectado que tienes la aplicación de Zooz en tu móvil. Por favor, introduzca la contraseña de la app ZooZ.";
+"This passcode will be used for future payments from this device for all apps that uses the ZooZ mobile payment checkout."="Esta contraseña será utilizada para futuros pagos en este móvil en todas las aplicaciones que usen el método de pago ZooZ";
+"Secure Payment"="Pago seguro";
+"Personal Passcode"="Contraseña personal";
+"Enhance Security"="Mejorar la seguridad";
+"Create personal passcode"="Crear una contraseña personal";
+"Invalid email"="E-mail inválido";
+"Invalid"="Inválido";
+"Invalid Number"="El número de tarjeta es incorrecto";
+"Invalid CVV"="Inválido";
+"Invalid ZIP"="Inválido";
+"Invalid ID"="ID Inválido";
+"Secure connection..."="Conexión seguro...";
+"Add a Card"="Añadir una tarjeta de";
+"Verify"="Verificar";
+"Add +"="Agregar +";
+"Authorization completed"="Autorizado";
+

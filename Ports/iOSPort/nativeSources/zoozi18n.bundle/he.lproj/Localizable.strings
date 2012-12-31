@@ -1,0 +1,70 @@
+/* 
+ Localizable.strings
+ ZooZSDK
+ 
+ Created by Ronen Morecki on 12/18/11.
+ Copyright (c) 2011 ronen@zooz.co. All rights reserved.
+ */
+"CVV is missing" = "חסר נתון CVV";
+"Close"="סגור";
+"Continue"="המשך";
+"Pay now"="שלם";
+"- Pay with:" = "";
+"Pay with:" = "";
+"Total:"=":סה\"כ";
+"Not Accepted"="לא מתקבל";
+"Thank You"="תודה רבה";
+"Payment is confirmed"="תשלום אושר";
+"Remember me in ZooZ mobile payment service."="זכור אותי בתשלומים עתידיים ממכשיר זה";
+"Excellent"="להתראות!";
+"Card owner full name"="שם מלא של בעל כרטיס";
+"Enter card number"="מספר כרטיס";
+"Expiration"="תוקף";
+"CVV"="CVV";
+"Zip Code"="מיקוד";
+"Email"="אימייל";
+"Missing Email"="חסר אימייל";
+"ID Number"="תעודת זהות";
+"ZooZ Mobile Gateway"="ZooZ תשלומים במובייל";
+"Card number is incorrect"="מספר כרטיס אינו תקין";
+"CVV is missing"="חסר קוד CVV";
+"Missing ZIP Code"="חסר מיקוד";
+"Missing ID Number"="חסר ת.ז.";
+"Invalid expiration date"="תוקף לא תקין";
+"Missing card owner name"="חסר שם בעל כרטיס";
+"Credit Card"="כרטיס אשראי";
+"PayPal Warning"="אזהרת PayPal";
+"Cannot connect to PayPal, please try again later"="לא ניתן להתחבר לפייפאל, נסה שנית מאוחר יותר.";
+"Ok"="אוקיי";
+"4 Digits passcode"="סיסמה 4 ספרות";
+"4 Digits"="4 ספרות";
+"Retype"="הקש שוב";
+"Code does not match"="קוד שהוקש אינו תואם";
+"Please create your passcode:"="אנא צור סיסמה אישית";
+"Save"="שמור";
+"Wrong Passcode"="סיסמה שגויה";
+"Please Enter your ZooZ Passcode"="אנא הקש את סיסמת ZooZ";
+"Forgot passcode? Click here to enter card details"="שכחת סיסמה? הקש כאן כדי להכניס פרטי אמצעי תשלום";
+"Not Accepted"="לא מתקבל";
+"Warning"="אזהרה";
+"Some network error occured"="נראה כי יש בעיית קישוריות לאינטרנט";
+"Some general service error occured, please try again later"="תקלת שירות. אנא נסה שוב מאוחר יותר או צור קשר עם תמיכת לקוחות";
+"Network Error"="תקלת קישוריות אינטרנט";
+"We identified that you have the ZooZ app installed on your phone. Please enter the passcode as used in ZooZ app ,or as saved in previous ZooZ payments on this device."="זיהינו כי על מכשירך מותקנת אפליקציית ZooZ. אנא הקש את הסיסמה כפי ששמרת באפליקציה זו או כפי ששמרת בתשלומי ZooZ קודמים.";
+"This passcode will be used for future payments from this device for all apps that uses the ZooZ mobile payment checkout."="סיסמה זו תשמש אותך בפעם הבאה שתשלם ממכשיר זה בכל אפליקציה המשתמשת בזוז מערכת תשלומים למובייל";
+"Secure Payment"="תשלום מאובטח";
+"Personal Passcode"="סיסמה אישית";
+"Enhance Security"="הוסף אבטחה";
+"Create personal passcode"="צור סיסמה אישית";
+"Invalid email"="כתובת אימייל לא תקינה";
+"Invalid"="לא תקין";
+"Invalid Number"="מספר כרטיס אינו תקין";
+"Invalid CVV"="לא תקין";
+"Invalid ZIP"="מיקוד לא תקין";
+"Invalid ID"="ת.ז. לא תקינה";
+"Secure connection..."="חיבור מאובטח...";
+"Add a Card"="הוספת כרטיס";
+"Verify"="אישור";
+"Add +"="הוסף +";
+"Authorization completed"="אושר בהצלחה";
+

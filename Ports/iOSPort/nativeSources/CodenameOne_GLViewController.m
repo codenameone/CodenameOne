@@ -1728,4 +1728,36 @@ extern JAVA_OBJECT productsArrayPending;
     }
 }
 
+-(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
+                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldn’t update your UI on this, just process the payment data */
+    NSString* tid = response.transactionID;
+    JAVA_FLOAT amount = response.paidAmount;
+    com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(fromNSString(tid), amount);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        repaintUI();
+    });
+}
+
+// Zooz callback methods
+-(void)paymentSuccessDialogClosed{
+    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: – this is where you should update your UI on success transaction */
+    dispatch_async(dispatch_get_main_queue(), ^{
+        repaintUI();
+    });
+}
+-(void)paymentCanceled{
+    com_codename1_impl_ios_ZoozPurchase_paymentCanceledOrFailed___java_lang_String(JAVA_NULL);
+    //User decided to close the dialog and not to pay
+    dispatch_async(dispatch_get_main_queue(), ^{
+        repaintUI();
+    });
+}
+-(void)openPaymentRequestFailed: (ZooZPaymentRequest *)request withErrorCode:
+(int)errorCode andErrorMessage: (NSString *)errorMessage{
+    com_codename1_impl_ios_ZoozPurchase_paymentCanceledOrFailed___java_lang_String(fromNSString(errorMessage));
+    //Some error occurred with opening the request to ZooZ servers, usually a network issue or wrong credentials issue
+    dispatch_async(dispatch_get_main_queue(), ^{
+        repaintUI();
+    });
+}
 @end
