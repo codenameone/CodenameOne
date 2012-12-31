@@ -3747,7 +3747,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public Purchase getInAppPurchase(boolean physicalGoods) {
-        if(physicalGoods && Display.getInstance().getProperty("ZoozAppKey", "").length() > 0){
+        if((physicalGoods|| !hasAndroidMarket()) && Display.getInstance().getProperty("ZoozAppKey", "").length() > 0){
             pur = new ZoozPurchase(activity);
             return pur;
         }
