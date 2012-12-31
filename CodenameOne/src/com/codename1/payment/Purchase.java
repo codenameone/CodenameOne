@@ -67,8 +67,8 @@ public abstract class Purchase {
      * @param amount the amount to pay
      * @param currency the three letter currency type
      * @return a token representing the pending transaction which will be matched 
-     * when receiving a callback from the platform or a null if the payment as 
-     * failed or canceled
+     * when receiving a callback from the platform or a null if the payment has 
+     * failed or was canceled
      * @throws RuntimeException This method is a part of the manual payments API and will fail if
      * isManualPaymentSupported() returns false
      */
@@ -76,6 +76,23 @@ public abstract class Purchase {
         throw new RuntimeException("Unsupported");
     }
     
+    /**
+     * Performs payment of a specific amount based on the manual payment API, notice that
+     * this doesn't use the in-app-purchase functionality of the device!
+     * 
+     * @param amount the amount to pay
+     * @param currency the three letter currency type
+     * @param invoiceNumber application specific invoice number
+     * @return a token representing the pending transaction which will be matched 
+     * when receiving a callback from the platform or a null if the payment has 
+     * failed or was canceled
+     * @throws RuntimeException This method is a part of the manual payments API and will fail if
+     * isManualPaymentSupported() returns false
+     */
+    public String pay(double amount, String currency, String invoiceNumber) {
+        return pay(amount, currency);
+    }
+
     /**
      * Indicates whether the payment platform supports things such as "item listing" or
      * requires that items be coded into the system. iOS provides listing and pricing
@@ -167,17 +184,23 @@ public abstract class Purchase {
     }
 
     /**
-     * Returns the native OS purchase implementation if applicable, if not this
-     * method will fallback to a cross platform purchase manager. 
+     * Returns the native OS purchase implementation if applicable, if unavailable this
+     * method will try to fallback to a custom purchase implementation and failing that
+     * will return null 
      * 
-     * @param physicalGoods set to true to indicate that you are interested in purchasing
-     * physical goods which are normally not allowed in the OS in-app-purchase solutions.
-     * @return instance of the purchase class
+     * @return instance of the purchase class or null
      */
-    public static Purchase getInAppPurchase(boolean physicalGoods) {
-        return Display.getInstance().getInAppPurchase(physicalGoods);
+    public static Purchase getInAppPurchase() {
+        return Display.getInstance().getInAppPurchase();
     }
     
+    /**
+     * @deprecated use the version that takes no arguments
+     */
+    public static Purchase getInAppPurchase(boolean d) {
+        return Display.getInstance().getInAppPurchase();
+    }
+
     /**
      * Returns true if the subscription API is supported in this platform
      * 

@@ -332,6 +332,8 @@ final class IOSNative {
     
     native void fetchProducts(String[] skus, Product[] products);
     native void purchase(String sku);
+    
+    native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
     native String formatInt(int i);
     native String formatDouble(double d);

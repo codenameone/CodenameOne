@@ -3274,7 +3274,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private Purchase pur;
     private Vector purchasedItems;
 
-    private Vector getPurchased() {
+    Vector getPurchased() {
         if(purchasedItems == null) {
             purchasedItems = (Vector)Storage.getInstance().readObject("CN1PurchasedItemList.dat");
             if(purchasedItems == null) {
@@ -3327,63 +3327,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
-    public Purchase getInAppPurchase(boolean physicalGoods) {
-        if(physicalGoods) {
-            return super.getInAppPurchase(physicalGoods);
-        }
-        if(pur == null) {
-            pur = new Purchase() {
-                public boolean isManagedPaymentSupported() {
-                    return true;
-                }
-
-                public boolean isItemListingSupported() {
-                    return true;
-                }
-
-                public Product[] getProducts(String[] skus) {
-                    final Product[] p = new Product[skus.length];
-                    nativeInstance.fetchProducts(skus, p);
-                    
-                    // wait for request to complete
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-                        @Override
-                        public void run() {
-                            while(p[p.length - 1].getDisplayName() == null) {
-                                try {
-                                    Thread.currentThread().sleep(10);
-                                } catch (InterruptedException ex) {
-                                }
-                            }
-                        }
-                    });
-                    return p;
-                }
-
-                public boolean wasPurchased(String sku) {
-                    return getPurchased().contains(sku);
-                }
-
-                public void purchase(String sku) {
-                    nativeInstance.purchase(sku);
-                }
-
-
-                /*public void subscribe(String sku) {
-                    purchase(sku);
-                }*/
-
-
-                public boolean isSubscriptionSupported() {
-                    return false;
-                }
-
-                public boolean isUnsubscribeSupported() {
-                    return false;
-                }
-            };
-        }
-        return pur;
+    public Purchase getInAppPurchase() {
+        return new ZoozPurchase(this, nativeInstance, purchaseCallback);
     }
     
     @Override

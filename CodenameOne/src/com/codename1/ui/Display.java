@@ -2931,15 +2931,22 @@ public final class Display {
     }
 
     /**
-     * Returns the native OS purchase implementation if applicable, if not this
-     * method will fallback to a cross platform purchase manager. 
+     * Returns the native OS purchase implementation if applicable, if unavailable this
+     * method will try to fallback to a custom purchase implementation and failing that
+     * will return null 
      * 
-     * @param physicalGoods set to true to indicate that you are interested in purchasing
-     * physical goods which are normally not allowed in the OS in-app-purchase solutions.
-     * @return instance of the purchase class
+     * @return instance of the purchase class or null
      */
-    public Purchase getInAppPurchase(boolean physicalGoods) {
-        return impl.getInAppPurchase(physicalGoods);
+    public Purchase getInAppPurchase() {
+        return impl.getInAppPurchase();
+    }
+    
+    /**
+     * @deprecated use the version that accepts no arguments, the physical goods purchase is always
+     * manual payment if applicable
+     */
+    public Purchase getInAppPurchase(boolean d) {
+        return getInAppPurchase();
     }
     
     /**

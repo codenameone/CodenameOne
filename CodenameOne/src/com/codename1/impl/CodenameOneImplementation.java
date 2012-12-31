@@ -4637,39 +4637,10 @@ public abstract class CodenameOneImplementation {
      * Returns the native OS purchase implementation if applicable, if not this
      * method will fallback to a cross platform purchase manager. 
      * 
-     * @param physicalGoods set to true to indicate that you are interested in purchasing
-     * physical goods which are normally not allowed in the OS in-app-purchase solutions.
      * @return instance of the purchase class
      */
-    public Purchase getInAppPurchase(boolean physicalGoods) {
-        return new Purchase() {
-            public boolean isManualPaymentSupported() {
-                return true;
-            }
-            
-            public String pay(double amount, String currency) {
-                /*String response = null;
-                ConnectionRequest cn = new ConnectionRequest();
-                String url = "https://sandbox.zooz.co/mobile/ExtendedServerAPI";
-                if(Display.getInstance().getProperty("payment.sandbox", "false").equalsIgnoreCase("false")) {
-                    url = "https://app.ZooZ.com/mobile/ExtendedServerAPI";
-                }
-                
-                String developerId = Display.getInstance().getProperty("zooz.devId", null);
-                if(developerId == null || developerId.length() == 0) {
-                    throw new RuntimeException("Missing developer id!");
-                }
-                cn.addRequestHeader("ZooZDeveloperId", developerId);
-                String serverAPIKey = Display.getInstance().getProperty("zooz.apiKey", null);
-                if(serverAPIKey == null || serverAPIKey.length() == 0) {
-                    throw new RuntimeException("Missing API key!");
-                }
-                cn.addRequestHeader("ZooZServerAPIKey", serverAPIKey);
-                NetworkManager.getInstance().addToQueueAndWait(cn);
-                return response;*/
-                return null;
-            }
-        };
+    public Purchase getInAppPurchase() {
+        return null;
     }
     
     /**

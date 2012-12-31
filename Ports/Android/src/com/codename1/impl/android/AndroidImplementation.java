@@ -3746,54 +3746,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Purchase pur;
     
     @Override
-    public Purchase getInAppPurchase(boolean physicalGoods) {
-        if((physicalGoods|| !hasAndroidMarket()) && Display.getInstance().getProperty("ZoozAppKey", "").length() > 0){
-            pur = new ZoozPurchase(activity);
-            return pur;
-        }
-        
-        if(physicalGoods || !((CodenameOneActivity)activity).isInAppBillingSupported()) {
-            return new Purchase() {
-                @Override
-                public boolean wasPurchased(String sku) {
-                    return ((CodenameOneActivity)activity).wasPurchased(sku);
-                }
-            };
-        }
-        if(pur == null) {
-            pur = new Purchase() {
-                @Override
-                public boolean isManagedPaymentSupported() {
-                    return true;
-                }
-
-                @Override
-                public boolean wasPurchased(String sku) {
-                    return ((CodenameOneActivity)activity).wasPurchased(sku);
-                }
-
-                @Override
-                public void purchase(String sku) {
-                    ((CodenameOneActivity)activity).purchase(sku);
-                }
-
-                @Override
-                public void subscribe(String sku) {
-                    ((CodenameOneActivity)activity).subscribe(sku);
-                }
-
-                @Override
-                public boolean isSubscriptionSupported() {
-                    return ((CodenameOneActivity)activity).isSubscriptionSupported();
-                }
-
-                @Override
-                public boolean isUnsubscribeSupported() {
-                    return false;
-                }
-            };
-        }
-        return pur;
+    public Purchase getInAppPurchase() {
+        return new ZoozPurchase(activity, hasAndroidMarket());
     }
 
     @Override

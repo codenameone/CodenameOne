@@ -157,6 +157,12 @@ public class CodenameOneActivity extends Activity {
         }
     }
     
+    public PurchaseCallback getPurchaseCallback() {
+        Object app = getApp();
+        PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback)app : null;
+        return pc;
+    }
+
     /**
      * A {@link PurchaseObserver} is used to get callbacks when Android Market sends
      * messages to this application so that we can update the UI.
@@ -189,15 +195,14 @@ public class CodenameOneActivity extends Activity {
                 }
             }
         }
-
+        
         @Override
         public void onPurchaseStateChange(Consts.PurchaseState purchaseState, String itemId,
                 int quantity, long purchaseTime, String developerPayload) {
             if (Consts.DEBUG) {
                 Log.i("CodeNameOne", "onPurchaseStateChange() itemId: " + itemId + " " + purchaseState);
             }
-            Object app = getApp();
-            PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback)app : null;
+            PurchaseCallback pc = getPurchaseCallback();
             if(purchaseState == Consts.PurchaseState.PURCHASED) {
                 addItem(itemId);
                 if(pc != null) {

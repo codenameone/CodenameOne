@@ -26,6 +26,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.util.Log;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.PurchaseCallback;
 import com.codename1.ui.Display;
 import com.zooz.android.lib.CheckoutActivity;
 
@@ -40,11 +41,46 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     private String purchaseId = null;
     
     private boolean completed = false;
+    private boolean hasMarket;
+    private String currency;
+    private double amount;
+    private String failMessage;
     
-    public ZoozPurchase(Activity activity) {
+    public ZoozPurchase(Activity activity, boolean hasMarket) {
         this.activity = activity;
+        this.hasMarket = hasMarket;
     }
 
+    @Override
+    public boolean isManagedPaymentSupported() {
+        return hasMarket;
+    }
+
+    @Override
+    public boolean wasPurchased(String sku) {
+        return ((CodenameOneActivity)activity).wasPurchased(sku);
+    }
+
+    @Override
+    public void purchase(String sku) {
+        ((CodenameOneActivity)activity).purchase(sku);
+    }
+
+    @Override
+    public void subscribe(String sku) {
+        ((CodenameOneActivity)activity).subscribe(sku);
+    }
+
+    @Override
+    public boolean isSubscriptionSupported() {
+        return ((CodenameOneActivity)activity).isSubscriptionSupported();
+    }
+
+    @Override
+    public boolean isUnsubscribeSupported() {
+        return false;
+    }
+                
     @Override
     public boolean isManualPaymentSupported() {
         return true;
@@ -65,20 +101,45 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
         activity.startActivityForResult(intent, ZOOZ_PAYMENT);
         
         Display.getInstance().invokeAndBlock(this);
+        
+        // use call serially so the purchase callback happens on the 
+        // next EDT loop AFTER the value was returned 
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                CodenameOneActivity cn = (CodenameOneActivity)activity;
+                PurchaseCallback pc = cn.getPurchaseCallback();
+                if(pc != null) {
+                    if(failMessage != null) {
+                        pc.paymentFailed(purchaseId, failMessage);
+                    } else {
+                        pc.paymentSucceeded(purchaseId, ZoozPurchase.this.amount, ZoozPurchase.this.currency);
+                    }
+                }
+            }
+        });
         return purchaseId;
     }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        failMessage = null;
         if(resultCode == Activity.RESULT_OK){
             purchaseId = data.getStringExtra(CheckoutActivity.ZOOZ_TRANSACTION_ID);
+            amount = data.getDoubleExtra(CheckoutActivity.ZOOZ_AMOUNT, -1);
+            currency = data.getStringExtra(CheckoutActivity.ZOOZ_CURRENCY_CODE);
         }else{
             if (data != null){
                 //failed to purchase - the purchaseId will be null
                 Log.d("Codename One", data.getStringExtra(CheckoutActivity.ZOOZ_ERROR_MSG));
+                purchaseId = data.getStringExtra(CheckoutActivity.ZOOZ_TRANSACTION_ID);
+                failMessage = data.getStringExtra(CheckoutActivity.ZOOZ_ERROR_MSG);
             }
         }
         completed = true;
+        synchronized(this) {
+            notify();
+        }
     }
 
     @Override
