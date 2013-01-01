@@ -138,6 +138,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.codename1.util.StringUtil;
+//import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
 
@@ -2300,7 +2302,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             super.setBrowserURL(browserPeer, url);
             return;
         }
-        ((AndroidImplementation.AndroidBrowserComponent) browserPeer).setURL(url);
+        AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
+        if(bc.parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+            bc.setURL(url);
+        }
     }
 
     public void browserStop(PeerComponent browserPeer) {
@@ -2352,6 +2357,78 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
         ((AndroidImplementation.AndroidBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+    }
+
+
+    /**
+     * Executes javascript and returns a string result where appropriate.
+     * @param browserPeer
+     * @param javaScript
+     * @return
+     */
+    @Override
+    public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
+        final AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
+
+        // The jsCallback is a special java object exposed to javascript that we use
+        // to return values from javascript to java.
+        synchronized (bc.jsCallback){
+            // Initialize the return value to null
+            bc.jsCallback.setReturnValue(null);
+
+            // Reset the callback so that it will fire the notify() when
+            // a value is set.
+            bc.jsCallback.reset();
+        }
+
+        // We are placing the javascript inside eval() so we need to escape
+        // the input.
+        String escaped = StringUtil.replaceAll(javaScript, "\\", "\\\\");
+        escaped = StringUtil.replaceAll(escaped, "'", "\\'");
+
+        final String js = "javascript:(function(){"
+                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"=null;try{"
+                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME
+                + "=eval('"+escaped +"');} catch (e){console.log(e)};"
+                + AndroidBrowserComponentCallback.JS_VAR_NAME+".setReturnValue(''+"
+                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME
+                + ");})()";
+
+        // Send the Javascript string via SetURL.
+        // NOTE!! This is sent asynchronously so we will need to wait for
+        // the result to come in.
+        bc.setURL(js);
+        if(Display.getInstance().isEdt()) {
+            // If we are on the EDT then we need to invokeAndBlock
+            // so that we wait for the javascript result, but we don't
+            // prevent the EDT from executing the rest of the pipeline.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    // Loop/wait until the callback value has been set.
+                    // The callback.setReturnValue() method, which will
+                    // be called from Javascript issues a notify() to
+                    // let us know it is done.
+                    while (!bc.jsCallback.isValueSet()) {
+                        synchronized(bc.jsCallback){
+                            try {
+                                bc.jsCallback.wait(200);
+                            } catch (InterruptedException ex) {}
+                        }
+                    }
+                }
+            });
+        } else {
+            // If we are not on the EDT, then it is safe to just loop and wait.
+            while (!bc.jsCallback.isValueSet()) {
+                synchronized(bc.jsCallback){
+                    try {
+                        bc.jsCallback.wait(200);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        }
+        return bc.jsCallback.getReturnValue();
     }
 
     
@@ -2429,11 +2506,43 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
+    /**
+     * A class that is used by executeAndReturnString to be exposed in Javascript
+     * so that it can accept return values.
+     */
+    static class AndroidBrowserComponentCallback {
+        static final String JS_VAR_NAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent";
+        static final String JS_RETURNVAL_VARNAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent_returnValue";
+        private String returnValue;
+        private boolean valueSet = false;
+        
+        //@JavascriptInterface
+        public synchronized void setReturnValue(String value){
+            valueSet = true;
+            this.returnValue = value;
+            notify();
+        }
+
+        public String getReturnValue() {
+            return returnValue;
+        }
+
+        public boolean isValueSet() {
+            return valueSet;
+        }
+
+        public void reset() {
+            valueSet = false;
+        }
+    }
+
+    
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
         private WebView web;
         private BrowserComponent parent;
+        protected AndroidBrowserComponentCallback jsCallback;
 
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
@@ -2442,6 +2551,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(true);
             this.act = act;
+            jsCallback = new AndroidBrowserComponentCallback();
+            web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
+
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
                     try {
@@ -2508,7 +2620,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         setURL(url);
                         return true;
                     }
-                    return super.shouldOverrideUrlLoading(view, url);
+                    return !parent.getBrowserNavigationCallback().shouldNavigate(url); 
                 }
                 
                 
@@ -2518,7 +2630,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-                    com.codename1.io.Log.p(consoleMessage.message());
+                    com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
                     return true;
                 }
                 
