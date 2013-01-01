@@ -4526,6 +4526,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
         ((SEBrowserComponent) browserPeer).execute(javaScript);
     }
+    
+    @Override
+    public String browserExecuteAndReturnString(PeerComponent browserPeer, String javaScript) {
+        return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
+    }
+    
 
     public void setBrowserURL(final PeerComponent browserPeer, final String url) {
         if (url.startsWith("jar:")) {

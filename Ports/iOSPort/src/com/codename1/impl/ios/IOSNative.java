@@ -173,7 +173,8 @@ final class IOSNative {
     native void browserClearHistory(long browserPeer);
 
     native void browserExecute(long browserPeer, String javaScript);
-
+    native String browserExecuteAndReturnString(long browserPeer, String javaScript);
+    
     native void browserForward(long browserPeer);
 
     native boolean browserHasBack(long browserPeer);

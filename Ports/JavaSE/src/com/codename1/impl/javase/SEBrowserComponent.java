@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
@@ -96,8 +97,57 @@ public class SEBrowserComponent extends PeerComponent {
                 p.fireWebEvent("onError", new ActionEvent(t1.getMessage(), -1));
             }
         });
+
+        // Monitor the location property so that we can send the shouldLoadURL event.
+        // This allows us to cancel the loading of a URL if we want to handle it ourself.
+        web.getEngine().locationProperty().addListener(new ChangeListener<String>(){
+            @Override
+            public void changed(ObservableValue<? extends String> prop, String before, String after) {
+                if ( !p.getBrowserNavigationCallback().shouldNavigate(web.getEngine().getLocation()) ){
+                    web.getEngine().getLoadWorker().cancel();
+                }
+            }
+
+        });
     }
 
+    /**
+     * Executes a javascript string and returns the result as a String if
+     * appropriate.
+     * @param js
+     * @return
+     */
+    public String executeAndReturnString(final String js){
+        final String[] result = new String[1];
+        final boolean[] complete = new boolean[]{false};
+        Platform.runLater(new Runnable() {
+            public void run() {
+                result[0] = ""+web.getEngine().executeScript(js);
+                synchronized(complete){
+                    complete[0] = true;
+                    complete.notify();
+                }
+            }
+        });
+
+        // We need to wait for the result of the javascript operation
+        // but we don't want to block the entire EDT, so we use invokeAndBlock
+        Display.getInstance().invokeAndBlock(new Runnable(){
+            public void run() {
+                while ( !complete[0] ){
+                    synchronized(complete){
+                        try {
+                            complete.wait(200);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            }
+
+        });
+        return result[0];
+    }
+     
     @Override
     protected void initComponent() {
         super.initComponent();

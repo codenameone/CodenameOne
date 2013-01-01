@@ -3227,6 +3227,20 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Executes javascript and returns string. The default implementation
+     * just wraps the browserExecute() method that doesn't return anything. It will
+     * return null always. You need to override this in the native implementation
+     * to return meaningful values.
+     * @param internal The peer browser component.
+     * @param javaScript The javascript to execute.
+     * @return String result of the javascript expression.
+     */
+    public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
+        browserExecute(internal, javaScript);
+        return null;
+    }
+
+    /**
      * Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
      * and access fields on the given object. Notice that on RIM devices which don't support reflection
      * this object must implement the propriatery Scriptable interface

@@ -1627,6 +1627,24 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
         nativeInstance.browserExecute(get(browserPeer), javaScript);
     }
+    
+    @Override
+    public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
+        if(Display.getInstance().isEdt()) {
+            final String[] result = new String[1];
+
+            // We cannot block the EDT so we use invokeAndBlock. This is very
+            // important since Javascript may try to communicate with the EDT
+            // from inside the script.
+            Display.getInstance().invokeAndBlock(new Runnable(){
+                public void run() {
+                    result[0] = nativeInstance.browserExecuteAndReturnString(get(browserPeer), javaScript);
+                }
+            });
+            return result[0];
+        } 
+        return nativeInstance.browserExecuteAndReturnString(get(browserPeer), javaScript);        
+    }
 
     @Override
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {

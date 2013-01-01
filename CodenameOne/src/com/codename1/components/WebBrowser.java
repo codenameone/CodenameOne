@@ -37,6 +37,7 @@ import com.codename1.ui.html.DefaultHTMLCallback;
 import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.util.Base64;
+import com.codename1.ui.events.BrowserNavigationCallback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -192,6 +193,35 @@ public class WebBrowser extends Container {
      * @param url 
      */
     public void onLoad(String url) {
+    }
+
+    /**
+     * Set the browser navigation callback which allows handling a case where 
+     * a URL invocation can be delegated to Java code. This allows binding 
+     * Java side functionality to JavaScript functionality in the same
+     * way PhoneGap/Cordova work
+     * @param callback the callback interface
+     */
+    public void setBrowserNavigationCallback(BrowserNavigationCallback callback){
+        if(BrowserComponent.isNativeBrowserSupported()) {
+            ((BrowserComponent)this.getInternal()).setBrowserNavigationCallback(callback);
+        } 
+    }
+
+    /**
+     * The browser navigation callback interface allows handling a case where 
+     * a URL invocation can be delegated to Java code. This allows binding 
+     * Java side functionality to JavaScript functionality in the same
+     * way PhoneGap/Cordova work
+     * 
+     * @return the callback interface
+     */
+    public BrowserNavigationCallback getBrowserNavigationCallback(){
+        if(BrowserComponent.isNativeBrowserSupported()) {
+            return ((BrowserComponent)this.getInternal()).getBrowserNavigationCallback();
+        } else {
+            return null;
+        }
     }
 
     /**

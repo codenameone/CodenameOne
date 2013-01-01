@@ -27,6 +27,8 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.events.BrowserNavigationCallback;
+import java.util.Vector;
 import java.util.Hashtable;
 
 /**
@@ -45,6 +47,35 @@ import java.util.Hashtable;
 public class BrowserComponent extends Container {
     private Hashtable listeners;
     private PeerComponent internal;
+    private BrowserNavigationCallback browserNavigationCallback = new BrowserNavigationCallback(){
+        public boolean shouldNavigate(String url) {
+            return true;
+        }
+    };
+
+    /**
+     * Set the browser navigation callback which allows handling a case where 
+     * a URL invocation can be delegated to Java code. This allows binding 
+     * Java side functionality to JavaScript functionality in the same
+     * way PhoneGap/Cordova work
+     * @param callback the callback interface
+     */
+    public void setBrowserNavigationCallback(BrowserNavigationCallback callback){
+        this.browserNavigationCallback = callback;
+    }
+
+    /**
+     * The browser navigation callback interface allows handling a case where 
+     * a URL invocation can be delegated to Java code. This allows binding 
+     * Java side functionality to JavaScript functionality in the same
+     * way PhoneGap/Cordova work
+     * 
+     * @return the callback interface
+     */
+    public BrowserNavigationCallback getBrowserNavigationCallback(){
+        return this.browserNavigationCallback;
+    }
+
 
     /**
      * This constructor will work as expected when a browser component is supported, see isNativeBrowserSupported()
@@ -249,6 +280,16 @@ public class BrowserComponent extends Container {
     }
 
     /**
+     * Executes the given JavaScript and returns a result string from the underlying platform
+     * where applicable
+     * @param javaScript the JavaScript code to execute
+     * @return the string returned from the Javascript call
+     */
+    public String executeAndReturnString(String javaScript){
+        return Display.getInstance().getImplementation().browserExecuteAndReturnString(internal, javaScript);
+    }
+
+    /**
      * Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
      * and access fields on the given object. Notice that on RIM devices which don't support reflection
      * this object must implement the propriatery Scriptable interface
@@ -256,6 +297,8 @@ public class BrowserComponent extends Container {
      *
      * @param o the object to invoke, notice all public fields and methods would be exposed to JavaScript
      * @param name the name to expose within JavaScript
+     * @deprecated this doesn't work in most platforms see issue 459 for details, use the setBrowserNavigationCallback
+     * method instead
      */
     public void exposeInJavaScript(Object o, String name) {
         Display.getInstance().getImplementation().browserExposeInJavaScript(internal, o, name);
