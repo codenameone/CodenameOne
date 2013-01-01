@@ -200,11 +200,11 @@ public class MapComponent extends Container {
                     
                     g.translate(-translateX, -translateY);
                     if (scaleX > 0) {
-                        g.translate(-(getWidth() - scaleX) / 2, -(getHeight() - scaleY) / 2);
+                        g.translate((getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2);
                         g.scale((float)scaleX/(float)getWidth(), (float)scaleY/(float)getHeight());
                         paintmap(g);
                         g.resetAffine();
-                        g.translate((getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2);
+                        g.translate(-(getWidth() - scaleX) / 2, -(getHeight() - scaleY) / 2);
                     }else{
                         paintmap(g);                    
                     }
