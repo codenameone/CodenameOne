@@ -23,6 +23,7 @@
 
 #import "UIWebViewEventDelegate.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_ui_events_BrowserNavigationCallback.h"
 #include "xmlvm.h"
 
 @implementation UIWebViewEventDelegate
@@ -41,15 +42,22 @@
 }
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+    JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback__(c);
+    if(navigateCallback != NULL) {
+        return (*(JAVA_BOOLEAN (*)(JAVA_OBJECT, JAVA_OBJECT)) *(((java_lang_Object*)navigateCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String])(navigateCallback, xmlvm_create_java_string([request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
+    } else {
+        return YES;
+    }
+}
+
+- (void)webViewDidStartLoad:(UIWebView *)webView {
+    NSURLRequest *request = webView.request;
     com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(request.URL.absoluteString.UTF8String));
     return YES;
 }
 
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(webView.request.URL.absoluteString.UTF8String));
-}
-
-- (void)webViewDidStartLoad:(UIWebView *)webView {
 }
 
 @end

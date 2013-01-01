@@ -2711,3 +2711,15 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         [pool release];
     });
 }
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript){
+    __block JAVA_OBJECT out;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIWebView* w = (UIWebView*)peer;
+        out = fromNSString([w stringByEvaluatingJavaScriptFromString:toNSString(javaScript)]);
+        [pool release];
+    });
+    return out;
+}
+
