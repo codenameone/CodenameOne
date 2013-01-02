@@ -14,7 +14,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.*;
-import android.content.pm.PackageInfo;
+import android.content.pm.*;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -66,9 +66,6 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.Vector;
-import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
@@ -1431,11 +1428,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int cellId = ((GsmCellLocation) telephonyManager.getCellLocation()).getCid();
                 return "" + cellId;
             } catch (Throwable t) {
-                return null;
+                return defaultValue;
             }
         }
         if ("AppName".equals(key)) {
-            return activity.getApplicationInfo().name;
+            
+            final PackageManager pm = activity.getPackageManager();
+            ApplicationInfo ai;
+            try {
+                ai = pm.getApplicationInfo(activity.getPackageName(), 0);
+            } catch (NameNotFoundException e) {
+                ai = null;
+            }
+            String applicationName = (String) (ai != null ? pm.getApplicationLabel(ai) : null);
+            if(applicationName == null){
+                return defaultValue;
+            }
+            return applicationName;
         }
         if ("AppVersion".equals(key)) {
             try {
@@ -1444,7 +1453,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (NameNotFoundException ex) {
                 ex.printStackTrace();
             }
-            return null;
+            return defaultValue;
         }
         if ("Platform".equals(key)) {
             return System.getProperty("platform");
