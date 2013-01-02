@@ -44,6 +44,8 @@ public class Tile {
     private static String tileLoadingText = "Loading...";
     private ActionListener listener;
     private static Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+    private static boolean paintLoading = false;
+    
     /**
      * Creates a new Tile.
      * 
@@ -133,7 +135,7 @@ public class Tile {
      */
     public void paint(Graphics g, int x, int y) {
         g.translate(x, y);
-        if (!paint(g)) {
+        if (!paint(g) && paintLoading) {
             paintTileLoading(g);
         }
         g.translate(-x, -y);
@@ -168,6 +170,17 @@ public class Tile {
                 g.drawImage(tileLoadingImage, x, y);
             }
         }
+    }
+    
+    /**
+     * This flag indicates if the Tile should paint a Loading image or Text or
+     * simply not do any painting if a map image is not ready for painting
+     * 
+     * @param if true a Loading rect is displayed when map image is being 
+     * downloaded
+     */ 
+    public static void setPaintLoading(boolean toPaint){
+        paintLoading = toPaint;
     }
     
     /**
