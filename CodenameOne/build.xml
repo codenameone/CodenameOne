@@ -179,61 +179,77 @@
         <copydir src="../Demos/SocialBoo" dest="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
         <copydir src="../Demos/Mapper" dest="build/CodenameOneDist/CodenameOne/demos/Mapper" />
         
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/TZoneFriends" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/NativeDemo/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/CameraDemo/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Tipster/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/KitchenSink/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/MapsDemo/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/ZXing/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/SQLSample/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/FacebookDemo/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Chrome/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/SocialBoo/lib" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../Demos/Mapper/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/TZoneFriends" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/NativeDemo/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/CameraDemo/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Tipster/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/KitchenSink/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/MapsDemo/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/ZXing/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/SQLSample/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/FacebookDemo/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Chrome/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/SocialBoo/lib" />
-        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../Demos/Mapper/lib" />
-        <zip basedir="src" destfile="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" compress="false">
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
+        <copy file="dist/CodenameOne.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
+        <zip basedir="src" destfile="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
-        <copy file="dist/CodenameOne.jar" todir="../Demos/TZoneFriends/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/NativeDemo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/NativeDemo/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/CameraDemo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/CameraDemo/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/Tipster/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Tipster/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/KitchenSink/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/KitchenSink/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/MapsDemo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/MapsDemo/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/ZXing/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/ZXing/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/SQLSample/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/SocialBoo/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/SocialBoo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Mapper/lib" />
-        <copy file="dist/CodenameOne.jar" todir="../Demos/Mapper/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/SQLSample/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/FacebookDemo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Chrome/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/SocialBoo/lib" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="../Demos/Mapper/lib" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne_SRC.jar" />
 
         <deltree dir="build/tmp"/>
         <mkdir dir="build/tmp"/>
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
-        <copy file="../Demos/TZoneFriends/lib/CodenameOne_SRC.zip" todir="build/tmp" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
         <zip basedir="build/tmp" compress="true" file="/Users/user2/Dropbox/updatedLibs.zip" />
