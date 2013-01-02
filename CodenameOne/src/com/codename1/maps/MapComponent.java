@@ -290,10 +290,16 @@ public class MapComponent extends Container {
                 double scale = currentDis / oldDistance;
                 if(scale > 1){
                     if(_zoom == getProvider().maxZoomLevel()){
+                        scaleX = 0;
+                        scaleY = 0;
+                        oldDistance = -1;
                         return;
                     }
                 }else{
                     if(_zoom == getProvider().minZoomLevel()){
+                        scaleX = 0;
+                        scaleY = 0;
+                        oldDistance = -1;
                         return;
                     }                    
                 }
