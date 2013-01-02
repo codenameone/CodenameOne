@@ -79,8 +79,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -241,6 +239,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text) {
         nativeInstance.editStringAt(x, y, w, h, peer, singleLine, rows, maxSize, constraint, text);
+    }
+
+    public void releaseImage(Object image) {
+        if(image instanceof NativeImage) {
+            ((NativeImage)image).deleteImage();
+        }
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
@@ -1594,12 +1598,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             return child;
         }
-
-        protected void finalize() {
+        
+        void deleteImage() {
             if(peer != 0) {
                 deleteNativePeer(peer);
                 peer = 0;
-            }
+            }            
+        }
+
+        protected void finalize() {
+            deleteImage();
         }
     }
 
