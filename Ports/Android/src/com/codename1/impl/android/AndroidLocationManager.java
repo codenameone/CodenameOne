@@ -14,6 +14,8 @@ import android.os.Handler;
 import android.os.Looper;
 import com.codename1.location.Location;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -23,10 +25,15 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
     private LocationManager locationManager;
     private String bestProvider;
-
+    private Context context;
+    private boolean searchForProvider = false;
+    
     public AndroidLocationManager(Object ctx) {
-        Context context = (Context) ctx;
+        this.context = (Context) ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+    }
+    
+    private void findBestProvider(boolean includeNetwork){
         Criteria criteria = new Criteria();
         criteria.setSpeedRequired(true);
         criteria.setAltitudeRequired(true);
@@ -38,18 +45,21 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             bestProvider = provider.getName();
 
         } else {
-            provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
-            enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-            if (provider != null && enabled) {
-                bestProvider = provider.getName();
-            } else {
-                bestProvider = locationManager.getBestProvider(criteria, true);
+            if(includeNetwork){
+                provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
+                enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                if (provider != null && enabled) {
+                    bestProvider = provider.getName();
+                } else {
+                    bestProvider = locationManager.getBestProvider(criteria, true);
+                }
             }
         }
-        System.out.println("bestProvider " + bestProvider);
+        System.out.println("bestProvider " + bestProvider);    
     }
-
+    
     public Location getCurrentLocation() throws IOException {
+        findBestProvider(true);
         android.location.Location location = locationManager.getLastKnownLocation(bestProvider);
         if (location != null) {
             return convert(location);
@@ -58,6 +68,34 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     }
 
     public void bindListener() {
+        findBestProvider(false);
+        if(bestProvider != null){
+            startListenToGPS();
+        }else{
+            searchForProvider = true;
+            setStatus(OUT_OF_SERVICE);
+            new Thread(){
+                public void run() {
+                    while(searchForProvider){
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException ex) {                            
+                        }
+                        //keep try to get the gps provider, it is very likely
+                        //that the app is requesting the user to turn on the gps
+                        findBestProvider(false);
+                        if(bestProvider != null){
+                            setStatus(AVAILABLE);
+                            startListenToGPS();
+                            return;
+                        }
+                    }                    
+                }                
+            }.start();
+        }
+    }
+    
+    private void startListenToGPS() {
         Handler mHandler = new Handler(Looper.getMainLooper());
         mHandler.post(new Runnable() {
 
@@ -66,8 +104,9 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             }
         });
     }
-
+    
     public void clearListener() {
+        searchForProvider = false;
         Handler mHandler = new Handler(Looper.getMainLooper());
         mHandler.post(new Runnable() {
 
