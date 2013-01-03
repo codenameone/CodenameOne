@@ -173,7 +173,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean vibrateInitialized = false;
     private int displayWidth;
     private int displayHeight;
-    Activity activity;
+    static Activity activity;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
@@ -3483,7 +3483,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         
         if (requestCode == ZOOZ_PAYMENT) {
-            ((ZoozPurchase) pur).onActivityResult(requestCode, resultCode, intent);
+            ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
 
@@ -3868,7 +3868,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public Purchase getInAppPurchase() {
-        return new ZoozPurchase(activity, hasAndroidMarket());
+        try {
+            pur = ZoozPurchase.class.newInstance();
+            return pur;
+        } catch(Throwable t) {
+            return super.getInAppPurchase();
+        }
     }
 
     @Override
