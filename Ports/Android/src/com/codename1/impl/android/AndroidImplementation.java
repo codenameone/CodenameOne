@@ -8,6 +8,7 @@ import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
 
 
+import android.webkit.CookieSyncManager;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Notification;
@@ -3894,42 +3895,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return scannerInstance;
     }
 
-    @Override
-    public Vector getCookiesForURL(String url) {
-        try {
-            URI uri = new URI(url);
-            CookieManager mgr = CookieManager.getInstance();
-            if ( !mgr.hasCookies() ) return null;
-            String cookieStr = mgr.getCookie(url);
-            if ( cookieStr == null ) return null;
-            String[] cookies = cookieStr.split(";");
-            int len = cookies.length;
-            Vector out = new Vector();
-            String domain = uri.getHost();
-            for ( int i=0; i<len; i++){
-                Cookie c = new Cookie();
-                String[] parts = cookies[i].split("=");
-                c.setName(parts[0].trim());
-                c.setValue(parts[1].trim());
-                c.setDomain(domain);
-                out.add(c);
-                
+    public void addCookie(Cookie c, boolean addToWebViewCookieManager, boolean sync) {
+        if(addToWebViewCookieManager) {
+            CookieManager mgr;
+            CookieSyncManager syncer;
+            try {
+                syncer = CookieSyncManager.getInstance();
+                mgr = CookieManager.getInstance();
+            } catch(IllegalStateException ex) {
+                syncer = CookieSyncManager.createInstance(this.getContext());
+                mgr = CookieManager.getInstance();
             }
-            
-            return out;
-        } catch (URISyntaxException ex) {
-            return null;
-        }
-        
-        
-    }
-
-    public void addCookie(Cookie c, boolean addToWebViewCookieManager) {
-        if ( addToWebViewCookieManager ){
-            CookieManager mgr = CookieManager.getInstance();
-
-            
-            //hc.setMaxAge((c.getExpires()*1000)-System.currentTimeMillis());
             String cookieString = c.getName()+"="+c.getValue()+
                     "; Domain="+c.getDomain()+
                     "; Path="+c.getPath()+
@@ -3939,6 +3915,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     (c.isSecure()?"s":"")+"://"+
                     c.getDomain()+
                     c.getPath(), cookieString);
+            if(sync) {
+                syncer.sync();
+            }
         }
         super.addCookie(c);
             
@@ -3948,7 +3927,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void addCookie(Cookie c) {
-        this.addCookie(c, true);
+        this.addCookie(c, true, true);
     }
     
     
@@ -3961,7 +3940,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){
         int len = cookiesArray.length;
         for ( int i=0; i< len; i++){
-            this.addCookie(cookiesArray[i], addToWebViewCookieManager);
+            this.addCookie(cookiesArray[i], addToWebViewCookieManager, false);
+        }
+        if(addToWebViewCookieManager) {
+            try {
+                CookieSyncManager.getInstance().sync();
+            } catch (IllegalStateException ex) {
+                CookieSyncManager.createInstance(getContext()).sync();
+            }
         }
     }
     
