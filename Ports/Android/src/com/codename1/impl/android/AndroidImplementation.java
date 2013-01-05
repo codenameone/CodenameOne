@@ -1463,13 +1463,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             String ua = getUserAgent();
             return ua;
         }
-        if ("IMEI".equals(key)) {
-            TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
-            return tm.getDeviceId();
-        }
-        if ("MSISDN".equals(key)) {
-            TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
-            return tm.getLine1Number();
+        try {
+            if ("IMEI".equals(key)) {
+                TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
+                return tm.getDeviceId();
+            }
+            if ("MSISDN".equals(key)) {
+                TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
+                return tm.getLine1Number();
+            }
+        } catch(Throwable t) {
+            // will be caused by no permissions.
+            return null;
         }
 
         //these keys/values are from the Application Resources (strings values)
