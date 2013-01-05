@@ -159,6 +159,9 @@ public class Capture {
                 } catch (InterruptedException ex) {
                 }
             }
+            if(url == null) {
+                return;
+            }
             if(targetWidth > 0 || targetHeight > 0) {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if(scale != null) {
