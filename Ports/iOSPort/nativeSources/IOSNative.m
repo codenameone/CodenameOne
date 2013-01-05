@@ -1830,9 +1830,10 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_OBJECT instan
                                       initWithContentViewController:pickerController] autorelease]; 
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                   inView:[CodenameOne_GLViewController instance]
+                                                   inView:[[CodenameOne_GLViewController instance] view]
                                  permittedArrowDirections:UIPopoverArrowDirectionAny 
                                                  animated:YES]; 
+                [popoverController retain];
             }
             else 
             { 
@@ -1840,6 +1841,39 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(JAVA_OBJECT instan
             }
             [pool release];
         }
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_openImageGallery__(JAVA_OBJECT instanceObject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+        if(![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary]) {
+            if(![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypeSavedPhotosAlbum]) {
+                return;
+            }
+            sourceType = UIImagePickerControllerSourceTypeSavedPhotosAlbum;
+        }
+        popoverController = nil;
+        
+        UIImagePickerController* pickerController = [[[UIImagePickerController alloc] init] autorelease];
+        
+        pickerController.delegate = [CodenameOne_GLViewController instance];
+        pickerController.sourceType = sourceType;
+                
+        if(popoverSupported()) {
+            popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
+                                  initWithContentViewController:pickerController] autorelease];
+            popoverController.delegate = [CodenameOne_GLViewController instance];
+            [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                               inView:[[CodenameOne_GLViewController instance] view]
+                             permittedArrowDirections:UIPopoverArrowDirectionAny
+                                             animated:YES];
+            [popoverController retain];
+        } else {
+            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+        }
+        [pool release];
     });
 }
 

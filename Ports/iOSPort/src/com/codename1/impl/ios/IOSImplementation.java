@@ -1117,6 +1117,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.captureCamera(true);
     }
 
+    @Override
+    public void openImageGallery(ActionListener response) {    
+        captureCallback = new EventDispatcher();
+        captureCallback.addListener(response);
+        nativeInstance.openImageGallery();
+    }
+    
+    
     class IOSMedia implements Media {
         private String uri;
         private boolean isVideo;

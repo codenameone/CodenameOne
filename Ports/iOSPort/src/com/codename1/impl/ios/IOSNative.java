@@ -271,6 +271,7 @@ final class IOSNative {
     
     // capture
     native void captureCamera(boolean movie);
+    native void openImageGallery();
     native long createAudioRecorder(String destinationFile);
     native void startAudioRecord(long peer);
     native void pauseAudioRecord(long peer);
