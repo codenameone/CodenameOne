@@ -198,7 +198,6 @@ public class MapComponent extends Container {
                     g.translate(translateX, translateY);
                 }else{
                     
-                    g.translate(-translateX, -translateY);
                     if (scaleX > 0) {
                         float sx = (float)scaleX/(float)getWidth();
                         float sy = (float)scaleY/(float)getHeight();                        
@@ -210,10 +209,11 @@ public class MapComponent extends Container {
                         g.resetAffine();
                         g.translate(-tx, -ty);
                     }else{
+                        g.translate(-translateX, -translateY);
                         paintmap(g);                    
+                        g.translate(translateX, translateY);
                     }
 
-                    g.translate(translateX, translateY);
                 
                 }
             }
