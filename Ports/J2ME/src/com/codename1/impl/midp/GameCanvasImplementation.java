@@ -2745,7 +2745,14 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             cam.setLayout(new BorderLayout());
             cam.show();
             
-            final MMAPIPlayer player = MMAPIPlayer.createPlayer("capture://video", null);
+            MMAPIPlayer p;
+            try {
+                p = MMAPIPlayer.createPlayer("capture://video", null);                
+            } catch (Exception e) {                
+                //s40 devices start camera with this uri
+                p = MMAPIPlayer.createPlayer("capture://image", null);                                
+            }
+            final MMAPIPlayer player = p;
             MIDPVideoComponent video = new MIDPVideoComponent(player);
             video.play();
             video.setVisible(true);
