@@ -3056,6 +3056,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    public String getAppHomePath() {
+        return getContext().getFilesDir().getAbsolutePath();
+    }
+
+    /**
+     * @inheritDoc
+     */
     public String[] listFiles(String directory) throws IOException {
         return new File(directory).list();
     }
@@ -3331,6 +3338,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
         return item.getText();    
     }
+    
+    
     
 
     public class Video extends AndroidImplementation.AndroidPeer implements Media {
