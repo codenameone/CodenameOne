@@ -1764,6 +1764,11 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if ("AppVersion".equals(key)) {
             return ApplicationDescriptor.currentApplicationDescriptor().getVersion();
         }
+        
+        if("AppName".equals(key)) {
+            return ApplicationDescriptor.currentApplicationDescriptor().getName();
+        }
+        
         if (initGetProperty) {
             initGetProperty = false;
             ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
@@ -3009,4 +3014,18 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public CodeScanner getCodeScanner() {
         return new CodeScannerImpl(new MultimediaManager());
     }
+    
+    public String getAppHomePath() {
+        String home = "file:///store/home/user/";
+        if (!exists(home)) {
+            return super.getAppHomePath();
+        }
+        String name = getProperty("AppName", "");
+        home = home + getFileSystemSeparator() + name + getFileSystemSeparator();
+        if(!exists(home)){
+            mkdir(home);
+        }
+        return home;
+    }
+    
 }
