@@ -231,7 +231,9 @@ public class MapComponent extends Container {
         if(buffer != null){
             buffer.dispose();
         }
-        buffer = null;
+        refreshLayers = true;
+        _needTiles = true;
+        buffer = null;        
         repaint();
     }
 
