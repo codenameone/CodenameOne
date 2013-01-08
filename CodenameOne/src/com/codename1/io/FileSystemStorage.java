@@ -271,4 +271,12 @@ public class FileSystemStorage {
         return Util.getImplementation().openOutputStream(file, offset);
     }
 
+    /**
+     * This will return the application home directory.
+     * 
+     * @return a writable directory that represent the application home directory
+     */
+     public String getAppHomePath(){
+         return Util.getImplementation().getAppHomePath();
+    }
 }

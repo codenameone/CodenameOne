@@ -4664,4 +4664,19 @@ public abstract class CodenameOneImplementation {
     public CodeScanner getCodeScanner() {
         return null;
     }
+
+    /**
+     * This will return the application home directory.
+     * 
+     * @return a writable directory that represent the application home directory
+     */
+    public String getAppHomePath() {
+        String home = listFilesystemRoots()[0];
+        String name = getProperty("AppName", packageName);
+        home = home + getFileSystemSeparator() + name + getFileSystemSeparator();
+        if(!exists(home)){
+            mkdir(home);
+        }
+        return home;
+    }
 }
