@@ -604,7 +604,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 if(ed.getFontFile() != null) {
                     trueTypeFont.setSelectedItem(ed.getFontFile().getName());
                     trueTypeFontSizeOption.setSelectedIndex(ed.getSizeSetting());
-                    trueTypeFontSizeValue.setValue(new Float(ed.getActualSize()));
+                    trueTypeFontSizeValue.setValue(new Double(ed.getActualSize()));
                 }
             }
             return;
