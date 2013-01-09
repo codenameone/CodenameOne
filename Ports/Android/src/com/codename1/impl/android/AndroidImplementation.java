@@ -3296,10 +3296,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void share(String toShare) {
+    public void share(String text, String image, String mimeType){   
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, toShare);
+        if(image == null){
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
+        }else{
+            shareIntent.setType(mimeType);
+            shareIntent.putExtra(Intent.EXTRA_STREAM, image);
+        }
         activity.startActivity(Intent.createChooser(shareIntent, "Share with..."));
     }
 
