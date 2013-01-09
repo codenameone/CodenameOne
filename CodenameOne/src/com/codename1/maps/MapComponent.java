@@ -40,6 +40,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.MathUtil;
 
@@ -158,6 +159,8 @@ public class MapComponent extends Container {
             setLayout(new BorderLayout());
             Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
             Button out = new Button("-");
+            out.setUIID("MapZoomOut");
+            
             out.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
@@ -167,6 +170,7 @@ public class MapComponent extends Container {
             });
             buttonsbar.addComponent(out);
             Button in = new Button("+");
+            in.setUIID("MapZoomIn");
             in.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {

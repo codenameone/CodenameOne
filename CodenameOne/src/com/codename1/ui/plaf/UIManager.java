@@ -690,6 +690,18 @@ public class UIManager {
         }
         themeProps.put("AdsComponent#derive", "Container");
         themeProps.put("WebBrowser#derive", "Container");
+        
+        if (installedTheme == null || !installedTheme.containsKey("MapZoomOut.derive")) {
+            themeProps.put("MapZoomOut.derive", "Button");
+        }
+        themeProps.put("MapZoomOut.sel#derive", "Button.sel");
+        themeProps.put("MapZoomOut.press#derive", "Button.press");
+        
+        if (installedTheme == null || !installedTheme.containsKey("MapZoomIn.derive")) {
+            themeProps.put("MapZoomIn.derive", "Button");
+        }
+        themeProps.put("MapZoomIn.sel#derive", "Button.sel");
+        themeProps.put("MapZoomIn.press#derive", "Button.press");        
 
     }
 
