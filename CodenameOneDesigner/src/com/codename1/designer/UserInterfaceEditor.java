@@ -5155,6 +5155,7 @@ public class UserInterfaceEditor extends BaseForm {
                         int propertyId = ((ComponentPropertyEditorModel)properties.getModel()).getRowId(row);
                         String propertyName = (String)properties.getValueAt(row, 0);
                         clearPropertyModification(getSelectedComponents()[0], propertyId, propertyName);
+                        saveUI();
                     }
                 }
             };

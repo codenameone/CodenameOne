@@ -2424,14 +2424,14 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                     methodSwitch.append("                ");
                     if(isAbstract) {
                         methodSwitch.append(camelCase);
-                        methodSwitch.append("();\n                return;\n\n");
+                        methodSwitch.append("();\n                break;\n\n");
                     } else {
                         methodSwitch.append("if(");
                         methodSwitch.append(camelCase);
-                        methodSwitch.append("()) {\n                    ev.consume();\n                }\n                return;\n\n");
+                        methodSwitch.append("()) {\n                    ev.consume();\n                    return;\n                }\n                break;\n\n");
                     }
                 }
-                methodSwitch.append("        }\n    }\n\n");
+                methodSwitch.append("        }\n        if(ev.getComponent() != null) {\n            handleComponentAction(ev.getComponent(), ev);\n        }\n    }\n\n");
                 w.write(methodSwitch.toString());
             }
 
