@@ -49,6 +49,10 @@ public class ShareButton extends Button implements ActionListener{
     
     private String textToShare;
     
+    private String imageToShare;
+    
+    private String imageMimeType;
+    
     private Vector shareServices = new Vector();
     
     /**
@@ -79,6 +83,28 @@ public class ShareButton extends Button implements ActionListener{
     public String getTextToShare() {
         return textToShare;
     }
+
+    /**
+     * Sets the image to share.
+     * Notice some sharing services cannot share image and a text, therefore if
+     * setTextToShare(...) is also used, the sharing service gives image sharing 
+     * higher priority.
+     * 
+     * @param imagePath the full file path
+     * @param imageMimeType the image mime type e.g. image/png, image/jpeg
+     */
+    public void setImageToShare(String imagePath, String imageMimeType) {
+        this.imageToShare = imagePath;
+        this.imageMimeType = imageMimeType;
+    }
+
+    /**
+     * Gets the image path to share
+     * @return 
+     */
+    public String getImagePathToShare() {
+        return imageToShare;
+    }
     
 
     /**
@@ -95,15 +121,28 @@ public class ShareButton extends Button implements ActionListener{
      */
     public void actionPerformed(ActionEvent evt) {
         if(Display.getInstance().isNativeShareSupported()){
-            Display.getInstance().share(textToShare);
+            Display.getInstance().share(textToShare, imageToShare, imageMimeType);                
             return;
         }
-        for (int i = 0; i < shareServices.size(); i++) {
-            ShareService share = (ShareService) shareServices.elementAt(i);
+        Vector sharing;
+        if(imageToShare != null){
+            sharing = new Vector();
+            for (int i = 0; i < shareServices.size(); i++) {
+                ShareService share = (ShareService) shareServices.elementAt(i);
+                if(share.canShareImage()){
+                    sharing.add(share);
+                }
+            }
+        }else{
+            sharing = shareServices;
+        }
+        for (int i = 0; i < sharing.size(); i++) {
+            ShareService share = (ShareService) sharing.elementAt(i);
             share.setMessage(textToShare);
+            share.setImage(imageToShare, imageMimeType);
             share.setOriginalForm(getComponentForm());
         }
-        List l = new List(shareServices);
+        List l = new List(sharing);
         l.setCommandList(true);
         final Dialog dialog = new Dialog("Share");
         dialog.setLayout(new BorderLayout());

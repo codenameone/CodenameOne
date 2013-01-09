@@ -127,5 +127,12 @@ public class SMSShare extends ShareService {
         MultiButton unsel = createRendererMultiButton();
         return new GenericListCellRenderer(sel, unsel);
     }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean canShareImage() {
+        return false;
+    }
     
 }

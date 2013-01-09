@@ -52,11 +52,11 @@ public class EmailShare extends ShareService {
     public EmailShare() {
         super("Email", Resources.getSystemResource().getImage("mail.png"));
     }
-    
+
     /**
      * @inheritDoc
      */
-    public void share(final String toShare) {
+    public void share(final String toShare, final String image, final String mimeType) {
         final Form currentForm = Display.getInstance().getCurrent();
         final Form contactsForm = new Form("Contacts");
         contactsForm.setLayout(new BorderLayout());
@@ -81,18 +81,35 @@ public class EmailShare extends ShareService {
                             public void actionPerformed(ActionEvent evt) {
                                 final ShareForm [] f = new ShareForm[1];
                                 Hashtable contact = (Hashtable) contacts.getSelectedItem();
-                                f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare,
-                                        new ActionListener() {
+                                if(image == null){
+                                    f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare,
+                                            new ActionListener() {
 
-                                            public void actionPerformed(ActionEvent evt) {
-                                                String [] recieptents = new String[1];
-                                                recieptents[0] = f[0].getTo();
-                                                Message msg = new Message(toShare);
-                                                Message.sendMessage(recieptents, "share", msg);
-                                                finish();
-                                            }
-                                        });
-                                f[0].show();
+                                                public void actionPerformed(ActionEvent evt) {
+                                                    String [] recieptents = new String[1];
+                                                    recieptents[0] = f[0].getTo();
+                                                    Message msg = new Message(toShare);
+                                                    Message.sendMessage(recieptents, "share", msg);
+                                                    finish();
+                                                }
+                                            });
+                                    f[0].show();
+                                }else{
+                                    f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare, image,
+                                            new ActionListener() {
+
+                                                public void actionPerformed(ActionEvent evt) {
+                                                    String [] recieptents = new String[1];
+                                                    recieptents[0] = f[0].getTo();
+                                                    Message msg = new Message(toShare);
+                                                    msg.setAttachment(image);
+                                                    msg.setMimeType(mimeType);
+                                                    Message.sendMessage(recieptents, "share", msg);
+                                                    finish();
+                                                }
+                                            });
+                                    f[0].show();                                
+                                }
                             }
                         });
                         contactsForm.addComponent(BorderLayout.CENTER, contacts);
@@ -113,6 +130,15 @@ public class EmailShare extends ShareService {
     }
     
     
+    
+    /**
+     * @inheritDoc
+     */
+    public void share(final String toShare) {
+        share(toShare, null, null);
+    }
+    
+    
     private MultiButton createRendererMultiButton() {
         MultiButton b = new MultiButton();
         b.setIconName("icon");
@@ -126,6 +152,13 @@ public class EmailShare extends ShareService {
         MultiButton sel = createRendererMultiButton();
         MultiButton unsel = createRendererMultiButton();
         return new GenericListCellRenderer(sel, unsel);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean canShareImage() {
+        return true;
     }
     
 }
