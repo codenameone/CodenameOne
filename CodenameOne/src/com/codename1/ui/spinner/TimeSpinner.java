@@ -309,10 +309,12 @@ public class TimeSpinner extends BaseSpinner {
             return;
         }
         this.currentMeridiem = currentMeridiem;
-        if(currentMeridiem) {
-            amPM.setValue(new Integer(1));
-        } else {
-            amPM.setValue(new Integer(0));
+        if(amPM != null) {
+            if(currentMeridiem) {
+                amPM.setValue(new Integer(1));
+            } else {
+                amPM.setValue(new Integer(0));
+            }
         }
     }
 
