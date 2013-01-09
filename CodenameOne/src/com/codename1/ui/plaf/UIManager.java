@@ -72,6 +72,9 @@ public class UIManager {
      * their values from this table if applicable.
      */
     private Hashtable resourceBundle;
+    
+    private boolean wasThemeInstalled;
+    
     /**
      * This EventDispatcher holds all listeners who would like to register to
      * Theme refreshed event
@@ -81,6 +84,14 @@ public class UIManager {
     UIManager() {
         current = new DefaultLookAndFeel(this);    
         resetThemeProps(null);
+    }
+    
+    /**
+     * Indicates if a theme was previously installed since the last reset
+     * @return true if setThemeProps was invoked
+     */
+    public boolean wasThemeInstalled() {
+        return wasThemeInstalled;
     }
 
     /**
@@ -285,7 +296,7 @@ public class UIManager {
      */
     private void resetThemeProps(Hashtable installedTheme) {
         themeProps = new Hashtable();
-
+        wasThemeInstalled = false;
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
         Integer centerAlign = new Integer(Component.CENTER);
         Integer rightAlign = new Integer(Component.RIGHT);
@@ -714,6 +725,7 @@ public class UIManager {
         if (accessible) {
             setThemePropsImpl(themeProps);
         }
+        wasThemeInstalled = true;
     }
 
     /**

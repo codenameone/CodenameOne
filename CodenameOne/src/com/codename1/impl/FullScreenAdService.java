@@ -36,6 +36,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.UIManager;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -89,6 +90,11 @@ public abstract class FullScreenAdService {
      * Invoked on application startup, this code will download an ad or timeout 
      */
     public void showWelcomeAd() {
+        if(!UIManager.getInstance().wasThemeInstalled()) {
+            if(Display.getInstance().hasNativeTheme()) {
+                Display.getInstance().installNativeTheme();
+            }
+        }
         ConnectionRequest r = createAdRequest();
         r.setPriority(ConnectionRequest.PRIORITY_HIGH);
         r.setTimeout(timeout);
