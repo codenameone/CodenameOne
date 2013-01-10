@@ -418,6 +418,19 @@ public class MapComponent extends Container {
     }
 
     /**
+     * Gets the screen coordinates of a specific Coord
+     * 
+     * @param coord a lat,lon location
+     * @return the Point of the coordinate on the Map
+     */ 
+    public Point getPointFromCoord(Coord coord){
+        if(!coord.isProjected()){
+            coord = _map.projection().fromWGS84(coord);
+        }
+        return screenTile().pointPosition(coord);        
+    }
+    
+    /**
      * @inheritDoc
      */
     public void keyPressed(int keyCode) {
