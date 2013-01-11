@@ -992,12 +992,22 @@ public class Border {
         }
     }
 
-   private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
+    private void setClipScaled(Graphics g, int x, int y, int w, int h) {
+        if(g.getScaleX() < 1) {
+            w = (int)(((float)w) / g.getScaleX());
+        }
+        if(g.getScaleY() < 1) {
+            h = (int)(((float)h) / g.getScaleY());
+        }
+        g.setClip(x, y, w, h);
+    }
+    
+    private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
             final int widthParameter, final int heightParameter, Component c) {
         int originalColor = g.getColor();
         int x = xParameter;
         int y = yParameter;
-       int width = widthParameter;
+        int width = widthParameter;
         int height = heightParameter;
         switch(type) {
             case TYPE_ROUNDED_PRESSED:
@@ -1126,7 +1136,7 @@ public class Border {
                 Image left = images[2]; Image right = images[3];
                 Image bottomRight = images[7];
                 
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
+                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 
                 x = xParameter;
                 y = yParameter;
@@ -1175,13 +1185,13 @@ public class Border {
                     }
                 }
 
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
+                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderLine(g, topLeft, topRight, top, x, y, width, arrowUpImage, arrowPosition);
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
+                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderLine(g, bottomLeft, bottomRight, bottom, x, y + height - bottom.getHeight(), width, arrowDownImage, arrowPosition);
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
+                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderColumn(g, topLeft, bottomLeft, left, x, y, height, arrowLeftImage, arrowPosition);
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
+                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderColumn(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height, arrowRightImage, arrowPosition);
                                 
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
@@ -1641,7 +1651,7 @@ public class Border {
             } else {
                 g.tileImage(center, x, currentY, center.getWidth(), currentHeight);
             }
-        }
+        } 
     }
 
     private void drawImageBorderLineScale(Graphics g, Image left, Image right, Image center, int x, int y, int width) {

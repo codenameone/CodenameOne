@@ -36,10 +36,27 @@ package com.codename1.ui.animations;
  * @author Shai Almog
  */
 public class Motion {
-
+    private static boolean slowMotion;
     // package protected for the resource editor
     static final int LINEAR = 0;
     static final int SPLINE = 1;
+
+    /**
+     * Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+     * @return the slowMotion
+     */
+    public static boolean isSlowMotion() {
+        return slowMotion;
+    }
+
+    /**
+     * Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+     * @param aSlowMotion the slowMotion to set
+     */
+    public static void setSlowMotion(boolean aSlowMotion) {
+        slowMotion = aSlowMotion;
+    }
+    
     int motionType;
 
     private static final int FRICTION = 2;
@@ -69,6 +86,9 @@ public class Motion {
         this.destinationValue = destinationValue;
         this.duration = duration;
         lastReturnedValue = sourceValue;
+        if(slowMotion) {
+            this.duration *= 50;
+        }
     }
 
     /**

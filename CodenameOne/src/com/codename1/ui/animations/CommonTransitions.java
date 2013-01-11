@@ -303,9 +303,9 @@ public final class CommonTransitions extends Transition {
 
         if(transitionType == TYPE_PULSATE_DIALOG) {
             if(getDestination() instanceof Dialog) {
-                motion = createMotion(600, 1100, 200);
+                motion = createMotion(600, 1100, 150);
                 motion.start();
-                motion2 = createMotion(100, 255, 300);
+                motion2 = createMotion(100, 255, 225);
                 motion2.start();
                 pulseState = 0;
                 Component c = getDialogParent(getDestination());
@@ -537,12 +537,12 @@ public final class CommonTransitions extends Transition {
                 switch(pulseState) {
                     case 0:
                         pulseState = 1;
-                        motion = createMotion(1100, 900, 90);
+                        motion = createMotion(1100, 900, 70);
                         motion.start();
                         return true;
                     case 1:
                         pulseState = 2;
-                        motion = createMotion(900, 1000, 180);
+                        motion = createMotion(900, 1000, 140);
                         motion.start();
                         return true;
                 }

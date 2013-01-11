@@ -102,6 +102,7 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.animations.Motion;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Scrollbar;
@@ -1362,6 +1363,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
             simulatorMenu.add(scrollFlag);
+
+            final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
+            simulatorMenu.add(slowMotionFlag);
+            slowMotionFlag.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent e) {
+                    Motion.setSlowMotion(slowMotionFlag.isSelected());
+                }
+            });
 
             simulatorMenu.addSeparator();
             JMenuItem exit = new JMenuItem("Exit");
@@ -3220,7 +3230,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private class NativeScreenGraphics {
-
         BufferedImage sourceImage;
         Graphics2D cachedGraphics;
     }

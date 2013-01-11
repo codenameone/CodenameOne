@@ -45,7 +45,8 @@ public final class Graphics {
     private Object nativeGraphics;
 
     private Object[] nativeGraphicsState;
-
+    private float scaleX = 1, scaleY = 1;
+    
     
     /**
      * Constructing new graphics with a given javax.microedition.lcdui.Graphics 
@@ -807,6 +808,8 @@ public final class Graphics {
      */
     public void resetAffine() {
         impl.resetAffine(nativeGraphics);
+        scaleX = 1;
+        scaleY = 1;
     }
 
     /**
@@ -817,6 +820,8 @@ public final class Graphics {
      */
     public void scale(float x, float y) {
         impl.scale(nativeGraphics, x, y);
+        scaleX = x;
+        scaleY = y;
     }
 
     /**
@@ -914,5 +919,21 @@ public final class Graphics {
      */
     public void tileImage(Image img, int x, int y, int w, int h) {
         impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+    }
+    
+    /**
+     * Returns the affine X scale
+     * @return the current scale
+     */
+    public float getScaleX() {
+        return scaleX;
+    }
+
+    /**
+     * Returns the affine Y scale
+     * @return the current scale
+     */
+    public float getScaleY() {
+        return scaleY;
     }
 }
