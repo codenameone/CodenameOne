@@ -51,7 +51,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] chkBoxImagesFocus = null;
     private Image[] rButtonImagesFocus = null;
     private boolean tickWhenFocused = true;
-    private char passwordChar = '\u2022'; 
+    private char passwordChar = '\u25CF'; 
     
     /** Creates a new instance of DefaultLookAndFeel */
     public DefaultLookAndFeel(UIManager manager) {
