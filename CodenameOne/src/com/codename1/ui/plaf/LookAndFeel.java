@@ -928,7 +928,7 @@ public abstract class LookAndFeel {
             Display.getInstance().setPureTouch(manager.isThemeConstant("pureTouchBool", Display.getInstance().isPureTouch()));
         }
 
-        int defaultTransitionSpeed = Integer.parseInt(manager.getThemeConstant("transitionSpeedInt", "300"));
+        int defaultTransitionSpeed = Integer.parseInt(manager.getThemeConstant("transitionSpeedInt", "220"));
         String slideDir = manager.getThemeConstant("slideDirection", "horizontal");
         String dialogSlideDir = manager.getThemeConstant("dlgSlideDirection", "vertical");
         String menuSlideDir = manager.getThemeConstant("menuSlideDirection", dialogSlideDir);
