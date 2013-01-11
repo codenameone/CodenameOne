@@ -1314,7 +1314,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_l
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         const char* chrs = stringToUTF8(uri);
         NSString* ns = [NSString stringWithUTF8String:chrs];
-        com_codename1_impl_ios_IOSNative_createAudio = [[AudioPlayer alloc] initWithURL:uri callback:onCompletion];
+        com_codename1_impl_ios_IOSNative_createAudio = [[AudioPlayer alloc] initWithURL:ns callback:onCompletion];
         [pool release];
     });
     return com_codename1_impl_ios_IOSNative_createAudio;
