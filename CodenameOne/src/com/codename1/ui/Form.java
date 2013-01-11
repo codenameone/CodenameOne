@@ -2388,7 +2388,14 @@ public class Form extends Container {
         Container parent = c.getParent();
         while (parent != null) {
             if (parent.isScrollable()) {
-                parent.scrollComponentToVisible(c);
+                if(parent == this) {
+                    // special case for Form
+                    if(getContentPane().isScrollable()) {
+                        getContentPane().scrollComponentToVisible(c);
+                    }
+                } else {
+                    parent.scrollComponentToVisible(c);
+                }
                 return;
             }
             parent = parent.getParent();
