@@ -171,7 +171,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     private short currentKey = 1;
     //protected ActionListener camResponse;
     protected EventDispatcher captureCallback;
-    private static boolean askForPermission = true;
+    //by default don't ask for permissions
+    private static boolean askForPermission = false;
 
     BlackBerryCanvas createCanvas() {
         return new BlackBerryCanvas(this);
@@ -1477,7 +1478,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         public BBEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | Field.SPELLCHECKABLE | type);
             this.lightweightEdit = lightweightEdit;
-
         }
 
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
@@ -1528,35 +1528,44 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
     }
 
+    public static char passwordChar = '\u25CF';
+        
+    private static String getPasswordsChars(String text){
+        String retVal = "";
+        for (int i = 0; i < text.length(); i++) {
+            retVal += passwordChar;                
+        }
+        return retVal;
+    }
+        
     /**
      * #######################################################################
      * #######################################################################
      *
      * see editString() method
      */
-    private class BBPasswordEditField extends PasswordEditField {
+    private class BBPasswordEditField extends net.rim.device.api.ui.component.EditField {
 
         private TextArea lightweightEdit = null;
         private NativeEditCallback callback = new NativeEditCallback();
 
         public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize) {
-            super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | type);
+            super("", lightweightEdit.getText(), maxSize, NO_COMPLEX_INPUT | Field.EDITABLE | Field.FOCUSABLE | type);
             this.lightweightEdit = lightweightEdit;
         }
-
+        
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
             g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
             g.setColor(lightweightEdit.getSelectedStyle().getBgColor());
             super.paintBackground(g);
-            g.setColor(lightweightEdit.getSelectedStyle().getBgColor());
-            g.fillRect(0, 0, this.getWidth(),
-                    this.getHeight());
         }
 
         public void paint(net.rim.device.api.ui.Graphics g) {
             g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
             g.setColor(lightweightEdit.getSelectedStyle().getFgColor());
-            super.paint(g);
+            g.drawText(getPasswordsChars(super.getText()), 0, 0);
+            //super.paint(g);
+            
         }
 
         protected boolean keyDown(int keycode, int time) {
@@ -1574,17 +1583,19 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         protected boolean keyUp(int keycode, int time) {
+            boolean b = super.keyUp(keycode, time);
             callback.onChanged();
-            return super.keyUp(keycode, time);
+            return b;
         }
 
         protected boolean navigationMovement(int dx, int dy, int status, int time) {
+            boolean b = super.navigationMovement(dx, dy, status, time);
             callback.onChanged();
-            return super.navigationMovement(dx, dy, status, time);
+            return b;
         }
-        
-        protected void update(int i) {
-            super.update(i);
+
+        protected void update(int delta) {
+            super.update(delta);
             lightweightEdit.setText(getText());
             callback.onChanged();
         }
