@@ -128,6 +128,8 @@ public abstract class CodenameOneImplementation {
     private static Runnable onCurrentFormChange;
     private static Runnable onExit;
     
+    private boolean useNativeCookieStore = true;
+    
     static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
@@ -4681,5 +4683,21 @@ public abstract class CodenameOneImplementation {
             mkdir(home);
         }
         return home;
+    }
+
+    /**
+     * Uses the native cookie store if applicable, this might break simulator compatibility
+     * @return the useNativeCookieStore
+     */
+    public boolean isUseNativeCookieStore() {
+        return useNativeCookieStore;
+    }
+
+    /**
+     * Uses the native cookie store if applicable, this might break simulator compatibility
+     * @param useNativeCookieStore the useNativeCookieStore to set
+     */
+    public void setUseNativeCookieStore(boolean useNativeCookieStore) {
+        this.useNativeCookieStore = useNativeCookieStore;
     }
 }

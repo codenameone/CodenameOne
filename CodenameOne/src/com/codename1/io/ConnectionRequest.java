@@ -1278,4 +1278,12 @@ public class ConnectionRequest implements IOProgressListener {
     public void setFailSilently(boolean failSilently) {
         this.failSilently = failSilently;
     }
+    
+    /**
+     * Indicates whether the native Cookie stores should be used
+     * @param b true to enable native cookie stores when applicable
+     */
+    public static void setUseNativeCookieStore(boolean b) {
+        Util.getImplementation().setUseNativeCookieStore(b);
+    }
 }

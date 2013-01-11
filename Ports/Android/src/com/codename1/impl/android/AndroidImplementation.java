@@ -3946,14 +3946,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void addCookie(Cookie c) {
-        this.addCookie(c, true, true);
+        if(isUseNativeCookieStore()) {
+            this.addCookie(c, true, true);
+        } else {
+            super.addCookie(c);
+        }
     }
     
     
 
     @Override
     public void addCookie(Cookie[] cookiesArray) {
-        this.addCookie(cookiesArray, true);
+        if(isUseNativeCookieStore()) {
+            this.addCookie(cookiesArray, true);
+        } else {
+            super.addCookie(cookiesArray);
+        }
     }
     
     public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){

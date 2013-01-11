@@ -168,22 +168,33 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void addCookie(Cookie c) {
-        nativeInstance.addCookie(c.getName(), c.getValue(), c.getDomain(), c.getPath(), c.isSecure(), c.isHttpOnly(), c.getExpires());
+        if(isUseNativeCookieStore()) {
+            nativeInstance.addCookie(c.getName(), c.getValue(), c.getDomain(), c.getPath(), c.isSecure(), c.isHttpOnly(), c.getExpires());
+        } else {
+            super.addCookie(c);
+        }
     }
 
     @Override
     public void addCookie(Cookie[] cookiesArray) {
-        int len = cookiesArray.length;
-        for(int i = 0 ; i < len ; i++){
-            addCookie(cookiesArray[i]);
+        if(isUseNativeCookieStore()) {
+            int len = cookiesArray.length;
+            for(int i = 0 ; i < len ; i++){
+                addCookie(cookiesArray[i]);
+            }
+        } else {
+            super.addCookie(cookiesArray);
         }
     }
 
     @Override
     public Vector getCookiesForURL(String url) {
-        Vector v = new Vector();
-        nativeInstance.getCookiesForURL(url, v);
-        return v;
+        if(isUseNativeCookieStore()) {
+            Vector v = new Vector();
+            nativeInstance.getCookiesForURL(url, v);
+            return v;
+        } 
+        return super.getCookiesForURL(url);
     }    
     
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
