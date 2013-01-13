@@ -4542,15 +4542,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
 
-    public void setBrowserURL(final PeerComponent browserPeer, final String url) {
+    public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if (url.startsWith("jar:")) {
-            super.setBrowserURL(browserPeer, url);
-            return;
+            url = url.substring(6);
+            url = this.getClass().getResource(url).toExternalForm();
         }
+        final String theUrl = url;
         Platform.runLater(new Runnable() {
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).setURL(url);
+                ((SEBrowserComponent) browserPeer).setURL(theUrl);
             }
         });
     }

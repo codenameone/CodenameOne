@@ -2317,8 +2317,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         if (url.startsWith("jar:")) {
-            super.setBrowserURL(browserPeer, url);
-            return;
+            url = url.substring(6);
+            if(url.indexOf("/") != 0) {
+                url = "/"+url;
+            }
+
+            url = "file:///android_asset"+url;
         }
         AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
         if(bc.parent.getBrowserNavigationCallback().shouldNavigate(url)) {
