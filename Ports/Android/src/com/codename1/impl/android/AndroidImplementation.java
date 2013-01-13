@@ -3604,20 +3604,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private File getOutputMediaFile(boolean isVideo) {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
-        if(android.os.Build.VERSION.SDK_INT >= 8) {
-            return GetOutputMediaFile.getOutputMediaFile(isVideo, activity);
-        }
-        else {
-            return null;
-        }
+        return GetOutputMediaFile.getOutputMediaFile(isVideo, activity);
     }
     
     private static class GetOutputMediaFile {
         public static File getOutputMediaFile(boolean isVideo, Activity activity) {
             activity.getComponentName();
 
-            File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_PICTURES), "" + activity.getTitle());
+            File mediaStorageDir = null;
+            if(android.os.Build.VERSION.SDK_INT >= 8) {
+                mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
+                     Environment.DIRECTORY_PICTURES), "" + activity.getTitle());
+            } else {
+                mediaStorageDir = new File(Environment.getExternalStorageDirectory(), "" + activity.getTitle());
+            }            
+            
             // This location works best if you want the created images to be shared
             // between applications and persist after your app has been uninstalled.
 
