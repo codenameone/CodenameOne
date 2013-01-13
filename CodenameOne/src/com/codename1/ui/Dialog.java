@@ -866,11 +866,15 @@ public class Dialog extends Form {
             buttonArea = new Container(new FlowLayout(CENTER));
         }
         buttonArea.setUIID("DialogCommandArea");
+        String uiid = getUIManager().getThemeConstant("dlgButtonCommandUIID", null);
         addButtonBar(buttonArea);
         if(cmds.length > 0) {
             int largest = Integer.parseInt(getUIManager().getThemeConstant("dlgCommandButtonSizeInt", "0"));
             for(int iter = 0 ; iter < cmds.length ; iter++) {
                 Button b = new Button(cmds[iter]);
+                if(uiid != null) {
+                    b.setUIID(uiid);
+                }
                 largest = Math.max(b.getPreferredW(), largest);
                 buttonArea.addComponent(b);
             }
