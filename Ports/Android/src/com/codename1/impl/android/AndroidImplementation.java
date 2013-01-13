@@ -281,11 +281,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getDeviceDensity() {
-        if (isTablet()) {
-            return Display.DENSITY_MEDIUM;
-        }
         DisplayMetrics metrics = new DisplayMetrics();
         activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        if (isTablet()) {
+            if(getDisplayWidth() > 1400) {
+                return Display.DENSITY_VERY_HIGH;
+            }
+            return Display.DENSITY_MEDIUM;
+        }
         switch (metrics.densityDpi) {
             case DisplayMetrics.DENSITY_LOW:
                 return Display.DENSITY_LOW;
