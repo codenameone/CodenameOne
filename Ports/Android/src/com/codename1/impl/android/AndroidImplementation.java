@@ -1040,11 +1040,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
 
+        boolean antialias = ((AndroidGraphics) graphics).getPaint().isAntiAlias();
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
         ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
         ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
                 ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).getPaint().setAntiAlias(antialias);
     }
 
     @Override
@@ -1106,12 +1107,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
-
+        
+        boolean antialias = ((AndroidGraphics) graphics).getPaint().isAntiAlias();
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
         ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
         ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
                 ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).getPaint().setAntiAlias(antialias);
+        
     }
 
     @Override
