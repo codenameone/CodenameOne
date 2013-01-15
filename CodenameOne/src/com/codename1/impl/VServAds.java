@@ -129,7 +129,7 @@ public class VServAds extends FullScreenAdService {
         };
         con.setUrl(URL);
         con.setPost(false);
-        con.addArgument("zoneid", zoneId);
+        con.addArgument("zoneid", getZoneId());
         con.addArgument("ua", Display.getInstance().getProperty("User-Agent", ""));
         con.addArgument("app", "1");
         con.addArgument("aid", Display.getInstance().getProperty("androidId", ""));
@@ -268,5 +268,19 @@ public class VServAds extends FullScreenAdService {
      */
     public void setCategory(int category) {
         this.category = category;
+    }
+
+    /**
+     * @return the zoneId
+     */
+    public String getZoneId() {
+        return zoneId;
+    }
+
+    /**
+     * @param zoneId the zoneId to set
+     */
+    public void setZoneId(String zoneId) {
+        this.zoneId = zoneId;
     }
 }
