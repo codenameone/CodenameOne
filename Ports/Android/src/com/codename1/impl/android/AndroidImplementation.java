@@ -1041,6 +1041,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void drawRect(Object graphics, int x, int y, int width, int height) {
 
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
+        ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
         ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
                 ((AndroidGraphics) graphics).getPaint());
 
@@ -1107,6 +1108,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void fillRect(Object graphics, int x, int y, int width, int height) {
 
         ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
+        ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
         ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
                 ((AndroidGraphics) graphics).getPaint());
 
