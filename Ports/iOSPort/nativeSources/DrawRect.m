@@ -37,9 +37,9 @@
     GlColorFromRGB(color, alpha);
     GLfloat vertexes[] = {
         x, y,
-        x + width, y,
-        x + width, y + height,
-        x, y + height,
+        x + width - 1, y,
+        x + width - 1, y + height - 1,
+        x, y + height - 1,
     };
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(2, GL_FLOAT, 0, vertexes);
