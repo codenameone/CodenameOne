@@ -1942,6 +1942,23 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_OBJECT 
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABAddressBookRef addressBook = getAddressBook();
     CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
+    
+    if(includeNumbers) {
+        CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
+        int responseCount = 0;
+        for(int iter = 0 ; iter < nPeople ; iter++) {
+            ABRecordRef ref = CFArrayGetValueAtIndex(allPeople, iter);
+            ABMultiValueRef numbers = ABRecordCopyValue(ref, kABPersonPhoneProperty);
+            
+            if(numbers != nil && ABMultiValueGetCount(numbers) > 0) {
+                responseCount++;
+            }
+        }
+        
+        [pool release];
+        return responseCount;
+    }
+    
     [pool release];
     return MAX(nPeople, 0);
 }
@@ -1953,6 +1970,22 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
     int size = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     ABAddressBookRef addressBook = getAddressBook();
     CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
+    if(includeNumbers) {
+        CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
+        int responseCount = 0;
+        for(int iter = 0 ; iter < nPeople ; iter++) {
+            ABRecordRef ref = CFArrayGetValueAtIndex(allPeople, iter);
+            ABMultiValueRef numbers = ABRecordCopyValue(ref, kABPersonPhoneProperty);
+            
+            if(numbers != nil && ABMultiValueGetCount(numbers) > 0) {
+                responseCount++;
+                data[responseCount] = ABRecordGetRecordID(ref);
+            }
+        }
+        
+        [pool release];
+        return;
+    }
     for(int iter = 0 ; iter < size ; iter++) {
         ABRecordRef ref = CFArrayGetValueAtIndex(allPeople, iter);
         data[iter] = ABRecordGetRecordID(ref);
