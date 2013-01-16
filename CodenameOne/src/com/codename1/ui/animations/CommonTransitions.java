@@ -30,8 +30,10 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 /**
@@ -313,6 +315,19 @@ public final class CommonTransitions extends Transition {
                 originalY = c.getY();
                 originalWidth = c.getWidth();
                 originalHeight = c.getHeight();
+                Display d = Display.getInstance();
+                Dialog dlg = (Dialog)destination;
+
+                // transparent image!
+                buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()), 
+                        Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight() +
+                        getDialogTitleHeight(dlg)), 0);
+                Graphics g = buffer.getGraphics();
+                Style stl = dlg.getDialogComponent().getStyle();
+                byte bgt = stl.getBgTransparency();
+                stl.setBgTransparency(0xff);
+                drawDialogCmp(buffer.getGraphics(), dlg);
+                stl.setBgTransparency(bgt, true);
                 return;
             }
             transitionType = TYPE_EMPTY;
@@ -639,7 +654,12 @@ public final class CommonTransitions extends Transition {
                         int h = (int)(originalHeight * ratio);
                         c.setX(originalX + ((originalWidth - w) / 2));
                         c.setY(originalY + ((originalHeight - h) / 2));
-                        paint(g, c, 0, 0);
+
+                        int currentDlgX = getDialogParent(getDestination()).getX();
+                        int currentDlgY = getDialogParent(getDestination()).getY();
+                        g.drawImage(buffer, currentDlgX, currentDlgY);
+                        
+                        //paint(g, c, 0, 0);
                         g.resetAffine();
                     } else {
                         c.setWidth((int)(originalWidth * ratio));
@@ -653,7 +673,7 @@ public final class CommonTransitions extends Transition {
             }
         } catch(Throwable t) {
             System.out.println("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
-            //t.printStackTrace();
+            t.printStackTrace();
         }
     }
 
