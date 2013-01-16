@@ -43,8 +43,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * Default constructor
      */
-    protected void initComponent() {
-        super.initComponent();
+    void initSpinner() {
         if(spin == null) {
             spin = createSpinner();
             addComponent(spin);

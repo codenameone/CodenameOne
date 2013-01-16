@@ -56,8 +56,7 @@ public class TimeSpinner extends BaseSpinner {
     /**
      * Default constructor
      */
-    protected void initComponent() {
-        super.initComponent();
+    void initSpinner() {
         if(hour == null) {
             hour = Spinner.create(startHour, endHour, currentHour, 1);
             minute = Spinner.create(0, 60, currentMinute, minuteStep);

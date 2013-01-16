@@ -57,11 +57,7 @@ public class DateSpinner extends BaseSpinner {
         currentYear = c.get(Calendar.YEAR);
     }
     
-    /**
-     * Default constructor
-     */
-    protected void initComponent() {
-        super.initComponent();
+    void initSpinner() {
         if(month == null) {
             day = Spinner.create(1, 32, currentDay, 1);
             month = Spinner.create(1, 13, currentMonth, 1);

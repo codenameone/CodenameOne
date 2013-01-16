@@ -53,6 +53,9 @@ public abstract class BaseSpinner extends Container {
      * @inheritDoc
      */
     protected Dimension calcPreferredSize() {
+        if(!isInitialized()) {
+            initSpinner();
+        }
         Dimension d = super.calcPreferredSize();
         if(overlayStyle.getBorder() != null) {
             d.setWidth(Math.max(overlayStyle.getBorder().getMinimumWidth(), d.getWidth()));
@@ -61,6 +64,18 @@ public abstract class BaseSpinner extends Container {
         return d;
     }
 
+    /**
+     * Default constructor
+     */
+    protected void initComponent() {
+        super.initComponent();
+        initSpinner();
+    }
+
+
+    void initSpinner() {
+    }
+    
     /**
      * @inheritDoc
      */

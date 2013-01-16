@@ -49,11 +49,7 @@ public class GenericSpinner extends BaseSpinner {
         render.setUIID("SpinnerRenderer");
     }
     
-    /**
-     * Default constructor
-     */
-    protected void initComponent() {
-        super.initComponent();
+    void initSpinner() {
         if(spin == null) {
             spin = createSpinner();
             setLayout(new BorderLayout());

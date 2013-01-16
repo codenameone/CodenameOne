@@ -38,10 +38,8 @@ public class DateTimeSpinner extends TimeSpinner {
     private boolean markToday = true;
     private boolean includeYear;
     
-    /**
-     * Default constructor
-     */
-    protected void initComponent() {
+    void initSpinner() {
+        super.initSpinner();
         if(date == null) {
             date = Spinner.createDate(startDate.getTime(), endDate.getTime(), currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);
             if(includeYear) {
@@ -55,7 +53,6 @@ public class DateTimeSpinner extends TimeSpinner {
                 ((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime());
             }
         }
-        super.initComponent();
     }
     
     void addComponents() {
