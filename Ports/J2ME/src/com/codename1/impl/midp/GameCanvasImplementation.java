@@ -2736,69 +2736,73 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     }
 
     public void capturePhoto(ActionListener response) {
-       captureResponse = response;
-        try {
-            final Form current = Display.getInstance().getCurrent();
-            Form cam = new Form();
-            cam.setTransitionInAnimator(CommonTransitions.createEmpty());
-            cam.setTransitionOutAnimator(CommonTransitions.createEmpty());
-            cam.setLayout(new BorderLayout());
-            cam.show();
-            
-            MMAPIPlayer p;
-            try {
-                p = MMAPIPlayer.createPlayer("capture://video", null);                
-            } catch (Exception e) {                
-                //s40 devices start camera with this uri
-                p = MMAPIPlayer.createPlayer("capture://image", null);                                
-            }
-            final MMAPIPlayer player = p;
-            MIDPVideoComponent video = new MIDPVideoComponent(player);
-            video.play();
-            video.setVisible(true);
-            cam.addComponent(BorderLayout.CENTER, video);
-            cam.revalidate();
-            ActionListener l = new ActionListener() {
+        captureResponse = response;
+        final Form current = Display.getInstance().getCurrent();
+        Form cam = new Form();
+        cam.setTransitionInAnimator(CommonTransitions.createEmpty());
+        cam.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        cam.setLayout(new BorderLayout());
+        cam.show();
 
-                public void actionPerformed(ActionEvent evt) {
-                    VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
-                    try {
-                        byte [] pic = cnt.getSnapshot("encoding=jpeg");
-                        String imagePath = getOutputMediaFile() + ".jpg";
-                        OutputStream out = null;
-                        try {
-                            out = FileSystemStorage.getInstance().openOutputStream(imagePath);
-                            out.write(pic);                            
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                            System.out.println("failed to store picture to " + imagePath );
-                        }finally{
-                            if(out != null){
-                                try {
-                                    out.close();
-                                    player.pause();
-                                    player.cleanup();
-                                } catch (IOException ex) {
-                                    ex.printStackTrace();
-                                }
-                            }
-                        }                        
-                        captureResponse.actionPerformed(new ActionEvent(imagePath));
-                        current.showBack();
-                    } catch (MediaException ex) {
-                        ex.printStackTrace();
-                        System.out.println("failed to take picture");
-                    }
-                }
-            };
-            cam.addGameKeyListener(Display.GAME_FIRE, l);
-            cam.addPointerReleasedListener(l);
-            
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            throw new RuntimeException("failed to start camera");
+        String platform = System.getProperty("microedition.platform");
+        MMAPIPlayer p = null;
+        if (platform != null && platform.indexOf("Nokia") >= 0) {
+            try {
+                p = MMAPIPlayer.createPlayer("capture://image", null);
+            } catch (Throwable e) {
+                // Ignore all exceptions for image capture, continue with video capture...
+            }
+        }
+        if (p == null) {
+            try {
+                p = MMAPIPlayer.createPlayer("capture://video", null);
+            } catch (Exception e) {
+                // The Nokia 2630 throws this if image/video capture is not supported
+                throw new RuntimeException("Image/video capture not supported on this phone");
+            }
         }
 
+        final MMAPIPlayer player = p;
+        MIDPVideoComponent video = new MIDPVideoComponent(player);
+        video.play();
+        video.setVisible(true);
+        cam.addComponent(BorderLayout.CENTER, video);
+        cam.revalidate();
+        ActionListener l = new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
+                try {
+                    byte[] pic = cnt.getSnapshot("encoding=jpeg");
+                    String imagePath = getOutputMediaFile() + ".jpg";
+                    OutputStream out = null;
+                    try {
+                        out = FileSystemStorage.getInstance().openOutputStream(imagePath);
+                        out.write(pic);
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                        System.out.println("failed to store picture to " + imagePath);
+                    } finally {
+                        if (out != null) {
+                            try {
+                                out.close();
+                                player.pause();
+                                player.cleanup();
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                    }
+                    captureResponse.actionPerformed(new ActionEvent(imagePath));
+                    current.showBack();
+                } catch (MediaException ex) {
+                    ex.printStackTrace();
+                    System.out.println("failed to take picture");
+                }
+            }
+        };
+        cam.addGameKeyListener(Display.GAME_FIRE, l);
+        cam.addPointerReleasedListener(l);
     }
 
     public void captureVideo(ActionListener response) {
