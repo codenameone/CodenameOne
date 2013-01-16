@@ -1920,7 +1920,19 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_OBJECT in
 ABAddressBookRef globalAddressBook = nil;
 ABAddressBookRef getAddressBook() {
     if(globalAddressBook == nil) {
-        globalAddressBook = ABAddressBookCreate();
+        if (ABAddressBookRequestAccessWithCompletion != nil) {
+            CFErrorRef error = nil;
+            globalAddressBook = ABAddressBookCreateWithOptions(NULL,&error);
+            __block bool completed = NO;
+            ABAddressBookRequestAccessWithCompletion(globalAddressBook, ^(bool granted, CFErrorRef error) {
+                completed = YES;
+            });
+            while(!completed) {
+                wait(10);
+            }
+        } else {
+            globalAddressBook = ABAddressBookCreate();            
+        }
     }
     return globalAddressBook;
 }
