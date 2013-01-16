@@ -25,11 +25,7 @@ package com.codename1.share;
 import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.contacts.ContactsModel;
-import com.codename1.ui.Command;
-import com.codename1.ui.Display;
-import com.codename1.ui.Form;
-import com.codename1.ui.Label;
-import com.codename1.ui.List;
+import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -65,8 +61,17 @@ public class SMSShare extends ShareService {
         Display.getInstance().startThread(new Runnable() {
 
             public void run() {
-                String[] ids = ContactsManager.getAllContactsWithNumbers();
-                ContactsModel model = new ContactsModel(ids);
+                String[] ids = ContactsManager.getAllContacts();
+                 if(ids == null || ids.length == 0){
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Dialog.show("Failed to Share", "No Contacts Found", "Ok", null);
+                            currentForm.showBack();
+                        }
+                    });
+                    return;
+                }
+               ContactsModel model = new ContactsModel(ids);
                 final List contacts = new List(model);
                 contacts.setRenderer(createListRenderer());
                 Display.getInstance().callSerially(new Runnable() {
