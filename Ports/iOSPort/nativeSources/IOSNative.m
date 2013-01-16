@@ -1465,6 +1465,18 @@ void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(JAVA_
     });
 }
 
+void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_boolean(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIWebView* w = (UIWebView*)peer;
+        
+        w.scrollView.scrollEnabled = NO;
+        w.scrollView.bounces = NO;
+        
+        [pool release];
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

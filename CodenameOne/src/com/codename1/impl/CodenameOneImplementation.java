@@ -3078,6 +3078,15 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Allows disabling the browsers native scrolling on devices that support it
+     * 
+     * @param browserPeer browser instance
+     * @param e true to enables scrolling and false disables it
+     */
+    public void setNativeBrowserScrollingEnabled(PeerComponent browserPeer, boolean e) {
+    }
+    
+    /**
      * If the implementation supports the creation of a browser component it should be returned in this
      * method
      *

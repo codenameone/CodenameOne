@@ -161,6 +161,7 @@ final class IOSNative {
     native void retainPeer(long peer);
 
     native void setPinchToZoomEnabled(long peer, boolean e);
+    native void setNativeBrowserScrollingEnabled(long peer, boolean e);
     native long createBrowserComponent(Object bc);
 
     native void setBrowserPage(long browserPeer, String html, String baseUrl);

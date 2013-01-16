@@ -2112,6 +2112,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void setNativeBrowserScrollingEnabled(PeerComponent browserComponent, boolean e) {
+        nativeInstance.setNativeBrowserScrollingEnabled(get(browserComponent), e);
+    }
+
+    @Override
     public boolean isOpaque(Image codenameOneImage, Object nativeImage) {
         // TODO
         return super.isOpaque(codenameOneImage, nativeImage);
@@ -2330,6 +2335,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     class NativeIPhoneView extends PeerComponent {
         private long[] nativePeer;
         private boolean lightweightMode;
+        private Image peerImage;
         
         public NativeIPhoneView(Object nativePeer) {
             super(nativePeer);
@@ -2340,6 +2346,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void finalize() {
             if(nativePeer[0] != 0) {
                 nativeInstance.releasePeer(nativePeer[0]);            
+            }
+        }
+        
+        public void paint(com.codename1.ui.Graphics g) {
+            if(peerImage != null) {
+                g.drawImage(peerImage, getX(), getY());
+            } else {
+                super.paint(g);
             }
         }
         

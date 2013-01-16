@@ -47,6 +47,9 @@ import java.util.Hashtable;
 public class BrowserComponent extends Container {
     private Hashtable listeners;
     private PeerComponent internal;
+    private boolean pinchToZoom = true;
+    private boolean nativeScrolling = true;
+    
     private BrowserNavigationCallback browserNavigationCallback = new BrowserNavigationCallback(){
         public boolean shouldNavigate(String url) {
             return true;
@@ -183,9 +186,38 @@ public class BrowserComponent extends Container {
      * @param e true to enable pinch to zoom, false to disable it
      */
     public void setPinchToZoomEnabled(boolean e) {
+        pinchToZoom = e;
         Display.getInstance().getImplementation().setPinchToZoomEnabled(internal, e);
     }
 
+    /**
+     * This method is unreliable and is only here for consistency with setPinchToZoomEnabled,
+     * it will not return whether the platform supports pinch since this is very hard to detect
+     * properly.
+     * @return the last value for setPinchToZoomEnabled
+     */
+    public boolean isPinchToZoomEnabled() {
+        return pinchToZoom;
+    }
+    
+    /**
+     * This flag allows disabling the native browser scrolling on platforms that support it
+     * @param b true to enable native scrolling, notice that non-native scrolling might be problematic
+     */
+    public void setNativeScrollingEnabled(boolean b) {
+        nativeScrolling = b;
+        Display.getInstance().getImplementation().setNativeBrowserScrollingEnabled(internal, e);
+    }
+    
+    /**
+     * This method is unreliable and is only here for consistency with setNativeScrollingEnabled.
+     * 
+     * @return the last value for setNativeScrollingEnabled
+     */
+    public boolean isNativeScrollingEnabled() {
+        return nativeScrolling;
+    }
+    
     /**
      * Shows the given HTML in the native viewer
      *
