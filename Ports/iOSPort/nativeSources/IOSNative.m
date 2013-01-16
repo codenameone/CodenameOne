@@ -1931,7 +1931,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_OBJECT 
     ABAddressBookRef addressBook = getAddressBook();
     CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
     [pool release];
-    return nPeople;
+    return MAX(nPeople, 0);
 }
 
 void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA_OBJECT instanceObject, JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
