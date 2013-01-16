@@ -206,7 +206,7 @@ public class BrowserComponent extends Container {
      */
     public void setNativeScrollingEnabled(boolean b) {
         nativeScrolling = b;
-        Display.getInstance().getImplementation().setNativeBrowserScrollingEnabled(internal, e);
+        Display.getInstance().getImplementation().setNativeBrowserScrollingEnabled(internal, b);
     }
     
     /**
