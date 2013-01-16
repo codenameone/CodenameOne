@@ -981,9 +981,9 @@ public class Container extends Component {
     }
 
     /**
-     * Makes sure the component is visible in the scroll if this container is 
+     * Makes sure the component is visible in the scroll if this container is
      * scrollable
-     * 
+     *
      * @param c the component that will be scrolling for visibility
      */
     public void scrollComponentToVisible(Component c) {
@@ -997,16 +997,38 @@ public class Container extends Component {
                     if (f != null && f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
                         if (r == c.getBounds()) {
-                            scrollRectToVisible(new Rectangle(0, 0, 
-                                    c.getX() + Math.min(c.getWidth(), getWidth()), 
+                            scrollRectToVisible(new Rectangle(0, 0,
+                                    c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
                             return;
                         }
                     }
                 }
-                scrollRectToVisible(r.getX(), r.getY(), 
-                        Math.min(r.getSize().getWidth(), getWidth()), 
-                        Math.min(r.getSize().getHeight(), getHeight()), c);
+                boolean moveToVisible = true;
+                boolean large = c.getVisibleBounds().getSize().getHeight() > getHeight() || 
+                        c.getVisibleBounds().getSize().getWidth() > getWidth();
+                if (large) {
+                    int x = getScrollX();
+                    int y = getScrollY();
+                    int w = getWidth();
+                    int h = getHeight();
+                    boolean visible = contains(c) && Rectangle.intersects(c.getAbsoluteX(),
+                            c.getAbsoluteY(),
+                            c.getWidth(),
+                            c.getHeight(),
+                            getAbsoluteX() + x,
+                            getAbsoluteY() + y,
+                            w,
+                            h);
+                    //if this is a big component no need to scroll to the begining if it's
+                    //partially visible
+                    moveToVisible = !visible;
+                }
+                if (moveToVisible) {
+                    scrollRectToVisible(r.getX(), r.getY(),
+                            Math.min(r.getSize().getWidth(), getWidth()),
+                            Math.min(r.getSize().getHeight(), getHeight()), c);
+                }
             }
         }
     }
