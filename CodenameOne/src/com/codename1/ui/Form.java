@@ -2367,8 +2367,15 @@ public class Form extends Container {
                 parent = current.getParent();
             }
             while (parent != null) {
-                if (parent.isScrollable()) {
-                    return parent.moveScrollTowards(direction, c);
+                if(parent == this) {
+                    if(getContentPane().isScrollable()) {
+                        getContentPane().moveScrollTowards(direction, c);
+                    }
+                    
+                }else{
+                    if (parent.isScrollable()) {
+                        return parent.moveScrollTowards(direction, c);
+                    }
                 }
                 parent = parent.getParent();
             }
