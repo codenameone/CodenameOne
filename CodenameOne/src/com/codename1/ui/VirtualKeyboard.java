@@ -31,6 +31,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -252,8 +253,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
         addComponent(BorderLayout.CENTER, buttons);
         initInputButtons(upperCase);
         inputField.setUseSoftkeys(false);
-        applyRTL(false);
-        
+        applyRTL(false);        
     }
 
     /**
@@ -400,7 +400,11 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
             } else {
                 row.getUnselectedStyle().setPadding(Component.LEFT, 0);
                 row.getUnselectedStyle().setPadding(Component.RIGHT, 0);
-                row.getUnselectedStyle().setMargin(Component.LEFT, emptySpace / 2);
+                row.getUnselectedStyle().setMarginUnit(new byte[]{Style.UNIT_TYPE_PIXELS, 
+                    Style.UNIT_TYPE_PIXELS, 
+                    Style.UNIT_TYPE_PIXELS, 
+                    Style.UNIT_TYPE_PIXELS});
+                        row.getUnselectedStyle().setMargin(Component.LEFT, emptySpace / 2);
                 row.getUnselectedStyle().setMargin(Component.RIGHT, emptySpace / 2);
             }
             buttons.addComponent(row);
