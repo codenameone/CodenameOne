@@ -4016,15 +4016,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             in.initiateScan(in.PRODUCT_CODE_TYPES);
         }
 
-        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        public void onActivityResult(int requestCode, final int resultCode, Intent data) {
             if (requestCode == IntentIntegrator.REQUEST_CODE && callback != null) {
                 if (resultCode == Activity.RESULT_OK) {
-                    String contents = data.getStringExtra("SCAN_RESULT");
-                    String formatName = data.getStringExtra("SCAN_RESULT_FORMAT");
-                    byte[] rawBytes = data.getByteArrayExtra("SCAN_RESULT_BYTES");
-                    callback.scanCompleted(contents, formatName, rawBytes);
+                    final String contents = data.getStringExtra("SCAN_RESULT");
+                    final String formatName = data.getStringExtra("SCAN_RESULT_FORMAT");
+                    final byte[] rawBytes = data.getByteArrayExtra("SCAN_RESULT_BYTES");
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            callback.scanCompleted(contents, formatName, rawBytes);
+                        }
+                    });
                 } else {
-                    callback.scanError(resultCode, null);
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            callback.scanError(resultCode, null);
+                        }
+                    });
                 }
                 callback = null;
             }
