@@ -3398,19 +3398,34 @@ public class IOSImplementation extends CodenameOneImplementation {
         return scannerInstance;
     }
     
-    static void scanCompleted(String contents, String formatName) {
-        scannerInstance.callback.scanCompleted(contents, formatName, null);
-        scannerInstance.callback = null;
+    static void scanCompleted(final String contents, final String formatName) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                scannerInstance.callback.scanCompleted(contents, formatName, null);
+                scannerInstance.callback = null;
+            }
+        });
     }
 
-    static void scanError(int errorCode, String message) {
-        scannerInstance.callback.scanError(errorCode, message);
-        scannerInstance.callback = null;
+    static void scanError(final int errorCode, final String message) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                scannerInstance.callback.scanError(errorCode, message);
+                scannerInstance.callback = null;
+            }
+        });
     }
 
     static void scanCanceled() {
-        scannerInstance.callback.scanCanceled();
-        scannerInstance.callback = null;
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                scannerInstance.callback.scanCanceled();
+                scannerInstance.callback = null;
+            }
+        });
     }
     
     class CodeScannerImpl extends CodeScanner  {
