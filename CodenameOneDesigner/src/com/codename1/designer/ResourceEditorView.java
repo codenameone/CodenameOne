@@ -4310,7 +4310,7 @@ public static void openInIDE(File f, int lineNumber) {
                 if(loadedResources.getL10NResourceNames().length > 0) {
                     File l10nDir = new File(destDir, "l10n");
                     l10nDir.mkdir();
-                    for(String s : loadedResources.getImageResourceNames()) {
+                    for(String s : loadedResources.getL10NResourceNames()) {
                         buildXML.append("   <l10n name=\"");
                         buildXML.append(s);
                         buildXML.append("\">");
