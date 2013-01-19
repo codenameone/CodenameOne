@@ -32,6 +32,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -228,7 +229,7 @@ public class Ads extends Container implements HTMLCallback {
         html.setHTMLCallback(this);
         html.setBodyText("<html><body><div align='center'>" + ad + "</div></body></html>");
         if (isInitialized()) {
-            replace(getComponentAt(0), html, UIManager.getInstance().getLookAndFeel().getDefaultFormTransitionOut());
+            replace(getComponentAt(0), html, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
         } else {
             replace(getComponentAt(0), html, null);
         }
