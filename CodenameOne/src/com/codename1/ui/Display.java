@@ -943,12 +943,20 @@ public final class Display {
 
     /**
      * Called by the underlying implementation to indicate that editing in the native
-     * system has completed and changes should propogate into Codename One
+     * system has completed and changes should propagate into Codename One
      *
      * @param c edited component
      * @param text new text for the component
      */
-    public void onEditingComplete(Component c, String text) {
+    public void onEditingComplete(final Component c, final String text) {
+        if(!isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    onEditingComplete(c, text);
+                }
+            });
+            return;
+        }
         c.onEditComplete(text);
         c.fireActionEvent();
     }

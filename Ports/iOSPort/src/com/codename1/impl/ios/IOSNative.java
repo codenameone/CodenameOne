@@ -156,6 +156,7 @@ final class IOSNative {
 
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
+    native long createPeerImage(long peer, int[] wh);
 
     native void releasePeer(long peer);
     native void retainPeer(long peer);

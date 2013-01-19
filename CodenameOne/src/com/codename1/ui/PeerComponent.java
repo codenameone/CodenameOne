@@ -40,6 +40,7 @@ import com.codename1.ui.geom.Rectangle;
 public class PeerComponent extends Component {
     private Object nativePeer;
     private Rectangle lastPos = new Rectangle(-1, -1, -1, -1);
+    private Image peerImage;
 
     /**
      * This constructor is used by the platform implementation to create instances
@@ -51,6 +52,49 @@ public class PeerComponent extends Component {
         this.nativePeer = nativePeer;
     }
 
+    /**
+     * The peer image is drawn when the component doesn't exist or during transition
+     * a placeholder image can be placed in the beginning to show something while
+     * the peer is being created asynchronously. This image might be replaced by
+     * an internal image representing the actual content of the peer
+     * @return an image
+     */
+    protected Image getPeerImage() {
+        if(peerImage == null) {
+            peerImage = generatePeerImage();
+        }
+        return peerImage;
+    }
+    
+    /**
+     * The native implementation should implement this method to generate a native peer
+     * image representing the component
+     * @return a screenshot of the component
+     */
+    protected Image generatePeerImage() {
+        return null;
+    }
+    
+    /**
+     * The peer image is drawn when the component doesn't exist or during transition
+     * a placeholder image can be placed in the beginning to show something while
+     * the peer is being created asynchronously. This image might be replaced by
+     * an internal image representing the actual content of the peer
+     * 
+     * @param i the peer image
+     */
+    protected void setPeerImage(Image i) {
+        peerImage = i;
+    }
+    
+    /**
+     * Subclasses should return true here if the peer image should be rendered instead of the actual peer
+     * @return true to render the peer image
+     */
+    protected boolean shouldRenderPeerImage() {
+        return false;
+    }
+    
     /**
      * Use this method to encapsulate a native UI object
      *
@@ -158,6 +202,11 @@ public class PeerComponent extends Component {
      */
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
+        if(shouldRenderPeerImage() && getWidth() > 0 && getHeight() > 0) {
+            g.drawImage(getPeerImage(), getX(), getY(), getWidth(), getHeight());
+        } else {
+            super.paint(g);
+        }
     }
     
     private void onPositionSizeChangeImpl() {

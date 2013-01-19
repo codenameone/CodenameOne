@@ -2331,11 +2331,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public PeerComponent createNativePeer(Object nativeComponent) {
         return new NativeIPhoneView(nativeComponent);
     }
-    
+        
     class NativeIPhoneView extends PeerComponent {
         private long[] nativePeer;
         private boolean lightweightMode;
-        private Image peerImage;
         
         public NativeIPhoneView(Object nativePeer) {
             super(nativePeer);
@@ -2346,14 +2345,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void finalize() {
             if(nativePeer[0] != 0) {
                 nativeInstance.releasePeer(nativePeer[0]);            
-            }
-        }
-        
-        public void paint(com.codename1.ui.Graphics g) {
-            if(peerImage != null) {
-                g.drawImage(peerImage, getX(), getY());
-            } else {
-                super.paint(g);
             }
         }
         
@@ -2401,6 +2392,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         
+        protected Image generatePeerImage() {
+            int[] wh = new int[2];
+            long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
+            NativeImage ni = new NativeImage("PeerScreen");
+            ni.peer = imagePeer;
+            ni.width = wh[0];
+            ni.height = wh[1];
+            return Image.createImage(ni);
+        }
+        
+        protected boolean shouldRenderPeerImage() {
+            return lightweightMode || !isInitialized();
+        }
     }
 
     public boolean areMutableImagesFast() {

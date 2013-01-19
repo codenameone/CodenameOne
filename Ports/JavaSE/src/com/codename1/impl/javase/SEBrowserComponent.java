@@ -28,11 +28,18 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Worker;
 import javafx.concurrent.Worker.State;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.image.WritableImage;
 import javafx.scene.web.WebView;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -43,16 +50,16 @@ import javax.swing.SwingUtilities;
  * @author Chen
  */
 public class SEBrowserComponent extends PeerComponent {
-
+    private static boolean firstTime = true;
     private WebView web;
     private javafx.embed.swing.JFXPanel panel;
-    private JFrame frm;
+    private JPanel frm;
     private JavaSEPort instance;
     private String currentURL;
     private boolean init = false;
     private JPanel cnt = new JPanel();
-
-    public SEBrowserComponent(JavaSEPort instance, JFrame f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
+    private boolean lightweightMode;
+    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
         super(null);
         this.web = web;
         this.instance = instance;
@@ -107,7 +114,6 @@ public class SEBrowserComponent extends PeerComponent {
                     web.getEngine().getLoadWorker().cancel();
                 }
             }
-
         });
     }
 
@@ -148,11 +154,6 @@ public class SEBrowserComponent extends PeerComponent {
         return result[0];
     }
      
-    @Override
-    protected void initComponent() {
-        super.initComponent();
-    }
-
     public void execute(final String js) {
         Platform.runLater(new Runnable() {
             public void run() {
@@ -160,24 +161,29 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
     }
-    
+        
     @Override
     protected void deinitialize() {
         super.deinitialize();
+        lightweightMode = true;
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                panel.removeAll();
-                cnt.remove(panel);
+                //panel.removeAll();
+                //cnt.remove(panel);
                 frm.remove(cnt);
                 frm.repaint();
+                init = false;
             }
         });
     }
 
     protected void setLightweightMode(final boolean l) {
+        if(lightweightMode == l) {
+            return;
+        }
+        lightweightMode = l;
         SwingUtilities.invokeLater(new Runnable() {
-            @Override
             public void run() {
 
                 if (!l) {
@@ -185,6 +191,7 @@ public class SEBrowserComponent extends PeerComponent {
                         init = true;
                         cnt.setVisible(true);
                         frm.add(cnt, 0);
+                        onPositionSizeChange();
                         frm.repaint();
                     } else {
                         cnt.setVisible(false);
@@ -199,20 +206,66 @@ public class SEBrowserComponent extends PeerComponent {
 
     }
 
+    protected com.codename1.ui.Image generatePeerImage() {
+        final com.codename1.ui.Image[] img = new com.codename1.ui.Image[] {null};
+        Platform.runLater(new Runnable() {
+            public void run() {
+                WritableImage w = new WritableImage(getWidth(), getHeight());
+                web.snapshot(null, w);
+                BufferedImage bi = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+                SwingFXUtils.fromFXImage(w, bi);
+                img[0] = com.codename1.ui.Image.createImage(bi);
+                setPeerImage(img[0]);
+                synchronized(img) {
+                    img.notify();
+                }
+            }
+        });
+        if(firstTime) {
+            // special case for first time
+            firstTime = false;
+            return com.codename1.ui.Image.createImage(5, 5);
+        }
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                synchronized(img) {
+                    while(img[0] == null) {
+                        try {
+                            img.wait(20);
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                }
+            }
+        });
+        return img[0];
+    }
+    
+    protected boolean shouldRenderPeerImage() {
+        return lightweightMode || !isInitialized();
+    }
+    
     @Override
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
         return new com.codename1.ui.geom.Dimension((int) web.getWidth(), (int) web.getHeight());
     }
 
     @Override
-    public void paint(Graphics g) {
-        if (init) {
-            onPositionSizeChange();
-        }
-    }
-
-    @Override
     protected void onPositionSizeChange() {
+        if(SwingUtilities.isEventDispatchThread()) {
+            final int x = getAbsoluteX();
+            final int y = getAbsoluteY();
+            final int w = getWidth();
+            final int h = getHeight();
+
+            cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
+                    (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+                    (int) (w * instance.zoomLevel),
+                    (int) (h * instance.zoomLevel));
+            cnt.validate();
+            return;
+        }
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -221,16 +274,11 @@ public class SEBrowserComponent extends PeerComponent {
                 final int w = getWidth();
                 final int h = getHeight();
 
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
-                                (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
-                                (int) (w * instance.zoomLevel),
-                                (int) (h * instance.zoomLevel));
-                        cnt.validate();
-                    }
-                });
+                cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
+                        (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+                        (int) (w * instance.zoomLevel),
+                        (int) (h * instance.zoomLevel));
+                cnt.validate();
             }
         });
     }

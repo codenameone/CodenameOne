@@ -1199,6 +1199,29 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_OBJECT 
     });
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
+    org_xmlvm_runtime_XMLVMArray* intArray = arr;
+    __block JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    __block GLUIImage* g;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIView* v = (UIView*)peer;
+        
+        UIGraphicsBeginImageContextWithOptions(v.bounds.size, v.opaque, 0.0);
+        [v.layer renderInContext:UIGraphicsGetCurrentContext()];
+
+        UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
+
+        UIGraphicsEndImageContext();
+        g = [[GLUIImage alloc] initWithImage:image];
+        data[0] = (JAVA_INT)v.bounds.size.width;
+        data[1] = (JAVA_INT)v.bounds.size.height;
+        
+        [pool release];    
+    });
+    return g;
+}
+
 void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

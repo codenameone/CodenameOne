@@ -46,6 +46,7 @@ import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.FontFormatException;
+import java.lang.reflect.InvocationTargetException;
 import javax.swing.JFrame;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
@@ -98,6 +99,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.payment.Product;
+import com.codename1.payment.Purchase;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -137,6 +140,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -154,6 +158,7 @@ import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -174,7 +179,14 @@ import javax.swing.text.JTextComponent;
  * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
+    public final static boolean IS_MAC;
     static {
+        String n = System.getProperty("os.name");
+        if(n != null && n.startsWith("Mac")) {
+            IS_MAC = true;
+        } else {
+            IS_MAC = false;
+        }
         System.setProperty("apple.laf.useScreenMenuBar", "true");
     }
     private static File baseResourceDir;
@@ -260,6 +272,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean showEDTViolationStacks = false;
     private boolean inInit;
     private boolean showMenu = true;
+    
+    private boolean manualPurchaseSupported;
+    private boolean managedPurchaseSupported;
+    private boolean subscriptionSupported;
+    private boolean refundSupported;
 
     public static void blockMonitors() {
         blockMonitors = true;
@@ -450,9 +467,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             return true;
         }
 
-        public void update(java.awt.Graphics g) {            
+        /*public void update(java.awt.Graphics g) {            
             paint(g);           
-        }
+        }*/
 
 
         private void updateBufferSize() {
@@ -518,6 +535,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 }
+                paintChildren(g);
                 g.dispose();
             }
         }
@@ -539,8 +557,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        public void paint(java.awt.Graphics g) {
-            super.paint(g);            
+        public void paintComponent(java.awt.Graphics g) {
+            super.paintComponent(g);            
             if (buffer != null) {
                 //g = getGraphics();
                 drawScreenBuffer(g);
@@ -1255,6 +1273,46 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(testRecorderMenu);
+
+            manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
+            managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
+            subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
+            refundSupported = pref.getBoolean("refundSupported", true);
+            JMenu purchaseMenu = new JMenu("Purchase");
+            simulatorMenu.add(purchaseMenu);
+            final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
+            manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
+            final JCheckBoxMenuItem managedPurchaseSupportedMenu = new JCheckBoxMenuItem("Managed Purchase");
+            managedPurchaseSupportedMenu.setSelected(managedPurchaseSupported);
+            final JCheckBoxMenuItem subscriptionSupportedMenu = new JCheckBoxMenuItem("Subscription");
+            subscriptionSupportedMenu.setSelected(subscriptionSupported);
+            final JCheckBoxMenuItem refundSupportedMenu = new JCheckBoxMenuItem("Refunds");
+            refundSupportedMenu.setSelected(refundSupported);
+            manualPurchaseSupportedMenu.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    manualPurchaseSupported = manualPurchaseSupportedMenu.isSelected();
+                    pref.putBoolean("manualPurchaseSupported", manualPurchaseSupported);
+                }
+            });
+            managedPurchaseSupportedMenu.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    managedPurchaseSupported = managedPurchaseSupportedMenu.isSelected();
+                    pref.putBoolean("managedPurchaseSupported", managedPurchaseSupported);
+                }
+            });
+            subscriptionSupportedMenu.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    subscriptionSupported = subscriptionSupportedMenu.isSelected();
+                    pref.putBoolean("subscriptionSupported", subscriptionSupported);
+                }
+            });
+            refundSupportedMenu.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    refundSupported = refundSupportedMenu.isSelected();
+                    pref.putBoolean("refundSupported", refundSupported);
+                }
+            });
+            
             
             JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
             performanceMonitor.addActionListener(new ActionListener() {
@@ -3971,11 +4029,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                JFileChooser fc = createImagesFileChooser();
+                File selected = pickImage();
 
                 com.codename1.ui.events.ActionEvent result;
-                if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    File selected = fc.getSelectedFile();
+                if (selected != null) {
                     result = new com.codename1.ui.events.ActionEvent(selected.getAbsolutePath());
                 } else {
                     result = null;
@@ -4503,16 +4560,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 final WebView webView = new WebView();
                 root.getChildren().add(webView);                
                 webContainer.setScene(new Scene(root));
-                bc[0] = new SEBrowserComponent(JavaSEPort.this, (JFrame) c, webContainer, webView, (BrowserComponent) parent);
+                bc[0] = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent);
+                synchronized(bc) {
+                    bc.notify();
+                }
             }
         });
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                while (bc[0] == null && err[0] == null) {
-                    try {
-                        Thread.sleep(500);
-                    } catch (InterruptedException ex) {
+                synchronized(bc) {
+                    while (bc[0] == null && err[0] == null) {
+                        try {
+                            bc.wait(20);
+                        } catch (InterruptedException ex) {
+                        }
                     }
                 }
             }
@@ -4638,6 +4700,150 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    public Purchase getInAppPurchase() {
+        return new Purchase() {
+            @Override
+            public Product[] getProducts(String[] skus) {
+                return null;
+            }
+
+            @Override
+            public boolean isItemListingSupported() {
+                return false;
+            }
+
+            @Override
+            public boolean isManagedPaymentSupported() {
+                return managedPurchaseSupported;
+            }
+
+            @Override
+            public boolean isManualPaymentSupported() {
+                return manualPurchaseSupported;
+            }
+
+            @Override
+            public boolean isRefundable(String sku) {
+                int val = JOptionPane.showConfirmDialog(window, "Is " + sku + " refundable?", "Purchase", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                return val == JOptionPane.YES_OPTION;
+            }
+
+            @Override
+            public boolean isSubscriptionSupported() {
+                return subscriptionSupported;
+            }
+
+            @Override
+            public boolean isUnsubscribeSupported() {
+                return subscriptionSupported;
+            }
+
+            @Override
+            public String pay(final double amount, final String currency) {
+                try {
+                    if(Display.getInstance().isEdt()) {
+                        final String[] response = new String[1];
+                        Display.getInstance().invokeAndBlock(new Runnable() {
+                            public void run() {
+                                response[0] = pay(amount, currency);
+                            }
+                        });
+                        return response[0];
+                    }
+                    if(manualPurchaseSupported) {
+                        throw new RuntimeException("Manual payment isn't supportedm check the isManualPaymentSupported() method!");
+                    }
+                    final String[] result = new String[1];
+                    SwingUtilities.invokeAndWait(new Runnable() {
+                        public void run() {
+                            int res = JOptionPane.showConfirmDialog(window, "A payment of " + amount + " was made\nDo you wish to accept it?", "Payment", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                            if(res == JOptionPane.YES_OPTION) {
+                                result[0] = UUID.randomUUID().toString();
+                            } 
+                        }
+                    });
+                    
+                    if(getPurchaseCallback() != null) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                if(result[0] != null) {
+                                    getPurchaseCallback().paymentSucceeded(result[0], amount, currency);
+                                } else {
+                                    getPurchaseCallback().paymentFailed(UUID.randomUUID().toString(), null);
+                                }
+                            }
+                        });
+                    }
+                    
+                    
+                    return result[0];
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+                return null;
+            }
+
+
+            @Override
+            public void purchase(String sku) {
+                super.purchase(sku);
+            }
+
+            @Override
+            public void refund(String sku) {
+                super.refund(sku);
+            }
+
+            @Override
+            public void subscribe(String sku) {
+                super.subscribe(sku);
+            }
+
+            @Override
+            public void unsubscribe(String sku) {
+                super.unsubscribe(sku);
+            }
+
+            @Override
+            public boolean wasPurchased(String sku) {
+                return super.wasPurchased(sku);
+            }
+
+        };
+    }
+    
+    
+    private File pickImage() {
+        if(IS_MAC) {
+            FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
+            fd.setFilenameFilter(new FilenameFilter() {
+
+                public boolean accept(File dir, String name) {
+                    name = name.toLowerCase();
+                    return  name.endsWith("png")
+                        || name.endsWith("jpg")
+                        || name.endsWith("jpeg");
+
+                }
+            });
+            fd.pack();
+            fd.setLocationByPlatform(true);
+            fd.setVisible(true);
+            if(fd.getFile() != null) {
+                return new File(fd.getDirectory(), fd.getFile());
+            }
+            return null;
+        } else {
+            JFileChooser fc = createImagesFileChooser();
+
+            if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                File selected = fc.getSelectedFile();
+                return selected;
+            }
+        }
+        return null;
+    }
+    
     private static JFileChooser createImagesFileChooser() {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle("Camera simulation - pick an image");

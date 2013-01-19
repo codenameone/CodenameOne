@@ -698,7 +698,8 @@ public final class CommonTransitions extends Transition {
     private Motion getComponentShiftMotion(Component c, boolean incoming) {
         Motion m = (Motion)c.getClientProperty("$shm");
         if(m == null) {
-            int travelDestination = getDestination().getWidth() - c.getWidth() - c.getAbsoluteX();
+            Component dest = getDestination();
+            int travelDestination = dest.getWidth() - c.getWidth() - c.getAbsoluteX();
             if(getDestination().getWidth() - c.getWidth() < 10) {
                 // big component that takes up all the space such as a title that occupies the entire title area
                 travelDestination = c.getWidth() / 2 - c.getPreferredW() / 2;

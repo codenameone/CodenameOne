@@ -169,6 +169,13 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Returns the purchase callback instance
+     */
+    public static PurchaseCallback getPurchaseCallback() {
+        return purchaseCallback;
+    }
+    
+    /**
      * Invoked by the display init method allowing the implementation to "bind"
      * 
      * @param m the object passed to the Display init method

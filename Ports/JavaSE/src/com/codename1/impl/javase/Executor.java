@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.Display;
 import java.io.File;
@@ -53,6 +54,9 @@ public class Executor {
                 final Object o = c.newInstance();
                 if(o instanceof PushCallback) {
                     CodenameOneImplementation.setPushCallback((PushCallback)o);
+                }
+                if(o instanceof PurchaseCallback) {
+                    CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)o);
                 }
                 Display.init(null);
                 Display.getInstance().callSerially(new Runnable() {
