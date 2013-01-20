@@ -138,6 +138,7 @@ public class CodenameOneActivity extends Activity {
     }
     
     void purchase(final String item) {
+        waitingForResult = true;
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -148,6 +149,7 @@ public class CodenameOneActivity extends Activity {
 
     void subscribe(final String item) {
         if(subscriptionSupported) {
+            waitingForResult = true;
             this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -219,20 +221,26 @@ public class CodenameOneActivity extends Activity {
 }
 
         @Override
-        public void onRequestPurchaseResponse(BillingService.RequestPurchase request,
-                Consts.ResponseCode responseCode) {
+        public void onRequestPurchaseResponse(final BillingService.RequestPurchase request,
+                final Consts.ResponseCode responseCode) {
             Object app = getApp();
             if(app != null && app instanceof PurchaseCallback) {
-                PurchaseCallback pc = (PurchaseCallback)app;
-                if (responseCode == Consts.ResponseCode.RESULT_OK) {
-                        // purchase was successfully sent to server
-                } else if (responseCode == Consts.ResponseCode.RESULT_USER_CANCELED) {
-                    // user canceled purchase
-                    pc.itemPurchaseError(request.mProductId, "Canceled");
-                } else {
-                    // purchase failed
-                    pc.itemPurchaseError(request.mProductId, responseCode.name());
-                }
+                final PurchaseCallback pc = (PurchaseCallback)app;
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        if (responseCode == Consts.ResponseCode.RESULT_OK) {
+                            // purchase was successfully sent to server
+                        } else if (responseCode == Consts.ResponseCode.RESULT_USER_CANCELED) {
+                            // user canceled purchase
+                            pc.itemPurchaseError(request.mProductId, "Canceled");
+                        } else {
+                            // purchase failed
+                            pc.itemPurchaseError(request.mProductId, responseCode.name());
+                        }
+                    }
+                });
             }
         }
 
