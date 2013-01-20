@@ -294,17 +294,23 @@ public class CodenameOneActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if(isBillingEnabled()) {
-            Handler mHandler = new Handler();
-            cnPurchaseObserver = new CN1PurchaseObserver(mHandler);
-            billing = new BillingService();
-            billing.setContext(this);
+        try {
+            if(isBillingEnabled()) {
+                Handler mHandler = new Handler();
+                cnPurchaseObserver = new CN1PurchaseObserver(mHandler);
+                billing = new BillingService();
+                billing.setContext(this);
 
-            purchaseDB = new PurchaseDatabase(this);
+                purchaseDB = new PurchaseDatabase(this);
 
-            // Check if billing is supported.
-            ResponseHandler.register(cnPurchaseObserver);
-            billing.checkBillingSupported(Consts.ITEM_TYPE_SUBSCRIPTION);
+                // Check if billing is supported.
+                ResponseHandler.register(cnPurchaseObserver);
+                billing.checkBillingSupported(Consts.ITEM_TYPE_SUBSCRIPTION);
+            }
+        } catch(Throwable t) {
+            // might happen if billing permissions are missing
+            System.out.print("This exception is totally valid and here only for debugging purposes");
+            t.printStackTrace();
         }
     }
 

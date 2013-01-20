@@ -3661,23 +3661,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return hasAndroidMarket(activity);
     }
 
+    private static final String GooglePlayStorePackageNameOld = "com.google.market";
+    private static final String GooglePlayStorePackageNameNew = "com.android.vending";
+
     /**
      * Indicates whether this is a Google certified device which means that it
      * has Android market etc.
      */
     public static boolean hasAndroidMarket(Context activity) {
         final PackageManager packageManager = activity.getPackageManager();
-
-        String packagename = activity.getPackageName();
-
-        String url = "market://details?id=" + packagename;
-
-        Intent i2 = new Intent(Intent.ACTION_VIEW);
-        i2.setData(Uri.parse(url));
-
-        List<ResolveInfo> resolveInfo = packageManager.queryIntentActivities(i2, PackageManager.MATCH_DEFAULT_ONLY);
-
-        return resolveInfo.size() > 0;
+        List<PackageInfo> packages = packageManager.getInstalledPackages(PackageManager.GET_UNINSTALLED_PACKAGES);
+        for (PackageInfo packageInfo : packages) {
+            if (packageInfo.packageName.equals(GooglePlayStorePackageNameOld) ||
+                packageInfo.packageName.equals(GooglePlayStorePackageNameNew)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

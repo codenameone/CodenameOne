@@ -48,7 +48,7 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     
     public ZoozPurchase() {
         activity = AndroidImplementation.activity;
-        AndroidImplementation.hasAndroidMarket(activity);
+        hasMarket= AndroidImplementation.hasAndroidMarket(activity);
     }
 
     @Override
