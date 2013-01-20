@@ -96,6 +96,7 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Storage;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -1312,7 +1313,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pref.putBoolean("refundSupported", refundSupported);
                 }
             });
-            
+            purchaseMenu.add(manualPurchaseSupportedMenu);
+            purchaseMenu.add(managedPurchaseSupportedMenu);
+            purchaseMenu.add(subscriptionSupportedMenu);
+            purchaseMenu.add(refundSupportedMenu);
             
             JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
             performanceMonitor.addActionListener(new ActionListener() {
@@ -4702,6 +4706,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public Purchase getInAppPurchase() {
         return new Purchase() {
+            private Vector purchases;
             @Override
             public Product[] getProducts(String[] skus) {
                 return null;
@@ -4724,10 +4729,29 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public boolean isRefundable(String sku) {
+                if(!refundSupported) {
+                    return false;
+                }
                 int val = JOptionPane.showConfirmDialog(window, "Is " + sku + " refundable?", "Purchase", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
                 return val == JOptionPane.YES_OPTION;
             }
 
+            private Vector getPurchases() {
+                if(purchases == null) {
+                    purchases = (Vector)Storage.getInstance().readObject("CN1InAppPurchases");
+                    if(purchases == null) {
+                        purchases = new Vector();
+                    }
+                }
+                return purchases;
+            }
+            
+            private void savePurchases() {
+                if(purchases != null) {
+                    Storage.getInstance().writeObject("CN1InAppPurchases", purchases);
+                }
+            }
+            
             @Override
             public boolean isSubscriptionSupported() {
                 return subscriptionSupported;
@@ -4750,16 +4774,27 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                         return response[0];
                     }
-                    if(manualPurchaseSupported) {
-                        throw new RuntimeException("Manual payment isn't supportedm check the isManualPaymentSupported() method!");
+                    if(!manualPurchaseSupported) {
+                        throw new RuntimeException("Manual payment isn't supported check the isManualPaymentSupported() method!");
                     }
                     final String[] result = new String[1];
-                    SwingUtilities.invokeAndWait(new Runnable() {
+                    final boolean[] completed = new boolean[] {false};
+                    SwingUtilities.invokeLater(new Runnable() {
                         public void run() {
                             int res = JOptionPane.showConfirmDialog(window, "A payment of " + amount + " was made\nDo you wish to accept it?", "Payment", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
                             if(res == JOptionPane.YES_OPTION) {
                                 result[0] = UUID.randomUUID().toString();
                             } 
+                            completed[0] = true;
+                        }
+                    });
+                    Display.getInstance().invokeAndBlock(new Runnable() {
+                        public void run() {
+                            while(!completed[0]) {
+                                try {
+                                    Thread.sleep(20);
+                                } catch(InterruptedException err) {}
+                            }
                         }
                     });
                     
@@ -4785,28 +4820,89 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
             @Override
-            public void purchase(String sku) {
-                super.purchase(sku);
+            public void purchase(final String sku) {
+                if(managedPurchaseSupported) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            final int res = JOptionPane.showConfirmDialog(window, "An in-app purchase of " + sku + " was made\nDo you wish to accept it?", "Payment", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);                            
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if(res == JOptionPane.YES_OPTION) {
+                                        getPurchaseCallback().itemPurchased(sku);
+                                        getPurchases().addElement(sku);
+                                        savePurchases();
+                                    } else {
+                                        getPurchaseCallback().itemPurchaseError(sku, "Purchase failed");
+                                    }
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    throw new RuntimeException("In app purchase isn't supported on this platform!");
+                }
             }
 
             @Override
-            public void refund(String sku) {
-                super.refund(sku);
+            public void refund(final String sku) {
+                if(refundSupported) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            getPurchaseCallback().itemRefunded(sku);
+                            getPurchases().removeElement(sku);
+                            savePurchases();
+                        }
+                    });
+                }
             }
 
             @Override
-            public void subscribe(String sku) {
-                super.subscribe(sku);
+            public void subscribe(final String sku) {
+                if(subscriptionSupported) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            final int res = JOptionPane.showConfirmDialog(window, "An in-app subscription to " + sku + " was made\nDo you wish to accept it?", "Payment", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if(res == JOptionPane.YES_OPTION) {
+                                        getPurchaseCallback().subscriptionStarted(sku);
+                                        getPurchases().addElement(sku);
+                                        savePurchases();
+                                    } else {
+                                        getPurchaseCallback().itemPurchaseError(sku, "Subscription failed");
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
             }
 
             @Override
-            public void unsubscribe(String sku) {
-                super.unsubscribe(sku);
+            public void unsubscribe(final String sku) {
+                if(subscriptionSupported) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            final int res = JOptionPane.showConfirmDialog(window, "In-app unsubscription request for " + sku + " was made\nDo you wish to accept it?", "Payment", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if(res == JOptionPane.YES_OPTION) {
+                                        getPurchaseCallback().subscriptionCanceled(sku);
+                                        getPurchases().removeElement(sku);
+                                        savePurchases();
+                                    } else {
+                                        getPurchaseCallback().itemPurchaseError(sku, "Error in unsubscribe");
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
             }
 
             @Override
             public boolean wasPurchased(String sku) {
-                return super.wasPurchased(sku);
+                return getPurchases().contains(sku);
             }
 
         };
