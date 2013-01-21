@@ -2570,6 +2570,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private WebView web;
         private BrowserComponent parent;
         protected AndroidBrowserComponentCallback jsCallback;
+        private boolean lightweightMode = false;
 
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
@@ -2664,6 +2665,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
 
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            setPeerImage(null);
+        }
+        
+        
+        protected Image generatePeerImage() {
+            Bitmap nativeBuffer = Bitmap.createBitmap(
+                    getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
+            Image image = new AndroidImplementation.NativeImage(nativeBuffer);
+            Canvas canvas = new Canvas(nativeBuffer);
+            web.draw(canvas);
+            return image;
+        }
+        
+        protected boolean shouldRenderPeerImage() {
+            return lightweightMode || !isInitialized();
+        }
+
+        protected void setLightweightMode(boolean l) {
+            if (lightweightMode == l) {
+                return;
+            }
+            lightweightMode = l;
+        }
+        
+        
+
+        
         public void setProperty(final String key, final Object value) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
