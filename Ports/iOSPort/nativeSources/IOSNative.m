@@ -2523,10 +2523,16 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
 }
 
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
-    SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
-    [[SKPaymentQueue defaultQueue] addPayment:payment];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
+        [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+        [[SKPaymentQueue defaultQueue] addPayment:payment];
+    });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(JAVA_OBJECT instanceObject) {
+    return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
+}
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(JAVA_OBJECT instanceObject, JAVA_INT i) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

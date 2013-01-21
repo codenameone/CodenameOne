@@ -1700,19 +1700,27 @@ extern JAVA_OBJECT productsArrayPending;
         switch (transaction.transactionState)
         {
             case SKPaymentTransactionStatePurchased:
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
-                break;
+                continue;
             case SKPaymentTransactionStateFailed:
                 if (transaction.error.code != SKErrorPaymentCancelled) {
-                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), nil);
+                    NSLog(@"Transaction error %@", transaction.error);
+                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), fromNSString(transaction.error.localizedDescription));
+                    continue;
                 }
-                break;
-            case SKPaymentTransactionStateRestored:                
-                break;
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+            case SKPaymentTransactionStateRestored:
+                NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
+                continue;
+            case SKPaymentTransactionStatePurchasing:
+                NSLog(@"SKPaymentTransactionStatePurchasing");
+                continue;
             default:
-                break;
+                NSLog(@"Transaction error %i", transaction.transactionState);
+                continue;
         }
-        [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
     }
 }
 

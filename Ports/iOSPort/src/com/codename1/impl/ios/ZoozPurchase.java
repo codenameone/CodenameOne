@@ -50,7 +50,7 @@ class ZoozPurchase extends Purchase implements Runnable {
     }
 
     public boolean isManagedPaymentSupported() {
-        return true;
+        return nativeInstance.canMakePayments();
     }
 
     public boolean isItemListingSupported() {

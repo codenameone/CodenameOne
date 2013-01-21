@@ -3347,46 +3347,81 @@ public class IOSImplementation extends CodenameOneImplementation {
         return purchasedItems;
     }
     
-    static void itemPurchased(String sku) {
+    static void itemPurchased(final String sku) {
         if(purchaseCallback != null) {
-            purchaseCallback.itemPurchased(sku);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.itemPurchased(sku);
+                }
+            });
         }
     }
     
-    static void itemPurchaseError(String sku, String errorMessage) {
+    static void itemPurchaseError(final String sku, final String errorMessage) {
         if(purchaseCallback != null) {
-            purchaseCallback.itemPurchaseError(sku, errorMessage);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.itemPurchaseError(sku, errorMessage);
+                }
+            });
         }
     }
 
-    static void itemRefunded(String sku) {
+    static void itemRefunded(final String sku) {
         if(purchaseCallback != null) {
-            purchaseCallback.itemRefunded(sku);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.itemRefunded(sku);
+                }
+            });
         }
     }
 
 
-    static void subscriptionStarted(String sku) {
+    static void subscriptionStarted(final String sku) {
         if(purchaseCallback != null) {
-            purchaseCallback.subscriptionStarted(sku);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.subscriptionStarted(sku);
+                }
+            });
         }
     }
 
-    static void subscriptionCanceled(String sku) {
+    static void subscriptionCanceled(final String sku) {
         if(purchaseCallback != null) {
-            purchaseCallback.subscriptionCanceled(sku);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.subscriptionCanceled(sku);
+                }
+            });
         }
     }
     
-    static void paymentFailed(String paymentCode, String failureReason) {
+    static void paymentFailed(final String paymentCode, final String failureReason) {
         if(purchaseCallback != null) {
-            purchaseCallback.paymentFailed(paymentCode, failureReason);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.paymentFailed(paymentCode, failureReason);
+                }
+            });
         }
     }
     
-    static void paymentSucceeded(String paymentCode, double amount, String currency) {
+    static void paymentSucceeded(final String paymentCode, final double amount, final String currency) {
         if(purchaseCallback != null) {
-            purchaseCallback.paymentSucceeded(paymentCode, amount, currency);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    purchaseCallback.paymentSucceeded(paymentCode, amount, currency);
+                }
+            });
         }
     }
     
