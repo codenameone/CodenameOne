@@ -2522,11 +2522,11 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     [pool release];
 }
 
+SKPayment *paymentInstance = nil;
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        SKPayment *payment = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
-        [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
-        [[SKPaymentQueue defaultQueue] addPayment:payment];
+        paymentInstance = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
+        [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
 }
 

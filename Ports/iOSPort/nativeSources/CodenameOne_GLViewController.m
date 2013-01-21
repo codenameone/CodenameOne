@@ -956,6 +956,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         [(EAGLView *)self.view presentFramebuffer];
         GLErrorLog;
     }
+    [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
 }
 
 - (void)keyboardWillHide:(NSNotification *)n
@@ -1693,34 +1694,40 @@ extern JAVA_OBJECT productsArrayPending;
     [pool release];
 }
 
+extern SKPayment *paymentInstance;
 - (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray *)transactions
 {
     for (SKPaymentTransaction *transaction in transactions)
     {
-        switch (transaction.transactionState)
-        {
-            case SKPaymentTransactionStatePurchased:
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
-                continue;
-            case SKPaymentTransactionStateFailed:
-                if (transaction.error.code != SKErrorPaymentCancelled) {
-                    NSLog(@"Transaction error %@", transaction.error);
-                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), fromNSString(transaction.error.localizedDescription));
-                    continue;
-                }
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                continue;
-            case SKPaymentTransactionStateRestored:
-                NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
-                continue;
-            case SKPaymentTransactionStatePurchasing:
-                NSLog(@"SKPaymentTransactionStatePurchasing");
-                continue;
-            default:
-                NSLog(@"Transaction error %i", transaction.transactionState);
-                continue;
+        if(paymentInstance == nil) {
+            [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+            continue;
         }
+            switch (transaction.transactionState)
+            {
+                case SKPaymentTransactionStatePurchased:
+                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                    com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
+                    continue;
+                case SKPaymentTransactionStateFailed:
+                    if (transaction.error.code != SKErrorPaymentCancelled) {
+                        NSLog(@"Transaction error %@", transaction.error);
+                        com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), fromNSString(transaction.error.localizedDescription));
+                    }
+                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                    continue;
+                case SKPaymentTransactionStateRestored:
+                    NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
+                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                    continue;
+                case SKPaymentTransactionStatePurchasing:
+                    NSLog(@"SKPaymentTransactionStatePurchasing");
+                    continue;
+                default:
+                    NSLog(@"Transaction error %i", transaction.transactionState);
+                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                    continue;
+            }
     }
 }
 
