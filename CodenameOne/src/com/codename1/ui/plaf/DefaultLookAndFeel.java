@@ -205,6 +205,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             rButtonImagesFocus = new Image[]{unselected, selected, disabledUnselected, disabledSelected};
         }
     }
+    
+    /**
+     * Sets the password character to display in the TextArea and the TextField
+     * @param the char to display
+     */ 
+    public void setPasswordChar(char c){
+        passwordChar = c;
+    }
 
     /**
      * Returns the images used to represent the radio button (selected followed by unselected).

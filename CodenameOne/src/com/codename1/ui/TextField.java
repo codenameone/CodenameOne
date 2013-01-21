@@ -1050,6 +1050,7 @@ public class TextField extends TextArea {
         Container symbols = new Container(new GridLayout(symbolArray.length / 5, 5));
         for(int iter = 0 ; iter < symbolArray.length ; iter++) {
             Button button = new Button(new Command("" + symbolArray[iter]));
+            button.setUIID("VKBButton");
             button.setAlignment(CENTER);
             symbols.addComponent(button);
         }
