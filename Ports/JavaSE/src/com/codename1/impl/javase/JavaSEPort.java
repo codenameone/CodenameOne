@@ -3072,7 +3072,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     ex.printStackTrace();
                 }
             }
-            return null;
+            return defaultValue;
         }
         String s = System.getProperty(key);
 
@@ -4296,8 +4296,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         }
         
-        
-
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
             return new com.codename1.ui.geom.Dimension(vid.getWidth(), vid.getHeight());
@@ -5061,4 +5059,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    public String getAppHomePath() {
+        return System.getProperty("user.home");
+    }    
 }
