@@ -2814,10 +2814,23 @@ public final class Display {
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     * @deprecated use the version that doesn't take an id argument this argument is effectively ignored!
      */
     public void registerPush(String id, boolean noFallback) {
+        registerPush(noFallback);
+    }
+
+    /**
+     * Register to receive push notification, invoke this method once (ever) to receive push
+     * notifications.
+     * 
+     * @param noFallback some devices don't support an efficient push API and will resort to polling 
+     * to provide push like functionality. If this flag is set to true no polling will occur and 
+     * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     */
+    public void registerPush(boolean noFallback) {
         if(Preferences.get("push_id", (long)-1) > 0) {
-            impl.registerPush(id, noFallback);
+            impl.registerPush(noFallback);
         }
     }
 

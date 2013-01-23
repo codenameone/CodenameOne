@@ -4339,12 +4339,11 @@ public abstract class CodenameOneImplementation {
     /**
      * User register to receive push notification
      * 
-     * @param id the id for the user
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
-    public void registerPush(String id, boolean noFallback) {
+    public void registerPush(boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
             registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());

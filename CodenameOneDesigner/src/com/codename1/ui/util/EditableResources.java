@@ -96,11 +96,13 @@ public class EditableResources extends Resources implements TreeModel {
 
     private EditableResources overrideResource;
     private File overrideFile;
+    private EditableResources parentResource;
     
     public void setOverrideMode(EditableResources overrideResource, File overrideFile) {
         this.overrideResource = overrideResource;
         this.overrideFile = overrideFile;
         if(overrideResource != null) {
+            overrideResource.parentResource = this;
             overrideResource.onChange = onChange;
         }
     }
@@ -673,7 +675,7 @@ public class EditableResources extends Resources implements TreeModel {
         }
         return super.getUi(id);
     }
-    
+
     public Hashtable getTheme(String id) {
         if(overrideResource != null) {
             Hashtable h = overrideResource.getTheme(id);
@@ -771,7 +773,7 @@ public class EditableResources extends Resources implements TreeModel {
 
             if(key.startsWith("@")) {
                 if(key.endsWith("Image")) {
-                    output.writeUTF(findId(theme.get(key)));
+                    output.writeUTF(findId(theme.get(key), true));
                 } else {
                     output.writeUTF((String)theme.get(key));
                 }
@@ -849,7 +851,7 @@ public class EditableResources extends Resources implements TreeModel {
 
             // if this is a background image
             if(key.endsWith("bgImage")) {
-                String imageId = findId(theme.get(key));
+                String imageId = findId(theme.get(key), true);
                 output.writeUTF(imageId);
                 continue;
             } 
@@ -980,9 +982,9 @@ public class EditableResources extends Resources implements TreeModel {
     
     private void writeImageHVBorder(DataOutputStream output, Border border) throws IOException {
         Image[] images = Accessor.getImages(border);
-        output.writeUTF(findId(images[0]));
-        output.writeUTF(findId(images[1]));
-        output.writeUTF(findId(images[2]));
+        output.writeUTF(findId(images[0], true));
+        output.writeUTF(findId(images[1], true));
+        output.writeUTF(findId(images[2], true));
     }
 
     private void writeImageBorder(DataOutputStream output, Border border) throws IOException {
@@ -990,7 +992,7 @@ public class EditableResources extends Resources implements TreeModel {
         Image[] images = Accessor.getImages(border);
         int resourceCount = 0;
         for(int iter = 0 ; iter < images.length ; iter++) {
-            if(images[iter] != null && findId(images[iter]) != null) {
+            if(images[iter] != null && findId(images[iter], true) != null) {
                 resourceCount++;
             }
         }
@@ -1001,22 +1003,22 @@ public class EditableResources extends Resources implements TreeModel {
         output.writeByte(resourceCount);
         switch(resourceCount) {
             case 2:
-                output.writeUTF(findId(images[0]));
-                output.writeUTF(findId(images[4]));
+                output.writeUTF(findId(images[0], true));
+                output.writeUTF(findId(images[4], true));
                 break;
             case 3:
-                output.writeUTF(findId(images[0]));
-                output.writeUTF(findId(images[4]));
-                output.writeUTF(findId(images[8]));
+                output.writeUTF(findId(images[0], true));
+                output.writeUTF(findId(images[4], true));
+                output.writeUTF(findId(images[8], true));
                 break;
             case 8:
                 for(int iter = 0 ; iter < 8 ; iter++) {
-                    output.writeUTF(findId(images[iter]));
+                    output.writeUTF(findId(images[iter], true));
                 }
                 break;
             case 9:
                 for(int iter = 0 ; iter < 9 ; iter++) {
-                    output.writeUTF(findId(images[iter]));
+                    output.writeUTF(findId(images[iter], true));
                 }
                 break;
         }
@@ -1112,10 +1114,14 @@ public class EditableResources extends Resources implements TreeModel {
         }
         return super.getResourceObject(res);
     }
-    
+
     public String findId(Object value) {
+        return findId(value, false);
+    }
+    
+    public String findId(Object value, boolean checkParent) {
         if(overrideResource != null) {
-            String o = overrideResource.findId(value);
+            String o = overrideResource.findId(value, false);
             if(o != null) {
                 return o;
             }
@@ -1136,6 +1142,9 @@ public class EditableResources extends Resources implements TreeModel {
                 return key;
             }
         }
+        if(checkParent && parentResource != null) {
+            return parentResource.findId(value, false);
+        } 
         return null;
     }
 
@@ -1426,6 +1435,15 @@ public class EditableResources extends Resources implements TreeModel {
         return i;
     }
 
+    private com.codename1.ui.Image getImageNoRecursion(String id) {
+        Object o = getResourceObject(id);
+        if(o instanceof MultiImage) {
+            MultiImage m = (MultiImage)o;
+            return m.getBest();
+        }
+        return (com.codename1.ui.Image)o;
+    }
+    
     public com.codename1.ui.Image getImage(String id) {
         if(overrideResource != null) {
             com.codename1.ui.Image o = overrideResource.getImage(id);
@@ -1433,10 +1451,9 @@ public class EditableResources extends Resources implements TreeModel {
                 return o;
             }
         }
-        Object o = getResourceObject(id);
-        if(o instanceof MultiImage) {
-            MultiImage m = (MultiImage)o;
-            return m.getBest();
+        Object o = getImageNoRecursion(id);
+        if(o == null && parentResource != null) {
+            return parentResource.getImageNoRecursion(id);
         }
         return (com.codename1.ui.Image)o;
     }
