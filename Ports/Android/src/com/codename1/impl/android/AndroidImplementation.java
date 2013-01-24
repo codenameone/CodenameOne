@@ -3712,16 +3712,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void registerPush(String id, boolean noFallback) {
+    public void registerPush(Hashtable metaData, boolean noFallback) {
         boolean has = hasAndroidMarket();
         if (noFallback && !has) {
             return;
         }
-        if (has) {
+        String id = (String)metaData.get("googlePlay");
+        if(has) {
             ((CodenameOneActivity) activity).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);
         }
+        registerPushOnServer(id, getApplicationKey(), (byte)1, getProperty("UDID", ""), getPackageName());
     }
 
     public static void stopPollingLoop() {
@@ -4049,6 +4051,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void onActivityResult(int requestCode, final int resultCode, Intent data) {
             if (requestCode == IntentIntegrator.REQUEST_CODE && callback != null) {
+                final ScanResult sr = callback;
                 if (resultCode == Activity.RESULT_OK) {
                     final String contents = data.getStringExtra("SCAN_RESULT");
                     final String formatName = data.getStringExtra("SCAN_RESULT_FORMAT");
@@ -4056,14 +4059,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            callback.scanCompleted(contents, formatName, rawBytes);
+                            sr.scanCompleted(contents, formatName, rawBytes);
                         }
                     });
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            callback.scanError(resultCode, null);
+                            sr.scanError(resultCode, null);
                         }
                     });
                 }
