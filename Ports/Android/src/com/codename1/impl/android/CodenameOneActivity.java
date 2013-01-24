@@ -525,10 +525,10 @@ public class CodenameOneActivity extends Activity {
     }
 
             
-    public void registerForPush(String userEmail) {
+    public void registerForPush(String key) {
         Intent registrationIntent = new Intent("com.google.android.c2dm.intent.REGISTER");
         registrationIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0)); // boilerplate
-        registrationIntent.putExtra("sender", userEmail);
+        registrationIntent.putExtra("sender", key);
         startService(registrationIntent);
     }
     

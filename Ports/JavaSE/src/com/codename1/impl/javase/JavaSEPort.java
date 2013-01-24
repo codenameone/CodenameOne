@@ -4455,7 +4455,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public void registerPush(String id, boolean noFallback) {
+    public void registerPush(Hashtable meta, boolean noFallback) {
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         String user = p.get("user", null);
         Display d = Display.getInstance();
@@ -4474,7 +4474,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             mainClass = mainClass.substring(0, mainClass.lastIndexOf('.'));
             d.setProperty("package_name", mainClass);
         }
-        super.registerPush(id, noFallback);
+        super.registerPush(meta, noFallback);
     }
 
     @Override

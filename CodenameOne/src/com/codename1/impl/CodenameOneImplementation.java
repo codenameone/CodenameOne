@@ -4343,7 +4343,7 @@ public abstract class CodenameOneImplementation {
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
-    public void registerPush(boolean noFallback) {
+    public void registerPush(Hashtable metaData, boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
             registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());

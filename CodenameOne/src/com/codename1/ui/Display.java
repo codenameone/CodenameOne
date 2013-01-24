@@ -2817,20 +2817,24 @@ public final class Display {
      * @deprecated use the version that doesn't take an id argument this argument is effectively ignored!
      */
     public void registerPush(String id, boolean noFallback) {
-        registerPush(noFallback);
+        Hashtable h = new Hashtable();
+        h.put("googlePlay", id);
+        registerPush(h, noFallback);
     }
 
     /**
      * Register to receive push notification, invoke this method once (ever) to receive push
      * notifications.
      * 
+     * @param metaData meta data for push, this is relevant on some platforms such as google where 
+     * a push id is necessary,
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      */
-    public void registerPush(boolean noFallback) {
-        if(Preferences.get("push_id", (long)-1) > 0) {
-            impl.registerPush(noFallback);
+    public void registerPush(Hashtable metaData, boolean noFallback) {
+        if(Preferences.get("push_id", (long)-1) == -1) {
+            impl.registerPush(metaData, noFallback);
         }
     }
 

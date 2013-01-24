@@ -2996,7 +2996,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void registerPush(String id, boolean noFallback) {
+    public void registerPush(Hashtable metaData, boolean noFallback) {
         nativeInstance.registerPush();
     }
 
