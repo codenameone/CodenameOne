@@ -296,11 +296,14 @@ public final class CommonTransitions extends Transition {
 
         // nothing to prepare in advance  for a shift fade transition
         if(transitionType == TYPE_SLIDE_AND_FADE) {
-            motion = createMotion(100, 200, speed);
-            motion2 = createMotion(0, getDestination().getWidth(), speed);
-            motion.start();
-            motion2.start();
-            return;
+            if(getSource() instanceof Form && getDestination() instanceof Form) {
+                motion = createMotion(100, 200, speed);
+                motion2 = createMotion(0, getDestination().getWidth(), speed);
+                motion.start();
+                motion2.start();
+                return;
+            } 
+            transitionType = TYPE_SLIDE;
         }
 
         if(transitionType == TYPE_PULSATE_DIALOG) {
