@@ -2385,6 +2385,9 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 // an edge case where a space preceds a number in a component name and the same name
                 // exists without a space might trigger this situation and thus code that won't compile
                 if(!createdMethodNames.contains(methodName)) {
+                    if(componentType.equals("com.codename1.ui.Form") || componentType.equals("com.codename1.ui.Dialog")) {
+                        continue;
+                    }
                     createdMethodNames.add(methodName);
                     w.write("    public " + componentType + methodName + "(Component root) {\n");
                     w.write("        return (" + componentType + ")" + "findByName(\"" + componentName + "\", root);\n");
