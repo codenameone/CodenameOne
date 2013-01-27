@@ -28,9 +28,12 @@ import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.services.ImageDownloadService;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -181,10 +184,18 @@ public class VServAds extends FullScreenAdService {
             NetworkManager.getInstance().addToQueue(c);
         }
         if("image".equalsIgnoreCase(contentType)) {
-            Label adComponent = new Label();
+            Button adComponent = new Button();
+            adComponent.setUIID("Container");
             adComponent.getStyle().setBgColor(backgroundColor);
             adComponent.getStyle().setOpacity(0xff);
-            NetworkManager.getInstance().addToQueueAndWait(new ImageDownloadService(imageURL, adComponent));
+            ImageDownloadService imd = new ImageDownloadService(imageURL, adComponent);
+            imd.setDownloadToStyles(isScaleMode());
+            NetworkManager.getInstance().addToQueueAndWait(imd);
+            adComponent.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    Display.getInstance().execute(getAdDestination());
+                }
+            });
             return adComponent;
         } else {
             WebBrowser wb = new WebBrowser();

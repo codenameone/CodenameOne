@@ -96,7 +96,8 @@ public class ImageDownloadService extends ConnectionRequest {
     public static void setAlwaysRevalidate(boolean aAlwaysRevalidate) {
         alwaysRevalidate = aAlwaysRevalidate;
     }
-        
+     
+    private boolean downloadToStyles;
     private Label parentLabel;
     private EncodedImage result;
     private Component targetList;
@@ -625,7 +626,11 @@ public class ImageDownloadService extends ConnectionRequest {
         if(parentLabel != null) {
             Dimension pref = parentLabel.getPreferredSize();
             if(parentLabel.getComponentForm() != null) {
-                parentLabel.setIcon(image);
+                if(isDownloadToStyles()) {
+                    parentLabel.getSelectedStyle().setBgImage(image);
+                } else {
+                    parentLabel.setIcon(image);
+                }
                 Dimension newPref = parentLabel.getPreferredSize();
 
                 // if the preferred size changed we need to reflow the UI
@@ -635,7 +640,11 @@ public class ImageDownloadService extends ConnectionRequest {
                     parentLabel.getComponentForm().revalidate();
                 }
             } else {
-                parentLabel.setIcon(image);
+                if(isDownloadToStyles()) {
+                    parentLabel.getSelectedStyle().setBgImage(image);
+                } else {
+                    parentLabel.setIcon(image);
+                }
             }
             parentLabel.repaint();
             return;
@@ -681,5 +690,23 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public EncodedImage getResult() {
         return result;
+    }
+
+    /**
+     * Downloads the image to the style objects associated with this component, effectively 
+     * sets the bgImage property on all the styles for the component instead of invoking setIcon
+     * @return the downloadToStyles
+     */
+    public boolean isDownloadToStyles() {
+        return downloadToStyles;
+    }
+
+    /**
+     * Downloads the image to the style objects associated with this component, effectively 
+     * sets the bgImage property on all the styles for the component instead of invoking setIcon
+     * @param downloadToStyles the downloadToStyles to set
+     */
+    public void setDownloadToStyles(boolean downloadToStyles) {
+        this.downloadToStyles = downloadToStyles;
     }
 }

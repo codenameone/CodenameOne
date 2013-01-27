@@ -51,6 +51,8 @@ public abstract class FullScreenAdService {
     private int timeout = 10000;
     private int adDisplayTime = 6000;
     private int timeForNext = -1;
+    private boolean scaleMode;
+    private boolean allowSkipping;
     
     /**
      * Creates a new request for an ad
@@ -200,13 +202,45 @@ public abstract class FullScreenAdService {
     public void setAdDisplayTime(int adDisplayTime) {
         this.adDisplayTime = adDisplayTime;
     }
+
+    /**
+     * @return the scaleMode
+     */
+    public boolean isScaleMode() {
+        return scaleMode;
+    }
+
+    /**
+     * @param scaleMode the scaleMode to set
+     */
+    public void setScaleMode(boolean scaleMode) {
+        this.scaleMode = scaleMode;
+    }
+
+    /**
+     * @return the allowSkipping
+     */
+    public boolean isAllowSkipping() {
+        return allowSkipping;
+    }
+
+    /**
+     * @param allowSkipping the allowSkipping to set
+     */
+    public void setAllowSkipping(boolean allowSkipping) {
+        this.allowSkipping = allowSkipping;
+    }
     
     class AdForm extends Form {
         boolean blocked = true;
         private long shown = -1;
         public AdForm(Component ad) {
-            setLayout(new BorderLayout());
-            addComponent(BorderLayout.CENTER, ad);
+            BorderLayout bl = new BorderLayout();
+            setLayout(bl);
+            if(!isScaleMode()) {
+                bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+            } 
+            addComponent(BorderLayout.CENTER, ad);                
             Command open = new Command("Open") {
                 public void actionPerformed(ActionEvent ev) {
                     Display.getInstance().execute(getAdDestination());
@@ -220,11 +254,15 @@ public abstract class FullScreenAdService {
             if(Display.getInstance().isTouchScreenDevice()) {
                 Container grid = new Container(new GridLayout(1, 2));
                 grid.addComponent(new Button(open));
-                grid.addComponent(new Button(skip));
+                if(isAllowSkipping()) {
+                    grid.addComponent(new Button(skip));
+                }
                 addComponent(BorderLayout.SOUTH, grid);
             } else {
                 addCommand(open);
-                addCommand(skip);
+                if(isAllowSkipping()) {
+                    addCommand(skip);
+                }
             }
             registerAnimated(this);
         }
