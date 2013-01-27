@@ -2467,7 +2467,7 @@ public class UIBuilder {
                     return;
                 }
                 if(action.equals("$Back")) {
-                    back();
+                    back(evt.getComponent());
                     return;
                 }
 
