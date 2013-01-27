@@ -31,6 +31,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -123,6 +124,52 @@ public class Log {
     protected Log() {}
     
     /**
+     * Returns a server generated unique device id that is cached locally and is only valid per application.
+     * Notice that this device id is specific to your application and to a specific install, it is guaranteed 
+     * to be completely unique or -1 if unavailable (which can be due to a network error). Warning: this 
+     * method might block while accessing the server!s
+     * @return a unique device id
+     */
+    public static long getUniqueDeviceId() {
+        long devId = Preferences.get("DeviceId__$", (long)-1);
+        if(devId > 0) {
+            return devId;
+        }
+        
+        devId = Preferences.get("UDeviceId__$", (long)-1);
+        if(devId > 0) {
+            return devId;
+        }
+        
+        String buildKey = Display.getInstance().getProperty("build_key", null);
+        if(buildKey == null) {
+            return -1;
+        }
+        // request the device id from the server
+        com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {
+            protected void readResponse(java.io.InputStream input) throws java.io.IOException  {
+                java.io.DataInputStream di = new java.io.DataInputStream(input);
+                com.codename1.io.Preferences.set("UDeviceId__$", di.readLong());
+            }
+            
+            protected void handleErrorResponseCode(int code, String message) {}
+            
+            protected void handleException(Exception err) {}
+        };
+        r.setPost(false);
+        r.setUrl("https://codename-one.appspot.com/registerDeviceServlet");
+        r.addArgument("a", Display.getInstance().getProperty("AppName", ""));
+        r.addArgument("b", buildKey);
+        r.addArgument("by",Display.getInstance().getProperty("built_by_user", ""));
+        r.addArgument("p", Display.getInstance().getProperty("package_name", ""));
+        r.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
+        r.addArgument("pl", Display.getInstance().getPlatformName());
+        r.addArgument("u", Display.getInstance().getProperty("udid", ""));
+        com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);
+        return Preferences.get("UDeviceId__$", (long)-1);
+    }
+    
+    /**
      * Sends the current log to the cloud regardless of the reporting level
      */
     public static void sendLog() {
@@ -135,9 +182,9 @@ public class Log {
                 return;
             }
             instance.logDirty = false;
-            long devId = Preferences.get("DeviceId__$", (long)-1);
+            long devId = getUniqueDeviceId();
             if(devId < 0) {
-                System.out.println("Device not registered cannot send log");
+                Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
                 return;
             }
             ConnectionRequest r = new ConnectionRequest();
