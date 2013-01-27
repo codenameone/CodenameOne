@@ -40,7 +40,7 @@ public class ActionEvent {
     
     private int keyEvent = -1;
     private int y = -1;
-    
+    private boolean longEvent = false;
     /**
      * Creates a new instance of ActionEvent
      * @param source element for the action event
@@ -59,6 +59,33 @@ public class ActionEvent {
         this.keyEvent = keyEvent;
     }
 
+    /**
+     * Creates a new instance of ActionEvent
+     * @param source element for the action event
+     * @param keyEvent the key that triggered the event
+     * @param longClick true if the event is triggered from long pressed
+     */
+    public ActionEvent(Object source, int keyEvent, boolean longClick) {
+        this.source = source;
+        this.keyEvent = keyEvent;
+        this.longEvent = longClick;
+    }
+    
+    /**
+     * Creates a new instance of ActionEvent as a pointer event
+     *
+     * @param source element for the pointer event
+     * @param x the x position of the pointer event
+     * @param y the y position of the pointer event
+     * @param longPointer true if the event is triggered from long pressed
+     */
+    public ActionEvent(Object source, int x, int y, boolean longPointer) {
+        this.source = source;
+        this.keyEvent = x;
+        this.y = y;
+        this.longEvent = longPointer;
+    }
+    
     /**
      * Creates a new instance of ActionEvent as a pointer event
      *
@@ -166,5 +193,12 @@ public class ActionEvent {
      */
     public int getY() {
         return y;
+    }
+    
+    /**
+     * Returns true for long click or long pointer event
+     */ 
+    public boolean isLongEvent(){
+        return longEvent;
     }
 }

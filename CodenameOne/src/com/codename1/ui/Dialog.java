@@ -166,7 +166,7 @@ public class Dialog extends Form {
     private static boolean commandsAsButtons;
 
     private boolean disposeWhenPointerOutOfBounds = false;
-
+    private boolean pressedOutOfBounds;
     private Label dialogTitle;
     private Container dialogContentPane;
 
@@ -1639,7 +1639,8 @@ public class Dialog extends Form {
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
-        if(disposeWhenPointerOutOfBounds &&
+        if(disposeWhenPointerOutOfBounds && 
+                pressedOutOfBounds &&
                 !getTitleComponent().contains(x, y) && 
                 !getContentPane().contains(x, y) && 
                 !getMenuBar().contains(x, y)){
@@ -1647,6 +1648,20 @@ public class Dialog extends Form {
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void pointerPressed(int x, int y) {
+        super.pointerPressed(x, y);
+        if(!getTitleComponent().contains(x, y) && 
+                !getContentPane().contains(x, y) && 
+                !getMenuBar().contains(x, y)){
+            pressedOutOfBounds = true;
+        }else{
+            pressedOutOfBounds = false;        
+        }
+    }
+    
     /**
      * Screen orientation position for the upcoming dialog. By default
      * the dialog will be shown at hardcoded coordinates, this method allows us

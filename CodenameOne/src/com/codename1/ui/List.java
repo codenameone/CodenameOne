@@ -1426,12 +1426,20 @@ public class List extends Component {
      * @inheritDoc
      */
     protected void fireActionEvent() {
+        fireActionEvent(new ActionEvent(eventSource));
+    }
+
+    
+    /**
+     * Triggers the event to the listeners
+     * @param evt the event to fire
+     */ 
+    protected void fireActionEvent(ActionEvent a) {
         if(isEnabled() && !Display.getInstance().hasDragOccured()){
             if(disposeDialogOnSelection) {
                 ((Dialog)getComponentForm()).dispose();
             }
             super.fireActionEvent();
-            ActionEvent a = new ActionEvent(eventSource);
             dispatcher.fireActionEvent(a);
             if(isCommandList() && !a.isConsumed()) {
                 Object i = getSelectedItem();
@@ -1885,12 +1893,12 @@ public class List extends Component {
                 }
                 if(longPress){
                     selectionCmp.longPointerPress(newX, newY);
+                    fireActionEvent(new ActionEvent(eventSource, newX, newY, true));
                 }else{
                     selectionCmp.pointerPressed(newX, newY);
                     selectionCmp.pointerReleased(newX, newY);
+                    fireActionEvent(new ActionEvent(eventSource, newX, newY, false));
                 }
-                // propogate the action event in the usual way
-                fireActionEvent();
             }
         }
     }

@@ -258,6 +258,13 @@ public class ContainerList extends Container {
         model.setSelectedIndex(index);
     }
     
+    /**
+     * Triggers the event to the listeners
+     * @param evt the event to fire
+     */ 
+    protected void fireActionEvent(ActionEvent evt) {
+        dispatcher.fireActionEvent(evt);
+    }
     
     /**
      * @inheritDoc
@@ -340,6 +347,7 @@ public class ContainerList extends Container {
             if(cmp instanceof Container) {
                 ((Container)cmp).revalidate();
             }
+            cmp.setFocus(hasFocus());
             cmp.paintComponent(g);
         }
 
@@ -372,14 +380,15 @@ public class ContainerList extends Container {
                         selectionCmp.setY(0);
                         if(longPress){
                             selectionCmp.longPointerPress(newX, newY);
+                            fireActionEvent(new ActionEvent(ContainerList.this, x, y, true));
+                            return;
                         }else{
                             selectionCmp.pointerPressed(newX, newY);
                             selectionCmp.pointerReleased(newX, newY);
                         }
                     }
                 }
-
-                dispatcher.fireActionEvent(new ActionEvent(ContainerList.this, x, y));
+                fireActionEvent(new ActionEvent(ContainerList.this, x, y));
             }
         }
         
@@ -389,7 +398,7 @@ public class ContainerList extends Container {
         public void keyReleased(int keyCode) {
             super.keyReleased(keyCode);
             if(Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
-                dispatcher.fireActionEvent(new ActionEvent(ContainerList.this, keyCode));
+                fireActionEvent(new ActionEvent(ContainerList.this, keyCode));
             }
         }
         
