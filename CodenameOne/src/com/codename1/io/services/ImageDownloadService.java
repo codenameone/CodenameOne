@@ -583,38 +583,11 @@ public class ImageDownloadService extends ConnectionRequest {
         return null;
     }
 
+    
     /**
      * @inheritDoc
      */
-    protected void readResponse(InputStream input) throws IOException  {
-        int imageScaleWidth = -1, imageScaleHeight = -1;
-        if(fastScale) {
-            if(toScale != null) {
-                imageScaleWidth = toScale.getWidth();
-                imageScaleHeight = toScale.getHeight();
-            } else {
-                if(placeholder != null) {
-                    imageScaleWidth = placeholder.getWidth();
-                    imageScaleHeight = placeholder.getHeight();
-                }
-            }
-        }
-        if(cacheImages) {
-            if(destinationFile != null) {
-                result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);
-            } else {
-                EncodedImage e = EncodedImage.create(input);
-                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);
-                //if the storage has failed create the image from the stream
-                if(result == null){
-                    result = e;
-                }
-            }
-        } else {
-            result = EncodedImage.create(input);
-        }
-        
-        
+    protected void postResponse() {
         // trigger an exception in case of an invalid image
         result.getWidth();
         Image image = result;
@@ -681,6 +654,40 @@ public class ImageDownloadService extends ConnectionRequest {
 
         // if this is a list cell renderer component
         fireResponseListener(new NetworkEvent(this, result));
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected void readResponse(InputStream input) throws IOException  {
+        int imageScaleWidth = -1, imageScaleHeight = -1;
+        if(fastScale) {
+            if(toScale != null) {
+                imageScaleWidth = toScale.getWidth();
+                imageScaleHeight = toScale.getHeight();
+            } else {
+                if(placeholder != null) {
+                    imageScaleWidth = placeholder.getWidth();
+                    imageScaleHeight = placeholder.getHeight();
+                }
+            }
+        }
+        if(cacheImages) {
+            if(destinationFile != null) {
+                result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);
+            } else {
+                EncodedImage e = EncodedImage.create(input);
+                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);
+                //if the storage has failed create the image from the stream
+                if(result == null){
+                    result = e;
+                }
+            }
+        } else {
+            result = EncodedImage.create(input);
+        }
+        
+        
     }
 
     /**
