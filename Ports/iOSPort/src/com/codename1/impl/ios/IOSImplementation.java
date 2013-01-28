@@ -3113,10 +3113,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
 
                 private void writeNSData(long p, OutputStream os) throws IOException {
-                    byte[] b = new byte[nativeInstance.getNSDataSize(p)];
-                    nativeInstance.nsDataToByteArray(p, b);
-                    nativeInstance.releasePeer(p);
-                    os.write(b);
+                    int size = nativeInstance.getNSDataSize(p);
+                    if(size < 128 * 1024) {
+                        byte[] b = new byte[size];
+                        nativeInstance.nsDataToByteArray(p, b);
+                        nativeInstance.releasePeer(p);
+                        os.write(b);
+                    } else {
+                        NSDataInputStream ni = new NSDataInputStream(p, size);
+                        Util.copy(ni, os);
+                        ni.close();
+                    }
                 }
                 
                 @Override
