@@ -213,6 +213,11 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     ((List)list).setMutableRendererBackgrounds(true);
                 }
             }
+            cmp.setFocus(true);
+            boolean lead = false;
+            if(cmp instanceof Container) {
+                lead = ((Container)cmp).getLeadComponent() != null;
+            }
             if(value instanceof Hashtable) {
                 Hashtable h = (Hashtable)value;
                 Boolean enabled = (Boolean)h.get(ENABLED);
@@ -234,7 +239,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                         }
                     }
                     setComponentValueWithTickering(entries[iter], val, list, cmp);
-                    entries[iter].setFocus(entries[iter].isFocusable());
+                    entries[iter].setFocus(lead || entries[iter].isFocusable());
                 }
             } else {
                 if(value instanceof CloudObject) {
@@ -278,6 +283,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     ((List)list).setMutableRendererBackgrounds(true);
                 }
             }
+            cmp.setFocus(false);
             if(value instanceof Hashtable) {
                 Hashtable h = (Hashtable)value;
                 Boolean enabled = (Boolean)h.get(ENABLED);
