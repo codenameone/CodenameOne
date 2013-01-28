@@ -38,6 +38,15 @@ extern UIView *editingComponent;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
+    NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
+    if( [apsInfo objectForKey:@"alert"] != NULL)
+    {
+	NSLog(@"Received notification: %@", userInfo);
+	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+        return YES;
+    }
     // Override point for customization after application launch.
     self.window.rootViewController = self.viewController;
     com_codename1_impl_ios_IOSImplementation_callback__();

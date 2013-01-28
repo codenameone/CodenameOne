@@ -79,6 +79,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
+import com.codename1.ui.Dialog;
 
 /**
  *
@@ -198,35 +199,28 @@ public class IOSImplementation extends CodenameOneImplementation {
     }    
     
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
-        /*if(cmp.getAbsoluteY() > getDisplayHeight() / 3) {
-            // if the text component is too low in the screen we "resize the screen" to fit
-            editingText = true;
-            sizeChangedImpl(getDisplayWidth(), getDisplayHeight());
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    cmp.getComponentForm().scrollComponentToVisible(cmp);
-                    currentEditing = (TextArea)cmp;
+        currentEditing = (TextArea)cmp;
 
-                    NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
-                    editStringAt(cmp.getAbsoluteX(),
-                            cmp.getAbsoluteY(),
-                            cmp.getWidth(),
-                            cmp.getHeight(),
-                            fnt.peer, currentEditing.isSingleLineTextArea(),
-                            currentEditing.getRows(), maxSize, constraint, text);
-                }
-            });
-        } else {*/
-            currentEditing = (TextArea)cmp;
-
-            NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
-            editStringAt(cmp.getAbsoluteX(),
-                    cmp.getAbsoluteY(),
-                    cmp.getWidth(),
-                    cmp.getHeight(),
-                    fnt.peer, currentEditing.isSingleLineTextArea(),
-                    currentEditing.getRows(), maxSize, constraint, text);
-        //}
+        NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
+        boolean forceSlideUp = false;
+        Form current = Display.getInstance().getCurrent();
+        if(current instanceof Dialog && !isTablet()) {
+            // special case, if we are editing a small dialog we want to move it
+            // so the bottom of the dialog shows within the screen. This is
+            // described in issue 505
+            Dialog dlg = (Dialog)current;
+            Component c = dlg.getDialogComponent();
+            if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
+                    c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
+                forceSlideUp = true;
+            }
+        }
+        nativeInstance.editStringAt(cmp.getAbsoluteX(),
+                cmp.getAbsoluteY(),
+                cmp.getWidth(),
+                cmp.getHeight(),
+                fnt.peer, currentEditing.isSingleLineTextArea(),
+                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp);
     }
     
     // callback for native code!
@@ -246,10 +240,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             System.out.println("Editing null component!!" + s);
         }
-    }
-
-    private void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text) {
-        nativeInstance.editStringAt(x, y, w, h, peer, singleLine, rows, maxSize, constraint, text);
     }
 
     public void releaseImage(Object image) {

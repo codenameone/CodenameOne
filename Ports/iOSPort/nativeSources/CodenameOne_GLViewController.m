@@ -61,6 +61,7 @@ int editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
+BOOL forceSlideUpField;
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
@@ -124,7 +125,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
- int constraint, const char* str, int len) {
+ int constraint, const char* str, int len, int dialogHeight, BOOL forceSlideUp) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
@@ -139,6 +140,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         editCompoentY = y / scale;
         editCompoentW = w / scale;
         editCompoentH = h / scale;
+        forceSlideUpField = forceSlideUp;
         CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
         if(isSingleLine) {
             UITextField* utf = [[UITextField alloc] initWithFrame:rect];
@@ -1009,8 +1011,10 @@ static CodenameOne_GLViewController *sharedSingleton;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
     if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
-        modifiedViewHeight = NO;
-        return;
+        if(!forceSlideUpField) {
+            modifiedViewHeight = NO;
+            return;
+        }
     }
     modifiedViewHeight = YES;
     
