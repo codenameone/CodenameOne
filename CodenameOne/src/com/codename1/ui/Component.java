@@ -3466,7 +3466,7 @@ public class Component implements Animation, StyleListener {
      * could block it from being used for some other purpose when
      * on top of said component.
      */
-    boolean shouldBlockSideSwipe() {
+    protected boolean shouldBlockSideSwipe() {
         return false;
     }
 
