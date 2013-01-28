@@ -66,7 +66,15 @@ public class AnalyticsService {
      * @return true if analytics is enabled
      */
     public static boolean isEnabled() {
-        return instance != null && instance.agent != null;
+        return instance != null && instance.isAnalyticsEnabled();
+    }
+    
+    /**
+     * Indicates if the analytics is enabled, subclasses must override this method to process their information
+     * @return true if analytics is enabled
+     */
+    protected boolean isAnalyticsEnabled() {
+        return agent != null;
     }
     
     /**
@@ -85,6 +93,14 @@ public class AnalyticsService {
     }
     
     /**
+     * Allows installing an analytics service other than the default
+     * @param i the analytics service implementation.
+     */
+    public static void init(AnalyticsService i) {
+        instance = i;
+    }
+    
+    /**
      * Sends an asynchronous notice to the server regarding a page in the application being viewed, notice that
      * you don't need to append the URL prefix to the page string.
      * 
@@ -92,6 +108,15 @@ public class AnalyticsService {
      * @param referer the source page
      */
     public static void visit(String page, String referer) {
+        instance.visitPage(page, referer);
+    }
+    
+    /**
+     * Subclasses should override this method to track page visits
+     * @param page the page visited
+     * @param referer the page from which the user came
+     */
+    protected void visitPage(String page, String referer) {
         String url = "https://codename-one.appspot.com/anal";
         ConnectionRequest r = new ConnectionRequest();
         r.setUrl(url);
