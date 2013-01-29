@@ -2771,31 +2771,30 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         ActionListener l = new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
                 try {
+                    VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
                     byte[] pic = cnt.getSnapshot("encoding=jpeg");
                     String imagePath = getOutputMediaFile() + ".jpg";
                     OutputStream out = null;
                     try {
                         out = FileSystemStorage.getInstance().openOutputStream(imagePath);
                         out.write(pic);
-                    } catch (IOException ex) {
+                    } catch (Throwable ex) {
                         ex.printStackTrace();
                         System.out.println("failed to store picture to " + imagePath);
                     } finally {
                         if (out != null) {
                             try {
                                 out.close();
-                                player.pause();
                                 player.cleanup();
-                            } catch (IOException ex) {
+                            } catch (Throwable ex) {
                                 ex.printStackTrace();
                             }
                         }
                     }
                     captureResponse.actionPerformed(new ActionEvent(imagePath));
                     current.showBack();
-                } catch (MediaException ex) {
+                } catch (Throwable ex) {
                     ex.printStackTrace();
                     System.out.println("failed to take picture");
                 }
