@@ -135,13 +135,15 @@ public class XMLParser {
      * @return A trimmed char entity without & and ;
      */
     private static String trimCharEntity(String symbol) {
-        if (symbol.startsWith("&")) {
-            symbol=symbol.substring(1);
-        }
-        if (symbol.endsWith(";")) {
-            symbol=symbol.substring(0, symbol.length()-1);
-        }
-        return symbol;
+		int start = 0;
+		int end = symbol.length();
+		if (symbol.charAt(0) == '&') {
+			start = 1;
+		}
+		if (symbol.charAt(end - 1) == ';') {
+			end--;
+		}
+		return symbol.substring(start, end);
     }
 
 
@@ -191,7 +193,8 @@ public class XMLParser {
             return HTMLUtils.convertCharEntity(charEntity, false, userDefinedCharEntities);
         } catch (IllegalArgumentException iae) {
             notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, "Unrecognized char entity: "+charEntity);
-            return "&"+charEntity+";"; // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
+            // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
+            return new StringBuffer().append('&').append(charEntity).append(';').toString();
         }
 
         /*int charCode=-1;
@@ -366,33 +369,33 @@ public class XMLParser {
      * @throws IOException if an I/O error in the stream is encountered
      */
     protected void parseTagContent(Element element,Reader is) throws IOException {
-        String text=null;
+        StringBuffer text=null;
         boolean leadingSpace=false;
         char c=(char)is.read();
-        String charEntity=null;
+        StringBuffer charEntity = null;
 
         while((byte)c!=-1) {
             if (c=='<') {
                 if ((includeWhitespacesBetweenTags) && (leadingSpace) && (text==null) && (element!=null) && (element.getNumChildren()>0)) { 
                     leadingSpace=false;
-                    text=" ";
+					text = new StringBuffer().append(' ');
                 }
                     
                 if (text!=null) {
                     // Mistakenly "collected" something that is not a char entity, perhaps
                     // misuse of the & character (instead of using &apos;)
                     if (charEntity!=null) { 
-                        text+="&"+charEntity;
+						text.append('&').append(charEntity.toString());
                         charEntity=null;
                     }
                     if (leadingSpace) {
-                        text=" "+text;
+                        text.insert(0, ' ');
                     }
                     if(element != null) {
-                        Element textElement=createNewTextElement(text);
+                        Element textElement=createNewTextElement(text.toString());
                         element.addChild(textElement);
                     } else {
-                        textElement(text);
+                        textElement(text.toString());
                     }
                     text=null;
                     leadingSpace=false;
@@ -402,15 +405,16 @@ public class XMLParser {
 
                 Element childElement=parseTag(is);
                 if (childElement==END_TAG) { //was actually an ending tag
-                    String closingTag="";
+					StringBuffer closingTag = new StringBuffer();
                     c=(char)is.read();
                     while ((c!='>')) {
-                        closingTag+=c;
+                        closingTag.append(c);
                         c=(char)is.read();
                     }
+					String ct = closingTag.toString();
                     if(eventParser) {
-                        endTag(closingTag);
-			if (!isEmptyTag(closingTag)) {
+                        endTag(ct);
+			if (!isEmptyTag(ct)) {
 			    // patch from http://code.google.com/p/codenameone/issues/detail?id=428 
                             // not really sure if this is the best approach but if it solves a bug...
 			    return;
@@ -418,12 +422,12 @@ public class XMLParser {
                     }
 
                     if(element != null) {
-                        if (closingTag.equalsIgnoreCase(element.getTagName())) {
+                        if (ct.equalsIgnoreCase(element.getTagName())) {
                             return;
-                        } else if (isEmptyTag(closingTag)) {
+                        } else if (isEmptyTag(ct)) {
                             // do nothing, someone chose to close an empty tag i.e. <img ....></img> or <br></br>
                         } else {
-                            notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, element.getTagName(), null, null, "Malformed XML - no appropriate closing tag for "+element.getTagName());
+                            notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, element.getTagName(), null, null, "Malformed XML - no appropriate closing tag for " + element.getTagName());
                         }
                     }
                 } else {
@@ -434,25 +438,25 @@ public class XMLParser {
             } else if (text!=null) {
                 if (charEntity!=null) {
                     if (c==';') { //end
-                        text+=convertCharEntity(charEntity);
+                        text.append(convertCharEntity(charEntity.toString()));
                         charEntity=null;
                     } else if (isLegalCharEntityCharacter(c)) {
-                        charEntity+=c;
+                        charEntity.append(c);
                     } else {
-                        text+="&"+charEntity+c;
+                        text.append('&').append(charEntity).append(c);
                         charEntity=null;
                     }
                 } else if (c=='&') { //start char entity
-                    charEntity=""; // The & is not included in the string we accumulate
+                    charEntity = new StringBuffer();
                 } else {
-                    text+=c;
+                    text.append(c);
                 }
             } else if (!isWhiteSpace(c)) {
                 if (c=='&') { //text starts with a character entity (i.e. &nbsp;)
-                    charEntity=""; // The & is not included in the string we accumulate
-                    text=""; //Initalize text so it won't be null
+                    charEntity = new StringBuffer(); // The & is not included in the string we accumulate
+					text = new StringBuffer(); //Initalize text so it won't be null
                 } else {
-                    text=""+c;
+                    text = new StringBuffer().append(c);
                 }
             } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
                 leadingSpace=true;
@@ -482,9 +486,9 @@ public class XMLParser {
      * @throws IOException if an I/O error in the stream is encountered
      */
     protected Element parseTag(Reader is) throws IOException {
-        String tagName="";
-        String curAttribute="";
-        String curValue="";
+        StringBuffer tagName = new StringBuffer();
+        StringBuffer curAttribute = new StringBuffer();
+        StringBuffer curValue = new StringBuffer();
         //boolean procInst=false; // Support for the styleshhet processing instruction was removed, as it is not supported in most browsers, and it causes problems by adding tags before the HTML element (Makign the document with multiple roots)
 
         char c=(char)is.read();
@@ -526,7 +530,7 @@ public class XMLParser {
 
         //collect tag name
         while ((!isWhiteSpace(c)) && (c!='>') && (c!='/')) {
-            tagName+=c;
+            tagName.append(Character.toLowerCase(c));
             c=(char)is.read();
         }
 
@@ -536,10 +540,10 @@ public class XMLParser {
         }
 
         boolean processTag = true;
-        if(eventParser) {
-            processTag = startTag(tagName);
-        }
-        tagName=tagName.toLowerCase();
+		String tn = tagName.toString();
+		if (eventParser) {
+			processTag = startTag(tn);
+		}
         // We do not support any processing instructions
         /*if (procInst) {
             if (tagName.equals("xml-stylesheet")) { // The XML processing instruction <?xml-stylesheet ... ?> has the same parameters as <link .. > and behaves the same way
@@ -556,11 +560,11 @@ public class XMLParser {
         }*/
         Element element = null;
         if(!eventParser) {
-            element=createNewElement(tagName);
-        }
+            element=createNewElement(tn);
+		}
 
-        if (!processTag || !isSupported(element)) {
-            notifyError(ParserCallback.ERROR_TAG_NOT_SUPPORTED, tagName, null, null, "The tag '"+tagName+"' is not supported in "+getSupportedStandardName());
+		if (!processTag || !isSupported(element)) {
+			notifyError(ParserCallback.ERROR_TAG_NOT_SUPPORTED, tn, null, null, "The tag '" + tn + "' is not supported in " + getSupportedStandardName());
             if (!processTag || !shouldEvaluate(element)) {
                 // If tag is not supported we skip it all till the closing tag.
                 // This is especially important for the script tag which may contain '<' and '>' which might confuse the parser
@@ -570,7 +574,7 @@ public class XMLParser {
                     c=(char)is.read();
                 }
                 if (lastChar!='/') { // If this is an empty tag, no need to search for its closing tag as there's none...
-                    String endTag="</"+tagName+">";
+                    String endTag = new StringBuffer().append('<').append('/').append(tagName).append('>').toString();
                     int index=0;
                     while(index<endTag.length()) {
                         c=(char)is.read();
@@ -591,7 +595,7 @@ public class XMLParser {
         }
 
         if (c=='>') { //tag declartion ended, process content
-            if (!isEmptyTag(tagName)) {
+            if (!isEmptyTag(tn)) {
                 parseTagContent(element, is);
             }
             return element;
@@ -599,26 +603,26 @@ public class XMLParser {
             c=(char)is.read();
             if (c=='>') {
                 if(eventParser) {
-                    endTag(tagName);
+                    endTag(tn);
                 }
                 return element;
             } else {
-                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tagName, null, null, "XML malformed - no > after /");
+                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, null, null, "XML malformed - no > after /");
             }
         }
 
 
         while(true) {
-            curAttribute=""+c;
+			curAttribute.delete(0, curAttribute.length()).append(c);
             c=(char)is.read();
             while ((!isWhiteSpace(c)) && (c!='=') && (c!='>')) {
-                curAttribute+=c;
+                curAttribute.append(Character.toLowerCase(c));
                 c=(char)is.read();
             }
 
             if (c=='>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
-                notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tagName,curAttribute,null, "Unexpected tag closing in tag "+tagName+", attribute="+curAttribute);
-                if (!isEmptyTag(tagName)) {
+                notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tn, curAttribute.toString(), null, "Unexpected tag closing in tag " + tagName + ", attribute=" + curAttribute);
+				if (!isEmptyTag(tn)) {
                     parseTagContent(element, is);
                 }
                 return element;
@@ -630,9 +634,9 @@ public class XMLParser {
             }
 
             if (c!='=') {
-                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tagName, curAttribute, null, "Unexpected character "+c+", expected '=' after attribute "+curAttribute+" in tag "+tagName);
+                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, "Unexpected character " + c + ", expected '=' after attribute " + curAttribute.toString() + " in tag " + tagName);
                 if (c=='>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
-                    if (!isEmptyTag(tagName)) {
+                    if (!isEmptyTag(tn)) {
                         parseTagContent(element, is);
                     }
                     return element;
@@ -654,10 +658,10 @@ public class XMLParser {
             if ((c=='"') || (c=='\'')) {
                 quote=c;
             } else {
-                curValue+=c;
+				curValue.append(c);
             }
 
-            String charEntity=null;
+            StringBuffer charEntity = null;
             boolean ended=false;
             while (!ended) {
                 c=(char)is.read();
@@ -668,42 +672,41 @@ public class XMLParser {
                     ended=true;
                 } else if (c=='&') {
                     if (charEntity!=null) {
-                        curValue+="&"+charEntity; // Wasn't a char entit, probably a url as a parameter : i.e. param="/test?p=val&pw=val2&p3=val3
+						curValue.append('&').append(charEntity); // Wasn't a char entit, probably a url as a parameter : i.e. param="/test?p=val&pw=val2&p3=val3
                     }
-                    charEntity="";
+                    charEntity = new StringBuffer();
                 } else {
                     if (charEntity!=null) {
                         if (c==';') {
-                            curValue+=convertCharEntity(charEntity);
+                            curValue.append(convertCharEntity(charEntity.toString()));
                             charEntity=null;
                         } else if (isLegalCharEntityCharacter(c)) {
-                            charEntity+=c;
+                            charEntity.append(c);
                         } else {
-                            curValue+="&"+charEntity+c;
+                            curValue.append('&').append(charEntity).append(c);
                             charEntity=null;
                         }
                     } else {
-                        curValue+=c;
+                        curValue.append(c);
                     }
                 }
             }
 
             if (charEntity!=null) { // Mistaken something else for a char entity - for example an action which is action="http://domain/test.html?param1=val1&param2=val2"
-                curValue+="&"+charEntity;
+                curValue.append('&').append(charEntity);
                 charEntity=null;
             }
 
             if(eventParser) {
-                attribute(tagName, curAttribute, curValue);
-            } else {
-                curAttribute=curAttribute.toLowerCase();
-                int error=element.setAttribute(curAttribute, curValue);
+                attribute(tn, curAttribute.toString(), curValue.toString());
+			} else {
+                int error=element.setAttribute(curAttribute.toString(), curValue.toString());
 
                 if (error==ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED) {
-                    notifyError(error, tagName, curAttribute, curValue, "Attribute '"+curAttribute+"' is not supported for tag '"+tagName+"'.");
+                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' is not supported for tag '" + tagName + "'.");
                     //notifyError(error, tagName, curAttribute, curValue, "Attribute '"+curAttribute+"' is not supported for tag '"+tagName+"'. Supported attributes: "+element.getSupportedAttributesList());
                 } else if (error==ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID) {
-                    notifyError(error, tagName, curAttribute, curValue, "Attribute '"+curAttribute+"' in tag '"+tagName+"' has an invalid value ("+curValue+")");
+                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' in tag '" + tn + "' has an invalid value (" + curValue.toString() + ")");
                 }
             }
 
@@ -713,7 +716,7 @@ public class XMLParser {
             }
 
             if (c=='>') { //tag declartion ended, process content
-                if (!isEmptyTag(tagName)) {
+                if (!isEmptyTag(tn)) {
                     parseTagContent(element, is);
                 }
                 return element;
@@ -722,12 +725,12 @@ public class XMLParser {
                 if (c=='>') {
                     return element;
                 } else {
-                    notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tagName, curAttribute, curValue, "XML malformed - no > after /");
+                    notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), curValue.toString(), "XML malformed - no > after /");
                 }
             }
 
-            curAttribute="";
-            curValue="";
+            curAttribute = new StringBuffer();
+			curValue = new StringBuffer();
 
         }
         
@@ -744,22 +747,23 @@ public class XMLParser {
      * @throws IOException
      */
     protected Element parseCommentOrXMLDeclaration(Reader is,String endTag) throws IOException {
+		char endTagChars[] = endTag.toCharArray();
         int endTagPos=0;
-        String text="";
+        StringBuffer text = new StringBuffer();
         boolean ended=false;
         while (!ended) {
             char c=(char)is.read();
-            if (c==endTag.charAt(endTagPos)) {
+            if (c==endTagChars[endTagPos]) {
                 endTagPos++;
-                if (endTagPos==endTag.length()) {
+                if (endTagPos==endTagChars.length) {
                     ended=true;
                 }
             } else {
                 if (endTagPos!=0) { //add - or -- if it wasn't an end tag eventually
-                    text+=endTag.substring(0, endTagPos);
+                    text.append(endTagChars, 0, endTagPos);
                     endTagPos=0;
                 }
-                text+=c;
+                text.append(c);
             }
         }
 
@@ -770,17 +774,17 @@ public class XMLParser {
             elementName="XML declaration";
         } else { //CDATA
             if(eventParser) {
-                textElement(text);
+                textElement(text.toString());
                 return null;
             }
-            return createNewTextElement(text);
+            return createNewTextElement(text.toString());
         }
 
         if(eventParser) {
             return null;
         }
         Element comment = createNewElement(elementName);
-        comment.setAttribute("content", text);
+        comment.setAttribute("content", text.toString());
         comment.isComment=true;
         return comment;
     }
