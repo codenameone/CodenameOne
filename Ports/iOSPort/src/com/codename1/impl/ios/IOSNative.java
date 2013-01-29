@@ -43,6 +43,7 @@ final class IOSNative {
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height);
     native long createImageFromARGB(int[] argb, int width, int height);
     native long createImage(byte[] data, int[] widthHeight);
+    native long createImageNSData(long nsData, int[] widthHeight);
     native long scale(long peer, int width, int height);
     native void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip);
     native void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip);

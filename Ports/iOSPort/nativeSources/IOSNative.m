@@ -314,6 +314,23 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(
     //XMLVM_END_WRAPPER
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT n2)
+{
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    NSData* nd = (NSData*)nsData;
+    UIImage* img = [UIImage imageWithData:nd];
+    org_xmlvm_runtime_XMLVMArray* intArray = n2;
+    JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    data2[0] = (int)img.size.width;
+    data2[1] = (int)img.size.height;
+    
+    GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
+    
+    [pool release];
+    return glu;
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_scale___long_int_int]

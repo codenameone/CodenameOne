@@ -340,15 +340,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public Object createImage(String path) throws IOException {
-        InputStream i;
+        long ns;
         if(path.startsWith("file:")) {
-            i = openFileInputStream(path);
+            ns = IOSImplementation.nativeInstance.createNSData(path);
         } else {
-            i = getResourceAsStream(getClass(), path);
+            ns = getResourceNSData(path);
         }
-        Object o = createImage(i);
-        Util.cleanup(i);
-        return o;
+        int[] wh = new int[2];
+        NativeImage n = new NativeImage(path);
+        n.peer = nativeInstance.createImageNSData(ns, wh);
+        n.width = wh[0];
+        n.height = wh[1];
+        nativeInstance.releasePeer(ns);
+        return n;
     }
 
     public boolean hasNativeTheme() {
@@ -390,6 +394,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public Object createImage(InputStream i) throws IOException {
+        long ns = getNSData(i);
+        if(ns > 0) {
+            int[] wh = new int[2];
+            NativeImage n = new NativeImage("Image created from stream");
+            n.peer = nativeInstance.createImageNSData(ns, wh);
+            n.width = wh[0];
+            n.height = wh[1];
+            Util.cleanup(i);
+            return n;
+        }
         byte[] buffer = toByteArray(i);
         return createImage(buffer, 0, buffer.length);
     }
@@ -824,6 +838,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setImageName(((NativeImage)nativeImage).peer, name);
     }
 
+    private long getResourceNSData(String resource) {
+        StringTokenizer t = new StringTokenizer(resource, "/.");
+        int cnt = t.countTokens();
+        while(cnt > 2) {
+            t.nextToken();
+        }
+        String name = t.nextToken();
+        String type = t.nextToken();
+        int val = nativeInstance.getResourceSize(name, type);
+        if(val <= 0) {
+            return -1;
+        }
+        return IOSImplementation.nativeInstance.createNSDataResource(name, type);
+    }
+    
     public InputStream getResourceAsStream(Class cls, String resource) {
         StringTokenizer t = new StringTokenizer(resource, "/.");
         int cnt = t.countTokens();

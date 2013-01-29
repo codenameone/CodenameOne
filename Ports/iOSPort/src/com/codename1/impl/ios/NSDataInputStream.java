@@ -40,6 +40,10 @@ public class NSDataInputStream extends InputStream {
     private int offset = 0;
     private int length;
     private int markOffset = 0;
+    public NSDataInputStream(long peer, int length) {
+        this.nsData = peer;
+        this.length = length;
+    }
     public NSDataInputStream(String file) {
         nsData = IOSImplementation.nativeInstance.createNSData(file);
         length = IOSImplementation.nativeInstance.getNSDataSize(nsData);
