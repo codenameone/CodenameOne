@@ -320,6 +320,7 @@ public class ContainerList extends Container {
         private int offset;
 
         Entry(int off) {
+            setUIID("Container");
             setFocusable(true);
             offset = off;
         }
