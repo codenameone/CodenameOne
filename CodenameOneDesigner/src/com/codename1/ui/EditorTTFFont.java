@@ -40,6 +40,10 @@ public class EditorTTFFont extends Font {
         this.sizeSetting = sizeSetting;
         this.actualSize = actualSize;
         this.systemFont = systemFont;
+        refresh();
+    }
+
+    public void refresh() {
         if(fontFile != null && fontFile.exists()) {
             try {
                 java.awt.Font f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fontFile);
@@ -72,9 +76,9 @@ public class EditorTTFFont extends Font {
             }
         } else {
             actualFont = systemFont;
-        }
+        }        
     }
-
+    
     /**
      * @return the systemFont
      */

@@ -1886,6 +1886,9 @@ public class EditableResources extends Resources implements TreeModel {
             Hashtable theme = getTheme(themeName);
             for(Object key : theme.keySet()) {
                 Object currentValue = theme.get(key);
+                if(currentValue instanceof EditorTTFFont) {
+                    ((EditorTTFFont)currentValue).refresh();
+                }
                 if(currentValue instanceof com.codename1.ui.Image) {
                     String id = findId(currentValue);
                     if(isMultiImage(id)) {
