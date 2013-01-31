@@ -3032,7 +3032,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             return super.getAppHomePath();
         }
         String name = getProperty("AppName", "");
-        home = home + getFileSystemSeparator() + name + getFileSystemSeparator();
+        home = home + name + getFileSystemSeparator();
         if(!exists(home)){
             mkdir(home);
         }
