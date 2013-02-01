@@ -667,7 +667,7 @@ public class UserInterfaceEditor extends BaseForm {
                 }
             }
             public void mouseClicked(MouseEvent e) {
-                if(SwingUtilities.isRightMouseButton(e)) {
+                if(e.isPopupTrigger()) {
                     if(!(e.getSource() instanceof JTree)) {
                         com.codename1.ui.Component cmp = containerInstance.getComponentAt(e.getX(), e.getY());
                         selectCmp(cmp);
@@ -2573,7 +2573,7 @@ public class UserInterfaceEditor extends BaseForm {
             });
             /*b.addMouseListener(new MouseAdapter() {
                 public void mouseClicked(MouseEvent e) {
-                    if(SwingUtilities.isRightMouseButton(e)) {
+                    if(e.isPopupTrigger()) {
                         JPopupMenu p = new JPopupMenu();
                         AbstractAction deleteAction = new AbstractAction("Delete") {
                             public void actionPerformed(ActionEvent e) {
@@ -5147,7 +5147,7 @@ public class UserInterfaceEditor extends BaseForm {
     }//GEN-LAST:event_codenameOneTabsActionPerformed
 
     private void propertiesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_propertiesMouseClicked
-        if(SwingUtilities.isRightMouseButton(evt)) {
+        if(evt.isPopupTrigger()) {
             AbstractAction clearModified = new AbstractAction() {
                 public void actionPerformed(ActionEvent e) {
                     int row = properties.getSelectedRow();

@@ -266,7 +266,7 @@ public class CodenameOneImageRenderer extends JComponent implements MouseListene
         Timeline t = (Timeline)image;
         if(dragging != null && t.isPause()) {
             // if this is a right mouse button update the source position
-            editor.updatePosition(e.getX(), e.getY(), dragging, SwingUtilities.isRightMouseButton(e));
+            editor.updatePosition(e.getX(), e.getY(), dragging, e.isPopupTrigger());
             dragging = null;
         }
         repaint();

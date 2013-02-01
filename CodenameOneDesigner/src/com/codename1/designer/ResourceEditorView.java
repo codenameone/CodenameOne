@@ -75,6 +75,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -2247,6 +2248,40 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
         final Map<String, String> allComponents = new HashMap<String, String>();
         initCommandMapAndNameToClassLookup(nameToClassLookup, commandMap, unhandledCommands, actionComponents, allComponents);
 
+        // list all the .ovr files and add them to the nameToClassLookup 
+        File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");  
+        if(overrideDir.exists()) {
+            File[] ovrFiles = overrideDir.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File file, String string) {
+                    return string.endsWith(".ovr");
+                }
+            });
+            for(File ovr : ovrFiles) {
+                try {
+                    EditableResources er = EditableResources.open(new FileInputStream(ovr));
+                    for(String currentResourceName : loadedResources.getUIResourceNames()) {
+                        UIBuilder b = new UIBuilder() {
+                            protected com.codename1.ui.Component createComponentInstance(String componentType, Class cls) {
+                                if(cls.getName().startsWith("com.codename1.ui.")) {
+                                    // subpackage of CodenameOne should be registered
+                                    if(cls.getName().lastIndexOf(".") > 15) {
+                                        nameToClassLookup.put(componentType, cls.getName());
+                                    }
+                                } else {
+                                    nameToClassLookup.put(componentType, cls.getName());
+                                }
+                                return null;
+                            }
+                        };
+                        b.createContainer(loadedResources, currentResourceName);
+                    }
+                } catch(IOException ioErr) {
+                    ioErr.printStackTrace();
+                }                
+            }
+        }
+        
         if(promptUserForPackageName) {
             JTextField packageName = new JTextField(packageString);
             JOptionPane.showMessageDialog(errorParent, packageName, "Please Pick The Package Name", JOptionPane.PLAIN_MESSAGE);

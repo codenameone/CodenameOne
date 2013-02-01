@@ -2048,7 +2048,7 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         }
 
         public void mouseClicked(MouseEvent e) {
-            /*if(SwingUtilities.isRightMouseButton(e)) {
+            /*if(e.isPopupTrigger()) {
                 String s = lastComponent;
                 if(s != null && (!s.equals(""))) {
                     clearFlashingTimer();
