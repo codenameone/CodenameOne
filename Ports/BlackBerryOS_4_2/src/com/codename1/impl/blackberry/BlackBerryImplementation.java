@@ -2024,17 +2024,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     private Object connectImpl(String url, boolean read, boolean write) throws IOException {
-        int mode;
-        if (read && write) {
-            mode = Connector.READ_WRITE;
-        } else {
-            if (write) {
-                mode = Connector.WRITE;
-            } else {
-                mode = Connector.READ;
-            }
-        }
-        return Connector.open(url, mode);
+        //BB known bug http://www.coderholic.com/blackberry-os-45-connection-not-writeable-error/
+        //Connections must be read and write
+        return Connector.open(url, Connector.READ_WRITE);
     }
 
     /**
