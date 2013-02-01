@@ -744,7 +744,11 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * Returns true for a post operation and false for a get operation
+     * Set to true for a post operation and false for a get operation, this will implicitly 
+     * set the method to post/get respectively (which you can change back by setting the method).
+     * The main importance of this method is how arguments are added to the request (within the 
+     * body or in the URL) and so it is important to invoke this method before any argument was 
+     * added.
      *
      * @throws IllegalStateException if invoked after an addArgument call
      */
