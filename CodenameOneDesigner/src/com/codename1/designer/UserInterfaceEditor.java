@@ -590,6 +590,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         InputMap input = componentHierarchy.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         input.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "delete");
+        input.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "delete");
         final AbstractAction delete = new AbstractAction("Delete") {
             {
                 putValue(AbstractAction.NAME, "Delete");
