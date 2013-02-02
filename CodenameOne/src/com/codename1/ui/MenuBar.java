@@ -48,7 +48,7 @@ import java.util.Vector;
  * @author Chen Fishbein
  */
 public class MenuBar extends Container implements ActionListener {
-
+    private boolean minimizeOnBack = true;
     private Command selectCommand;
     private Command defaultCommand;
     /**
@@ -1278,6 +1278,10 @@ public class MenuBar extends Container implements ActionListener {
         if (keyCode == backSK) {
             // the back command should be invoked
             c = parent.getBackCommand();
+            if(c == null && minimizeOnBack) {
+                Display.getInstance().minimizeApplication();
+                return;
+            }
         } else {
             if (keyCode == clearSK || keyCode == backspaceSK) {
                 c = getClearCommand();
@@ -1553,5 +1557,21 @@ public class MenuBar extends Container implements ActionListener {
      */
     protected Command getCancelMenuItem() {
         return cancelMenuItem;
+    }
+
+    /**
+     * When set to true the physical back button will minimize the application
+     * @return the minimizeOnBack
+     */
+    public boolean isMinimizeOnBack() {
+        return minimizeOnBack;
+    }
+
+    /**
+     * When set to true the physical back button will minimize the application
+     * @param minimizeOnBack the minimizeOnBack to set
+     */
+    public void setMinimizeOnBack(boolean minimizeOnBack) {
+        this.minimizeOnBack = minimizeOnBack;
     }
 }

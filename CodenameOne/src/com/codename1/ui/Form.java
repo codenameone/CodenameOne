@@ -1638,6 +1638,22 @@ public class Form extends Container {
     }
 
     /**
+     * When set to true the physical back button will minimize the application
+     * @return the minimizeOnBack
+     */
+    public boolean isMinimizeOnBack() {
+        return menuBar.isMinimizeOnBack();
+    }
+
+    /**
+     * When set to true the physical back button will minimize the application
+     * @param minimizeOnBack the minimizeOnBack to set
+     */
+    public void setMinimizeOnBack(boolean minimizeOnBack) {
+        menuBar.setMinimizeOnBack(minimizeOnBack);
+    }
+
+    /**
      * @inheritDoc
      */
     public void keyReleased(int keyCode) {
