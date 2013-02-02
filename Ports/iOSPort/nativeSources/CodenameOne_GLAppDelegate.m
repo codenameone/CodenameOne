@@ -28,6 +28,7 @@
 
 extern UIView *editingComponent;
 
+#define INCLUDE_CN1_PUSH
 
 @implementation CodenameOne_GLAppDelegate
 
@@ -38,6 +39,7 @@ extern UIView *editingComponent;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+#ifdef INCLUDE_CN1_PUSH
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if( [apsInfo objectForKey:@"alert"] != NULL)
@@ -47,6 +49,7 @@ extern UIView *editingComponent;
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
         return YES;
     }
+#endif
     // Override point for customization after application launch.
     self.window.rootViewController = self.viewController;
     com_codename1_impl_ios_IOSImplementation_callback__();
@@ -113,16 +116,10 @@ extern UIView *editingComponent;
 
 - (void)applicationWillTerminate:(UIApplication *)application
 {
-    
-    /*
-     Called when the application is about to terminate.
-     Save data if appropriate.
-     See also applicationDidEnterBackground:.
-     */
-//    [self.viewController stopAnimation];
     com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__();
 }
 
+#ifdef INCLUDE_CN1_PUSH
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
     NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
                 stringByReplacingOccurrencesOfString:@" " withString:@""];
@@ -141,6 +138,7 @@ extern UIView *editingComponent;
 	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
 }
+#endif
 
 - (void)dealloc
 {
