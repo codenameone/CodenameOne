@@ -2079,7 +2079,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                     }
                     if(actionComponentNames != null &&
                             (actual instanceof com.codename1.ui.Button || actual instanceof com.codename1.ui.List ||
-                            actual instanceof com.codename1.ui.TextArea)) {
+                            actual instanceof com.codename1.ui.list.ContainerList || actual instanceof com.codename1.ui.TextArea)) {
                         if(actual instanceof com.codename1.ui.Button) {
                             if(((com.codename1.ui.Button)actual).getCommand() != null) {
                                 return;

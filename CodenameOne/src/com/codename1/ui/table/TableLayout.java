@@ -240,123 +240,127 @@ public class TableLayout extends Layout {
      * @inheritDoc
      */
     public void layoutContainer(Container parent) {
-        verticalSpanningExists = false;
-        horizontalSpanningExists = false;
+        try {
+            verticalSpanningExists = false;
+            horizontalSpanningExists = false;
 
-        // column and row size in pixels
-        Style s = parent.getStyle();
-        int top = s.getPadding(false, Component.TOP);
-        int left = s.getPadding(parent.isRTL(), Component.LEFT);
-        int bottom = s.getPadding(false, Component.BOTTOM);
-        int right = s.getPadding(parent.isRTL(), Component.RIGHT);
+            // column and row size in pixels
+            Style s = parent.getStyle();
+            int top = s.getPadding(false, Component.TOP);
+            int left = s.getPadding(parent.isRTL(), Component.LEFT);
+            int bottom = s.getPadding(false, Component.BOTTOM);
+            int right = s.getPadding(parent.isRTL(), Component.RIGHT);
 
-        boolean rtl = parent.isRTL();
+            boolean rtl = parent.isRTL();
 
-        columnSizes = new int[columns];
-        if(modifableColumnSize == null) {
-            modifableColumnSize = new boolean[columns];
-        }
-        columnPositions = new int[columns];
-        int[] rowSizes = new int[rows];
-        rowPositions = new int[rows];
-
-        int pWidth = parent.getLayoutWidth() - parent.getSideGap() - left - right; 
-        int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom; 
-
-        int currentX = left;
-        for(int iter = 0 ; iter < columnSizes.length ; iter++) {
-            columnSizes[iter] = getColumnWidthPixels(iter, pWidth, pWidth);
-        }
-
-        // try to recalculate the columns for none horizontally scrollable tables
-        // so they are distributed sensibly if no room is available
-        if(!parent.isScrollableX()) {
-            int totalWidth = 0;
-            int totalModifyablePixels = 0;
-
-            // check how many columns we can modify (the user hasn't requested a specific size for those)
-            for(int iter = 0 ; iter < modifableColumnSize.length ; iter++) {
-                if(modifableColumnSize[iter]) {
-                    totalModifyablePixels += columnSizes[iter];
-                }
-                totalWidth += columnSizes[iter];
+            columnSizes = new int[columns];
+            if(modifableColumnSize == null) {
+                modifableColumnSize = new boolean[columns];
             }
-            if(pWidth < totalWidth) {
-                int totalPixelsToRemove = totalWidth - pWidth;
+            columnPositions = new int[columns];
+            int[] rowSizes = new int[rows];
+            rowPositions = new int[rows];
 
-                int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;
+            int pWidth = parent.getLayoutWidth() - parent.getSideGap() - left - right; 
+            int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom; 
 
-                // Go over the modifyable columns and remove the right pixels according to the ratio
+            int currentX = left;
+            for(int iter = 0 ; iter < columnSizes.length ; iter++) {
+                columnSizes[iter] = getColumnWidthPixels(iter, pWidth, pWidth);
+            }
+
+            // try to recalculate the columns for none horizontally scrollable tables
+            // so they are distributed sensibly if no room is available
+            if(!parent.isScrollableX()) {
+                int totalWidth = 0;
+                int totalModifyablePixels = 0;
+
+                // check how many columns we can modify (the user hasn't requested a specific size for those)
                 for(int iter = 0 ; iter < modifableColumnSize.length ; iter++) {
                     if(modifableColumnSize[iter]) {
-                        columnSizes[iter] = (int)(((float)columnSizes[iter]) / ((float)totalModifyablePixels) * totalPixelsNecessary);
+                        totalModifyablePixels += columnSizes[iter];
+                    }
+                    totalWidth += columnSizes[iter];
+                }
+                if(pWidth < totalWidth) {
+                    int totalPixelsToRemove = totalWidth - pWidth;
+
+                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;
+
+                    // Go over the modifyable columns and remove the right pixels according to the ratio
+                    for(int iter = 0 ; iter < modifableColumnSize.length ; iter++) {
+                        if(modifableColumnSize[iter]) {
+                            columnSizes[iter] = (int)(((float)columnSizes[iter]) / ((float)totalModifyablePixels) * totalPixelsNecessary);
+                        }
                     }
                 }
             }
-        }
 
-        for(int iter = 0 ; iter < columnSizes.length ; iter++) {
-            if(rtl) {
-                currentX += columnSizes[iter];
-                columnPositions[iter] = pWidth - currentX;
-            } else {
-                columnPositions[iter] = currentX;
-                currentX += columnSizes[iter];
-            }
-        }
-
-        int currentY = top;
-        for(int iter = 0 ; iter < rowSizes.length ; iter++) {
-            if(parent.isScrollableY()) {
-                rowSizes[iter] = getRowHeightPixels(iter, pHeight, -1);
-            } else {
-                rowSizes[iter] = getRowHeightPixels(iter, pHeight, pHeight - currentY + top);
-            }
-            rowPositions[iter] = currentY;
-            currentY += rowSizes[iter];
-        }
-
-
-        for(int r = 0 ; r < rowSizes.length ; r++) {
-            for(int c = 0 ; c < columnSizes.length ; c++) {
-                Constraint con = tablePositions[r * columns + c];
-                int conX, conY, conW, conH;
-                if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
-                    Style componentStyle = con.parent.getStyle();
-                    int leftMargin = componentStyle.getMargin(parent.isRTL(), Component.LEFT);
-                    int topMargin = componentStyle.getMargin(false, Component.TOP);
-//                    conX = left + leftMargin + columnPositions[c]; // bugfix table with padding not drawn correctly
-//                    conY = top + topMargin + rowPositions[r]; // bugfix table with padding not drawn correctly
-                    conX = leftMargin + columnPositions[c];
-                    conY = topMargin + rowPositions[r];
-                    if(con.spanHorizontal > 1) {
-                        horizontalSpanningExists = true;
-                        int w = columnSizes[c];
-                        for(int sh = 1 ; sh < con.spanHorizontal ; sh++) {
-                            w += columnSizes[Math.min(c + sh, columnSizes.length - 1)];
-                        }
-
-                        // for RTL we need to move the component to the side so spanning will work
-                        if(rtl) {
-                            conX = left + leftMargin + columnPositions[c + con.spanHorizontal - 1];
-                        }
-                        conW = w - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
-                    } else {
-                        conW = columnSizes[c] - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
-                    }
-                    if(con.spanVertical > 1) {
-                        verticalSpanningExists = true;
-                        int h = rowSizes[r];
-                        for(int sv = 1 ; sv < con.spanVertical ; sv++) {
-                            h += rowSizes[Math.min(r + sv, rowSizes.length - 1)];
-                        }
-                        conH = h - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
-                    } else {
-                        conH = rowSizes[r] - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
-                    }
-                    placeComponent(rtl, con, conX, conY, conW, conH);
+            for(int iter = 0 ; iter < columnSizes.length ; iter++) {
+                if(rtl) {
+                    currentX += columnSizes[iter];
+                    columnPositions[iter] = pWidth - currentX;
+                } else {
+                    columnPositions[iter] = currentX;
+                    currentX += columnSizes[iter];
                 }
             }
+
+            int currentY = top;
+            for(int iter = 0 ; iter < rowSizes.length ; iter++) {
+                if(parent.isScrollableY()) {
+                    rowSizes[iter] = getRowHeightPixels(iter, pHeight, -1);
+                } else {
+                    rowSizes[iter] = getRowHeightPixels(iter, pHeight, pHeight - currentY + top);
+                }
+                rowPositions[iter] = currentY;
+                currentY += rowSizes[iter];
+            }
+
+
+            for(int r = 0 ; r < rowSizes.length ; r++) {
+                for(int c = 0 ; c < columnSizes.length ; c++) {
+                    Constraint con = tablePositions[r * columns + c];
+                    int conX, conY, conW, conH;
+                    if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
+                        Style componentStyle = con.parent.getStyle();
+                        int leftMargin = componentStyle.getMargin(parent.isRTL(), Component.LEFT);
+                        int topMargin = componentStyle.getMargin(false, Component.TOP);
+    //                    conX = left + leftMargin + columnPositions[c]; // bugfix table with padding not drawn correctly
+    //                    conY = top + topMargin + rowPositions[r]; // bugfix table with padding not drawn correctly
+                        conX = leftMargin + columnPositions[c];
+                        conY = topMargin + rowPositions[r];
+                        if(con.spanHorizontal > 1) {
+                            horizontalSpanningExists = true;
+                            int w = columnSizes[c];
+                            for(int sh = 1 ; sh < con.spanHorizontal ; sh++) {
+                                w += columnSizes[Math.min(c + sh, columnSizes.length - 1)];
+                            }
+
+                            // for RTL we need to move the component to the side so spanning will work
+                            if(rtl) {
+                                conX = left + leftMargin + columnPositions[c + con.spanHorizontal - 1];
+                            }
+                            conW = w - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
+                        } else {
+                            conW = columnSizes[c] - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
+                        }
+                        if(con.spanVertical > 1) {
+                            verticalSpanningExists = true;
+                            int h = rowSizes[r];
+                            for(int sv = 1 ; sv < con.spanVertical ; sv++) {
+                                h += rowSizes[Math.min(r + sv, rowSizes.length - 1)];
+                            }
+                            conH = h - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
+                        } else {
+                            conH = rowSizes[r] - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
+                        }
+                        placeComponent(rtl, con, conX, conY, conW, conH);
+                    }
+                }
+            }
+        } catch(ArrayIndexOutOfBoundsException err) {
+            err.printStackTrace();
         }
     }
 

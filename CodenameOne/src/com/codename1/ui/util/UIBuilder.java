@@ -578,6 +578,10 @@ public class UIBuilder {
                 ((List)cmp).addActionListener((ActionListener)listener);
                 return;
             }
+            if(cmp instanceof ContainerList) {
+                ((ContainerList)cmp).addActionListener((ActionListener)listener);
+                return;
+            }
             ((TextArea)cmp).addActionListener((ActionListener)listener);
             return;
         }
@@ -912,6 +916,13 @@ public class UIBuilder {
                     if(l != null) {
                         ((List)actualLead).addActionListener(l);
                     }
+                } else {
+                    if(actualLead instanceof ContainerList) {
+                        ActionListener l = getFormListenerInstance(root, embedded);
+                        if(l != null) {
+                            ((ContainerList)actualLead).addActionListener(l);
+                        }
+                    }                    
                 }
             }
         }

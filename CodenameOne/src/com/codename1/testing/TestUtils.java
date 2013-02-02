@@ -259,7 +259,7 @@ public class TestUtils {
     }
 
     private static void waitForFormNameImpl(String title) {
-        while(!title.equals(Display.getInstance().getCurrent().getTitle())) {
+        while(!title.equals(Display.getInstance().getCurrent().getName())) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {

@@ -208,7 +208,8 @@ public class EditableResources extends Resources implements TreeModel {
     }
     
     EditableResources(InputStream input) throws IOException {
-        super(input);
+        super();
+        openFile(input);
     }
 
     public static void setResourcesClassLoader(Class cls) {
@@ -345,8 +346,12 @@ public class EditableResources extends Resources implements TreeModel {
         loadingMode = false;
         modified = false;
         updateModified();
-        undoQueue.clear();
-        redoQueue.clear();
+        
+        // can occure when a resource file is opened via the constructor
+        if(undoQueue != null) {
+            undoQueue.clear();
+            redoQueue.clear();
+        }
         ThemeEditor.resetThemeLoaded();
     }
 
