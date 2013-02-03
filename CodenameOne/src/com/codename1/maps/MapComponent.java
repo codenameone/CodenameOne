@@ -229,7 +229,9 @@ public class MapComponent extends Container {
         drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);        
     }
 
-    @Override
+    /**
+     * @inheritDoc
+     */
     protected void laidOut() {
         super.laidOut();
         if(buffer != null){
@@ -242,6 +244,12 @@ public class MapComponent extends Container {
     }
 
     
+    /**
+     * @inheritDoc
+     */
+    protected boolean shouldBlockSideSwipe() {
+        return true;
+    }
     
     /**
      * @inheritDoc

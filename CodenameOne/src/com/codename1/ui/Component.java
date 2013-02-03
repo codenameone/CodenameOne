@@ -174,7 +174,8 @@ public class Component implements Animation, StyleListener {
      */
     private int animationSpeed;
     private Motion animationMotion;
-    private Motion draggedMotion;
+    private Motion draggedMotionX;
+    private Motion draggedMotionY;
 
     /**
      * Allows us to flag a drag operation in action thus preventing the mouse pointer
@@ -1845,7 +1846,8 @@ public class Component implements Animation, StyleListener {
     }
 
     void clearDrag() {
-        draggedMotion = null;
+        draggedMotionX = null;
+        draggedMotionY = null;
         Component parent = getParent();
         if(parent != null){
             parent.clearDrag();
@@ -2211,13 +2213,19 @@ public class Component implements Animation, StyleListener {
         return tensileDragEnabled;
     }
 
-    void startTensile(int offset, int dest) {
+    void startTensile(int offset, int dest, boolean vertical) {
+        Motion draggedMotion;
         if(tensileDragEnabled) {
             draggedMotion = Motion.createDecelerationMotion(offset, dest, 500);
             draggedMotion.start();
         } else {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
             draggedMotion.start();
+        }
+        if(vertical){
+            draggedMotionY = draggedMotion;
+        }else{
+            draggedMotionX = draggedMotion;        
         }
         // just to be sure, there are some cases where this doesn't work as expected
         Form p = getComponentForm();
@@ -2280,21 +2288,21 @@ public class Component implements Animation, StyleListener {
             if(shouldScrollX){
                 scroll = scrollX;
                 if (scroll < 0) {
-                    startTensile(scroll, 0);
+                    startTensile(scroll, 0, false);
                     return;
                 } else {
                     if(scroll > getScrollDimension().getWidth() - getWidth()) {
-                        startTensile(scroll, Math.max(getScrollDimension().getWidth() - getWidth(), 0));
+                        startTensile(scroll, Math.max(getScrollDimension().getWidth() - getWidth(), 0), false);
                         return;
                     }
                 }
             } else {
                 if (scroll < 0) {
-                    startTensile(scroll, 0);
+                    startTensile(scroll, 0, true);
                     return;
                 } else {
                     if(scroll > getScrollDimension().getHeight() - getHeight()) {
-                        startTensile(scroll, Math.max(getScrollDimension().getHeight() - getHeight(), 0));
+                        startTensile(scroll, Math.max(getScrollDimension().getHeight() - getHeight(), 0), true);
                         return;
                     }
                 }
@@ -2311,21 +2319,25 @@ public class Component implements Animation, StyleListener {
             }
             if(!shouldScrollX) {
                 if(speed < 0) {
-                    draggedMotion = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
+                    draggedMotionY = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
                 } else {
-                    draggedMotion = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
+                    draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
                             getHeight() + tl, speed, 0.0004f);
                 }
             } else {
                 if(speed < 0) {
-                    draggedMotion = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
+                    draggedMotionX = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
                 } else {
-                    draggedMotion = Motion.createFrictionMotion(scroll, getScrollDimension().getWidth() -
+                    draggedMotionX = Motion.createFrictionMotion(scroll, getScrollDimension().getWidth() -
                             getWidth() + tl, speed, 0.0004f);
                 }
             }
- 
-            draggedMotion.start();
+            if(draggedMotionX != null){
+                draggedMotionX.start();
+            }
+            if(draggedMotionY != null){
+                draggedMotionY.start();
+            }
         }
     }
 
@@ -2723,66 +2735,80 @@ public class Component implements Animation, StyleListener {
             }
             return true;
         }
-
+        boolean animateY = false;
+        boolean animateX = false;
         // perform the dragging motion if exists
-        if (draggedMotion != null) {
+        if (draggedMotionY != null) {
             // change the variable directly for efficiency both in removing redundant
             // repaints and scroll checks
-            int dragVal = draggedMotion.getValue();
+            int dragVal = draggedMotionY.getValue();
 
             // this can't be a part of the parent if since we need the last value to arrive
-            if(draggedMotion.isFinished()) {
-                if(dragVal < 0) {
-                    startTensile(dragVal, 0);
+            if (draggedMotionY.isFinished()) {
+                if (dragVal < 0) {
+                    startTensile(dragVal, 0, true);
                 } else {
-                    if (isScrollableY()) {
-                        int edge = (getScrollDimension().getHeight() - getHeight());
-                        if(dragVal > edge && edge > 0) {
-                            startTensile(dragVal, getScrollDimension().getHeight() - getHeight());
-                        } else {
-                            if(snapToGrid && getScrollY() < edge && getScrollY() > 0) {
-                                int dest = getGridPosY();
-                                int scroll = getScrollY();
-                                if(dest != scroll) {
-                                    startTensile(scroll, dest);
-                                } else {
-                                    draggedMotion = null;
-                                }
-                            } else {
-                                draggedMotion = null;
-                            }
-                        }
+                    int edge = (getScrollDimension().getHeight() - getHeight());
+                    if (dragVal > edge && edge > 0) {
+                        startTensile(dragVal, getScrollDimension().getHeight() - getHeight(), true);
                     } else {
-                        int edge = getScrollDimension().getWidth() - getWidth();
-                        if(dragVal > edge) {
-                            startTensile(dragVal, getScrollDimension().getWidth() - getWidth());
-                        } else {
-                            if(snapToGrid && getScrollX() < edge && getScrollX() > 0) {
-                                int dest = getGridPosX();
-                                int scroll = getScrollX();
-                                if(dest != scroll) {
-                                    startTensile(scroll, dest);
-                                } else {
-                                    draggedMotion = null;
-                                }
+                        if (snapToGrid && getScrollY() < edge && getScrollY() > 0) {
+                            int dest = getGridPosY();
+                            int scroll = getScrollY();
+                            if (dest != scroll) {
+                                startTensile(scroll, dest, true);
                             } else {
-                                draggedMotion = null;
+                                draggedMotionY = null;
                             }
+                        } else {
+                            draggedMotionY = null;
                         }
                     }
+
                 }
             }
 
-            if (isScrollableY()) {
-                scrollY = dragVal;
-                updateTensileHighlightIntensity();
-                return true;
-            } else {
-                scrollX = dragVal;
-                return true;
-            }
+            scrollY = dragVal;
+            updateTensileHighlightIntensity();
+            animateY = true;
         }
+        if (draggedMotionX != null) {
+            // change the variable directly for efficiency both in removing redundant
+            // repaints and scroll checks
+            int dragVal = draggedMotionX.getValue();
 
+            // this can't be a part of the parent if since we need the last value to arrive
+            if (draggedMotionX.isFinished()) {
+                if (dragVal < 0) {
+                    startTensile(dragVal, 0, false);
+                } else {
+                    int edge = (getScrollDimension().getWidth() - getWidth());
+                    if (dragVal > edge && edge > 0) {
+                        startTensile(dragVal, getScrollDimension().getWidth() - getWidth(), false);
+                    } else {
+                        if (snapToGrid && getScrollX() < edge && getScrollX() > 0) {
+                            int dest = getGridPosX();
+                            int scroll = getScrollX();
+                            if (dest != scroll) {
+                                startTensile(scroll, dest, false);
+                            } else {
+                                draggedMotionX = null;
+                            }
+                        } else {
+                            draggedMotionX = null;
+                        }
+                    }
+
+                }
+            }
+
+            scrollX = dragVal;
+            animateX = true;
+        }
+        if(animateY || animateX){
+            return true;
+        }
+        
         Painter bgp = getStyle().getBgPainter();
         animateBackground = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
 
@@ -2797,8 +2823,8 @@ public class Component implements Animation, StyleListener {
         }
 
         if(!animateBackground && (destScrollY == -1 || destScrollY == scrollY) &&
-                !animateBackground && m == null && draggedMotion == null &&
-                !dragActivated) {
+                !animateBackground && m == null && draggedMotionY == null &&
+                draggedMotionX == null && !dragActivated) {
             tryDeregisterAnimated();
         }
 
