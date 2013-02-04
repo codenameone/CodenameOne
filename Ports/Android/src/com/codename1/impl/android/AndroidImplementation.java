@@ -1927,19 +1927,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void deinit(){
+            final boolean [] removed = new boolean[1];
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     if (layoutWrapper != null && AndroidImplementation.this.relativeLayout != null) {
                         AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
                         AndroidImplementation.this.relativeLayout.requestLayout();
                     }
+                    removed[0] = true;
                 }
             });
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    if (layoutWrapper != null) {
-                        while (layoutWrapper.getParent() != null);
-                    }
+                    while (!removed[0]);
                 }
             });
         }
@@ -1953,6 +1953,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         public void init(){
+            final boolean [] added = new boolean[1];
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     if (layoutWrapper == null) {
@@ -2012,15 +2013,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if(AndroidImplementation.this.relativeLayout != null){
                         AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
                     }
-
+                    added[0] = true;
                 }
             });
 
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    if (layoutWrapper != null) {
-                        while (layoutWrapper.getParent() == null);
-                    }
+                        while (!added[0]);
                 }
             });
         }
