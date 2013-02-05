@@ -1997,10 +1997,10 @@ public class Form extends Container {
                 Button b = (Button)pendingButton;
                 int relRadius = b.getReleaseRadius();
                 if(relRadius > 0) {
-                    Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() - relRadius);
+                    Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
                     if(r.contains(x, y)) {
                         buttonsAwatingRelease = null;
-                        pointerReleased(x, y);
+                        pointerReleased(b.getAbsoluteX() + 1, b.getAbsoluteY() + 1);
                         return;
                     }
                 }
