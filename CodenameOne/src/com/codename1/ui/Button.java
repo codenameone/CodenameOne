@@ -72,6 +72,8 @@ public class Button extends Label {
 
     private boolean toggle;
 
+    private int releaseRadius;
+    
     /** 
      * Constructs a button with an empty string for its text.
      */
@@ -147,6 +149,7 @@ public class Button extends Label {
         setIcon(icon);
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
+        releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
     }
 
     /**
@@ -505,9 +508,6 @@ public class Button extends Label {
                 state=STATE_ROLLOVER;
                 repaint();
             }
-        } else {
-            state = STATE_DEFAULT;
-            repaint();
         }
         super.pointerDragged(x, y);
     }
@@ -628,5 +628,23 @@ public class Button extends Label {
      */
     public boolean isOppositeSide() {
         return false;
+    }
+
+    /**
+     * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
+     * pointer release events and not to pointer press events
+     * @return the releaseRadius
+     */
+    public int getReleaseRadius() {
+        return releaseRadius;
+    }
+
+    /**
+     * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
+     * pointer release events and not to pointer press events
+     * @param releaseRadius the releaseRadius to set
+     */
+    public void setReleaseRadius(int releaseRadius) {
+        this.releaseRadius = releaseRadius;
     }
 }

@@ -1983,6 +1983,29 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
+        if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
+            // special case allowing drag within a button
+            Component atXY = getComponentAt(x, y);
+            Component pendingButton = (Component)buttonsAwatingRelease.elementAt(0);
+            if(atXY == pendingButton) {
+                buttonsAwatingRelease = null;
+                pointerReleased(x, y);
+                return;
+            }
+            
+            if(pendingButton instanceof Button) {
+                Button b = (Button)pendingButton;
+                int relRadius = b.getReleaseRadius();
+                if(relRadius > 0) {
+                    Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() - relRadius);
+                    if(r.contains(x, y)) {
+                        buttonsAwatingRelease = null;
+                        pointerReleased(x, y);
+                        return;
+                    }
+                }
+            }
+        }
         if (pointerReleasedListeners != null) {
             pointerReleasedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
