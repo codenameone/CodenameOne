@@ -1263,6 +1263,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             simulatorMenu.add(networkMonitor);
 
+            JMenuItem componentTreeInspector = new JMenuItem("Component Inspector");
+            componentTreeInspector.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    new ComponentTreeInspector();
+                }
+            });
+            simulatorMenu.add(componentTreeInspector);
+
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
             testRecorderMenu.addActionListener(new ActionListener() {
 
@@ -4338,6 +4347,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public InputStream getResourceAsStream(Class cls, String resource) {
+        if(!resource.startsWith("/")) {
+            System.out.println("ERROR: resources must reside in the root directory thus must start with a '/' character in Codename One! Invalid resource: " + resource);
+            return null;
+        }
+        if(resource.indexOf('/', 1) > -1) {
+            System.out.println("ERROR: resources cannont be nested in directories in Codename One! Invalid resource: " + resource);
+            return null;
+        }
         if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);

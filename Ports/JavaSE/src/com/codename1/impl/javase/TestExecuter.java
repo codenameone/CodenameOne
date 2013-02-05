@@ -66,6 +66,7 @@ public class TestExecuter {
                             try {
                                 TestReporting.getInstance().startingTestCase(test);
                                 test.prepare();
+                                TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
                                 failed = !test.runTest();
                                 test.cleanup();
                             } catch(Exception err) {
@@ -85,7 +86,9 @@ public class TestExecuter {
                         }
                     };
                     timeoutKiller.schedule(timeoutTask, timeout);
+                    TestReporting.getInstance().startingTestCase(test);
                     test.prepare();
+                    TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
                     failed = !test.runTest();
                     test.cleanup();
                     TestReporting.getInstance().finishedTestCase(test, !failed);
