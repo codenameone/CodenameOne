@@ -536,7 +536,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      * @param handler The HttpRequestHandler to which all requests for links will be sent
      */
     public HTMLComponent(DocumentRequestHandler handler) {
-        setLayout(new BorderLayout());
+        setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         this.handler=handler;
         threadQueue=new ResourceThreadQueue(this);
         setHandlesInput(true);
@@ -1213,7 +1213,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      */
     void displayPage() {
         removeAll();
-        addComponent(BorderLayout.CENTER,mainContainer);
+        addComponent(mainContainer);
         setScrollY(0);
 
         revalidate();
