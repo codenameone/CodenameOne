@@ -1848,10 +1848,35 @@ public class Form extends Container {
         }
     }
 
+    private void autoRelease(int x, int y) {
+        if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
+            // special case allowing drag within a button
+            Component atXY = getComponentAt(x, y);
+            Component pendingButton = (Component)buttonsAwatingRelease.elementAt(0);
+            if(atXY != pendingButton) {
+                if(pendingButton instanceof Button) {
+                    Button b = (Button)pendingButton;
+                    int relRadius = b.getReleaseRadius();
+                    if(relRadius > 0) {
+                        Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
+                        if(!r.contains(x, y)) {
+                            buttonsAwatingRelease = null;
+                            b.dragInitiated();
+                        }
+                        return;
+                    }
+                    buttonsAwatingRelease = null;
+                    b.dragInitiated();
+                }
+            }            
+        }
+    }
+    
     /**
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
+        autoRelease(x, y);
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
@@ -1873,6 +1898,7 @@ public class Form extends Container {
 
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
         }
