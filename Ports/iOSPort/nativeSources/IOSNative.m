@@ -171,7 +171,8 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 (int* arr, int width, int height);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
-(int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize, int constraint, const char* str, int len, BOOL dialogHeight);
+(int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize, 
+        int constraint, const char* str, int len, BOOL dialogHeight, int color, long imagePeer);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -257,10 +258,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(JAVA_OBJECT instanc
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide)
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
+                JAVA_INT color, JAVA_LONG imagePeer)
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, stringToUTF8(n10), 0, forceSlide);
+    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, stringToUTF8(n10), 0, forceSlide, color, imagePeer);
     [pool release];
 }
 

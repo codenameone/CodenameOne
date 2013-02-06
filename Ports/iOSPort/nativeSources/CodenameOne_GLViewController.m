@@ -125,7 +125,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
- int constraint, const char* str, int len, int dialogHeight, BOOL forceSlideUp) {
+ int constraint, const char* str, int len, int dialogHeight, BOOL forceSlideUp,
+int color, long imagePeer) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
@@ -541,9 +542,9 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  * Signature: ()I
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
-    if(displayWidth <= 0) {
+    //if(displayWidth <= 0) {
         displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
-    }
+    //}
     //NSLog(@"Display width %i", displayWidth);
     return displayWidth;
 }
@@ -555,9 +556,9 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
  */
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
-    if(displayHeight <= 0) {
+    //if(displayHeight <= 0) {
         displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
-    }
+    //}
     return displayHeight;
 }
 
@@ -879,18 +880,20 @@ static CodenameOne_GLViewController *sharedSingleton;
                                                  name:UIKeyboardWillHideNotification
                                                object:self.view.window];
     
+    //detect orientation by statusBarOrientation
+    UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+    
     UIImage *img = nil;
     if(isIPad()) {
         if(scaleValue > 1) {
-            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() >
-               Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()) {
+            if(!isPortrait) {
                 img = [UIImage imageNamed:@"Default-Landscape@2x.png"];
             } else {
                 img = [UIImage imageNamed:@"Default-Portrait@2x.png"];
             }
         } else {
-            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() >
-               Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()) {
+            if(!isPortrait) {
                 NSString* str = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Default-Landscape.png"];
                 NSData* iData = [NSData dataWithContentsOfFile:str];
                 img = [[UIImage alloc] initWithData:iData];
@@ -922,26 +925,30 @@ static CodenameOne_GLViewController *sharedSingleton;
         float scale = scaleValue;
         DrawImage* dr;
         GLUIImage* gl;
-        /*if(isRetinaBug()) {
-         CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, img.size.width * 2, img.size.height * 2 - 20 * scale));
-         img = [UIImage imageWithCGImage:imageRef];
-         CGImageRelease(imageRef);
-         
-         gl = [[GLUIImage alloc] initWithImage:img];
-         dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width / 2 h:img.size.height / 2];
-         } else {*/
-        CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()));
-        img = [UIImage imageWithCGImage:imageRef];
-        CGImageRelease(imageRef);
-        
+
+        int wi = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
+        int he = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
+        if (!isIPad()) {
+            //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
+            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()));
+            img = [UIImage imageWithCGImage:imageRef];
+            CGImageRelease(imageRef);
+        }
+
+        //some hacking to scale launch image so that it will be drawn correctly
+        int heightFix = 0;
+        GLfloat xScale = 1;
+        if (!isPortrait && wi < he) {
+            heightFix = he - wi;
+            xScale = wi*1.0 / he;
+        }
         gl = [[GLUIImage alloc] initWithImage:img];
-        dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
-        //}
-        
+        dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height + heightFix];
+
         [(EAGLView *)self.view setFramebuffer];
         GLErrorLog;
         
-        glScalef(1, -1, 1);
+        glScalef(xScale, -1, 1);
         GLErrorLog;
         glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
         GLErrorLog;
@@ -952,7 +959,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         glTranslatef(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
         GLErrorLog;
         
-        glScalef(1, -1, 1);
+        glScalef(xScale, -1, 1);
         GLErrorLog;
         
         [(EAGLView *)self.view presentFramebuffer];

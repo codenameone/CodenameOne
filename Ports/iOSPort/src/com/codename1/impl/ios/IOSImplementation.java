@@ -215,12 +215,19 @@ public class IOSImplementation extends CodenameOneImplementation {
                 forceSlideUp = true;
             }
         }
+        /*Image backgroundImage = Image.createImage(currentEditing.getWidth(), currentEditing.getHeight());
+        com.codename1.ui.Graphics g = backgroundImage.getGraphics();
+        g.translate(-currentEditing.getX(), currentEditing.getY());
+        currentEditing.paint(g);
+        NativeImage nm = (NativeImage)backgroundImage.getImage();*/
+        
         nativeInstance.editStringAt(cmp.getAbsoluteX(),
                 cmp.getAbsoluteY(),
                 cmp.getWidth(),
                 cmp.getHeight(),
                 fnt.peer, currentEditing.isSingleLineTextArea(),
-                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp);
+                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
+                currentEditing.getStyle().getFgColor(), /*nm.peer*/0);
     }
     
     // callback for native code!
