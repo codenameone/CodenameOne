@@ -530,7 +530,10 @@ public class XMLParser {
 
         //collect tag name
         while ((!isWhiteSpace(c)) && (c!='>') && (c!='/')) {
-            tagName.append(Character.toLowerCase(c));
+        	if (eventParser == false) {
+        		c = Character.toLowerCase(c);
+        	}
+        	tagName.append(c);
             c=(char)is.read();
         }
 
@@ -616,7 +619,10 @@ public class XMLParser {
 			curAttribute.delete(0, curAttribute.length()).append(c);
             c=(char)is.read();
             while ((!isWhiteSpace(c)) && (c!='=') && (c!='>')) {
-                curAttribute.append(Character.toLowerCase(c));
+            	if (eventParser == false) {
+            		c = Character.toLowerCase(c);
+            	}
+                curAttribute.append(c);
                 c=(char)is.read();
             }
 
@@ -728,10 +734,7 @@ public class XMLParser {
                     notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), curValue.toString(), "XML malformed - no > after /");
                 }
             }
-
-            curAttribute = new StringBuffer();
-			curValue = new StringBuffer();
-
+			curValue = curValue.delete(0,curValue.length());
         }
         
     }
