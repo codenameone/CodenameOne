@@ -59,6 +59,7 @@ public class SEBrowserComponent extends PeerComponent {
     private boolean init = false;
     private JPanel cnt = new JPanel();
     private boolean lightweightMode;
+    private boolean lightweightModeSet;
     public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
         super(null);
         this.web = web;
@@ -179,9 +180,10 @@ public class SEBrowserComponent extends PeerComponent {
     }
 
     protected void setLightweightMode(final boolean l) {
-        if(lightweightMode == l) {
+        if(lightweightModeSet && lightweightMode == l) {
             return;
         }
+        lightweightModeSet = true;
         lightweightMode = l;
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
