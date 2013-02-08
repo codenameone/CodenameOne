@@ -3088,6 +3088,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void laidOut() {
         if(!isCellRenderer()) {
+            deregisterAnimatedInternal();
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight()) {
                 setScrollY(getScrollDimension().getHeight() - getHeight());

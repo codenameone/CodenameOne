@@ -884,7 +884,7 @@ public class Form extends Container {
     /**
      * Identical to the none-internal version, the difference between the internal/none-internal
      * is that it references a different vector that is unaffected by the user actions.
-     * That is why we can dynamically register/deregister without interfearing with user interaction.
+     * That is why we can dynamically register/deregister without interfering with user interaction.
      */
     void registerAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents == null) {
