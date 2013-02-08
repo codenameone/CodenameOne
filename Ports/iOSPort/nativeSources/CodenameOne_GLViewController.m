@@ -126,7 +126,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, int dialogHeight, BOOL forceSlideUp,
-int color, long imagePeer) {
+ int color, long imagePeer) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
@@ -543,7 +543,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
     //if(displayWidth <= 0) {
-        displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
+    displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
     //}
     //NSLog(@"Display width %i", displayWidth);
     return displayWidth;
@@ -557,7 +557,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
     //if(displayHeight <= 0) {
-        displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
+    displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     //}
     return displayHeight;
 }
@@ -905,14 +905,14 @@ static CodenameOne_GLViewController *sharedSingleton;
         }
     } else {
         /*if([UIScreen mainScreen].scale > 1) {
-            if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
-                img = [UIImage imageNamed:@"Default@2x.png"];
-            } else {
-                img = [UIImage imageNamed:@"Default@2x.png"];
-            }
-        } else {
-            img = [UIImage imageNamed:@"Default.png"];
-        }*/
+         if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
+         img = [UIImage imageNamed:@"Default@2x.png"];
+         } else {
+         img = [UIImage imageNamed:@"Default@2x.png"];
+         }
+         } else {
+         img = [UIImage imageNamed:@"Default.png"];
+         }*/
         if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
             // workaround for stupid iphone 5 behavior where image named just DOESN'T WORK!
             img = [UIImage imageNamed:@"Default-568h@2x.png"];
@@ -925,7 +925,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         float scale = scaleValue;
         DrawImage* dr;
         GLUIImage* gl;
-
+        
         int wi = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
         int he = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
         if (!isIPad()) {
@@ -934,7 +934,7 @@ static CodenameOne_GLViewController *sharedSingleton;
             img = [UIImage imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
         }
-
+        
         //some hacking to scale launch image so that it will be drawn correctly
         int heightFix = 0;
         GLfloat xScale = 1;
@@ -944,7 +944,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         }
         gl = [[GLUIImage alloc] initWithImage:img];
         dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height + heightFix];
-
+        
         [(EAGLView *)self.view setFramebuffer];
         GLErrorLog;
         
@@ -1016,7 +1016,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     // resize the noteView
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-
+    
     BOOL patch = NO;
     if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
         if(!forceSlideUpField) {
@@ -1151,8 +1151,22 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
 }
 
+bool lockDrawing;
+- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+    @synchronized([CodenameOne_GLViewController instance]) {
+        [currentTarget removeAllObjects];
+        lockDrawing = YES;
+    }
+    com_codename1_impl_ios_IOSImplementation_paintNow__();
+    @synchronized([CodenameOne_GLViewController instance]) {
+        [currentTarget addObjectsFromArray:upcomingTarget];
+        [upcomingTarget removeAllObjects];
+    }
+    [self drawFrame:CGRectMake(0, 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl())];
+}
+
 - (BOOL)shouldAutorotate {
-    UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];    
+    UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
     switch (orientationLock) {
         case 0:
             return YES;
@@ -1210,6 +1224,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         displayWidth = (int)self.view.bounds.size.width * scaleValue;
         displayHeight = (int)self.view.bounds.size.height * scaleValue;
     }
+    lockDrawing = NO;
     screenSizeChanged(displayWidth, displayHeight);
 }
 
@@ -1434,6 +1449,9 @@ static CodenameOne_GLViewController *sharedSingleton;
      return;
      }*/
     //currentBackBuffer = buff;
+    if(lockDrawing) {
+        return;
+    }
     CGRect rect = CGRectMake(x, y, width, height);
     painted = NO;
 	//[self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:0 waitUntilDone:NO];
@@ -1644,7 +1662,7 @@ extern int popoverSupported();
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
 		UIImage* image = [info objectForKey:UIImagePickerControllerOriginalImage];
-
+        
         if (image.imageOrientation != UIImageOrientationUp) {
             UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
             [image drawInRect:(CGRect){0, 0, image.size}];
@@ -1725,43 +1743,43 @@ extern SKPayment *paymentInstance;
             [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
             continue;
         }
-            switch (transaction.transactionState)
-            {
-                case SKPaymentTransactionStatePurchased:
-                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                    com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
-                    continue;
-                case SKPaymentTransactionStateFailed:
-                    if (transaction.error.code != SKErrorPaymentCancelled) {
-                        NSLog(@"Transaction error %@", transaction.error);
-                        com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), fromNSString(transaction.error.localizedDescription));
-                    }
-                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                    continue;
-                case SKPaymentTransactionStateRestored:
-                    NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
-                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                    continue;
-                case SKPaymentTransactionStatePurchasing:
-                    NSLog(@"SKPaymentTransactionStatePurchasing");
-                    continue;
-                default:
-                    NSLog(@"Transaction error %i", transaction.transactionState);
-                    [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                    continue;
-            }
+        switch (transaction.transactionState)
+        {
+            case SKPaymentTransactionStatePurchased:
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(fromNSString(transaction.payment.productIdentifier));
+                continue;
+            case SKPaymentTransactionStateFailed:
+                if (transaction.error.code != SKErrorPaymentCancelled) {
+                    NSLog(@"Transaction error %@", transaction.error);
+                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(fromNSString(transaction.payment.productIdentifier), fromNSString(transaction.error.localizedDescription));
+                }
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+            case SKPaymentTransactionStateRestored:
+                NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+            case SKPaymentTransactionStatePurchasing:
+                NSLog(@"SKPaymentTransactionStatePurchasing");
+                continue;
+            default:
+                NSLog(@"Transaction error %i", transaction.transactionState);
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+        }
     }
 }
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
-    NSLog(@"audioRecorderDidFinishRecording: %i", (int)flag);        
+    NSLog(@"audioRecorderDidFinishRecording: %i", (int)flag);
 }
 
 - (void)audioRecorderEncodeErrorDidOccur:(AVAudioRecorder *)recorder error:(NSError *)error {
-    if(error != nil) {  
-        NSLog(@"audioRecorderEncodeErrorDidOccur: %@", [error localizedDescription]);        
+    if(error != nil) {
+        NSLog(@"audioRecorderEncodeErrorDidOccur: %@", [error localizedDescription]);
     } else {
-        NSLog(@"audioRecorderEncodeErrorDidOccur with null argument");        
+        NSLog(@"audioRecorderEncodeErrorDidOccur with null argument");
     }
 }
 

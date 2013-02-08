@@ -2470,10 +2470,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public static void streamComplete(long peer) {
         NetworkConnection n = connections.get(peer);
-        synchronized(n.LOCK) {
-            n.connected = true;
-            n.streamComplete();
-            n.LOCK.notifyAll();
+        if(n != null) {
+            synchronized(n.LOCK) {
+                n.connected = true;
+                n.streamComplete();
+                n.LOCK.notifyAll();
+            }
         }
     }
     
@@ -3353,6 +3355,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             });
         }
+    }
+    
+    public static void paintNow() {
+        final Display d = Display.getInstance();
+        d.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                f.paintComponent(instance.getCodenameOneGraphics(), true);
+            }
+        }, 50);
     }
     
     /**

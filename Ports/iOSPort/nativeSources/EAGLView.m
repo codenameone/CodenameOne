@@ -52,7 +52,7 @@ extern BOOL isRetina();
 {
     self = [super initWithCoder:coder];
 	if (self) {
-        self.clearsContextBeforeDrawing = YES;
+        self.clearsContextBeforeDrawing = NO;
         if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
             if(isRetinaBug()) {
                 self.contentScaleFactor = 1.0;
