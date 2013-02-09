@@ -3656,6 +3656,18 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream createStorageOutputStream(String name) throws IOException {
+        if(name.indexOf('/') > -1) {
+            throw new IOException("Illegal charcter '/' in storage name: " + name);
+        }
+        if(name.indexOf('\\') > -1) {
+            throw new IOException("Illegal charcter '\\' in storage name: " + name);
+        }
+        if(name.indexOf('*') > -1) {
+            throw new IOException("Illegal charcter '*' in storage name: " + name);
+        }
+        if(name.indexOf('?') > -1) {
+            throw new IOException("Illegal charcter '?' in storage name: " + name);
+        }
         return new FileOutputStream(new File(getStorageDir(), name));
     }
 
