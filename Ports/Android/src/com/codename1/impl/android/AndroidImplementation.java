@@ -2269,6 +2269,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     synchronized (lock) {
                         WebView wv = new WebView(activity) {
+                            
                             public boolean onKeyDown(int keyCode, KeyEvent event) {
                                 switch (keyCode) {
                                     case KeyEvent.KEYCODE_BACK:
@@ -2293,6 +2294,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return super.onKeyUp(keyCode, event);
                             }
                         };
+                        wv.setOnTouchListener(new View.OnTouchListener() {
+
+                            @Override
+                            public boolean onTouch(View v, MotionEvent event) {
+                                switch (event.getAction()) {
+                                    case MotionEvent.ACTION_DOWN:
+                                    case MotionEvent.ACTION_UP:
+                                        if (!v.hasFocus()) {
+                                            v.requestFocus();
+                                        }
+                                        break;
+                                }
+                                return false;
+                            }
+                        });
+                        wv.requestFocus(View.FOCUS_DOWN);
+                        wv.setFocusableInTouchMode(true);
                         bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, activity, parent);
                         lock.notify();
                     }
