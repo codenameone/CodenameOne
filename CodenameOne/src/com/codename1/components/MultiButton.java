@@ -196,6 +196,7 @@ public class MultiButton extends Container {
             } else {
                 emblem = new Button();
             }
+            emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
             if(old.getCommand() != null) {
                 Image img = old.getIcon();
