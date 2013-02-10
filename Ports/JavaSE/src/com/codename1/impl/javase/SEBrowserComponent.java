@@ -93,6 +93,9 @@ public class SEBrowserComponent extends PeerComponent {
                 } else if (newState == State.RUNNING) {
                     p.fireWebEvent("onLoadResource", new ActionEvent(url));
                 } else if (newState == State.SUCCEEDED) {
+                    if (!p.isNativeScrollingEnabled()) {
+                        web.getEngine().executeScript("document.body.style.overflow='hidden'");
+                    }
                     p.fireWebEvent("onLoad", new ActionEvent(url));
                 }
                 currentURL = url;
