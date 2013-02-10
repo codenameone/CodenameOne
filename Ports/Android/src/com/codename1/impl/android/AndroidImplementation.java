@@ -183,7 +183,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int timeout = -1;
     private CodeScannerImpl scannerInstance;
 
-
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
@@ -2259,6 +2258,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    @Override
+    public void setNativeBrowserScrollingEnabled(PeerComponent browserPeer, boolean e) {
+        super.setNativeBrowserScrollingEnabled(browserPeer, e);
+        AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+        bc.setScrollingEnabled(e);
+        
+    }
+
+    @Override
+    public void setPinchToZoomEnabled(PeerComponent browserPeer, boolean e) {
+        super.setPinchToZoomEnabled(browserPeer, e);
+        AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+        bc.setPinchZoomEnabled(e);
+    }
+
     public PeerComponent createBrowserComponent(final Object parent) {
         final AndroidImplementation.AndroidBrowserComponent[] bc = new AndroidImplementation.AndroidBrowserComponent[1];
 
@@ -2581,20 +2595,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     
+    
+    
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
         private WebView web;
         private BrowserComponent parent;
+        private boolean scrollingEnabled = true;
         protected AndroidBrowserComponentCallback jsCallback;
         private boolean lightweightMode = false;
-
+        
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
             parent = (BrowserComponent) p;
             this.web = web;
             web.getSettings().setJavaScriptEnabled(true);
-            web.getSettings().setSupportZoom(true);
+            web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
             this.act = act;
             jsCallback = new AndroidBrowserComponentCallback();
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
@@ -2711,6 +2728,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         
 
+        public void setScrollingEnabled(boolean enabled){
+            this.scrollingEnabled = enabled;
+            web.setHorizontalScrollBarEnabled(enabled);
+            web.setVerticalScrollBarEnabled(enabled);
+            if ( !enabled ){
+                web.setOnTouchListener(new View.OnTouchListener(){
+
+                    @Override
+                    public boolean onTouch(View view, MotionEvent me) {
+                        return (me.getAction() == MotionEvent.ACTION_MOVE);
+                    }
+
+                });
+            } else {
+               web.setOnTouchListener(null);
+            }
+            
+        }
+        
+        public boolean isScrollingEnabled(){
+            return scrollingEnabled;
+        }
         
         public void setProperty(final String key, final Object value) {
             act.runOnUiThread(new Runnable() {
@@ -2893,6 +2932,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     web.addJavascriptInterface(o, name);
                 }
             });
+        }
+
+        public  void setPinchZoomEnabled(boolean e) {
+            web.getSettings().setSupportZoom(e);
+            web.getSettings().setBuiltInZoomControls(e);
         }
     }
 
