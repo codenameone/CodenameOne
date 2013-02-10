@@ -57,7 +57,7 @@ int nextPowerOf2(int val) {
 int displayWidth = -1;
 int displayHeight = -1;
 UIView *editingComponent;
-int editCompoentX, editCompoentY, editCompoentW, editCompoentH;
+float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
@@ -125,8 +125,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
- int constraint, const char* str, int len, int dialogHeight, BOOL forceSlideUp,
- int color, long imagePeer) {
+ int constraint, const char* str, int len, BOOL forceSlideUp,
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
@@ -137,15 +137,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
     }
     dispatch_sync(dispatch_get_main_queue(), ^{
         float scale = scaleValue;
-        editCompoentX = x / scale;
-        editCompoentY = y / scale;
-        editCompoentW = w / scale;
-        editCompoentH = h / scale;
+        editCompoentX = (x + padLeft) / scale;
+        editCompoentY = (y + padTop) / scale;
+        editCompoentW = (w - padLeft - padRight) / scale;
+        editCompoentH = (h - padTop - padBottom) / scale;
         forceSlideUpField = forceSlideUp;
         CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
         if(isSingleLine) {
             UITextField* utf = [[UITextField alloc] initWithFrame:rect];
             editingComponent = utf;
+            [utf setTextColor:UIColorFromRGB(color, 255)];
             
             if((constraint & 0x80000) == 0x80000) {
                 utf.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -189,9 +190,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             utf.text = [NSString stringWithUTF8String:str];
             utf.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
-            utf.backgroundColor = [UIColor whiteColor];
+            [utf setBackgroundColor:[UIColor clearColor]];
             utf.returnKeyType = UIReturnKeyDone;
-            utf.borderStyle = UITextBorderStyleRoundedRect;
+            utf.borderStyle = UITextBorderStyleNone;
             [[NSNotificationCenter defaultCenter]
              addObserver:utf.delegate
              selector:@selector(textFieldDidChange)

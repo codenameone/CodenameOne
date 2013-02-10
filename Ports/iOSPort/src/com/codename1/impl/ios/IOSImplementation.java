@@ -80,6 +80,9 @@ import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.plaf.Style;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -215,19 +218,33 @@ public class IOSImplementation extends CodenameOneImplementation {
                 forceSlideUp = true;
             }
         }
-        /*Image backgroundImage = Image.createImage(currentEditing.getWidth(), currentEditing.getHeight());
-        com.codename1.ui.Graphics g = backgroundImage.getGraphics();
-        g.translate(-currentEditing.getX(), currentEditing.getY());
-        currentEditing.paint(g);
-        NativeImage nm = (NativeImage)backgroundImage.getImage();*/
+
+        cmp.repaint();
         
+        Style stl = currentEditing.getStyle();
+        boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
         nativeInstance.editStringAt(cmp.getAbsoluteX(),
                 cmp.getAbsoluteY(),
                 cmp.getWidth(),
                 cmp.getHeight(),
                 fnt.peer, currentEditing.isSingleLineTextArea(),
                 currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                currentEditing.getStyle().getFgColor(), /*nm.peer*/0);
+                stl.getFgColor(), 0,//peer, 
+                stl.getPadding(false, Component.TOP),
+                stl.getPadding(false, Component.BOTTOM),
+                stl.getPadding(rtl, Component.LEFT),
+                stl.getPadding(rtl, Component.RIGHT));
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while(instance.currentEditing != null) {
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        });
     }
     
     // callback for native code!
@@ -1750,7 +1767,18 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
-        return super.convertToPixels(dipCount, horizontal);
+        // ipad mini is ignored, there is no sensible way to detect it
+        if(isTablet()) {
+            if(getDisplayWidth() < 1100) {
+                return (int)Math.round((((float)dipCount) * 5.1975051975052));
+            }
+            return (int)Math.round((((float)dipCount) * 10.3939299449122));
+        } else {
+            if(getDisplayWidth() < 500) {
+                return (int)Math.round((((float)dipCount) * 6.4173236936575));
+            }
+            return (int)Math.round((((float)dipCount) * 12.8369704749679));
+        }
     }
 
     @Override

@@ -38,7 +38,7 @@ final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer);
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height);
     native long createImageFromARGB(int[] argb, int width, int height);
