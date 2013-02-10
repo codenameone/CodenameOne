@@ -389,7 +389,7 @@ public class ContainerList extends Container {
                         }
                     }
                 }
-                fireActionEvent(new ActionEvent(ContainerList.this, x, y));
+                fireActionEvent(new ActionEvent(ContainerList.this, x, y, longPress));
             }
         }
         
