@@ -201,11 +201,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getCookiesForURL(url);
     }    
     
+    private static final Object EDITING_LOCK = new Object(); 
+    private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
         currentEditing = (TextArea)cmp;
+        
+        //register the edited TextArea to support moving to the next field
+        TextEditUtil.setCurrentEditComponent(cmp); 
 
-        NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
-        boolean forceSlideUp = false;
+        final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
+        boolean forceSlideUpTmp = false;
         Form current = Display.getInstance().getCurrent();
         if(current instanceof Dialog && !isTablet()) {
             // special case, if we are editing a small dialog we want to move it
@@ -215,36 +220,50 @@ public class IOSImplementation extends CodenameOneImplementation {
             Component c = dlg.getDialogComponent();
             if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
                     c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
-                forceSlideUp = true;
+                forceSlideUpTmp = true;
             }
         }
+        final boolean forceSlideUp = forceSlideUpTmp;
 
         cmp.repaint();
         
-        Style stl = currentEditing.getStyle();
-        boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
-        nativeInstance.editStringAt(cmp.getAbsoluteX(),
-                cmp.getAbsoluteY(),
-                cmp.getWidth(),
-                cmp.getHeight(),
-                fnt.peer, currentEditing.isSingleLineTextArea(),
-                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                stl.getFgColor(), 0,//peer, 
-                stl.getPadding(false, Component.TOP),
-                stl.getPadding(false, Component.BOTTOM),
-                stl.getPadding(rtl, Component.LEFT),
-                stl.getPadding(rtl, Component.RIGHT));
+        // give the repaint one cycle to "do its magic...
+        final Style stl = currentEditing.getStyle();
+        final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                nativeInstance.editStringAt(cmp.getAbsoluteX(),
+                        cmp.getAbsoluteY(),
+                        cmp.getWidth(),
+                        cmp.getHeight(),
+                        fnt.peer, currentEditing.isSingleLineTextArea(),
+                        currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
+                        stl.getFgColor(), 0,//peer, 
+                        stl.getPadding(false, Component.TOP),
+                        stl.getPadding(false, Component.BOTTOM),
+                        stl.getPadding(rtl, Component.LEFT),
+                        stl.getPadding(rtl, Component.RIGHT));
+            }
+        });
+        editNext = false;
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                while(instance.currentEditing != null) {
-                    try {
-                        Thread.sleep(20);
-                    } catch (InterruptedException ex) {
+                synchronized(EDITING_LOCK) {
+                    while(instance.currentEditing == cmp) {
+                        try {
+                            EDITING_LOCK.wait(20);
+                        } catch (InterruptedException ex) {
+                        }
                     }
                 }
             }
         });
+        if(editNext) {
+            editNext = false;
+            TextEditUtil.editNextTextArea();
+        }
     }
     
     // callback for native code!
@@ -252,9 +271,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance.editingText = false;
         if(instance.currentEditing != null) {
             if(finished) {
-                instance.currentEditing.setText(s);
-                Display.getInstance().onEditingComplete(instance.currentEditing, s);
-                instance.currentEditing = null;
+                editNext = cursorPositon == -2;
+                synchronized(EDITING_LOCK) {
+                    instance.currentEditing.setText(s);
+                    Display.getInstance().onEditingComplete(instance.currentEditing, s);
+                    instance.currentEditing = null;
+                    EDITING_LOCK.notify();
+                }
             } else {
                 instance.currentEditing.setText(s);
             }

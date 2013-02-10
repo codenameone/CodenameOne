@@ -196,6 +196,23 @@ extern BOOL isRetina();
     }
 }
 
+/**
+ * User clicked Done or Next button above the keyboard
+ */
+-(void) keyboardDoneNextClicked {
+    if(editingComponent != nil) {
+        stringEdit(YES, -2, editingComponent.text);
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+        [editingComponent release];
+        editingComponent = nil;
+        
+        repaintUI();
+        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+    }
+}
+
+
 -(void)textViewDidChange:(UITextView *)textView {
     stringEdit(NO, -1, editingComponent.text);    
 }
@@ -206,12 +223,15 @@ extern BOOL isRetina();
 
 - (BOOL)textFieldShouldReturn:(UITextField *)theTextField {
     if(editingComponent != nil) {
-        stringEdit(YES, -1, editingComponent.text);
+        stringEdit(YES, -2, editingComponent.text);
         [editingComponent resignFirstResponder];
         [editingComponent removeFromSuperview];
         [editingComponent release];
         editingComponent = nil;
         repaintUI();
+        
+        //if there is one then goto the edit next textarea
+        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();        
     }
     return YES;
 }

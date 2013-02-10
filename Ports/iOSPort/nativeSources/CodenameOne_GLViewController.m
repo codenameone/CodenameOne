@@ -191,13 +191,50 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.text = [NSString stringWithUTF8String:str];
             utf.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
             [utf setBackgroundColor:[UIColor clearColor]];
-            utf.returnKeyType = UIReturnKeyDone;
+            
+            JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
+            if (isLastEdit) {
+                utf.returnKeyType = UIReturnKeyDone;
+            } else {
+                utf.returnKeyType = UIReturnKeyNext;
+            }
+            
             utf.borderStyle = UITextBorderStyleNone;
             [[NSNotificationCenter defaultCenter]
              addObserver:utf.delegate
              selector:@selector(textFieldDidChange)
              name:UITextFieldTextDidChangeNotification
-             object:utf];
+             object:utf];            
+
+            if ((utf.keyboardType == UIKeyboardTypeDecimalPad
+                || utf.keyboardType == UIKeyboardTypePhonePad
+                || utf.keyboardType == UIKeyboardTypeNumberPad) && !isIPad()) {
+                //add navigation toolbar to the top of the keyboard
+                UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+                [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+                [toolbar sizeToFit];
+
+                //add a space filler to the left:
+                UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+                
+                NSString* buttonTitle;
+                
+                //TODO: should provide a mechanism to i18n Done and Next strings
+                if (isLastEdit) {
+                    buttonTitle = @"Done";
+                } else {
+                    buttonTitle = @"Next";
+                }
+                UIBarButtonItem *doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneNextClicked)];
+
+                NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
+
+                [flexButton release];
+                [doneButton release];
+                [toolbar setItems:itemsArray];
+                [utf setInputAccessoryView:toolbar];
+            }
         } else {
             UITextView* utv = [[UITextView alloc] initWithFrame:rect];
             editingComponent = utv;
