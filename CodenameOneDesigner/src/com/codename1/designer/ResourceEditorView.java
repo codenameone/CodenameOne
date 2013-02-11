@@ -2079,7 +2079,8 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                     }
                     if(actionComponentNames != null &&
                             (actual instanceof com.codename1.ui.Button || actual instanceof com.codename1.ui.List ||
-                            actual instanceof com.codename1.ui.list.ContainerList || actual instanceof com.codename1.ui.TextArea)) {
+                            actual instanceof com.codename1.ui.list.ContainerList || actual instanceof com.codename1.ui.TextArea ||
+                            actual instanceof com.codename1.ui.Calendar)) {
                         if(actual instanceof com.codename1.ui.Button) {
                             if(((com.codename1.ui.Button)actual).getCommand() != null) {
                                 return;
@@ -2488,7 +2489,8 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             for(String currentName : allComponents.keySet()) {
                 String value = allComponents.get(currentName);
                 if(value.equals("com.codename1.ui.List") || value.equals("com.codename1.ui.ComboBox") ||
-                        value.equals("com.codename1.ui.list.ContainerList") || value.equals("com.codename1.ui.list.MultiList")) {
+                        value.equals("com.codename1.ui.list.ContainerList") || value.equals("com.codename1.ui.list.MultiList") ||
+                        value.equals("com.codename1.ui.Calendar")) {
                     listComponents.add(currentName);
                 }
             }
