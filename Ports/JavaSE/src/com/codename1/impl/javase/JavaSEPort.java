@@ -273,7 +273,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean showEDTViolationStacks = false;
     private boolean inInit;
     private boolean showMenu = true;
-    
+
+    private Double pixelMilliRatio;
     private boolean manualPurchaseSupported;
     private boolean managedPurchaseSupported;
     private boolean subscriptionSupported;
@@ -1025,6 +1026,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 e = z.getNextEntry();
             }
             z.close();
+            
+            String pix = props.getProperty("pixelRatio");
+            if(pix != null && pix.length() > 0) {
+                try {
+                    pixelMilliRatio = Double.valueOf(pix);
+                } catch(NumberFormatException err) {
+                    err.printStackTrace();
+                    pixelMilliRatio = null;
+                }
+            } else {
+                pixelMilliRatio = null;
+            }
 
             portraitSkinHotspots = new HashMap<Point, Integer>();
             portraitScreenCoordinates = new Rectangle();
@@ -5092,4 +5105,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String getAppHomePath() {
         return System.getProperty("user.home");
     }    
+
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        if(pixelMilliRatio != null) {
+            return (int)Math.round(dipCount * pixelMilliRatio.doubleValue());
+        }
+        return super.convertToPixels(dipCount, horizontal);
+    }
 }

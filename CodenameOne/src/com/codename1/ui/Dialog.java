@@ -1068,6 +1068,7 @@ public class Dialog extends Form {
             if(getTitleComponent().getUIID().equals("DialogTitle")) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
+            getContentPane().setUIID("PopupContentPane");
         }
 
         disposeOnRotation = true;

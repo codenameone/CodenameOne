@@ -967,6 +967,8 @@ public class Image {
     }
 
     /**
+     * DO NOT CALL THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING! Images dispose
+     * automatically for most cases except for very rare special cases.
      * Images on devices usually holds a native memory, some platforms garbage 
      * collectors might fail to release the native and to fail with out of memory
      * errors.
