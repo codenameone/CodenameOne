@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.5" maxVersion="1.5" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <Properties>
@@ -105,7 +105,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="deviceType" min="-2" pref="125" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="uiPreviewContent" pref="244" max="32767" attributes="0"/>
+                                  <Component id="uiPreviewContent" pref="346" max="32767" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Component id="localePicker" min="-2" max="-2" attributes="0"/>
                               </Group>
@@ -283,7 +283,7 @@
                           <Group type="102" alignment="0" attributes="1">
                               <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="searchField" pref="391" max="32767" attributes="0"/>
+                              <Component id="searchField" max="32767" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="borderWizard" min="-2" max="-2" attributes="0"/>
                           </Group>
@@ -312,7 +312,7 @@
                           <Component id="borderWizard" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="stylesTabbedPane" pref="327" max="32767" attributes="0"/>
+                      <Component id="stylesTabbedPane" pref="349" max="32767" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="addThemeEntry" alignment="3" min="-2" max="-2" attributes="0"/>

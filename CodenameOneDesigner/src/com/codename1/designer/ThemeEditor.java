@@ -21,7 +21,6 @@
  * CA 94065 USA or visit www.oracle.com if you need additional information or
  * have any questions.
  */
-
 package com.codename1.designer;
 
 import com.codename1.designer.PickMIDlet;
@@ -96,9 +95,10 @@ import javax.swing.table.DefaultTableCellRenderer;
 /**
  * Allows changing the theme data
  *
- * @author  Shai Almog
+ * @author Shai Almog
  */
 public class ThemeEditor extends BaseForm {
+
     boolean dirty;
     private static TableTranferable copyInstance;
     private EditableResources resources;
@@ -109,7 +109,6 @@ public class ThemeEditor extends BaseForm {
     private Object originalFlashingPropertyValue;
     private javax.swing.Timer flashingTimer;
     private Hashtable themeHash;
-    
     private String themeName;
     private JPanel previewOptionsPanel = new JPanel();
     private JButton previewOptions = new JButton("Advanced Options");
@@ -120,14 +119,16 @@ public class ThemeEditor extends BaseForm {
     static boolean wasThemeLoaded() {
         return themeWasLoaded;
     }
-    
+
     public static void resetThemeLoaded() {
         themeWasLoaded = false;
     }
-    
-    /** Creates new form ThemeEditor */
+
+    /**
+     * Creates new form ThemeEditor
+     */
     public ThemeEditor(EditableResources resources, String themeName, Hashtable themeHash, ResourceEditorView view) {
-        if(resources.isOverrideMode() && !resources.isOverridenResource(themeName)) {
+        if (resources.isOverrideMode() && !resources.isOverridenResource(themeName)) {
             setOverrideMode(true, view.getComponent());
         }
         this.resources = resources;
@@ -146,11 +147,12 @@ public class ThemeEditor extends BaseForm {
         previewOptionsPanel.add(new JLabel("Form:"));
         JComboBox formPicker = new JComboBox();
         formPicker.setLightWeightPopupEnabled(false);
-        previewOptionsPanel.add(formPicker);        
+        previewOptionsPanel.add(formPicker);
         JButton previewInSimulator = new JButton("Simulator");
         previewInSimulator.setToolTipText("Open the current form in the device simulator");
         previewInSimulator.setEnabled(view.getProjectGeneratorSettings() != null);
         previewInSimulator.addActionListener(new ActionListener() {
+
             public void actionPerformed(ActionEvent ae) {
                 simulatorActionPerformed(ae);
             }
@@ -160,6 +162,7 @@ public class ThemeEditor extends BaseForm {
         previewOptionsPosition.add(previewOptionsPanel);
         previewParentPanel.add(java.awt.BorderLayout.NORTH, previewOptionsPosition);
         previewOptions.addActionListener(new ActionListener() {
+
             public void actionPerformed(ActionEvent e) {
                 previewParentPanel.remove(previewOptionsPosition);
                 previewParentPanel.add(java.awt.BorderLayout.NORTH, configPane);
@@ -172,27 +175,28 @@ public class ThemeEditor extends BaseForm {
         String localeLanguageValue = Preferences.userNodeForPackage(getClass()).get("localeLanguageValue", null);
         localeVector.addElement(null);
         int selectedLocaleIndex = -1;
-        for(String currentLocale : resources.getL10NResourceNames()) {
+        for (String currentLocale : resources.getL10NResourceNames()) {
             Enumeration e = resources.listL10NLocales(currentLocale);
-            while(e.hasMoreElements()) {
-                String lang = (String)e.nextElement();
-                if(currentLocale.equals(localeValue) && lang.equals(localeLanguageValue)) {
+            while (e.hasMoreElements()) {
+                String lang = (String) e.nextElement();
+                if (currentLocale.equals(localeValue) && lang.equals(localeLanguageValue)) {
                     selectedLocaleIndex = localeVector.size();
                     Accessor.setResourceBundle(resources.getL10N(localeValue, localeLanguageValue));
                 }
-                localeVector.addElement(new String[] {currentLocale, lang});
+                localeVector.addElement(new String[]{currentLocale, lang});
             }
         }
         localePicker.setModel(new DefaultComboBoxModel(localeVector));
-        if(selectedLocaleIndex > -1) {
+        if (selectedLocaleIndex > -1) {
             localePicker.setSelectedIndex(selectedLocaleIndex);
         }
         localePicker.setRenderer(new DefaultListCellRenderer() {
+
             public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                if(value == null) {
+                if (value == null) {
                     value = "[None]";
                 } else {
-                    String[] s = (String[])value;
+                    String[] s = (String[]) value;
                     value = s[0] + " - " + s[1];
                 }
                 return super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
@@ -207,22 +211,23 @@ public class ThemeEditor extends BaseForm {
         String[] sortedUIElements = new String[resources.getUIResourceNames().length];
         System.arraycopy(resources.getUIResourceNames(), 0, sortedUIElements, 0, sortedUIElements.length);
         Arrays.sort(sortedUIElements, String.CASE_INSENSITIVE_ORDER);
-        for(String currentUI : sortedUIElements) {
+        for (String currentUI : sortedUIElements) {
             uiPreviewConentVector.addElement(currentUI);
         }
         uiPreviewConentVector.addElement("Default Demo");
         uiPreviewContent.setModel(new DefaultComboBoxModel(uiPreviewConentVector));
         String selectionInUiPreviewContent = Preferences.userNodeForPackage(getClass()).get("uiPreviewContent", null);
-        if(selectionInUiPreviewContent != null) {
+        if (selectionInUiPreviewContent != null) {
             uiPreviewContent.setSelectedItem(selectionInUiPreviewContent);
         }
         formPicker.setModel(uiPreviewContent.getModel());
         formPicker.addActionListener(new ActionListener() {
+
             public void actionPerformed(ActionEvent ae) {
                 initMIDlet();
             }
         });
-        
+
         int widthResoltutionValue = Preferences.userNodeForPackage(getClass()).getInt("selectedSizeWidth", 320);
         int heightResoltutionValue = Preferences.userNodeForPackage(getClass()).getInt("selectedSizeHeight", 480);
         int fontSizeValue = Preferences.userNodeForPackage(getClass()).getInt("selectedSizeFont", 13);
@@ -260,35 +265,36 @@ public class ThemeEditor extends BaseForm {
 
         // a race condition causes CodenameOne to sometimes paint a blank screen
         new Thread() {
+
             public void run() {
                 try {
                     sleep(3000);
                     dirty = true;
-                    while(com.codename1.ui.Display.getInstance().getCurrent() == null) {
+                    while (com.codename1.ui.Display.getInstance().getCurrent() == null) {
                         sleep(200);
                     }
                     // repaint the UI every 1.5 seconds to allow delayed repaints to appear. E.g.
                     // changing the text of the HTML components body happens asynchroniously
-                    while(SwingUtilities.windowForComponent(ThemeEditor.this) != null) {
+                    while (SwingUtilities.windowForComponent(ThemeEditor.this) != null) {
                         sleep(1500);
-                        if(dirty) {
+                        if (dirty) {
                             com.codename1.ui.Display.getInstance().getCurrent().repaint();
                             sleep(500);
                             previewPanel.repaint();
                             dirty = false;
                         }
                     }
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {
+                }
             }
         }.start();
         initialized = true;
         themeWasLoaded = true;
     }
 
-
     private void updateDeviceType(int i) {
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
-        switch(i) {
+        switch (i) {
             case 0:
                 com.codename1.ui.Display.getInstance().setTouchScreenDevice(true);
                 JavaSEPortWithSVGSupport.setSoftkeyCount(2);
@@ -325,21 +331,21 @@ public class ThemeEditor extends BaseForm {
     }
 
     private int get(JSpinner s) {
-        return ((Number)s.getValue()).intValue();
+        return ((Number) s.getValue()).intValue();
     }
 
     private float getFloat(JSpinner s) {
-        return ((Number)s.getValue()).floatValue();
+        return ((Number) s.getValue()).floatValue();
     }
 
-    private void initMIDlet() {        
+    private void initMIDlet() {
         JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
         JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
         // if the last element is selected in the combo its a MIDlet otherwise
         // its a UI form
-        if(uiPreviewContent.getSelectedIndex() == uiPreviewContent.getModel().getSize() - 1) {
+        if (uiPreviewContent.getSelectedIndex() == uiPreviewContent.getModel().getSize() - 1) {
             previewPanel.removeAll();
-            if(com.codename1.ui.Display.isInitialized()) {
+            if (com.codename1.ui.Display.isInitialized()) {
                 com.codename1.ui.Display.deinitialize();
             }
             JavaSEPortWithSVGSupport.setDefaultInitTarget(previewPanel);
@@ -348,9 +354,9 @@ public class ThemeEditor extends BaseForm {
             previewPanel.getComponent(0).setPreferredSize(new java.awt.Dimension(get(widthResoltution), get(heightResolution)));
             PickMIDlet.startMIDlet(themeHash);
         } else {
-            Preferences.userNodeForPackage(getClass()).put("uiPreviewContent", (String)uiPreviewContent.getSelectedItem());
+            Preferences.userNodeForPackage(getClass()).put("uiPreviewContent", (String) uiPreviewContent.getSelectedItem());
             Accessor.setTheme(themeHash);
-            if(com.codename1.ui.Display.isInitialized()) {
+            if (com.codename1.ui.Display.isInitialized()) {
                 com.codename1.ui.Display.deinitialize();
             }
             previewPanel.removeAll();
@@ -379,21 +385,22 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
             Display.getInstance().callSerially(new Runnable() {
+
                 @Override
                 public void run() {
                     com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
-                    final com.codename1.ui.Container c = builder.createContainer(resources, (String)uiPreviewContent.getSelectedItem());
-                    if(c instanceof com.codename1.ui.Form) {
-                        if(c instanceof com.codename1.ui.Dialog) {
-                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Dialog)c).getTransitionInAnimator();
-                            ((com.codename1.ui.Dialog)c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
-                            ((com.codename1.ui.Dialog)c).showModeless();
-                            ((com.codename1.ui.Dialog)c).setTransitionInAnimator(t);
+                    final com.codename1.ui.Container c = builder.createContainer(resources, (String) uiPreviewContent.getSelectedItem());
+                    if (c instanceof com.codename1.ui.Form) {
+                        if (c instanceof com.codename1.ui.Dialog) {
+                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Dialog) c).getTransitionInAnimator();
+                            ((com.codename1.ui.Dialog) c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
+                            ((com.codename1.ui.Dialog) c).showModeless();
+                            ((com.codename1.ui.Dialog) c).setTransitionInAnimator(t);
                         } else {
-                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Form)c).getTransitionInAnimator();
-                            ((com.codename1.ui.Form)c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
-                            ((com.codename1.ui.Form)c).show();
-                            ((com.codename1.ui.Form)c).setTransitionInAnimator(t);
+                            com.codename1.ui.animations.Transition t = ((com.codename1.ui.Form) c).getTransitionInAnimator();
+                            ((com.codename1.ui.Form) c).setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
+                            ((com.codename1.ui.Form) c).show();
+                            ((com.codename1.ui.Form) c).setTransitionInAnimator(t);
                         }
                     } else {
                         com.codename1.ui.Form f = new Form();
@@ -406,16 +413,21 @@ public class ThemeEditor extends BaseForm {
             });
         }
     }
-    
+
     static class TableTranferable {
+
         Object attribute;
         String uiid;
         Hashtable values;
-        public TableTranferable() {}
+
+        public TableTranferable() {
+        }
+
         public TableTranferable(String uiid, Hashtable values) {
             this.uiid = uiid;
             this.values = values;
         }
+
         public TableTranferable(String uiid, Object attribute) {
             this.uiid = uiid;
             this.attribute = attribute;
@@ -428,31 +440,33 @@ public class ThemeEditor extends BaseForm {
         table.setDefaultRenderer(Object.class, new ThemeRenderer());
 
         class Copy extends AbstractAction implements ListSelectionListener {
+
             Copy() {
                 putValue(NAME, "Copy");
                 table.getSelectionModel().addListSelectionListener(this);
                 setEnabled(false);
             }
+
             public void actionPerformed(ActionEvent e) {
                 int r = table.getSelectedRow();
-                if(r > -1) {
+                if (r > -1) {
                     r = getModelSelection(getCurrentStyleTable());
-                    String key = (String)getCurrentStyleModel().getValueAt(r, 0);
+                    String key = (String) getCurrentStyleModel().getValueAt(r, 0);
                     Hashtable values = new Hashtable();
                     String prefix = getCurrentStyleModel().prefix;
-                    for(Object k : themeHash.keySet()) {
-                        String currentKey = (String)k;
+                    for (Object k : themeHash.keySet()) {
+                        String currentKey = (String) k;
                         String origCurrentKey = currentKey;
-                        if(currentKey.startsWith("@")) {
+                        if (currentKey.startsWith("@")) {
                             continue;
                         }
-                        if(currentKey.startsWith(key + ".")) {
-                            if(prefix == null) {
-                                if(currentKey.indexOf('#') > -1) {
+                        if (currentKey.startsWith(key + ".")) {
+                            if (prefix == null) {
+                                if (currentKey.indexOf('#') > -1) {
                                     continue;
                                 }
                             } else {
-                                if(currentKey.indexOf(prefix) < 0) {
+                                if (currentKey.indexOf(prefix) < 0) {
                                     continue;
                                 }
                                 currentKey = currentKey.replace(prefix, "");
@@ -468,25 +482,28 @@ public class ThemeEditor extends BaseForm {
                 setEnabled(table.getSelectedRow() > -1);
             }
         }
-        
+
         class Derive extends AbstractAction implements ListSelectionListener {
+
             private String destination;
+
             Derive(String title, String destination) {
                 putValue(NAME, title);
                 this.destination = destination;
                 table.getSelectionModel().addListSelectionListener(this);
                 valueChanged(null);
             }
+
             public void actionPerformed(ActionEvent e) {
                 int r = table.getSelectedRow();
-                if(r > -1) {
+                if (r > -1) {
                     r = getModelSelection(getCurrentStyleTable());
-                    String key = (String)getCurrentStyleModel().getValueAt(r, 0);
+                    String key = (String) getCurrentStyleModel().getValueAt(r, 0);
                     String deriveKey = key + ".";
-                    if(getCurrentStyleModel().prefix != null) {
+                    if (getCurrentStyleModel().prefix != null) {
                         deriveKey += getCurrentStyleModel().prefix;
                     }
-                    if(destination == null) {
+                    if (destination == null) {
                         resources.setThemeProperty(themeName, key + ".sel#derive", deriveKey);
                         resources.setThemeProperty(themeName, key + ".press#derive", deriveKey);
                         resources.setThemeProperty(themeName, key + ".dis#derive", deriveKey);
@@ -502,46 +519,48 @@ public class ThemeEditor extends BaseForm {
             }
 
             public void valueChanged(ListSelectionEvent e) {
-                if(destination == null && getCurrentStyleModel().prefix != null) {
+                if (destination == null && getCurrentStyleModel().prefix != null) {
                     setEnabled(false);
                     return;
                 }
-                if(getCurrentStyleModel().prefix != null && getCurrentStyleModel().prefix.equals(destination)) {
+                if (getCurrentStyleModel().prefix != null && getCurrentStyleModel().prefix.equals(destination)) {
                     setEnabled(false);
                     return;
                 }
                 setEnabled(table.getSelectedRow() > -1);
             }
         }
-        
+
         class CopyAttribute extends AbstractAction implements ListSelectionListener {
+
             CopyAttribute() {
                 putValue(NAME, "Copy Attribute");
                 table.getSelectionModel().addListSelectionListener(this);
                 setEnabled(false);
             }
+
             public void actionPerformed(ActionEvent e) {
                 int r = table.getSelectedRow();
-                if(r > -1) {
+                if (r > -1) {
                     r = getModelSelection(getCurrentStyleTable());
-                    String key = (String)getCurrentStyleModel().getValueAt(r, 0);
-                    JComboBox attributeList = new JComboBox(new Object[] {
-                        "fgColor", "bgColor","derive",
-                        "align", "textDecoration", "border", "font", "bgImage",
-                        "transparency", "padding", "margin", "bgType", "bgGradient"
-                    });
+                    String key = (String) getCurrentStyleModel().getValueAt(r, 0);
+                    JComboBox attributeList = new JComboBox(new Object[]{
+                                "fgColor", "bgColor", "derive",
+                                "align", "textDecoration", "border", "font", "bgImage",
+                                "transparency", "padding", "margin", "bgType", "bgGradient"
+                            });
                     int selection = JOptionPane.showConfirmDialog(ThemeEditor.this, attributeList, "Select Attribute", JOptionPane.OK_CANCEL_OPTION);
-                    if(selection != JOptionPane.OK_OPTION) {
+                    if (selection != JOptionPane.OK_OPTION) {
                         return;
                     }
-                    if(getCurrentStyleModel().prefix == null) {
+                    if (getCurrentStyleModel().prefix == null) {
                         key += "." + attributeList.getSelectedItem();
                     } else {
                         key += "." + getCurrentStyleModel().prefix + attributeList.getSelectedItem();
                     }
                     Object value = themeHash.get(key);
-                    if(value != null) {
-                        copyInstance = new TableTranferable((String)attributeList.getSelectedItem(), value);
+                    if (value != null) {
+                        copyInstance = new TableTranferable((String) attributeList.getSelectedItem(), value);
                     } else {
                         JOptionPane.showMessageDialog(ThemeEditor.this, "Attribute " + key + " undefined", "Undefined Attribute", JOptionPane.ERROR_MESSAGE);
                     }
@@ -553,32 +572,36 @@ public class ThemeEditor extends BaseForm {
             }
         }
         class Cut extends Copy {
+
             Cut() {
                 putValue(NAME, "Cut");
             }
+
             public void actionPerformed(ActionEvent e) {
                 super.actionPerformed(e);
                 int r = table.getSelectedRow();
-                if(r > -1) {
+                if (r > -1) {
                     removeThemeEntryActionPerformed(e);
                 }
             }
         }
         class Paste extends AbstractAction {
+
             Paste() {
                 putValue(NAME, "Paste");
             }
+
             public void actionPerformed(ActionEvent e) {
-                if(copyInstance != null) {
-                    if(copyInstance.attribute != null) {
+                if (copyInstance != null) {
+                    if (copyInstance.attribute != null) {
                         int r = table.getSelectedRow();
-                        if(r > -1) {
+                        if (r > -1) {
                             r = getModelSelection(getCurrentStyleTable());
-                            String key = (String)getCurrentStyleModel().getValueAt(r, 0);
-                            if(key == null) {
+                            String key = (String) getCurrentStyleModel().getValueAt(r, 0);
+                            if (key == null) {
                                 resources.setThemeProperty(themeName, copyInstance.uiid, copyInstance.attribute);
                             } else {
-                                if(getCurrentStyleModel().prefix != null) {
+                                if (getCurrentStyleModel().prefix != null) {
                                     key += "." + getCurrentStyleModel().prefix + copyInstance.uiid;
                                 } else {
                                     key += "." + copyInstance.uiid;
@@ -589,7 +612,7 @@ public class ThemeEditor extends BaseForm {
                             refreshTheme(themeHash);
                         }
                     } else {
-                        AddThemeEntry entry = new AddThemeEntry(true, resources, view, 
+                        AddThemeEntry entry = new AddThemeEntry(true, resources, view,
                                 new Hashtable(themeHash), getCurrentStyleModel().prefix,
                                 themeName);
                         entry.pasteKeyValues(copyInstance.values);
@@ -598,7 +621,7 @@ public class ThemeEditor extends BaseForm {
                 }
             }
         }
-        
+
         final Copy copy = new Copy();
         final Cut cut = new Cut();
         final CopyAttribute copyAttr = new CopyAttribute();
@@ -615,29 +638,35 @@ public class ThemeEditor extends BaseForm {
         input.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "delete");
         input.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "edit");
         final AbstractAction delete = new AbstractAction("Delete") {
+
             {
                 putValue(AbstractAction.NAME, "Delete");
             }
+
             public void actionPerformed(ActionEvent e) {
-                if(table.getSelectedRowCount() == 1) {
+                if (table.getSelectedRowCount() == 1) {
                     removeThemeEntryActionPerformed(e);
                 }
             }
         };
         table.getActionMap().put("delete", delete);
         final AbstractAction edit = new AbstractAction("Edit") {
+
             {
                 putValue(AbstractAction.NAME, "Edit");
             }
+
             public void actionPerformed(ActionEvent e) {
-                if(table.getSelectedRowCount() == 1) {
+                if (table.getSelectedRowCount() == 1) {
                     editEntryActionPerformed(e);
                 }
             }
         };
         table.getActionMap().put("edit", edit);
         table.addMouseListener(new MouseAdapter() {
+
             private JPopupMenu popupMenu;
+
             public void mousePressed(MouseEvent e) {
                 showPopup(e);
             }
@@ -648,7 +677,7 @@ public class ThemeEditor extends BaseForm {
 
             private void showPopup(MouseEvent e) {
                 if (e.isPopupTrigger()) {
-                    if(popupMenu == null) {
+                    if (popupMenu == null) {
                         popupMenu = new JPopupMenu();
                         popupMenu.add(copy);
                         popupMenu.add(copyAttr);
@@ -674,127 +703,115 @@ public class ThemeEditor extends BaseForm {
         table.setModel(model);
         table.getSelectionModel().setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+
             public void valueChanged(ListSelectionEvent e) {
                 int row = getModelSelection(getCurrentStyleTable());
                 editEntry.setEnabled(row > -1);
                 removeThemeEntry.setEnabled(row > -1);
-                /*if(liveHighlighting.isSelected() && row > -1 && table != constantsTable && row < model.getRowCount()) {
-                    flashSelectedProperty(model, (String)model.getValueAt(row, 0));
-                }*/
+                /*
+                 * if(liveHighlighting.isSelected() && row > -1 && table !=
+                 * constantsTable && row < model.getRowCount()) {
+                 * flashSelectedProperty(model, (String)model.getValueAt(row,
+                 * 0)); }
+                 */
             }
         });
     }
 
-    
     /**
-     * Returns a "contrasting" value for the property to flash, e.g. for a font, return a differnet font
-     * or for a color return a ligher/darker color...
+     * Returns a "contrasting" value for the property to flash, e.g. for a font,
+     * return a differnet font or for a color return a ligher/darker color...
      */
     private Object findFlushingPropertyContrust() {
-        if(flashingProperty.indexOf("Color") > -1) {
+        if (flashingProperty.indexOf("Color") > -1) {
             // flash to white or black depending on whether the color is closer to white
             int val = Integer.decode("0x" + originalFlashingPropertyValue);
-            if(val > 0xf0f0f0) {
+            if (val > 0xf0f0f0) {
                 return "000000";
             } else {
                 return "ffffff";
             }
         }
-        if(flashingProperty.indexOf("derive") > -1) {
+        if (flashingProperty.indexOf("derive") > -1) {
             return "NoPropertyUIIDExists";
         }
-        if(flashingProperty.indexOf("font") > -1) {
+        if (flashingProperty.indexOf("font") > -1) {
             // if this is not a bold font then just return a system bold font
-            if((((com.codename1.ui.Font)originalFlashingPropertyValue).getStyle() & com.codename1.ui.Font.STYLE_BOLD) != 0) {
+            if ((((com.codename1.ui.Font) originalFlashingPropertyValue).getStyle() & com.codename1.ui.Font.STYLE_BOLD) != 0) {
                 return com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_LARGE);
             }
             return com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD, com.codename1.ui.Font.SIZE_LARGE);
         }
-        if(flashingProperty.indexOf("bgImage") > -1) {
-            com.codename1.ui.Image i  = (com.codename1.ui.Image)originalFlashingPropertyValue;
-            return i.modifyAlpha((byte)128);
+        if (flashingProperty.indexOf("bgImage") > -1) {
+            com.codename1.ui.Image i = (com.codename1.ui.Image) originalFlashingPropertyValue;
+            return i.modifyAlpha((byte) 128);
         }
-        if(flashingProperty.indexOf("transparency") > -1) {
-            int v = Integer.parseInt((String)originalFlashingPropertyValue);
-            if(v < 128) {
+        if (flashingProperty.indexOf("transparency") > -1) {
+            int v = Integer.parseInt((String) originalFlashingPropertyValue);
+            if (v < 128) {
                 return "255";
             } else {
                 return "100";
             }
         }
-        /*if(flashingProperty.indexOf("scale") > -1) {
-            return "false";
-        }*/
-        if(flashingProperty.indexOf("padding") > -1 || flashingProperty.indexOf("margin") > -1) {
+        /*
+         * if(flashingProperty.indexOf("scale") > -1) { return "false"; }
+         */
+        if (flashingProperty.indexOf("padding") > -1 || flashingProperty.indexOf("margin") > -1) {
             return "10,10,10,10";
         }
-        if(flashingProperty.indexOf("border") > -1) {
-            if(originalFlashingPropertyValue != null) {
-                Border pressed = ((Border)originalFlashingPropertyValue).createPressedVersion();
-                if(pressed != null) {
+        if (flashingProperty.indexOf("border") > -1) {
+            if (originalFlashingPropertyValue != null) {
+                Border pressed = ((Border) originalFlashingPropertyValue).createPressedVersion();
+                if (pressed != null) {
                     return pressed;
                 }
             }
             return Border.createBevelRaised();
         }
-        if(flashingProperty.indexOf("bgType") > -1) {
+        if (flashingProperty.indexOf("bgType") > -1) {
             return originalFlashingPropertyValue;
         }
-        if(flashingProperty.indexOf("bgGradient") > -1) {
+        if (flashingProperty.indexOf("bgGradient") > -1) {
             Object[] gradient = new Object[4];
             System.arraycopy(originalFlashingPropertyValue, 0, gradient, 0, 4);
-            gradient[0] = ((Object[])originalFlashingPropertyValue)[1];
-            gradient[1] = ((Object[])originalFlashingPropertyValue)[0];
+            gradient[0] = ((Object[]) originalFlashingPropertyValue)[1];
+            gradient[1] = ((Object[]) originalFlashingPropertyValue)[0];
             return gradient;
         }
-        if(flashingProperty.indexOf("align") > -1 || flashingProperty.indexOf("textDecoration") > -1) {
+        if (flashingProperty.indexOf("align") > -1 || flashingProperty.indexOf("textDecoration") > -1) {
             return originalFlashingPropertyValue;
         }
         throw new IllegalArgumentException("Unsupported property type: " + flashingProperty);
     }
-    
-    
+
     /**
-     * Causes the selected property in the table to flash on 
+     * Causes the selected property in the table to flash on
+     *
      * @param key
      */
     private void flashSelectedProperty(ThemeModel model, String key) {
-        /*refreshRam();
-        clearFlashingTimer();
-        flashingProperty = key;
-        originalFlashingPropertyValue = model.getPropertyValue(key);
-        final Object contrastingColor = findFlushingPropertyContrust();
-        
-        flashingTimer = new javax.swing.Timer(250, new ActionListener() {
-            private long time = System.currentTimeMillis();
-            private boolean flashValue = true;
-            private Hashtable flashHash;
-            public void actionPerformed(ActionEvent e) {
-                if(System.currentTimeMillis() - time > 3000) {
-                    clearFlashingTimer();
-                    return;
-                }
-                Hashtable h = themeHash;
-                if(flashValue) {
-                    if(flashHash == null) {
-                        flashHash = new Hashtable(themeHash);
-                        flashHash.put(flashingProperty, contrastingColor);
-                    }
-                    h = flashHash;
-                    flashValue = false;
-                } else {
-                    flashValue = true;
-                }
-                refreshTheme(h);
-            }
-        });
-        flashingTimer.setRepeats(true);
-        flashingTimer.start();*/
+        /*
+         * refreshRam(); clearFlashingTimer(); flashingProperty = key;
+         * originalFlashingPropertyValue = model.getPropertyValue(key); final
+         * Object contrastingColor = findFlushingPropertyContrust();
+         *
+         * flashingTimer = new javax.swing.Timer(250, new ActionListener() {
+         * private long time = System.currentTimeMillis(); private boolean
+         * flashValue = true; private Hashtable flashHash; public void
+         * actionPerformed(ActionEvent e) { if(System.currentTimeMillis() - time
+         * > 3000) { clearFlashingTimer(); return; } Hashtable h = themeHash;
+         * if(flashValue) { if(flashHash == null) { flashHash = new
+         * Hashtable(themeHash); flashHash.put(flashingProperty,
+         * contrastingColor); } h = flashHash; flashValue = false; } else {
+         * flashValue = true; } refreshTheme(h); } });
+         * flashingTimer.setRepeats(true); flashingTimer.start();
+         */
     }
-    
+
     private void clearFlashingTimer() {
-        if(flashingTimer != null) {
-            if(flashingTimer.isRunning()) {
+        if (flashingTimer != null) {
+            if (flashingTimer.isRunning()) {
                 flashingTimer.stop();
             }
             flashingTimer = null;
@@ -803,12 +820,11 @@ public class ThemeEditor extends BaseForm {
             refreshTheme(themeHash);
         }
     }
-    
-    
-    /** This method is called from within the constructor to
-     * initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is
-     * always regenerated by the Form Editor.
+
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
      */
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -1247,7 +1263,7 @@ public class ThemeEditor extends BaseForm {
 
     private void themeMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_themeMouseClicked
         // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled() && SwingUtilities.isLeftMouseButton(evt)) {
+        if (evt.getClickCount() == 2 && editEntry.isEnabled() && SwingUtilities.isLeftMouseButton(evt)) {
             editEntryActionPerformed(null);
         }
     }//GEN-LAST:event_themeMouseClicked
@@ -1256,51 +1272,52 @@ public class ThemeEditor extends BaseForm {
      * Returns the currently editable table based on the tabbed pane selection
      */
     private EditorTable getCurrentStyleTable() {
-        JScrollPane scroll = (JScrollPane)stylesTabbedPane.getSelectedComponent();
-        return (EditorTable)scroll.getViewport().getView();
+        JScrollPane scroll = (JScrollPane) stylesTabbedPane.getSelectedComponent();
+        return (EditorTable) scroll.getViewport().getView();
     }
 
     /**
      * Returns the currently editable table model on the tabbed pane selection
      */
     private ThemeModel getCurrentStyleModel() {
-        return (ThemeModel)getCurrentStyleTable().getModel();//getInternalModel();
+        return (ThemeModel) getCurrentStyleTable().getModel();//getInternalModel();
     }
 
 private void addThemeEntryActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addThemeEntryActionPerformed
-        clearFlashingTimer();
-        AddThemeEntry entry = new AddThemeEntry(true, resources, view, new Hashtable(themeHash),
-                getCurrentStyleModel().prefix, themeName);
-        showAddThemeEntry(entry);
+    clearFlashingTimer();
+    AddThemeEntry entry = new AddThemeEntry(true, resources, view, new Hashtable(themeHash),
+            getCurrentStyleModel().prefix, themeName);
+    showAddThemeEntry(entry);
 }//GEN-LAST:event_addThemeEntryActionPerformed
 
-private void showAddThemeEntry(AddThemeEntry entry) {
-        if(getCurrentStyleTable() == constantsTable) {
+    private void showAddThemeEntry(AddThemeEntry entry) {
+        if (getCurrentStyleTable() == constantsTable) {
             ConstantEditor prompt = new ConstantEditor(null, null, resources);
-            if(JOptionPane.showConfirmDialog(this, prompt, "Add", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
-                   == JOptionPane.OK_OPTION) {
-                if(prompt.isValidState()) {
+            
+            if (ModifiableJOptionPane.showConfirmDialog(this, prompt, "Add")
+                    == JOptionPane.OK_OPTION) {
+                if (prompt.isValidState()) {
                     getCurrentStyleModel().addKeyValue(prompt.getConstant(), prompt.getValue());
                     resources.setModified();
                 }
             }
             return;
         }
-        if(JOptionPane.showConfirmDialog(this, entry, "Add", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) ==
-            JOptionPane.OK_OPTION) {
+        if (ModifiableJOptionPane.showConfirmDialog(this, entry, "Add")
+                == JOptionPane.OK_OPTION) {
             String uiid = entry.getUIID();
             Hashtable tmp = new Hashtable(themeHash);
-            if(uiid == null || uiid.length() == 0) {
+            if (uiid == null || uiid.length() == 0) {
                 // default style what should I do here?
                 entry.updateThemeHashtable(tmp);
             } else {
-                for(Object k : getCurrentStyleModel().keys) {
-                    if(uiid.equals(k)) {
-                        int res = JOptionPane.showConfirmDialog(this, "The property " + uiid +
-                                " is already defined.\nDo you want to overwrite it?",
+                for (Object k : getCurrentStyleModel().keys) {
+                    if (uiid.equals(k)) {
+                        int res = JOptionPane.showConfirmDialog(this, "The property " + uiid
+                                + " is already defined.\nDo you want to overwrite it?",
                                 "Selector Already Defined", JOptionPane.OK_CANCEL_OPTION,
                                 JOptionPane.QUESTION_MESSAGE);
-                        if(res != JOptionPane.OK_OPTION) {
+                        if (res != JOptionPane.OK_OPTION) {
                             return;
                         }
                     }
@@ -1314,159 +1331,151 @@ private void showAddThemeEntry(AddThemeEntry entry) {
             initTableModel(selectedStyles, "sel#");
             initTableModel(pressedStyles, "press#");
             initTableModel(disabledStyles, "dis#");
-            /*if(themeHash.containsKey(entry.getKey())) {
-                int result = JOptionPane.showConfirmDialog(this, entry.getKey() + " is already defined would you like to modify it?", "Selector Exists", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                if(result == JOptionPane.YES_OPTION) {
-                    getCurrentStyleModel().setKeyValue(entry.getKey(), entry.getValue());
-                    return;
-                }
-                
-                // cancel or closing the dialog are the same...
-                if(result != JOptionPane.NO_OPTION) {
-                    return;
-                }
-                
-                // this is the NO option which means going back to editing
-                showAddThemeEntry(entry);
-                return;
-            }
-            if(entry.getKey().indexOf("bgImage") > -1) {
-                if(entry.isBrokenImage()) {
-                    JOptionPane.showMessageDialog(this, "You must select an Image", "Select Image", JOptionPane.ERROR_MESSAGE);
-                    showAddThemeEntry(entry);
-                    return;
-                }
-                if(entry.getKey().equals("Form.bgImage")) {
-                    com.codename1.ui.Image i = (com.codename1.ui.Image)entry.getValue();
-                    if(!i.isOpaque()) {
-                        JOptionPane.showMessageDialog(this, "The selected image is translucent, we recommend using opaque images only for forms", "Translucent Image Selected", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-            }
-            getCurrentStyleModel().addKeyValue(entry.getKey(), entry.getValue());*/
+            /*
+             * if(themeHash.containsKey(entry.getKey())) { int result =
+             * JOptionPane.showConfirmDialog(this, entry.getKey() + " is already
+             * defined would you like to modify it?", "Selector Exists",
+             * JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+             * if(result == JOptionPane.YES_OPTION) {
+             * getCurrentStyleModel().setKeyValue(entry.getKey(),
+             * entry.getValue()); return; }
+             *
+             * // cancel or closing the dialog are the same... if(result !=
+             * JOptionPane.NO_OPTION) { return; }
+             *
+             * // this is the NO option which means going back to editing
+             * showAddThemeEntry(entry); return; }
+             * if(entry.getKey().indexOf("bgImage") > -1) {
+             * if(entry.isBrokenImage()) { JOptionPane.showMessageDialog(this,
+             * "You must select an Image", "Select Image",
+             * JOptionPane.ERROR_MESSAGE); showAddThemeEntry(entry); return; }
+             * if(entry.getKey().equals("Form.bgImage")) {
+             * com.codename1.ui.Image i =
+             * (com.codename1.ui.Image)entry.getValue(); if(!i.isOpaque()) {
+             * JOptionPane.showMessageDialog(this, "The selected image is
+             * translucent, we recommend using opaque images only for forms",
+             * "Translucent Image Selected", JOptionPane.ERROR_MESSAGE); } } }
+             * getCurrentStyleModel().addKeyValue(entry.getKey(),
+             * entry.getValue());
+             */
         } else {
             refreshTheme(themeHash);
         }
-}
+    }
 
 private void editEntryActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editEntryActionPerformed
-        clearFlashingTimer();
-        if(getCurrentStyleTable() == constantsTable) {
-            int row = getModelSelection(getCurrentStyleTable());
-            String key = (String)getCurrentStyleModel().getValueAt(row, 0);
-            ConstantEditor prompt = new ConstantEditor(key, getCurrentStyleModel().getValueAt(row, 1), resources);
-            if(JOptionPane.showConfirmDialog(this, prompt, "Edit", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
-                   == JOptionPane.OK_OPTION) {
-                if(prompt.isValidState()) {
-                    if(prompt.getConstant().equals(key)) {
-                        getCurrentStyleModel().setKeyValue(prompt.getConstant(), prompt.getValue());
-                    } else {
-                        getCurrentStyleModel().remove(row);
-                        getCurrentStyleModel().addKeyValue(prompt.getConstant(), prompt.getValue());
-                    }
-                    resources.setModified();
-                }
-            }
-            return;
-        }
-
-        AddThemeEntry entry = new AddThemeEntry(false, resources, view, 
-                new Hashtable(themeHash), getCurrentStyleModel().prefix,
-                themeName);
+    clearFlashingTimer();
+    if (getCurrentStyleTable() == constantsTable) {
         int row = getModelSelection(getCurrentStyleTable());
-        String key = (String)getCurrentStyleModel().getValueAt(row, 0);
-        if(getCurrentStyleTable() == pressedStyles) {
-            entry.setKeyValues(key, "press#");
-        } else {
-            if(getCurrentStyleTable() == disabledStyles) {
-                entry.setKeyValues(key, "dis#");
-            } else {
-                if(getCurrentStyleTable() == selectedStyles) {
-                    entry.setKeyValues(key, "sel#");
+        String key = (String) getCurrentStyleModel().getValueAt(row, 0);
+        ConstantEditor prompt = new ConstantEditor(key, getCurrentStyleModel().getValueAt(row, 1), resources);
+        if (ModifiableJOptionPane.showConfirmDialog(this, prompt, "Edit")
+                == JOptionPane.OK_OPTION) {
+            if (prompt.isValidState()) {
+                if (prompt.getConstant().equals(key)) {
+                    getCurrentStyleModel().setKeyValue(prompt.getConstant(), prompt.getValue());
                 } else {
-                    entry.setKeyValues(key, "");
+                    getCurrentStyleModel().remove(row);
+                    getCurrentStyleModel().addKeyValue(prompt.getConstant(), prompt.getValue());
                 }
+                resources.setModified();
             }
         }
-        if(JOptionPane.showConfirmDialog(this, entry, "Edit", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) ==
-            JOptionPane.OK_OPTION) {
-            Hashtable tmp = new Hashtable(themeHash);
-            entry.updateThemeHashtable(tmp);
-            resources.setTheme(themeName, tmp);
-            themeHash = resources.getTheme(themeName);
-            refreshTheme(themeHash);
-            initTableModel(theme, null);
-            initTableModel(selectedStyles, "sel#");
-            initTableModel(pressedStyles, "press#");
-            initTableModel(disabledStyles, "dis#");
-            /*String newKey = entry.getKey();
-            
-            // if the user changed the key in the dialog we need to remove and add a new element which
-            // is the real operation performed by the user
-            if(newKey.equals(key)) {
-                getCurrentStyleModel().setKeyValue(key, entry.getValue());
-            } else {
-                getCurrentStyleModel().remove(row);
-                getCurrentStyleModel().addKeyValue(newKey, entry.getValue());
-            }
-            resources.setModified();
-            if(newKey.equals("Form.bgImage")) {
-                com.codename1.ui.Image i = (com.codename1.ui.Image)entry.getValue();
-                if(!i.isOpaque()) {
-                    JOptionPane.showMessageDialog(this, "The selected image is translucent, we recommend using opaque images only for forms", "Translucent Image Selected", JOptionPane.ERROR_MESSAGE);
-                }
-            }*/
+        return;
+    }
+
+    AddThemeEntry entry = new AddThemeEntry(false, resources, view,
+            new Hashtable(themeHash), getCurrentStyleModel().prefix,
+            themeName);
+    int row = getModelSelection(getCurrentStyleTable());
+    String key = (String) getCurrentStyleModel().getValueAt(row, 0);
+    if (getCurrentStyleTable() == pressedStyles) {
+        entry.setKeyValues(key, "press#");
+    } else {
+        if (getCurrentStyleTable() == disabledStyles) {
+            entry.setKeyValues(key, "dis#");
         } else {
-            refreshTheme(themeHash);
+            if (getCurrentStyleTable() == selectedStyles) {
+                entry.setKeyValues(key, "sel#");
+            } else {
+                entry.setKeyValues(key, "");
+            }
         }
+    }
+    if (ModifiableJOptionPane.showConfirmDialog(this, entry, "Edit")
+            == JOptionPane.OK_OPTION) {
+        Hashtable tmp = new Hashtable(themeHash);
+        entry.updateThemeHashtable(tmp);
+        resources.setTheme(themeName, tmp);
+        themeHash = resources.getTheme(themeName);
+        refreshTheme(themeHash);
+        initTableModel(theme, null);
+        initTableModel(selectedStyles, "sel#");
+        initTableModel(pressedStyles, "press#");
+        initTableModel(disabledStyles, "dis#");
+        /*
+         * String newKey = entry.getKey();
+         *
+         * // if the user changed the key in the dialog we need to remove and
+         * add a new element which // is the real operation performed by the
+         * user if(newKey.equals(key)) { getCurrentStyleModel().setKeyValue(key,
+         * entry.getValue()); } else { getCurrentStyleModel().remove(row);
+         * getCurrentStyleModel().addKeyValue(newKey, entry.getValue()); }
+         * resources.setModified(); if(newKey.equals("Form.bgImage")) {
+         * com.codename1.ui.Image i = (com.codename1.ui.Image)entry.getValue();
+         * if(!i.isOpaque()) { JOptionPane.showMessageDialog(this, "The selected
+         * image is translucent, we recommend using opaque images only for
+         * forms", "Translucent Image Selected", JOptionPane.ERROR_MESSAGE); } }
+         */
+    } else {
+        refreshTheme(themeHash);
+    }
 }//GEN-LAST:event_editEntryActionPerformed
 
 private void removeThemeEntryActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeThemeEntryActionPerformed
-        if(JOptionPane.showConfirmDialog(this, "Are You Sure?", "Remove", JOptionPane.YES_NO_OPTION, JOptionPane.PLAIN_MESSAGE) ==
-            JOptionPane.YES_OPTION) {
-            getCurrentStyleModel().remove(getModelSelection(getCurrentStyleTable()));
-            searchField.setText("");
-        }
+    if (JOptionPane.showConfirmDialog(this, "Are You Sure?", "Remove", JOptionPane.YES_NO_OPTION, JOptionPane.PLAIN_MESSAGE)
+            == JOptionPane.YES_OPTION) {
+        getCurrentStyleModel().remove(getModelSelection(getCurrentStyleTable()));
+        searchField.setText("");
+    }
 }//GEN-LAST:event_removeThemeEntryActionPerformed
 
 private void manageStylesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_manageStylesActionPerformed
-    
 }//GEN-LAST:event_manageStylesActionPerformed
 
 private void selectedStylesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_selectedStylesMouseClicked
-        // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled()) {
-            editEntryActionPerformed(null);
-        }
+    // a double click should map to the edit action
+    if (evt.getClickCount() == 2 && editEntry.isEnabled()) {
+        editEntryActionPerformed(null);
+    }
 }//GEN-LAST:event_selectedStylesMouseClicked
 
 private void pressedStylesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_pressedStylesMouseClicked
-        // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled()) {
-            editEntryActionPerformed(null);
-        }
+    // a double click should map to the edit action
+    if (evt.getClickCount() == 2 && editEntry.isEnabled()) {
+        editEntryActionPerformed(null);
+    }
 }//GEN-LAST:event_pressedStylesMouseClicked
 
 private void uiPreviewContentActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_uiPreviewContentActionPerformed
-
 }//GEN-LAST:event_uiPreviewContentActionPerformed
 
 private void constantsTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_constantsTableMouseClicked
-        // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled()) {
-            editEntryActionPerformed(null);
-        }
+    // a double click should map to the edit action
+    if (evt.getClickCount() == 2 && editEntry.isEnabled()) {
+        editEntryActionPerformed(null);
+    }
 }//GEN-LAST:event_constantsTableMouseClicked
 
 private void disabledStylesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_disabledStylesMouseClicked
-        // a double click should map to the edit action
-        if(evt.getClickCount() == 2 && editEntry.isEnabled()) {
-            editEntryActionPerformed(null);
-        }
+    // a double click should map to the edit action
+    if (evt.getClickCount() == 2 && editEntry.isEnabled()) {
+        editEntryActionPerformed(null);
+    }
 }//GEN-LAST:event_disabledStylesMouseClicked
 
     private int getCode(java.awt.event.KeyEvent evt) {
-        switch(evt.getKeyCode()) {
+        switch (evt.getKeyCode()) {
             case KeyEvent.VK_UP:
                 return com.codename1.ui.Display.getInstance().getKeyCode(com.codename1.ui.Display.GAME_UP);
             case KeyEvent.VK_DOWN:
@@ -1495,51 +1504,51 @@ private void previewPanelMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIR
 }//GEN-LAST:event_previewPanelMouseReleased
 
 private void widthResoltutionStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_widthResoltutionStateChanged
-        previewPanel.getComponent(0).setBounds(0, 0, get(widthResoltution), get(heightResolution));
-        previewPanel.getComponent(0).setPreferredSize(new java.awt.Dimension(get(widthResoltution), get(heightResolution)));
-        Preferences.userNodeForPackage(getClass()).putInt("selectedSizeWidth", get(widthResoltution));
-        resources.refreshThemeMultiImages();
-        previewScroll.revalidate();
-        dirty = true;
+    previewPanel.getComponent(0).setBounds(0, 0, get(widthResoltution), get(heightResolution));
+    previewPanel.getComponent(0).setPreferredSize(new java.awt.Dimension(get(widthResoltution), get(heightResolution)));
+    Preferences.userNodeForPackage(getClass()).putInt("selectedSizeWidth", get(widthResoltution));
+    resources.refreshThemeMultiImages();
+    previewScroll.revalidate();
+    dirty = true;
 }//GEN-LAST:event_widthResoltutionStateChanged
 
 private void heightResolutionStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_heightResolutionStateChanged
-        previewPanel.getComponent(0).setBounds(0, 0, get(widthResoltution), get(heightResolution));
-        previewPanel.getComponent(0).setPreferredSize(new java.awt.Dimension(get(widthResoltution), get(heightResolution)));
-        Preferences.userNodeForPackage(getClass()).putInt("selectedSizeHeight", get(heightResolution));
-        resources.refreshThemeMultiImages();
-        previewScroll.revalidate();
-        dirty = true;
+    previewPanel.getComponent(0).setBounds(0, 0, get(widthResoltution), get(heightResolution));
+    previewPanel.getComponent(0).setPreferredSize(new java.awt.Dimension(get(widthResoltution), get(heightResolution)));
+    Preferences.userNodeForPackage(getClass()).putInt("selectedSizeHeight", get(heightResolution));
+    resources.refreshThemeMultiImages();
+    previewScroll.revalidate();
+    dirty = true;
 }//GEN-LAST:event_heightResolutionStateChanged
 
 private void systemFontSizeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_systemFontSizeStateChanged
-        JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
-        Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFont", get(systemFontSize));
-        refreshTheme(themeHash);
-        previewScroll.revalidate();
+    JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
+    Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFont", get(systemFontSize));
+    refreshTheme(themeHash);
+    previewScroll.revalidate();
 }//GEN-LAST:event_systemFontSizeStateChanged
 
 private void smallFontSizeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_smallFontSizeStateChanged
-        JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
-        Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFontSmall", get(smallFontSize));
-        refreshTheme(themeHash);
-        previewScroll.revalidate();
+    JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
+    Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFontSmall", get(smallFontSize));
+    refreshTheme(themeHash);
+    previewScroll.revalidate();
 }//GEN-LAST:event_smallFontSizeStateChanged
 
 private void largeFontSizeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_largeFontSizeStateChanged
-        JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
-        Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFontLarge", get(largeFontSize));
-        refreshTheme(themeHash);
-        previewScroll.revalidate();
+    JavaSEPortWithSVGSupport.setFontSize(get(systemFontSize), get(smallFontSize), get(largeFontSize));
+    Preferences.userNodeForPackage(getClass()).putInt("selectedSizeFontLarge", get(largeFontSize));
+    refreshTheme(themeHash);
+    previewScroll.revalidate();
 }//GEN-LAST:event_largeFontSizeStateChanged
 
 private void localePickerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_localePickerActionPerformed
-    if(localePicker.getSelectedIndex() == 0) {
+    if (localePicker.getSelectedIndex() == 0) {
         Accessor.setResourceBundle(null);
         Preferences.userNodeForPackage(getClass()).remove("localeValue");
         Preferences.userNodeForPackage(getClass()).remove("localeLanguageValue");
     } else {
-        String[] val = (String[])localePicker.getSelectedItem();
+        String[] val = (String[]) localePicker.getSelectedItem();
         Accessor.setResourceBundle(resources.getL10N(val[0], val[1]));
         Preferences.userNodeForPackage(getClass()).put("localeValue", val[0]);
         Preferences.userNodeForPackage(getClass()).put("localeLanguageValue", val[1]);
@@ -1550,7 +1559,7 @@ private void deviceTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
     int deviceTypeValue = deviceType.getSelectedIndex();
     Preferences.userNodeForPackage(getClass()).putInt("deviceTypeValue", deviceTypeValue);
     updateDeviceType(deviceTypeValue);
-    if(initialized) {
+    if (initialized) {
         initMIDlet();
     }
 }//GEN-LAST:event_deviceTypeActionPerformed
@@ -1563,148 +1572,158 @@ private void hideConfigActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
 }//GEN-LAST:event_hideConfigActionPerformed
 
 // taken from Heinz's excellent newsletter http://www.javaspecialists.eu/archive/Issue078.html
-static class MemorySizes {
-  private final Map primitiveSizes = new IdentityHashMap() {
-    {
-      put(boolean.class, new Integer(1));
-      put(byte.class, new Integer(1));
-      put(char.class, new Integer(2));
-      put(short.class, new Integer(2));
-      put(int.class, new Integer(4));
-      put(float.class, new Integer(4));
-      put(double.class, new Integer(8));
-      put(long.class, new Integer(8));
-    }
-  };
-  public int getPrimitiveFieldSize(Class clazz) {
-    return ((Integer) primitiveSizes.get(clazz)).intValue();
-  }
-  public int getPrimitiveArrayElementSize(Class clazz) {
-    return getPrimitiveFieldSize(clazz);
-  }
-  public int getPointerSize() {
-    return 4;
-  }
-  public int getClassSize() {
-    return 8;
-  }
-}
+    static class MemorySizes {
 
-private static final MemorySizes sizes = new MemorySizes();
+        private final Map primitiveSizes = new IdentityHashMap() {
 
-/**
- * This class can estimate how much memory an Object uses.  It is
- * fairly accurate for JDK 1.4.2.  It is based on the newsletter #29.
- */
-private  static final class MemoryCounter {
-  private final Map visited = new IdentityHashMap();
-  private final Stack stack = new Stack();
+            {
+                put(boolean.class, new Integer(1));
+                put(byte.class, new Integer(1));
+                put(char.class, new Integer(2));
+                put(short.class, new Integer(2));
+                put(int.class, new Integer(4));
+                put(float.class, new Integer(4));
+                put(double.class, new Integer(8));
+                put(long.class, new Integer(8));
+            }
+        };
 
-  public synchronized long estimate(Object obj) {
-    assert visited.isEmpty();
-    assert stack.isEmpty();
-    long result = _estimate(obj);
-    while (!stack.isEmpty()) {
-      result += _estimate(stack.pop());
-    }
-    visited.clear();
-    return result;
-  }
-
-  private boolean skipObject(Object obj) {
-    if (obj instanceof String) {
-      // this will not cause a memory leak since
-      // unused interned Strings will be thrown away
-      if (obj == ((String) obj).intern()) {
-        return true;
-      }
-    }
-    return (obj == null)
-        || visited.containsKey(obj);
-  }
-
-  private long _estimate(Object obj) {
-    if (skipObject(obj)) return 0;
-    visited.put(obj, null);
-    long result = 0;
-
-    if(obj instanceof WeakReference) {
-        return 8;
-    }
-
-    Class clazz = obj.getClass();
-    if(clazz == Class.class) {
-        return 0;
-    }
-    if(clazz.getName().startsWith("java.awt")) {
-        return 0;
-    }
-    if(obj instanceof com.codename1.ui.util.Resources) {
-        return 0;
-    }
-    if(obj instanceof com.codename1.ui.util.UIBuilder) {
-        return 0;
-    }
-    if (clazz.isArray()) {
-      return _estimateArray(obj);
-    }
-    while (clazz != null) {
-      Field[] fields = clazz.getDeclaredFields();
-      for (int i = 0; i < fields.length; i++) {
-        if (!Modifier.isStatic(fields[i].getModifiers())) {
-          if (fields[i].getType().isPrimitive()) {
-            result += sizes.getPrimitiveFieldSize(
-                fields[i].getType());
-          } else {
-            result += sizes.getPointerSize();
-            fields[i].setAccessible(true);
-            try {
-              Object toBeDone = fields[i].get(obj);
-              if (toBeDone != null) {
-                stack.add(toBeDone);
-              }
-            } catch (IllegalAccessException ex) { assert false; }
-          }
+        public int getPrimitiveFieldSize(Class clazz) {
+            return ((Integer) primitiveSizes.get(clazz)).intValue();
         }
-      }
-      clazz = clazz.getSuperclass();
-    }
-    result += sizes.getClassSize();
-    long rounded = roundUpToNearestEightBytes(result);
-    //System.out.println("Estimating: " + clazz.getName() + " is " + rounded);
-    return rounded;
-  }
 
-  private long roundUpToNearestEightBytes(long result) {
-    if ((result % 8) != 0) {
-      result += 8 - (result % 8);
-    }
-    return result;
-  }
-
-  protected long _estimateArray(Object obj) {
-    long result = 16;
-    int length = Array.getLength(obj);
-    if (length != 0) {
-      Class arrayElementClazz = obj.getClass().getComponentType();
-      if (arrayElementClazz.isPrimitive()) {
-        result += length *
-            sizes.getPrimitiveArrayElementSize(arrayElementClazz);
-      } else {
-        for (int i = 0; i < length; i++) {
-          result += sizes.getPointerSize() +
-              _estimate(Array.get(obj, i));
+        public int getPrimitiveArrayElementSize(Class clazz) {
+            return getPrimitiveFieldSize(clazz);
         }
-      }
+
+        public int getPointerSize() {
+            return 4;
+        }
+
+        public int getClassSize() {
+            return 8;
+        }
     }
-    return result;
-  }
-}
+    private static final MemorySizes sizes = new MemorySizes();
+
+    /**
+     * This class can estimate how much memory an Object uses. It is fairly
+     * accurate for JDK 1.4.2. It is based on the newsletter #29.
+     */
+    private static final class MemoryCounter {
+
+        private final Map visited = new IdentityHashMap();
+        private final Stack stack = new Stack();
+
+        public synchronized long estimate(Object obj) {
+            assert visited.isEmpty();
+            assert stack.isEmpty();
+            long result = _estimate(obj);
+            while (!stack.isEmpty()) {
+                result += _estimate(stack.pop());
+            }
+            visited.clear();
+            return result;
+        }
+
+        private boolean skipObject(Object obj) {
+            if (obj instanceof String) {
+                // this will not cause a memory leak since
+                // unused interned Strings will be thrown away
+                if (obj == ((String) obj).intern()) {
+                    return true;
+                }
+            }
+            return (obj == null)
+                    || visited.containsKey(obj);
+        }
+
+        private long _estimate(Object obj) {
+            if (skipObject(obj)) {
+                return 0;
+            }
+            visited.put(obj, null);
+            long result = 0;
+
+            if (obj instanceof WeakReference) {
+                return 8;
+            }
+
+            Class clazz = obj.getClass();
+            if (clazz == Class.class) {
+                return 0;
+            }
+            if (clazz.getName().startsWith("java.awt")) {
+                return 0;
+            }
+            if (obj instanceof com.codename1.ui.util.Resources) {
+                return 0;
+            }
+            if (obj instanceof com.codename1.ui.util.UIBuilder) {
+                return 0;
+            }
+            if (clazz.isArray()) {
+                return _estimateArray(obj);
+            }
+            while (clazz != null) {
+                Field[] fields = clazz.getDeclaredFields();
+                for (int i = 0; i < fields.length; i++) {
+                    if (!Modifier.isStatic(fields[i].getModifiers())) {
+                        if (fields[i].getType().isPrimitive()) {
+                            result += sizes.getPrimitiveFieldSize(
+                                    fields[i].getType());
+                        } else {
+                            result += sizes.getPointerSize();
+                            fields[i].setAccessible(true);
+                            try {
+                                Object toBeDone = fields[i].get(obj);
+                                if (toBeDone != null) {
+                                    stack.add(toBeDone);
+                                }
+                            } catch (IllegalAccessException ex) {
+                                assert false;
+                            }
+                        }
+                    }
+                }
+                clazz = clazz.getSuperclass();
+            }
+            result += sizes.getClassSize();
+            long rounded = roundUpToNearestEightBytes(result);
+            //System.out.println("Estimating: " + clazz.getName() + " is " + rounded);
+            return rounded;
+        }
+
+        private long roundUpToNearestEightBytes(long result) {
+            if ((result % 8) != 0) {
+                result += 8 - (result % 8);
+            }
+            return result;
+        }
+
+        protected long _estimateArray(Object obj) {
+            long result = 16;
+            int length = Array.getLength(obj);
+            if (length != 0) {
+                Class arrayElementClazz = obj.getClass().getComponentType();
+                if (arrayElementClazz.isPrimitive()) {
+                    result += length
+                            * sizes.getPrimitiveArrayElementSize(arrayElementClazz);
+                } else {
+                    for (int i = 0; i < length; i++) {
+                        result += sizes.getPointerSize()
+                                + _estimate(Array.get(obj, i));
+                    }
+                }
+            }
+            return result;
+        }
+    }
 
 private void simulatorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_simulatorActionPerformed
-    if(resources.getUIResourceNames().length > 0) { 
-        String ui = (String)uiPreviewContent.getSelectedItem();
-        if(ui == null) {
+    if (resources.getUIResourceNames().length > 0) {
+        String ui = (String) uiPreviewContent.getSelectedItem();
+        if (ui == null) {
             ui = resources.getUIResourceNames()[0];
         }
         PreviewInSimulator.execute(this, themeName, view.getTemporarySaveOfCurrentFile(), ui);
@@ -1730,13 +1749,14 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
 
     private Map<String, Long> sort(final Map<String, Long> m) {
         TreeMap<String, Long> result = new TreeMap(new Comparator<String>() {
+
             public int compare(String o1, String o2) {
                 long v1 = m.get(o1);
                 long v2 = m.get(o2);
-                if(v1 == v2) {
+                if (v1 == v2) {
                     return String.CASE_INSENSITIVE_ORDER.compare(o1, o2);
                 }
-                return (int)(v2 - v1);
+                return (int) (v2 - v1);
             }
         });
         result.putAll(m);
@@ -1744,30 +1764,32 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     }
 
     private void measureComponentPaintLayoutTime(com.codename1.ui.Component c, Map<String, Long> paintTimes, Map<String, Long> layoutTimes) {
-        if(c.getName() != null && c.getWidth() > 0 && c.getHeight() > 0) {
+        if (c.getName() != null && c.getWidth() > 0 && c.getHeight() > 0) {
             long t1;
-            if(c instanceof com.codename1.ui.Container) {
+            if (c instanceof com.codename1.ui.Container) {
                 t1 = System.nanoTime();
-                ((com.codename1.ui.Container)c).revalidate();
-                ((com.codename1.ui.Container)c).revalidate();
-                ((com.codename1.ui.Container)c).revalidate();
-                ((com.codename1.ui.Container)c).revalidate();
+                ((com.codename1.ui.Container) c).revalidate();
+                ((com.codename1.ui.Container) c).revalidate();
+                ((com.codename1.ui.Container) c).revalidate();
+                ((com.codename1.ui.Container) c).revalidate();
                 long layoutTime = (System.nanoTime() - t1) / 4;
                 layoutTimes.put(c.getName(), layoutTime);
             }
             com.codename1.ui.Graphics lg = com.codename1.ui.Image.createImage(c.getWidth(), c.getHeight()).getGraphics();
             t1 = System.nanoTime();
-            c.paintComponent(lg); c.paintComponent(lg); c.paintComponent(lg);
+            c.paintComponent(lg);
+            c.paintComponent(lg);
+            c.paintComponent(lg);
             long paintTime = (System.nanoTime() - t1) / 3;
             paintTimes.put(c.getName(), paintTime);
         }
-        if(c instanceof com.codename1.ui.Tabs) {
-            measureComponentPaintLayoutTime(((com.codename1.ui.Tabs)c).getTabComponentAt(((com.codename1.ui.Tabs)c).getSelectedIndex()),
+        if (c instanceof com.codename1.ui.Tabs) {
+            measureComponentPaintLayoutTime(((com.codename1.ui.Tabs) c).getTabComponentAt(((com.codename1.ui.Tabs) c).getSelectedIndex()),
                     paintTimes, layoutTimes);
         } else {
-            if(c instanceof com.codename1.ui.Container) {
-                com.codename1.ui.Container cnt = (com.codename1.ui.Container)c;
-                for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+            if (c instanceof com.codename1.ui.Container) {
+                com.codename1.ui.Container cnt = (com.codename1.ui.Container) c;
+                for (int iter = 0; iter < cnt.getComponentCount(); iter++) {
                     measureComponentPaintLayoutTime(cnt.getComponentAt(iter), paintTimes, layoutTimes);
                 }
             }
@@ -1777,9 +1799,10 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     private static void refreshTheme(Hashtable theme) {
         Accessor.setTheme(theme);
         Display.getInstance().callSerially(new Runnable() {
+
             public void run() {
                 Form f = Display.getInstance().getCurrent();
-                if(f != null) {
+                if (f != null) {
                     f.refreshTheme();
                     f.revalidate();
                 }
@@ -1791,56 +1814,58 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
      * The model connects the the UI to the editable resource information
      */
     class ThemeModel extends AbstractTableModel {
+
         private Hashtable theme;
         private List keys;
         private String prefix;
+
         public ThemeModel(Hashtable theme, String prefix) {
             this.theme = theme;
             this.prefix = prefix;
             keys = new ArrayList();
-            if(prefix != null) {
+            if (prefix != null) {
                 // special case for the constants table...
-                if(prefix.equals("@")) {
-                    for(Object keyObject : themeHash.keySet()) {
-                        String key = (String)keyObject;
-                        if(key.startsWith("@")) {
+                if (prefix.equals("@")) {
+                    for (Object keyObject : themeHash.keySet()) {
+                        String key = (String) keyObject;
+                        if (key.startsWith("@")) {
                             keys.add(keyObject);
                         }
                     }
                 } else {
-                    for(Object keyObject : themeHash.keySet()) {
-                        String key = (String)keyObject;
-                        if(key.indexOf(prefix) > -1) {
+                    for (Object keyObject : themeHash.keySet()) {
+                        String key = (String) keyObject;
+                        if (key.indexOf(prefix) > -1) {
                             key = getUIID(key);
-                            if(key != null && !keys.contains(key)) {
+                            if (key != null && !keys.contains(key)) {
                                 keys.add(key);
                             }
                         }
                     }
                 }
             } else {
-                for(Object keyObject : themeHash.keySet()) {
-                    String key = (String)keyObject;
-                    if(key.indexOf("#") < 0) {
+                for (Object keyObject : themeHash.keySet()) {
+                    String key = (String) keyObject;
+                    if (key.indexOf("#") < 0) {
                         key = getUIID(key);
-                        if(key != null && !keys.contains(key)) {
+                        if (key != null && !keys.contains(key)) {
                             keys.add(key);
                         }
                     }
                 }
             }
             Collections.sort(keys);
-            
+
             // place the default style first except for the case of the constants table
-            if(prefix == null || prefix.indexOf('#') > -1) {
+            if (prefix == null || prefix.indexOf('#') > -1) {
                 keys.add(0, null);
             }
         }
 
         private String getUIID(String key) {
-            if(key.indexOf('@') < 0) {
+            if (key.indexOf('@') < 0) {
                 int pos = key.indexOf('.');
-                if(pos > -1) {
+                if (pos > -1) {
                     key = key.substring(0, pos);
                     return key;
                 }
@@ -1851,30 +1876,31 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         private void refreshTheme() {
             Accessor.setTheme(theme);
             Display.getInstance().callSeriallyAndWait(new Runnable() {
+
                 public void run() {
                     try {
                         Display.getInstance().getCurrent().refreshTheme();
-                    } catch(Throwable t) {}
+                    } catch (Throwable t) {
+                    }
                 }
             });
         }
 
-
         public void remove(int offset) {
-            if(prefix != null && prefix.indexOf('@') < 0) {
-                if(offset == 0) {
+            if (prefix != null && prefix.indexOf('@') < 0) {
+                if (offset == 0) {
                     return;
                 }
             }
-            String key = (String)keys.remove(offset);
+            String key = (String) keys.remove(offset);
             List<String> actualKeys = new ArrayList<String>();
-            for(Object k : themeHash.keySet()) {
-                String currentKey = (String)k;
-                if(currentKey.startsWith(key + ".") || currentKey.equals(key)) {
+            for (Object k : themeHash.keySet()) {
+                String currentKey = (String) k;
+                if (currentKey.startsWith(key + ".") || currentKey.equals(key)) {
                     actualKeys.add(currentKey);
                 }
             }
-            if(actualKeys.size() > 0) {
+            if (actualKeys.size() > 0) {
                 String[] keys = new String[actualKeys.size()];
                 actualKeys.toArray(keys);
                 resources.setThemeProperties(themeName, keys, new Object[keys.length]);
@@ -1884,18 +1910,17 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
             refreshTheme();
         }
 
-        /*public Object getPropertyValue(String key) {
-            return theme.get(key);
-        }*/
-
+        /*
+         * public Object getPropertyValue(String key) { return theme.get(key); }
+         */
         public int getRowCount() {
             return keys.size();
         }
 
         @Override
         public String getColumnName(int col) {
-            if(col == 0) {
-                if("@".equals(prefix)) {
+            if (col == 0) {
+                if ("@".equals(prefix)) {
                     return "Key";
                 }
                 return "Selector";
@@ -1932,36 +1957,35 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         }
 
         public Object getValueAt(int rowIndex, int columnIndex) {
-            if(columnIndex == 1) {
-                if("@".equals(prefix)) {
+            if (columnIndex == 1) {
+                if ("@".equals(prefix)) {
                     return theme.get(keys.get(rowIndex));
                 }
             }
             return keys.get(rowIndex);
         }
     }
-
     private static com.codename1.ui.Button previewImage;
     private static com.codename1.ui.Image tempImage;
 
     public static Icon getUIIDPreviewImage(String value, boolean focus, boolean enabled, boolean pressed) {
-        if(previewImage == null) {
+        if (previewImage == null) {
             previewImage = new com.codename1.ui.Button("Preview");
             tempImage = com.codename1.ui.Image.createImage(100, 32);
             previewImage.setWidth(100);
             previewImage.setHeight(32);
         }
-        if(value == null) {
+        if (value == null) {
             previewImage.setUIID("veryunlikelythatsomeonewilldefinethisuiid");
         } else {
-            previewImage.setUIID((String)value);
+            previewImage.setUIID((String) value);
         }
         previewImage.setFocus(focus);
         previewImage.setEnabled(enabled);
         com.codename1.ui.Graphics g = tempImage.getGraphics();
         g.setColor(0xffffff);
         g.fillRect(0, 0, tempImage.getWidth(), tempImage.getHeight());
-        if(pressed) {
+        if (pressed) {
             previewImage.pressed();
             previewImage.paintComponent(g);
             previewImage.released();
@@ -1972,26 +1996,27 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     }
 
     class ThemeRenderer extends DefaultTableCellRenderer {
+
         public ThemeRenderer() {
         }
 
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-            if(column == 0 || table == constantsTable) {
+            if (column == 0 || table == constantsTable) {
                 setIcon(null);
-                if(value == null || value instanceof String) {
-                    String v = (String)value;
-                    if(v == null) {
+                if (value == null || value instanceof String) {
+                    String v = (String) value;
+                    if (v == null) {
                         v = "<html><body><b>[Default Style]</b></body></html>";
                     } else {
-                        if(v.startsWith("@")) {
+                        if (v.startsWith("@")) {
                             v = v.substring(1, v.length());
                         }
                     }
                     return super.getTableCellRendererComponent(table, v, isSelected, hasFocus, row, column);
                 } else {
-                    if(value instanceof com.codename1.ui.Image) {
+                    if (value instanceof com.codename1.ui.Image) {
                         super.getTableCellRendererComponent(table, "", isSelected, hasFocus, row, column);
-                        setIcon(new CodenameOneImageIcon((com.codename1.ui.Image)value, 32, 32));
+                        setIcon(new CodenameOneImageIcon((com.codename1.ui.Image) value, 32, 32));
                         return this;
                     }
                 }
@@ -2000,24 +2025,26 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
             boolean focus = (table == selectedStyles);
             boolean enabled = (table != disabledStyles);
             boolean pressed = (table == pressedStyles);
-            
-            setIcon(getUIIDPreviewImage((String)value, focus, enabled, pressed));
+
+            setIcon(getUIIDPreviewImage((String) value, focus, enabled, pressed));
             return this;
         }
     }
-    
+
     class MouseHandler implements MouseMotionListener, MouseListener {
+
         private Method mtd;
         private String lastComponent;
         private boolean lastComponentFocus;
+
         public void mouseDragged(MouseEvent e) {
         }
 
         public void mouseMoved(MouseEvent e) {
             Form f = Display.getInstance().getCurrent();
-            if(f != null) {
+            if (f != null) {
                 com.codename1.ui.Component c = f.getComponentAt(e.getX(), e.getY());
-                if(c != null) {
+                if (c != null) {
                     try {
                         String tip = c.getUIID();
                         lastComponentFocus = c.hasFocus();
@@ -2025,11 +2052,11 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
 
                         // the code above shows softbuttons as buttons rather than as softbuttons
                         // which is not quite what we want...
-                        if(parent != null && parent instanceof com.codename1.ui.MenuBar) {
+                        if (parent != null && parent instanceof com.codename1.ui.MenuBar) {
                             // special case for title which falls into the gray area
-                            if(!tip.equals("Title") || tip.equals("DialogTitle")) {
+                            if (!tip.equals("Title") || tip.equals("DialogTitle")) {
                                 String parentTip = parent.getUIID();
-                                if(parentTip != null) {
+                                if (parentTip != null) {
                                     tip = parentTip;
                                 }
                             }
@@ -2038,7 +2065,7 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
                         lastComponent = tip;
                         previewPanel.setToolTipText(tip);
                         return;
-                    } catch(Exception err) {
+                    } catch (Exception err) {
                         // shouldn't happen
                         err.printStackTrace();
                     }
@@ -2048,30 +2075,17 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         }
 
         public void mouseClicked(MouseEvent e) {
-            /*if(e.isPopupTrigger()) {
-                String s = lastComponent;
-                if(s != null && (!s.equals(""))) {
-                    clearFlashingTimer();
-                    String pref = null;
-                    if(lastComponentFocus) {
-                        pref = "sel#";
-                    }
-                    AddThemeEntry entry = new AddThemeEntry(true, resources, view, new Hashtable(themeHash), pref);
-                    s = s + ".fgColor";
-                    Object val = themeHash.get(s);
-                    if(val != null) {
-                        entry.setKeyValue(s, val);
-                    } else {
-                        Object fg = themeHash.get("fgColor");
-                        if(fg != null) {
-                            entry.setKeyValue(s, fg);
-                        } else {
-                            entry.setKeyValue(s, "000000");
-                        }
-                    }
-                    showAddThemeEntry(entry);
-                }
-            }*/
+            /*
+             * if(e.isPopupTrigger()) { String s = lastComponent; if(s != null
+             * && (!s.equals(""))) { clearFlashingTimer(); String pref = null;
+             * if(lastComponentFocus) { pref = "sel#"; } AddThemeEntry entry =
+             * new AddThemeEntry(true, resources, view, new
+             * Hashtable(themeHash), pref); s = s + ".fgColor"; Object val =
+             * themeHash.get(s); if(val != null) { entry.setKeyValue(s, val); }
+             * else { Object fg = themeHash.get("fgColor"); if(fg != null) {
+             * entry.setKeyValue(s, fg); } else { entry.setKeyValue(s,
+             * "000000"); } } showAddThemeEntry(entry); } }
+             */
         }
 
         public void mousePressed(MouseEvent e) {
@@ -2085,8 +2099,7 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
 
         public void mouseExited(MouseEvent e) {
         }
-    }    
-    
+    }
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton addThemeEntry;
     private javax.swing.JButton borderWizard;
