@@ -109,13 +109,14 @@ public class ModifiableJOptionPane extends JOptionPane {
     }
 
     public static int showConfirmDialog(Component parent, Object msg, String title) {
-
+        ((JComponent)msg).setPreferredSize(new Dimension(800, 600));
         ModifiableJOptionPane mo = new ModifiableJOptionPane(msg);
         mo.setOptionType(OK_CANCEL_OPTION);
         mo.setMessageType(PLAIN_MESSAGE);
         JDialog d = mo.createDialog(parent, title);
         //this can probably be commented out, but first we should check the effect on Mac
-        d.setSize(new Dimension(800, 650));
+        d.setSize(new Dimension(800, 700));
+        d.pack();
         d.setResizable(true);
         mo.selectInitialValue();
         d.show();
