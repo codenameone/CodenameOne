@@ -582,6 +582,10 @@ public class UIBuilder {
                 ((ContainerList)cmp).addActionListener((ActionListener)listener);
                 return;
             }
+            if(cmp instanceof com.codename1.ui.Calendar) {
+                ((com.codename1.ui.Calendar)cmp).addActionListener((ActionListener)listener);
+                return;
+            }
             ((TextArea)cmp).addActionListener((ActionListener)listener);
             return;
         }
@@ -922,7 +926,14 @@ public class UIBuilder {
                         if(l != null) {
                             ((ContainerList)actualLead).addActionListener(l);
                         }
-                    }                    
+                    } else {
+                        if(actualLead instanceof com.codename1.ui.Calendar) {
+                            ActionListener l = getFormListenerInstance(root, embedded);
+                            if(l != null) {
+                                ((com.codename1.ui.Calendar)actualLead).addActionListener(l);
+                            }
+                        }                    
+                    }
                 }
             }
         }
