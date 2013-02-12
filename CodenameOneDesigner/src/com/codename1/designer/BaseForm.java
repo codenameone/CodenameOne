@@ -75,9 +75,9 @@ public class BaseForm extends JPanel {
     private static ImageIcon overrideImage;
 
     public static boolean isRightClick(MouseEvent ev) {
-        if(ResourceEditorApp.IS_MAC) {
+        /*if(ResourceEditorApp.IS_MAC) {
             return ev.isPopupTrigger();
-        }
+        }*/
         return SwingUtilities.isRightMouseButton(ev);
     }
     
