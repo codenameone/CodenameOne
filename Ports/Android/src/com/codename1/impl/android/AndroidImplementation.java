@@ -1546,23 +1546,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             callback.addListener(response);
         }
 
-        if (url.startsWith("intent:#")) {
-            int flags = Intent.URI_INTENT_SCHEME;
-            Intent intent;
-            try {
-                intent = Intent.parseUri(url, flags);
-            } catch (URISyntaxException ex) {
-                throw new RuntimeException(ex.getMessage());
-            }
-            activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME); //
-        } else {
-            try {
-                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        int flags = Intent.URI_INTENT_SCHEME;
+        Intent intent;
+        try {
+            intent = Intent.parseUri(url, flags);
+            activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME);
+            return;
+        } catch (URISyntaxException ex) {
+        }
+
+        try {
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
+
 
     /**
      * @inheritDoc
