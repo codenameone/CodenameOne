@@ -44,9 +44,10 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.MathUtil;
 
-
 /**
- * All communication with the map and layers should be done in WGS84, it takes care of coordinates transformation.
+ * All communication with the map and layers should be done in WGS84, it takes
+ * care of coordinates transformation.
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class MapComponent extends Container {
@@ -71,12 +72,10 @@ public class MapComponent extends Container {
     private int scaleY = 0;
     private int translateX;
     private int translateY;
-    
-    
     private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
-    
+
     /**
-     * Empty constructor creates a map with OpenStreetMapProvider on the Last 
+     * Empty constructor creates a map with OpenStreetMapProvider on the Last
      * known Location of the LocationManager
      */
     public MapComponent() {
@@ -85,15 +84,16 @@ public class MapComponent extends Container {
 
     /**
      * Constructor with a given provider
+     *
      * @param provider map provider
      */
     public MapComponent(MapProvider provider) {
-        this(provider, (Coord)null, 4, true);
+        this(provider, (Coord) null, 4, true);
     }
 
     /**
      * Constructor
-     * 
+     *
      * @param provider map provider
      * @param centerPosition center position
      * @param zoomLevel zoom level
@@ -104,7 +104,7 @@ public class MapComponent extends Container {
 
     /**
      * Constructor
-     * 
+     *
      * @param provider map provider
      * @param centerPosition center position
      * @param zoomLevel zoom level
@@ -116,7 +116,7 @@ public class MapComponent extends Container {
 
     /**
      * Constructor
-     * 
+     *
      * @param provider map provider
      * @param centerPosition center position
      * @param zoomLevel zoom level
@@ -127,7 +127,7 @@ public class MapComponent extends Container {
 
     /**
      * Constructor
-     * 
+     *
      * @param provider map provider
      * @param centerPosition center position
      * @param zoomLevel zoom level
@@ -148,10 +148,10 @@ public class MapComponent extends Container {
             } else {
                 _center = new Coord(0, 0, true);
             }
-        }else{
-            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);        
+        } else {
+            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);
         }
-        
+
         _zoom = zoomLevel;
         _layers = new Vector();
         setFocusable(false);
@@ -160,7 +160,7 @@ public class MapComponent extends Container {
             Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
             Button out = new Button("-");
             out.setUIID("MapZoomOut");
-            
+
             out.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
@@ -181,52 +181,48 @@ public class MapComponent extends Container {
             buttonsbar.addComponent(in);
             addComponent(BorderLayout.SOUTH, buttonsbar);
         }
-        Painter bg = new Painter() {
+        drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);
+    }
 
-            public void paint(Graphics g, Rectangle rect) {
-                if (Display.getInstance().areMutableImagesFast()) {
-                    if (buffer == null) {
-                        buffer = Image.createImage(getWidth(), getHeight());
-                    }
-                    if (_needTiles || refreshLayers) {
-                        paintmap(buffer.getGraphics());
-                        refreshLayers = false;
-                    }
-                    g.translate(-translateX, -translateY);
-                    if (scaleX > 0) {
-                        g.drawImage(buffer, (getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2, scaleX, scaleY);
-                    } else {
-                        g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);
-                    }
-
-                    g.translate(translateX, translateY);
-                }else{
-                    
-                    if (scaleX > 0) {
-                        float sx = (float)scaleX/(float)getWidth();
-                        float sy = (float)scaleY/(float)getHeight();                        
-                        int tx = (int) (((getWidth() - scaleX) / 2)/sx);
-                        int ty = (int) (((getHeight() - scaleY) / 2)/sy);
-                        g.translate(tx, ty);
-                        g.scale(sx, sy);
-                        paintmap(g);
-                        g.resetAffine();
-                        g.translate(-tx, -ty);
-                    }else{
-                        g.translate(-translateX, -translateY);
-                        paintmap(g);                    
-                        g.translate(translateX, translateY);
-                    }
-
-                
-                }
+    /**
+     * @inheritDoc
+     */
+    public void paintBackground(Graphics g) {
+        super.paintBackground(g);
+        if (Display.getInstance().areMutableImagesFast()) {
+            if (buffer == null) {
+                buffer = Image.createImage(getWidth(), getHeight());
             }
-        };
-        getUnselectedStyle().setBgTransparency(255);
-        getSelectedStyle().setBgTransparency(255);
-        getUnselectedStyle().setBgPainter(bg);
-        getSelectedStyle().setBgPainter(bg);
-        drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);        
+            if (_needTiles || refreshLayers) {
+                paintmap(buffer.getGraphics());
+                refreshLayers = false;
+            }
+            g.translate(-translateX, -translateY);
+            if (scaleX > 0) {
+                g.drawImage(buffer, (getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2, scaleX, scaleY);
+            } else {
+                g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);
+            }
+
+            g.translate(translateX, translateY);
+        } else {
+
+            if (scaleX > 0) {
+                float sx = (float) scaleX / (float) getWidth();
+                float sy = (float) scaleY / (float) getHeight();
+                int tx = (int) (((getWidth() - scaleX) / 2) / sx);
+                int ty = (int) (((getHeight() - scaleY) / 2) / sy);
+                g.translate(tx, ty);
+                g.scale(sx, sy);
+                paintmap(g);
+                g.resetAffine();
+                g.translate(-tx, -ty);
+            } else {
+                g.translate(-translateX, -translateY);
+                paintmap(g);
+                g.translate(translateX, translateY);
+            }
+        }
     }
 
     /**
@@ -234,31 +230,28 @@ public class MapComponent extends Container {
      */
     protected void laidOut() {
         super.laidOut();
-        if(buffer != null){
+        if (buffer != null) {
             buffer.dispose();
         }
         refreshLayers = true;
         _needTiles = true;
-        buffer = null;        
+        buffer = null;
         repaint();
     }
 
-    
     /**
      * @inheritDoc
      */
     protected boolean shouldBlockSideSwipe() {
         return true;
     }
-    
+
     /**
      * @inheritDoc
      */
     protected Dimension calcPreferredSize() {
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
-    
-   
 
     /**
      * @inheritDoc
@@ -266,13 +259,13 @@ public class MapComponent extends Container {
     protected void focusGained() {
         setHandlesInput(true);
     }
-    
+
     /**
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
-        
+
         translateX += (draggedx - x);
         translateY += (draggedy - y);
         draggedx = x;
@@ -284,38 +277,38 @@ public class MapComponent extends Container {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
-        super.pointerPressed(x, y);        
+        super.pointerPressed(x, y);
         pressedx = x;
         pressedy = y;
         draggedx = x;
         draggedy = y;
     }
-    
+
     @Override
     public void pointerDragged(int[] x, int[] y) {
         if (x.length > 1) {
             double currentDis = distance(x, y);
-            if(oldDistance == -1){
+            if (oldDistance == -1) {
                 oldDistance = currentDis;
                 scaleX = getWidth();
                 scaleY = getHeight();
             }
             if (Math.abs(currentDis - oldDistance) > 10f) {
                 double scale = currentDis / oldDistance;
-                if(scale > 1){
-                    if(_zoom == getProvider().maxZoomLevel()){
+                if (scale > 1) {
+                    if (_zoom == getProvider().maxZoomLevel()) {
                         scaleX = 0;
                         scaleY = 0;
                         oldDistance = -1;
                         return;
                     }
-                }else{
-                    if(_zoom == getProvider().minZoomLevel()){
+                } else {
+                    if (_zoom == getProvider().minZoomLevel()) {
                         scaleX = 0;
                         scaleY = 0;
                         oldDistance = -1;
                         return;
-                    }                    
+                    }
                 }
                 scaleX = (int) (scale * scaleX);
                 scaleY = (int) (scale * scaleY);
@@ -326,59 +319,59 @@ public class MapComponent extends Container {
             super.pointerDragged(x, y);
         }
     }
-    
-    private double distance(int[] x, int[] y){
-            int disx = x[0] - x[1];
-            int disy = y[0] - y[1];
-            return Math.sqrt(disx*disx + disy*disy);    
+
+    private double distance(int[] x, int[] y) {
+        int disx = x[0] - x[1];
+        int disy = y[0] - y[1];
+        return Math.sqrt(disx * disx + disy * disy);
     }
-    
+
     /**
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
-        
-        if(oldDistance != -1){
-            double scale = (double)scaleX/(double)getWidth();
-            if(scale > 1){
-                if(scale < 1.2){
+
+        if (oldDistance != -1) {
+            double scale = (double) scaleX / (double) getWidth();
+            if (scale > 1) {
+                if (scale < 1.2) {
                     //do nothing
-                }else if(scale < 1.6){
-                    zoomIn();                
-                }else if(scale < 2.0){
-                    zoomIn();                
-                    zoomIn();                
-                }else if(scale < 2.4){
-                    zoomIn();                
-                    zoomIn();                
-                    zoomIn();                                
-                }else{
-                    zoomIn();                
-                    zoomIn();                
-                    zoomIn();                                
-                    zoomIn();                                                
+                } else if (scale < 1.6) {
+                    zoomIn();
+                } else if (scale < 2.0) {
+                    zoomIn();
+                    zoomIn();
+                } else if (scale < 2.4) {
+                    zoomIn();
+                    zoomIn();
+                    zoomIn();
+                } else {
+                    zoomIn();
+                    zoomIn();
+                    zoomIn();
+                    zoomIn();
                 }
-            }else{
-                if(scale > 0.8){
+            } else {
+                if (scale > 0.8) {
                     //do nothing
-                }else if(scale > 0.5){
-                    zoomOut();                
-                }else if(scale > 0.2){
-                    zoomOut();                
-                    zoomOut();                
-                }else{
-                    zoomOut();                
-                    zoomOut();                
-                    zoomOut();                                
+                } else if (scale > 0.5) {
+                    zoomOut();
+                } else if (scale > 0.2) {
+                    zoomOut();
+                    zoomOut();
+                } else {
+                    zoomOut();
+                    zoomOut();
+                    zoomOut();
                 }
             }
-            translateX = 0;        
-            translateY = 0;        
+            translateX = 0;
+            translateY = 0;
             scaleX = 0;
             scaleY = 0;
             oldDistance = -1;
-            if(buffer != null){
+            if (buffer != null) {
                 buffer.dispose();
                 buffer = null;
             }
@@ -388,9 +381,9 @@ public class MapComponent extends Container {
         Coord scale = _map.scale(_zoom);
         _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
         _needTiles = true;
-        translateX = 0;        
-        translateY = 0;        
-        
+        translateX = 0;
+        translateY = 0;
+
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
         Tile t = screenTile();
@@ -409,10 +402,10 @@ public class MapComponent extends Container {
         }
         repaint();
     }
-    
+
     /**
      * Gets the Coord location on the map from a x, y position.
-     * 
+     *
      * @param x
      * @param y
      * @return a Coord Object.
@@ -427,17 +420,17 @@ public class MapComponent extends Container {
 
     /**
      * Gets the screen coordinates of a specific Coord
-     * 
+     *
      * @param coord a lat,lon location
      * @return the Point of the coordinate on the Map
-     */ 
-    public Point getPointFromCoord(Coord coord){
-        if(!coord.isProjected()){
+     */
+    public Point getPointFromCoord(Coord coord) {
+        if (!coord.isProjected()) {
             coord = _map.projection().fromWGS84(coord);
         }
-        return screenTile().pointPosition(coord);        
+        return screenTile().pointPosition(coord);
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -474,7 +467,7 @@ public class MapComponent extends Container {
     }
 
     private void paintmap(Graphics g) {
-        
+
         g.translate(getX(), getY());
         if (_needTiles) {
             getTiles();
@@ -568,7 +561,7 @@ public class MapComponent extends Container {
     }
 
     private void drawPointer(Graphics g) {
-        if(drawMapPointer) {
+        if (drawMapPointer) {
             g.setColor(0xFF0000);
             int centerX = getWidth() / 2;
             int centerY = getHeight() / 2;
@@ -590,6 +583,7 @@ public class MapComponent extends Container {
 
     /**
      * Adds a layer to the map
+     *
      * @param layer to add
      */
     public void addLayer(Layer layer) {
@@ -598,6 +592,7 @@ public class MapComponent extends Container {
 
     /**
      * Adds a layer to the map
+     *
      * @param layer to add
      * @param minZoomLevel min zoom level of this Layer
      * @param maxZoomLevel max zoom level of this Layer
@@ -610,6 +605,7 @@ public class MapComponent extends Container {
 
     /**
      * Removes a Layer from the map
+     *
      * @param layer to remove
      */
     public void removeLayer(Layer layer) {
@@ -624,7 +620,7 @@ public class MapComponent extends Container {
         refreshLayers = true;
         repaint();
     }
-    
+
     /**
      * Removes all layers from the map
      */
@@ -633,28 +629,29 @@ public class MapComponent extends Container {
         refreshLayers = true;
         repaint();
     }
-    
+
     /**
      * Returns layers count
      */
-    public int getLayersConut(){
+    public int getLayersConut() {
         return _layers.size();
     }
 
     /**
      * Returns Layer at index
-     * 
+     *
      * @param index the index of the layer
-     * @throws ArrayIndexOutOfBoundsException - if the index is out of range 
+     * @throws ArrayIndexOutOfBoundsException - if the index is out of range
      * (index < 0 || index >= size())
      */
-    public Layer getLayerAt(int index){
+    public Layer getLayerAt(int index) {
         Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
         return l;
     }
-    
+
     /**
      * Gets the map provider
+     *
      * @return the map provider
      */
     public MapProvider getProvider() {
@@ -723,7 +720,7 @@ public class MapComponent extends Container {
 
     /**
      * Zoom the map the the giving bounding box
-     * 
+     *
      * @param boundingBox to zoom to
      * @throws IllegalArgumentException if the boundingBox is not wg84 format
      */
@@ -748,8 +745,9 @@ public class MapComponent extends Container {
 
     /**
      * Zoom map to the center of the given coordinate with the given zoom level
-     * 
-     * @param coord center map to this coordinate, coord should be in wg84 format
+     *
+     * @param coord center map to this coordinate, coord should be in wg84
+     * format
      * @param zoomLevel zoom map to this level;
      * @throws IllegalArgumentException if the coord is not wg84 format
      */
@@ -783,7 +781,7 @@ public class MapComponent extends Container {
             }
         }
         if (bbox != null) {
-            if(bbox.projected()){
+            if (bbox.projected()) {
                 bbox = _map.projection().toWGS84(bbox);
             }
             zoomTo(bbox);
@@ -797,54 +795,53 @@ public class MapComponent extends Container {
     public Coord getCenter() {
         return _map.projection().toWGS84(_center);
     }
-   
+
     /**
      * Returns the current zoom level of the map.
-     * 
+     *
      * @return zoom level
      */
-    public int getZoomLevel(){
+    public int getZoomLevel() {
         return _zoom;
     }
-    
+
     /**
      * Sets the current zoom level of the map.
-     * 
+     *
      * @return zoom level
      */
-    public void setZoomLevel(int zoom){
-        if ( zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
+    public void setZoomLevel(int zoom) {
+        if (zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
             _zoom = zoom;
             _needTiles = true;
             repaint();
-        }else{
+        } else {
             System.out.println("zoom level must be bigger then the min zoom "
                     + "level and smaller then the max zoom level");
         }
     }
-    
-    
+
     /**
      * Returns the max zoom level of the map
-     * 
+     *
      * @return max zoom level
      */
-    public int getMaxZoomLevel(){
+    public int getMaxZoomLevel() {
         return _map.maxZoomLevel();
     }
-    
+
     /**
      * Returns the min zoom level of the map
-     * 
+     *
      * @return min zoom level
      */
-    public int getMinZoomLevel(){
+    public int getMinZoomLevel() {
         return _map.minZoomLevel();
     }
-    
-    
+
     /**
      * Gets the center of the map.
+     *
      * @return Coord in WGS84
      */
     public Coord center() {
@@ -852,9 +849,10 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a left keycode 
+     * Returns true if this is a left keycode
+     *
      * @param keyCode
-     * @return true if this is a left keycode 
+     * @return true if this is a left keycode
      */
     protected boolean isLeftKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -862,9 +860,10 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a right keycode 
+     * Returns true if this is a right keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isRightKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -872,9 +871,10 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a down keycode 
+     * Returns true if this is a down keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isDownKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -882,9 +882,10 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a up keycode 
+     * Returns true if this is a up keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isUpKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -892,40 +893,43 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a zoom in keycode 
+     * Returns true if this is a zoom in keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isZoomInKey(int keyCode) {
         return keyCode == '1';
     }
 
     /**
-     * Returns true if this is a zoom out keycode 
+     * Returns true if this is a zoom out keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isZoomOutKey(int keyCode) {
         return keyCode == '3';
     }
 
     /**
-     * Returns true if this is a zoom to layers keycode 
+     * Returns true if this is a zoom to layers keycode
+     *
      * @param keyCode
-     * @return 
+     * @return
      */
     protected boolean isZoomToLayersKey(int keyCode) {
         return keyCode == '5';
     }
-    
+
     /**
      * Returns the distance between 2 points in meters
-     * 
+     *
      * @param latitude1
      * @param longitude1
      * @param latitude2
      * @param longitude2
-     * 
+     *
      * @return distance in meters
      */
     public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
@@ -935,12 +939,10 @@ public class MapComponent extends Container {
                 + Math.cos(Math.toRadians(latitude1)) * Math.cos(Math.toRadians(latitude2)) * longitudeSin * longitudeSin;
         double c = 2 * MathUtil.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return (long) (6378137 * c);
-    }    
-    
-    
-    
+    }
+
     private void setLatitude(double latitude) {
-        this.latitude = latitude;        
+        this.latitude = latitude;
         setCoord(latitude, longitude);
     }
 
@@ -949,14 +951,14 @@ public class MapComponent extends Container {
         setCoord(latitude, longitude);
     }
 
-    private void setCoord(double latitude, double longitude){
-        if(Double.isNaN(latitude) && Double.isNaN(longitude)){
-            _center =  _map.projection().fromWGS84(new Coord(latitude, longitude));
+    private void setCoord(double latitude, double longitude) {
+        if (Double.isNaN(latitude) && Double.isNaN(longitude)) {
+            _center = _map.projection().fromWGS84(new Coord(latitude, longitude));
             _needTiles = true;
             repaint();
         }
     }
-        
+
     /**
      * @inheritDoc
      */
@@ -970,7 +972,7 @@ public class MapComponent extends Container {
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Integer.class};
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -986,7 +988,7 @@ public class MapComponent extends Container {
         }
         return null;
     }
-        
+
     /**
      * @inheritDoc
      */
@@ -1005,10 +1007,8 @@ public class MapComponent extends Container {
         }
         return super.setPropertyValue(name, value);
     }
-    
-    
-    
 }
+
 class LayerWithZoomLevels {
 
     public Layer layer;
