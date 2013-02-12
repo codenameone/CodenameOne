@@ -74,6 +74,13 @@ import org.jdesktop.swingx.sort.RowFilters;
 public class BaseForm extends JPanel {
     private static ImageIcon overrideImage;
 
+    public static boolean isRightClick(MouseEvent ev) {
+        if(ResourceEditorApp.IS_MAC) {
+            return ev.isPopupTrigger();
+        }
+        return SwingUtilities.isRightMouseButton(ev);
+    }
+    
     public BaseForm() {
         RootPaneContainer r = (RootPaneContainer)ResourceEditorApp.getApplication().getMainFrame();
         r.setGlassPane(new JLabel());
