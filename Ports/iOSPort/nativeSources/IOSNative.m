@@ -2180,14 +2180,19 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
     });
 }
 
+#define INCLUDE_CN1_PUSH2
 
 void com_codename1_impl_ios_IOSNative_registerPush__(JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
 		(UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_deregisterPush__(JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2
     [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+#endif
 }
 
 UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
