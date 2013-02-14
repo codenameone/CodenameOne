@@ -1091,6 +1091,13 @@ public class Dialog extends Form {
             boolean b = getTitle().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
+            if(!b && manager.isThemeConstant("shrinkPopupTitleBool", true)) {
+                getTitleComponent().setPreferredSize(new Dimension(0,0));
+                if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
+                    getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
+                    getContentPane().getStyle().setPadding(TOP, getContentPane().getStyle().getPadding(TOP) + getTitleComponent().getStyle().getPadding(TOP));
+                }
+            }
         }
 
         // allows a text area to recalculate its preferred size if embedded within a dialog
