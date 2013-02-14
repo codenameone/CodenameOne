@@ -62,7 +62,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -2261,7 +2260,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void dial(String phoneNumber) {        
-        nativeInstance.dial("tel:" + phoneNumber);
+        nativeInstance.dial("tel://" + phoneNumber);
     }
 
     @Override
@@ -2512,10 +2511,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public static void appendData(long peer, byte[] data) {
         NetworkConnection n = connections.get(peer);
-        synchronized(n.LOCK) {
-            n.appendData(data);
-            n.connected = true;
-            n.LOCK.notifyAll();
+        if(n != null) {
+            synchronized(n.LOCK) {
+                n.appendData(data);
+                n.connected = true;
+                n.LOCK.notifyAll();
+            }
         }
     }
     
@@ -2540,7 +2541,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     static class NetworkConnection extends InputStream {
         private long peer;
-        private ByteArrayOutputStream body;
+        private SmallByteArrayOutputStream body;
         private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
@@ -2739,7 +2740,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
-        n.body = new ByteArrayOutputStream();
+        n.body = new SmallByteArrayOutputStream();
         return n.body;
     }
 
