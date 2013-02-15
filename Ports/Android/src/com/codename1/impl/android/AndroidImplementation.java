@@ -3642,12 +3642,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
                 callback.fireActionEvent(new ActionEvent(filePath));
+                return;
             } else {
                 callback.fireActionEvent(new ActionEvent("ok"));
+                return;
             }
         }
         callback.fireActionEvent(null);
-
     }
 
     @Override
