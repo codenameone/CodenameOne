@@ -63,6 +63,7 @@ import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileFilter;
 import java.awt.BorderLayout;
 import java.awt.Desktop;
+import java.awt.FileDialog;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
@@ -3787,6 +3788,43 @@ public static void openInIDE(File f, int lineNumber) {
     }
 
     public static File[] showFileChooser(boolean multi, boolean open, boolean dir, String dialogTitle, final String label, final String... type) {
+        if(ResourceEditorApp.IS_MAC && !dir && !multi) {
+            // on Mac we prefer the native AWT file chooser which is far superior
+            FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
+
+            fd.setFilenameFilter(new FilenameFilter() {
+
+                public boolean accept(File dir, String name) {
+                    name = name.toLowerCase();
+                    for(String t : type) {
+                        if(name.endsWith(t)) {
+                            return true;
+                        }
+                    }
+                    return  false;
+
+                }
+            });
+            if(open) {
+                fd.setMode(FileDialog.LOAD);
+            } else {
+                fd.setMode(FileDialog.SAVE);
+            }
+            if(dialogTitle != null) {
+                fd.setTitle(dialogTitle);
+            }
+            String defaultDir = Preferences.userNodeForPackage(ResourceEditorView.class).get("lastDir", System.getProperty("user.home"));
+            fd.setDirectory(defaultDir);
+            fd.pack();
+            fd.setLocationByPlatform(true);
+            fd.setVisible(true);
+            if(fd.getFile() != null) {
+                File selection = new File(fd.getDirectory(), fd.getFile());
+                Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", selection.getAbsolutePath());
+                return new File[] {selection};
+            }
+            return null;            
+        }
         JFileChooser c = createFileChooser(label, type);
         c.setMultiSelectionEnabled(multi);
         if(dialogTitle != null) {
@@ -3818,10 +3856,6 @@ public static void openInIDE(File f, int lineNumber) {
         } else {
             return new File[] {c.getSelectedFile()};
         }
-    }
-    
-    private JFileChooser createFileChooser() {
-        return createFileChooser("Resource Files (*.res)", ".res");
     }
 
     void addToRecentMenu(File selection) {

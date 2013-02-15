@@ -44,6 +44,7 @@ public class AddThemeResource extends javax.swing.JDialog {
     public AddThemeResource(java.awt.Component c, EditableResources res) {
         super((java.awt.Frame)SwingUtilities.windowForComponent(c), true);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         name.setText(AddResourceDialog.nextAvailableName(res, "Theme"));
         try {
             templateDetails.setPage(getClass().getResource("/templates/Native_Theme.html"));
@@ -168,11 +169,11 @@ public class AddThemeResource extends javax.swing.JDialog {
             if (evt.getSource() == template) {
                 AddThemeResource.this.templateActionPerformed(evt);
             }
-            else if (evt.getSource() == ok) {
-                AddThemeResource.this.okActionPerformed(evt);
-            }
             else if (evt.getSource() == cancel) {
                 AddThemeResource.this.cancelActionPerformed(evt);
+            }
+            else if (evt.getSource() == ok) {
+                AddThemeResource.this.okActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents

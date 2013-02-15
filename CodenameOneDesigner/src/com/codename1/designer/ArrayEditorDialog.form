@@ -37,7 +37,7 @@
                       <EmptySpace min="-2" max="-2" attributes="0"/>
                       <Component id="jScrollPane2" pref="209" max="32767" attributes="0"/>
                   </Group>
-                  <Component id="jPanel1" alignment="0" pref="473" max="32767" attributes="0"/>
+                  <Component id="jPanel1" alignment="0" pref="507" max="32767" attributes="0"/>
               </Group>
               <EmptySpace min="-2" max="-2" attributes="0"/>
           </Group>

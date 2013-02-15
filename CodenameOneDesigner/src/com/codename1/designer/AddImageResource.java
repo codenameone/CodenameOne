@@ -44,6 +44,7 @@ public class AddImageResource extends javax.swing.JDialog {
     public AddImageResource(java.awt.Frame parent, boolean modal, EditableResources res) {
         super(parent, modal);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         name.setText(AddResourceDialog.nextAvailableName(res, "Image"));
         pack();
         setLocationByPlatform(true);
@@ -63,11 +64,13 @@ public class AddImageResource extends javax.swing.JDialog {
         name = new javax.swing.JTextField();
         jLabel2 = new javax.swing.JLabel();
         type = new javax.swing.JComboBox();
-        ok = new javax.swing.JButton();
-        cancel = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
         help = new javax.swing.JTextPane();
         jLabel3 = new javax.swing.JLabel();
+        jPanel1 = new javax.swing.JPanel();
+        jPanel2 = new javax.swing.JPanel();
+        ok = new javax.swing.JButton();
+        cancel = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -86,14 +89,6 @@ public class AddImageResource extends javax.swing.JDialog {
         type.setName("type"); // NOI18N
         type.addActionListener(formListener);
 
-        ok.setText("OK");
-        ok.setName("ok"); // NOI18N
-        ok.addActionListener(formListener);
-
-        cancel.setText("Cancel");
-        cancel.setName("cancel"); // NOI18N
-        cancel.addActionListener(formListener);
-
         jScrollPane1.setName("jScrollPane1"); // NOI18N
 
         help.setContentType("text/html");
@@ -105,6 +100,23 @@ public class AddImageResource extends javax.swing.JDialog {
         jLabel3.setText("<html><body><b>To \"batch add\" multiple images use the images menu above</b>");
         jLabel3.setName("jLabel3"); // NOI18N
 
+        jPanel1.setName("jPanel1"); // NOI18N
+
+        jPanel2.setName("jPanel2"); // NOI18N
+        jPanel2.setLayout(new java.awt.GridLayout(1, 2));
+
+        ok.setText("OK");
+        ok.setName("ok"); // NOI18N
+        ok.addActionListener(formListener);
+        jPanel2.add(ok);
+
+        cancel.setText("Cancel");
+        cancel.setName("cancel"); // NOI18N
+        cancel.addActionListener(formListener);
+        jPanel2.add(cancel);
+
+        jPanel1.add(jPanel2);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -112,30 +124,24 @@ public class AddImageResource extends javax.swing.JDialog {
             .add(layout.createSequentialGroup()
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 340, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 409, Short.MAX_VALUE)
+                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 409, Short.MAX_VALUE)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
                             .add(jLabel2))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(layout.createSequentialGroup()
-                                .add(ok)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(cancel))
-                            .add(name, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 309, Short.MAX_VALUE)
-                            .add(type, 0, 309, Short.MAX_VALUE)))
-                    .add(jLabel3))
+                            .add(name, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 363, Short.MAX_VALUE)
+                            .add(type, 0, 363, Short.MAX_VALUE)))
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel3))
                 .addContainerGap())
         );
-
-        layout.linkSize(new java.awt.Component[] {cancel, ok}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
-
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
                 .addContainerGap()
-                .add(jLabel3)
+                .add(jLabel3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel1)
@@ -145,11 +151,9 @@ public class AddImageResource extends javax.swing.JDialog {
                     .add(jLabel2)
                     .add(type, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 119, Short.MAX_VALUE)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(ok)
-                    .add(cancel))
+                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 143, Short.MAX_VALUE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
 
@@ -164,11 +168,11 @@ public class AddImageResource extends javax.swing.JDialog {
             if (evt.getSource() == type) {
                 AddImageResource.this.typeActionPerformed(evt);
             }
-            else if (evt.getSource() == ok) {
-                AddImageResource.this.okActionPerformed(evt);
-            }
             else if (evt.getSource() == cancel) {
                 AddImageResource.this.cancelActionPerformed(evt);
+            }
+            else if (evt.getSource() == ok) {
+                AddImageResource.this.okActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -257,6 +261,8 @@ public class AddImageResource extends javax.swing.JDialog {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
+    private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel2;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTextField name;
     private javax.swing.JButton ok;

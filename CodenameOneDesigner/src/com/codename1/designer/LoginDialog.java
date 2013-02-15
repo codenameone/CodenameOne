@@ -26,6 +26,7 @@ public class LoginDialog extends javax.swing.JDialog {
     public LoginDialog(java.awt.Component parent) {
         super((java.awt.Frame)SwingUtilities.getWindowAncestor(parent), true);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(loginButton, cancelButton);
         Preferences p = Preferences.userNodeForPackage(getClass());
         remember.setSelected(p.getBoolean("remeber", false));
         if(remember.isSelected()) {

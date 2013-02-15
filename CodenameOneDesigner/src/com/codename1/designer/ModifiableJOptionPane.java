@@ -5,6 +5,7 @@
 package com.codename1.designer;
 
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.HeadlessException;
 import javax.swing.*;
@@ -88,6 +89,14 @@ public class ModifiableJOptionPane extends JOptionPane {
         return dialog;
     }
 
+    public static void reverseOKCancel(JButton ok, JButton cancel) {
+        if(ResourceEditorApp.IS_MAC) {
+            Container c = ok.getParent();
+            c.remove(ok);
+            c.add(ok);
+        }
+    }
+    
     /**
      * @see javax.swing.JOptionPane#createInternalFrame(java.awt.Component,
      * java.lang.String)

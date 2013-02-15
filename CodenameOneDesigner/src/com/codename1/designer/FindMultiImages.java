@@ -49,6 +49,7 @@ public class FindMultiImages extends javax.swing.JDialog {
         super(parent, modal);
         this.res = res;
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         pack();
         setLocationByPlatform(true);
         setVisible(true);

@@ -39,6 +39,7 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
     public CheckerBoardColorCalibration(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         setLocationByPlatform(true);
         colorA.setText(Integer.toHexString(getColorA()));
         colorB.setText(Integer.toHexString(getColorB()));
@@ -69,6 +70,8 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
         lbl = new javax.swing.JLabel();
         colorB = new javax.swing.JTextField();
         colorBButton = new javax.swing.JButton();
+        jPanel1 = new javax.swing.JPanel();
+        jPanel2 = new javax.swing.JPanel();
         ok = new javax.swing.JButton();
         cancel = new javax.swing.JButton();
 
@@ -96,13 +99,22 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
         colorBButton.setText("...");
         colorBButton.setName("colorBButton"); // NOI18N
 
+        jPanel1.setName("jPanel1"); // NOI18N
+
+        jPanel2.setName("jPanel2"); // NOI18N
+        jPanel2.setLayout(new java.awt.GridLayout());
+
         ok.setText("OK");
         ok.setName("ok"); // NOI18N
         ok.addActionListener(formListener);
+        jPanel2.add(ok);
 
         cancel.setText("Cancel");
         cancel.setName("cancel"); // NOI18N
         cancel.addActionListener(formListener);
+        jPanel2.add(cancel);
+
+        jPanel1.add(jPanel2);
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -110,13 +122,9 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
                 .addContainerGap()
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(layout.createSequentialGroup()
-                        .add(10, 10, 10)
-                        .add(ok)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(cancel))
-                    .add(layout.createSequentialGroup()
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
                             .add(lbl))
@@ -130,10 +138,8 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
                                 .add(colorB, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(colorBButton)))))
-                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
         );
-
-        layout.linkSize(new java.awt.Component[] {cancel, ok}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
         layout.linkSize(new java.awt.Component[] {colorA, colorB}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
 
@@ -151,9 +157,7 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
                     .add(colorB, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(colorBButton))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(ok)
-                    .add(cancel))
+                .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -191,6 +195,8 @@ public class CheckerBoardColorCalibration extends javax.swing.JDialog {
     private javax.swing.JTextField colorB;
     private javax.swing.JButton colorBButton;
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel2;
     private javax.swing.JLabel lbl;
     private javax.swing.JButton ok;
     // End of variables declaration//GEN-END:variables

@@ -58,6 +58,7 @@ public class VKBEditor extends javax.swing.JDialog {
     public VKBEditor(java.awt.Component parent, String name, String value) {
         super((java.awt.Frame)SwingUtilities.windowForComponent(parent), true);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         originalValue = value;
         this.name.setText(name);
         Form blankForm = new Form();

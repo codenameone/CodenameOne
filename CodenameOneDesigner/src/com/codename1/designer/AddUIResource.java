@@ -45,6 +45,7 @@ public class AddUIResource extends javax.swing.JDialog {
     public AddUIResource(java.awt.Component c, EditableResources res) {
         super((java.awt.Frame)SwingUtilities.windowForComponent(c), true);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         name.setText(AddResourceDialog.nextAvailableName(res, "GUI"));
         try {
             templateDetails.setPage(getClass().getResource("/templates/BlankForm.html"));
@@ -169,11 +170,11 @@ public class AddUIResource extends javax.swing.JDialog {
             if (evt.getSource() == template) {
                 AddUIResource.this.templateActionPerformed(evt);
             }
-            else if (evt.getSource() == ok) {
-                AddUIResource.this.okActionPerformed(evt);
-            }
             else if (evt.getSource() == cancel) {
                 AddUIResource.this.cancelActionPerformed(evt);
+            }
+            else if (evt.getSource() == ok) {
+                AddUIResource.this.okActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents

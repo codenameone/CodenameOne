@@ -57,6 +57,7 @@ public class ArrayEditorDialog extends javax.swing.JDialog {
             String title, String helpText) {
         super((java.awt.Frame)SwingUtilities.windowForComponent(parentCmp), true);
         initComponents();
+        ModifiableJOptionPane.reverseOKCancel(ok, cancel);
         setTitle(title);
         try {
             help.setPage(getClass().getResource(helpText));
@@ -228,7 +229,7 @@ public class ArrayEditorDialog extends javax.swing.JDialog {
                             .add(moveDown))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 209, Short.MAX_VALUE))
-                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 473, Short.MAX_VALUE))
+                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 507, Short.MAX_VALUE))
                 .addContainerGap())
         );
 
@@ -278,11 +279,11 @@ public class ArrayEditorDialog extends javax.swing.JDialog {
             else if (evt.getSource() == moveDown) {
                 ArrayEditorDialog.this.moveDownActionPerformed(evt);
             }
-            else if (evt.getSource() == ok) {
-                ArrayEditorDialog.this.okActionPerformed(evt);
-            }
             else if (evt.getSource() == cancel) {
                 ArrayEditorDialog.this.cancelActionPerformed(evt);
+            }
+            else if (evt.getSource() == ok) {
+                ArrayEditorDialog.this.okActionPerformed(evt);
             }
         }
 
