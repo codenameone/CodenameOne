@@ -1497,6 +1497,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private String getUserAgent() {
         try {
+            String userAgent = System.getProperty("http.agent");            
+            if(userAgent != null){
+                return userAgent;
+            }
+        } catch (Exception e) {
+        }
+        
+        try {
             Constructor<WebSettings> constructor = WebSettings.class.getDeclaredConstructor(Context.class, WebView.class);
             constructor.setAccessible(true);
             try {
