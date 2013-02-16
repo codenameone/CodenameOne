@@ -70,6 +70,7 @@ import net.rim.device.api.system.EventInjector;
 import net.rim.device.api.system.JPEGEncodedImage;
 import net.rim.device.api.system.PNGEncodedImage;
 import net.rim.device.api.ui.*;
+import net.rim.device.api.ui.picker.FilePicker;
 
 /**
  * Implementation class for newer blackberry devices
@@ -139,6 +140,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
     public void lockOrientation(boolean portrait) {
         net.rim.device.api.ui.UiEngineInstance ue;
         ue = net.rim.device.api.ui.Ui.getUiEngineInstance();
+        
         if (portrait) {
             ue.setAcceptableDirections(net.rim.device.api.system.Display.DIRECTION_PORTRAIT);
         } else {
@@ -514,5 +516,30 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return ((Font)font).derive(weight, (int)size);
     }  
     
-    
+    public void openImageGallery(final ActionListener response) {
+
+        try {
+            final FilePicker picker = FilePicker.getInstance();
+            
+            app.invokeLater(new Runnable() {
+
+                public void run() {
+                    final String file = picker.show();
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        public void run() {
+                            if (file != null) {
+                                response.actionPerformed(new ActionEvent(file));
+                            } else {
+                                response.actionPerformed(null);
+                            }
+                        }
+                    });
+                }
+            });
+            
+        } catch (Throwable e) {
+            super.openImageGallery(response);
+        }
+    }
 }
