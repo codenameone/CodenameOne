@@ -1019,6 +1019,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
 }
 
+BOOL patch = NO;
 - (void)keyboardWillHide:(NSNotification *)n
 {
     keyboardIsShown = NO;
@@ -1036,10 +1037,18 @@ static CodenameOne_GLViewController *sharedSingleton;
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
-    if(displayHeight > displayWidth) {
-        viewFrame.origin.y += keyboardSize.height;
+    if(patch) {
+        if(displayHeight > displayWidth) {
+            viewFrame.origin.y += keyboardSize.height / 2;
+        } else {
+            viewFrame.origin.x -= keyboardSize.height / 2;
+        }
     } else {
-        viewFrame.origin.x -= keyboardSize.height;
+        if(displayHeight > displayWidth) {
+            viewFrame.origin.y += keyboardSize.height;
+        } else {
+            viewFrame.origin.x -= keyboardSize.height;
+        }
     }
     /*float y = editingComponent.frame.origin.y;
      y += keyboardSize.height;
@@ -1068,7 +1077,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
-    BOOL patch = NO;
+    patch = NO;
     if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
         if(!forceSlideUpField) {
             modifiedViewHeight = NO;

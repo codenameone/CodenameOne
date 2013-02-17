@@ -100,7 +100,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     static IOSImplementation instance;
     private TextArea currentEditing;
     private static boolean initialized;
-    private boolean editingText;
     private Lifecycle life;
     private static CodeScannerImpl scannerInstance;
     private static boolean minimized;
@@ -144,9 +143,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public int getDisplayHeight() {
-        if(editingText) {
-            return nativeInstance.getDisplayHeight() / 2; 
-        }
         return nativeInstance.getDisplayHeight();
     }
 
@@ -268,7 +264,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     // callback for native code!
     public static void editingUpdate(String s, int cursorPositon, boolean finished) {
-        instance.editingText = false;
         if(instance.currentEditing != null) {
             if(finished) {
                 editNext = cursorPositon == -2;
