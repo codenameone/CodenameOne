@@ -1100,6 +1100,9 @@ public class Dialog extends Form {
                     int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
                     int titlePT = getTitleComponent().getStyle().getPadding(TOP);
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
+                    if(pu == null){
+                        pu = new byte[4]; 
+                   }
                     pu[0] = Style.UNIT_TYPE_PIXELS;
                     getContentPane().getStyle().setPaddingUnit(pu);
                     int pop = Display.getInstance().convertToPixels(manager.getThemeConstant("popupNoTitleAddPaddingInt", 1), false);
