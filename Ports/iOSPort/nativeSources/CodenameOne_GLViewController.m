@@ -139,6 +139,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         float scale = scaleValue;
         editCompoentX = (x + padLeft) / scale;
         editCompoentY = (y + padTop) / scale;
+        if (scale > 1) {
+            editCompoentY -= 1.5;
+        } else {
+            editCompoentY -= 1;
+        }
         editCompoentW = (w - padLeft - padRight) / scale;
         editCompoentH = (h - padTop - padBottom) / scale;
         forceSlideUpField = forceSlideUp;
@@ -966,35 +971,43 @@ static CodenameOne_GLViewController *sharedSingleton;
         
         int wi = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
         int he = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
-        if (!isIPad()) {
+
+        //some hacking to scale launch image so that it will be drawn correctly
+        GLfloat xScale = 1;
+        if(isPortrait) {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
-            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl()));
+            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, wi, he));
             img = [UIImage imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
+            
+            gl = [[GLUIImage alloc] initWithImage:img];
+            dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
+            [(EAGLView *)self.view setFramebuffer];
+        } else {
+            //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
+            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, he, wi));
+            img = [UIImage imageWithCGImage:imageRef];
+            CGImageRelease(imageRef);
+            
+            gl = [[GLUIImage alloc] initWithImage:img];
+            int imgHeight = img.size.height;
+            int imgWidth = img.size.width;
+            dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:imgHeight h:imgWidth];
+            NSLog(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
+            [(EAGLView *)self.view setFramebuffer];
         }
         
-        //some hacking to scale launch image so that it will be drawn correctly
-        int heightFix = 0;
-        GLfloat xScale = 1;
-        if (!isPortrait && wi < he) {
-            heightFix = he - wi;
-            xScale = wi*1.0 / he;
-        }
-        gl = [[GLUIImage alloc] initWithImage:img];
-        dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height + heightFix];
-        
-        [(EAGLView *)self.view setFramebuffer];
         GLErrorLog;
         
         glScalef(xScale, -1, 1);
         GLErrorLog;
-        glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
+        glTranslatef(0, -he, 0);
         GLErrorLog;
         
         [dr execute];
         [gl release];
         
-        glTranslatef(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
+        glTranslatef(0, he, 0);
         GLErrorLog;
         
         glScalef(xScale, -1, 1);
@@ -1191,6 +1204,9 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 bool lockDrawing;
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+    if(firstTime) {
+        return;
+    }
     @synchronized([CodenameOne_GLViewController instance]) {
         [currentTarget removeAllObjects];
         lockDrawing = YES;
@@ -1822,7 +1838,7 @@ extern SKPayment *paymentInstance;
 }
 
 -(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
-                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldn’t update your UI on this, just process the payment data */
+                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldnít update your UI on this, just process the payment data */
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
     com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(fromNSString(tid), amount);
@@ -1833,7 +1849,7 @@ extern SKPayment *paymentInstance;
 
 // Zooz callback methods
 -(void)paymentSuccessDialogClosed{
-    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: – this is where you should update your UI on success transaction */
+    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: ñ this is where you should update your UI on success transaction */
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();
     });
