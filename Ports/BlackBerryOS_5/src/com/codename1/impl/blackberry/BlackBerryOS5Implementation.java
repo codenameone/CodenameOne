@@ -520,7 +520,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
 
         try {
             final FilePicker picker = FilePicker.getInstance();
-            
+            picker.setFilter(".jpg");
             app.invokeLater(new Runnable() {
 
                 public void run() {
