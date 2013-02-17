@@ -111,17 +111,26 @@ class DatabaseImpl extends Database {
         
         @Override
         public boolean first() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             position = -1;
             return IOSImplementation.nativeInstance.sqlCursorFirst(peer);
         }
 
         @Override
         public boolean last() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             throw new IOException("Unsupported");
         }
 
         @Override
         public boolean next() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             if(IOSImplementation.nativeInstance.sqlCursorNext(peer)) {
                 position++;
                 return true;
@@ -131,11 +140,17 @@ class DatabaseImpl extends Database {
 
         @Override
         public boolean prev() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             throw new IOException("Unsupported");
         }
 
         @Override
         public int getColumnIndex(String columnName) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             for(int iter = 0 ; true ; iter++) {
                 String n = getColumnName(iter);
                 if(n == null) {
@@ -149,16 +164,25 @@ class DatabaseImpl extends Database {
 
         @Override
         public String getColumnName(int columnIndex) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlGetColName(peer, columnIndex);
         }
 
         @Override
         public int getPosition() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return position;
         }
 
         @Override
         public boolean position(int row) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             throw new IOException("Unsupported");
         }
 
@@ -180,46 +204,73 @@ class DatabaseImpl extends Database {
         
         @Override
         public Row getRow() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return this;
         }
 
         @Override
         public byte[] getBlob(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnBlob(peer, index);
         }
 
         @Override
         public double getDouble(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnDouble(peer, index);
         }
 
         @Override
         public float getFloat(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnFloat(peer, index);
         }
 
         @Override
         public int getInteger(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnInteger(peer, index);
         }
 
         @Override
         public long getLong(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnLong(peer, index);
         }
 
         @Override
         public short getShort(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnShort(peer, index);
         }
 
         @Override
         public String getString(int index) throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
         }
 
         @Override
         public int getColumnCount() throws IOException {
+            if(peer == 0) {
+                throw new IOException("Working with a closed cursor");
+            }
             return IOSImplementation.nativeInstance.sqlCursorGetColumnCount(peer);
         }
     }

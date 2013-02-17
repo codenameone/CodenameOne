@@ -400,7 +400,11 @@ public final class CloudObject implements Externalizable {
      * @return a long value
      */
     public Long getLong(String key) {
-        return (Long)getObject(key);
+        Object o = getObject(key);
+        if(o instanceof Integer) {
+            return new Long(((Integer)o).intValue());
+        }
+        return (Long)o;
     }
 
     /**
@@ -437,7 +441,11 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Integer getInteger(String key) {
-        return (Integer)getObject(key);
+        Object o = getObject(key);
+        if(o instanceof Long) {
+            return new Integer((int)((Long)o).longValue());
+        }
+        return (Integer)o;
     }
 
     /**
@@ -511,7 +519,11 @@ public final class CloudObject implements Externalizable {
      * @return a value
      */
     public Float getFloat(String key) {
-        return (Float)getObject(key);
+        Object o = getObject(key);
+        if(o instanceof Double) {
+            return new Float(((Double)o).floatValue());
+        }
+        return (Float)o;
     }
 
     /**

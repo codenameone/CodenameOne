@@ -41,6 +41,7 @@ import java.util.logging.Logger;
 public class SECursor implements Cursor, Row{
     
     private ResultSet resultSet;
+    private boolean closed;
     
     public SECursor(ResultSet resultSet) {
         this.resultSet = resultSet;
@@ -49,6 +50,9 @@ public class SECursor implements Cursor, Row{
     
     @Override
     public boolean first() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.first();
         } catch (SQLException ex) {
@@ -59,6 +63,9 @@ public class SECursor implements Cursor, Row{
 
     @Override
     public boolean last() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.last();
         } catch (SQLException ex) {
@@ -69,6 +76,9 @@ public class SECursor implements Cursor, Row{
 
     @Override
     public boolean next() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.next();
         } catch (SQLException ex) {
@@ -79,6 +89,9 @@ public class SECursor implements Cursor, Row{
 
     @Override
     public boolean prev() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.previous();
         } catch (SQLException ex) {
@@ -88,6 +101,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public int getColumnIndex(String columnName) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
             int colsCount = meta.getColumnCount();
@@ -105,6 +121,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public String getColumnName(int columnIndex) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
             return meta.getColumnName(columnIndex + 1);
@@ -115,6 +134,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public int getPosition() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getRow();
         } catch (SQLException ex) {
@@ -124,10 +146,16 @@ public class SECursor implements Cursor, Row{
     }
 
     public Row getRow() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         return this;
     }
 
     public boolean position(int row) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.absolute(row);
         } catch (SQLException ex) {
@@ -137,7 +165,11 @@ public class SECursor implements Cursor, Row{
     }
 
     public void close() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
+            closed = true;
             resultSet.close();
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -146,6 +178,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public byte[] getBlob(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             Blob b = resultSet.getBlob(index+1);
             InputStream is = b.getBinaryStream();
@@ -158,6 +193,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public double getDouble(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getDouble(index+1);
         } catch (SQLException ex) {
@@ -167,6 +205,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public float getFloat(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getFloat(index+1);
         } catch (SQLException ex) {
@@ -176,6 +217,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public int getInteger(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getInt(index+1);
         } catch (SQLException ex) {
@@ -185,6 +229,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public long getLong(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getLong(index+1);
         } catch (SQLException ex) {
@@ -194,6 +241,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public short getShort(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getShort(index+1);
         } catch (SQLException ex) {
@@ -203,6 +253,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public String getString(int index) throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             return resultSet.getString(index+1);
         } catch (SQLException ex) {
@@ -212,6 +265,9 @@ public class SECursor implements Cursor, Row{
     }
 
     public int getColumnCount() throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
             return meta.getColumnCount();

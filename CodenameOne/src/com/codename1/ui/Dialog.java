@@ -1093,9 +1093,17 @@ public class Dialog extends Form {
             getTitleComponent().setVisible(b);
             if(!b && manager.isThemeConstant("shrinkPopupTitleBool", true)) {
                 getTitleComponent().setPreferredSize(new Dimension(0,0));
+                getTitleComponent().getStyle().setBorder(null);
+                getTitleArea().setPreferredSize(new Dimension(0,0));
                 if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    getContentPane().getStyle().setPadding(TOP, getContentPane().getStyle().getPadding(TOP) + getTitleComponent().getStyle().getPadding(TOP));
+                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
+                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    byte[] pu = getContentPane().getStyle().getPaddingUnit();
+                    pu[0] = Style.UNIT_TYPE_PIXELS;
+                    getContentPane().getStyle().setPaddingUnit(pu);
+                    int pop = Display.getInstance().convertToPixels(manager.getThemeConstant("popupNoTitleAddPaddingInt", 1), false);
+                    getContentPane().getStyle().setPadding(TOP, pop + cpPaddingTop + titlePT);
                 }
             }
         }

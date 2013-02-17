@@ -80,6 +80,7 @@ import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.plaf.Style;
+import java.io.ByteArrayOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -2541,7 +2542,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     static class NetworkConnection extends InputStream {
         private long peer;
-        private SmallByteArrayOutputStream body;
+        private ByteArrayOutputStream body;
         private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
@@ -2740,7 +2741,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
-        n.body = new SmallByteArrayOutputStream();
+        n.body = new ByteArrayOutputStream();
         return n.body;
     }
 

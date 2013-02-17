@@ -272,6 +272,16 @@ public class UIBuilder {
         }
     }
 
+    /**
+     * Removes a navigation frame from the stack, this is useful in case you
+     * want to go back to a form in the middle of the navigation stack.
+     */
+    protected void popNavigationStack() {
+        if(baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
+            baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
+        }
+    }
+    
     private Vector getFormNavigationStackForComponent(Component c) {
         if(baseFormNavigationStack == null) {
             return null;
