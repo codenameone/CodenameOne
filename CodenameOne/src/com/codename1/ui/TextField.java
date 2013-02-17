@@ -1273,6 +1273,7 @@ public class TextField extends TextArea {
             f.addCommand(clear, 0);
             f.addCommand(t9, 0);
             f.setClearCommand(clear);
+            f.revalidate();
             return original;
         }
         return null;
@@ -1348,6 +1349,7 @@ public class TextField extends TextArea {
                 }
                 originalCommands = null;
             }
+            f.revalidate();
         }
     }
     
