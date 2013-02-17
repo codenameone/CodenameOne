@@ -93,7 +93,12 @@ public abstract class BaseSpinner extends Container {
     }
 
     Component createSeparator() {
-        Label l = new Label(" ");
+        Label l = new Label(" ") {
+
+            public void repaint() {
+                getParent().repaint();
+            }
+        };
         l.setUIID("SpinnerSeparator");
         return l;
     }

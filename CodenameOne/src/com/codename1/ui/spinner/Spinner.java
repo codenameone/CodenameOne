@@ -591,4 +591,13 @@ class Spinner extends List {
         }
         return super.shouldRenderSelection();
     }
+
+    public void repaint() {
+        if(getParent() instanceof BaseSpinner){
+            getParent().repaint();            
+        }else{
+            super.repaint();        
+        }
+    }
+    
 }
