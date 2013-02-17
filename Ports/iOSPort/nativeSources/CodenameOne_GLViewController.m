@@ -1020,6 +1020,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 
 BOOL patch = NO;
+int keyboardSlideOffset;
 - (void)keyboardWillHide:(NSNotification *)n
 {
     keyboardIsShown = NO;
@@ -1037,6 +1038,7 @@ BOOL patch = NO;
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
+    keyboardSlideOffset = 0;
     if(patch) {
         if(displayHeight > displayWidth) {
             viewFrame.origin.y += keyboardSize.height / 2;
@@ -1078,6 +1080,7 @@ BOOL patch = NO;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
     patch = NO;
+    keyboardSlideOffset = 0;
     if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
         if(!forceSlideUpField) {
             modifiedViewHeight = NO;
@@ -1091,14 +1094,18 @@ BOOL patch = NO;
     if(patch) {
         if(displayHeight > displayWidth) {
             viewFrame.origin.y -= (keyboardSize.height / 2);
+            keyboardSlideOffset = -(keyboardSize.height / 2);
         } else {
             viewFrame.origin.x += (keyboardSize.height / 2);
+            keyboardSlideOffset = (keyboardSize.height / 2);
         }
     } else {
         if(displayHeight > displayWidth) {
             viewFrame.origin.y -= keyboardSize.height;
+            keyboardSlideOffset = -keyboardSize.height;
         } else {
             viewFrame.origin.x += keyboardSize.height;
+            keyboardSlideOffset = keyboardSize.height;
         }
     }
     
@@ -1582,7 +1589,9 @@ bool lockDrawing;
 }
 
 static BOOL skipNextTouch = NO;
+int shiftNextRelease = 0;
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    shiftNextRelease = 0;
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
@@ -1594,7 +1603,7 @@ static BOOL skipNextTouch = NO;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue - keyboardSlideOffset;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
@@ -1603,6 +1612,7 @@ static BOOL skipNextTouch = NO;
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
              editCompoentY + editCompoentH >= point.y)) {
+            shiftNextRelease = keyboardSlideOffset;
             if([editingComponent isKindOfClass:[UITextView class]]) {
                 UITextView* v = (UITextView*)editingComponent;
                 stringEdit(YES, -1, v.text);
@@ -1618,6 +1628,7 @@ static BOOL skipNextTouch = NO;
             displayHeight = (int)self.view.bounds.size.height * scaleValue;
             //screenSizeChanged(displayWidth, displayHeight);
             repaintUI();
+            
             //skipNextTouch = YES;
             //return;
         }
@@ -1642,12 +1653,13 @@ static BOOL skipNextTouch = NO;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue - shiftNextRelease;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
-        yArray[0] = (int)point.y * scaleValue;
+        yArray[0] = (int)point.y * scaleValue - shiftNextRelease;
     }
+    shiftNextRelease = 0;
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
@@ -1668,12 +1680,13 @@ static BOOL skipNextTouch = NO;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue;
+            yArray[iter] = (int)currentPoint.y * scaleValue - shiftNextRelease;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
-        yArray[0] = (int)point.y * scaleValue;
+        yArray[0] = (int)point.y * scaleValue - shiftNextRelease;
     }
+    shiftNextRelease = 0;
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
@@ -1847,7 +1860,7 @@ extern SKPayment *paymentInstance;
 }
 
 -(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
-                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldnít update your UI on this, just process the payment data */
+                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldnÌt update your UI on this, just process the payment data */
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
     com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(fromNSString(tid), amount);
@@ -1858,7 +1871,7 @@ extern SKPayment *paymentInstance;
 
 // Zooz callback methods
 -(void)paymentSuccessDialogClosed{
-    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: ñ this is where you should update your UI on success transaction */
+    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: Ò this is where you should update your UI on success transaction */
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();
     });
