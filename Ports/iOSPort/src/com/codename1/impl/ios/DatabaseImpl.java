@@ -188,7 +188,8 @@ class DatabaseImpl extends Database {
 
         @Override
         public void close() throws IOException {
-            if(peer != 0) {
+            // if the database was closed do not close the SQL cursor!
+            if(peer != 0 && DatabaseImpl.this.peer != 0) {
                 IOSImplementation.nativeInstance.sqlCursorCloseStatement(peer);
                 peer = 0;
             }
