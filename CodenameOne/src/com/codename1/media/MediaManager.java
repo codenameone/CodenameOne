@@ -117,4 +117,40 @@ public class MediaManager {
     public static String getMediaRecorderingMimeType(){
         return Display.getInstance().getMediaRecorderingMimeType();
     }
+    
+    /**
+     * Gets the available recording MimeTypes
+     */ 
+    public static String[] getAvailableRecordingMimeTypes(){
+        return Display.getInstance().getAvailableRecordingMimeTypes();        
+    }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param path a file path to where to store the recording, if the file does
+     * not exists it will be created.
+     * @param mimeType the output mime type that is supported see 
+     * getAvailableRecordingMimeTypes()
+     * @throws IllegalArgumentException if given mime-type is not supported
+     * @throws IOException id failed to create a Media object
+     */
+    public static Media createMediaRecorder(String path, String mimeType) throws IOException {
+        boolean supportedMime = false;
+        String [] supported  = getAvailableRecordingMimeTypes();
+        for (int i = 0; i < supported.length; i++) {
+            String mime = supported[i];
+            if(mime.equals(mimeType)){
+                supportedMime = true;
+                break;
+            }
+        }
+        if(!supportedMime){
+            throw new IllegalArgumentException("Mime type " + mimeType + 
+                    " is not supported on this platform use "
+                    + "getAvailableRecordingMimeTypes()");
+        }
+        return Display.getInstance().createMediaRecorder(path, mimeType);
+    }
 }

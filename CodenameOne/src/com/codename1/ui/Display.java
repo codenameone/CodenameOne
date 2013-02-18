@@ -2858,6 +2858,19 @@ public final class Display {
     }
 
     /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param path a file path to where to store the recording, if the file does
+     * not exists it will be created.
+     * @param mimeType the output mime type that is supported see 
+     * getAvailableRecordingMimeTypes() 
+     */
+    public Media createMediaRecorder(String path, String mimeType) throws IOException {
+        return impl.createMediaRecorder(path, mimeType);
+    }
+    
+    /**
      * Returns the image IO instance that allows scaling image files.
      * @return the image IO instance or null if image IO isn't supported for the given platform
      */
@@ -2995,5 +3008,12 @@ public final class Display {
      */
     public CodeScanner getCodeScanner() {
         return impl.getCodeScanner();
+    }
+ 
+    /**
+     * Gets the available recording MimeTypes
+     */ 
+    public String[] getAvailableRecordingMimeTypes() {
+        return impl.getAvailableRecordingMimeTypes();
     }
 }

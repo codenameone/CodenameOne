@@ -4372,6 +4372,20 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param path a file path to where to store the recording, if the file does
+     * not exists it will be created.
+     * @param mimeType the output mime type that is supported see 
+     * getAvailableRecordingMimeTypes()
+     * 
+     */
+    public Media createMediaRecorder(String path, String mimeType) throws IOException{
+        return createMediaRecorder(path);
+    }
+    
+    /**
      * Stops the polling push loop
      */
     protected static void stopPolling() {
@@ -4565,6 +4579,13 @@ public abstract class CodenameOneImplementation {
      */
     public String getMediaRecorderingMimeType() {
         return "audio/amr";
+    }
+    
+    /**
+     * Gets the available recording MimeTypes
+     */ 
+    public String [] getAvailableRecordingMimeTypes(){
+        return new String[]{getMediaRecorderingMimeType()};
     }
     
     /**
