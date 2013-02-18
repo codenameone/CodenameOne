@@ -542,4 +542,16 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             super.openImageGallery(response);
         }
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String [] getAvailableRecordingMimeTypes(){
+        //The PCM format is not supported by BlackBerry devices on the CDMA network.
+        if(isCDMA()){
+            return new String[]{"audio/amr", "qcelp"};        
+        }
+        return new String[]{"audio/amr", "audio/basic", "qcelp"};
+    }
+    
 }
