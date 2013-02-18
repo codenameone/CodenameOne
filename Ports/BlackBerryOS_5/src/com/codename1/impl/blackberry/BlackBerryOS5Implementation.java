@@ -439,6 +439,13 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         }
         return false;
     }
+
+    public String getDatabasePath(String databaseName) {
+        if(!existsDB(databaseName)){
+            return null;
+        }
+        return getDBDir() + databaseName;
+    }
     
     private String getDBDir() {
         String[] roots = listFilesystemRoots();
@@ -469,23 +476,26 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return file;
     }
 
-	/* (non-Javadoc)
-	 * @see com.codename1.impl.blackberry.BlackBerryImplementation#openOutputStream(java.lang.Object)
-	 */
-	public OutputStream openOutputStream(Object connection) throws IOException {
-		if (connection instanceof String) {
-			return super.openOutputStream(connection);
-		}
+    /**
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.impl.blackberry.BlackBerryImplementation#openOutputStream(java.lang.Object)
+     */
+    public OutputStream openOutputStream(Object connection) throws IOException {
+        if (connection instanceof String) {
+            return super.openOutputStream(connection);
+        }
         OutputStream os = ((HttpConnection) connection).openOutputStream();
         // getSoftwareVersion() not available in legacy port,introduced at API 4.3.0
-        int majorVersion = DeviceInfo.getSoftwareVersion().charAt(0)-'0';
+        int majorVersion = DeviceInfo.getSoftwareVersion().charAt(0) - '0';
         // in version 7, BBOS started supporting HTTP 1.1, so facade not required.
         if (majorVersion < 7) {
-        	os = new BlackBerryOutputStream(os);
+            os = new BlackBerryOutputStream(os);
         }
         return new BufferedOutputStream(os, ((HttpConnection) connection).getURL());
-	}
-        
+    }
+
         
     public CodeScanner getCodeScanner() {        
         return new CodeScannerImpl(new AdvancedMultimediaManager());
