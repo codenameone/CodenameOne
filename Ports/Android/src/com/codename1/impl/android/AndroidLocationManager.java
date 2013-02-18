@@ -130,14 +130,18 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
     public void onLocationChanged(android.location.Location loc) {
         com.codename1.location.LocationListener l = getLocationListener();
-        l.locationUpdated(convert(loc));
+        if(l != null){
+            l.locationUpdated(convert(loc));
+        }
     }
 
     public void onStatusChanged(String provider, int status, Bundle extras) {
         com.codename1.location.LocationListener l = getLocationListener();
-        int s = convertStatus(status);
-        setStatus(s);
-        l.providerStateChanged(s);
+        if(l != null){
+            int s = convertStatus(status);
+            setStatus(s);
+            l.providerStateChanged(s);
+        }
     }
 
     private int convertStatus(int status) {
