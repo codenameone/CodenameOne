@@ -44,9 +44,13 @@ public class MediaRecorder implements Media {
     private OutputStream out;
     
     public MediaRecorder(String path) throws IOException {
+        this(path, "audio/amr");
+    }
+    
+    public MediaRecorder(String path, String mimeType) throws IOException {
         try {
             //recorder = Manager.createPlayer("capture://audio?encoding=audio/amr&bitrate=12200&voipMode=true");
-            recorder = Manager.createPlayer("capture://audio?encoding=audio/amr");            
+            recorder = Manager.createPlayer("capture://audio?encoding="+mimeType);            
             recorder.realize();
             rc = (RecordControl) recorder.getControl("RecordControl");
             out = FileSystemStorage.getInstance().openOutputStream(path);
@@ -55,7 +59,7 @@ public class MediaRecorder implements Media {
             ex.printStackTrace();
         }
     }
-
+    
     public void play() {
         try {
             rc.startRecord();

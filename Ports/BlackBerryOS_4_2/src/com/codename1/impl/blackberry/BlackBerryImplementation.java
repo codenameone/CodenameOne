@@ -101,6 +101,7 @@ import com.codename1.ui.Image;
 import java.util.Date;
 import javax.microedition.io.Datagram;
 import javax.microedition.io.DatagramConnection;
+import javax.microedition.media.Manager;
 import javax.wireless.messaging.MessageConnection;
 import javax.wireless.messaging.TextMessage;
 import net.rim.blackberry.api.invoke.CameraArguments;
@@ -2918,7 +2919,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
 
     
-    private boolean isCDMA() {
+    boolean isCDMA() {
         if ((RadioInfo.getActiveWAFs() & RadioInfo.WAF_CDMA)
                 == RadioInfo.WAF_CDMA) {
             return true;
@@ -2946,7 +2947,25 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
      */
     public Media createMediaRecorder(String path) throws IOException {
         return new MediaRecorder(path);        
-    }    
+    }
+
+    /**
+     * @inheritDoc 
+     */
+    public Media createMediaRecorder(String path, String mimeType) throws IOException {
+        return new MediaRecorder(path, mimeType);        
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public String [] getAvailableRecordingMimeTypes(){
+        //The PCM format is not supported by BlackBerry devices on the CDMA network.
+        if(isCDMA()){
+            return new String[]{"audio/amr"};        
+        }
+        return new String[]{"audio/amr", "audio/basic"};
+    }
     
     /**
      * @inheritDoc
