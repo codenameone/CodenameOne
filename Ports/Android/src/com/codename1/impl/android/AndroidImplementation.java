@@ -1742,6 +1742,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Media createMediaRecorder(final String path) throws IOException {
+        return createMediaRecorder(path, "audio/amr");
+    }
+    
+    @Override
+    public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
 
         final AndroidRecorder[] record = new AndroidRecorder[1];
         final IOException[] error = new IOException[1];
@@ -1754,8 +1759,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     synchronized (lock) {
                         MediaRecorder recorder = new MediaRecorder();
                         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-                        recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-                        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                        if(mimeType.contains("amr")){
+                            recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+                            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                        }else{
+                            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);            
+                            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                        }
                         recorder.setOutputFile(path);
                         try {
                             recorder.prepare();
@@ -1785,9 +1795,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             return record[0];
         }
-
-
     }
+    
+    public String [] getAvailableRecordingMimeTypes(){
+        return new String[]{"audio/amr", "audio/aac"};
+    }
+    
 
     /**
      * @inheritDoc
