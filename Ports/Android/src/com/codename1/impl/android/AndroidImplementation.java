@@ -3945,7 +3945,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        SQLiteDatabase db = activity.openOrCreateDatabase(databaseName, activity.MODE_PRIVATE, null);
+        SQLiteDatabase db = activity.openOrCreateDatabase(databaseName, activity.MODE_PRIVATE, null);        
         return new AndroidDB(db);
     }
 
@@ -3960,6 +3960,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return db.exists();
     }
 
+    public String getDatabasePath(String databaseName) {
+        if(!existsDB(databaseName)){
+            return null;
+        }
+        return activity.getDatabasePath(databaseName).getAbsolutePath();
+    }
+    
     public boolean isNativeTitle() {
         return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
