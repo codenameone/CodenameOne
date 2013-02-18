@@ -1090,7 +1090,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.captureCamera(false);
     }
 
-    public Media createMediaRecorder(String path) throws IOException{
+    @Override
+    public String [] getAvailableRecordingMimeTypes() {
+        return super.getAvailableRecordingMimeTypes();
+    }
+    
+    @Override
+    public Media createMediaRecorder(String path, String mimeType) throws IOException{
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
         return new Media() {
             private boolean playing;
@@ -3316,6 +3322,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException{
         return new DatabaseImpl(databaseName);
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        String s = nativeInstance.getDocumentsDir();
+        if(!s.endsWith("/")) {
+            s += "/";
+        }
+        return s + databaseName;
     }
     
     @Override
