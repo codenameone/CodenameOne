@@ -4379,7 +4379,6 @@ public abstract class CodenameOneImplementation {
      * not exists it will be created.
      * @param mimeType the output mime type that is supported see 
      * getAvailableRecordingMimeTypes()
-     * 
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
         return createMediaRecorder(path);
@@ -4620,6 +4619,15 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Returns the file path of the Database if exists and if supported on 
+     * the platform.
+     * @return the file path of the database or null if not exists
+     */
+    public String getDatabasePath(String databaseName) {
+        return null;
+    }
+    
+    /**
      * Indicates if the title of the Form is native title(in android ICS devices
      * if the command behavior is native the ActionBar is used to display the title
      * and the menu)
@@ -4736,4 +4744,5 @@ public abstract class CodenameOneImplementation {
     public void setUseNativeCookieStore(boolean useNativeCookieStore) {
         this.useNativeCookieStore = useNativeCookieStore;
     }
+
 }

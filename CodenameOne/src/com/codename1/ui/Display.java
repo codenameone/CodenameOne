@@ -2920,6 +2920,14 @@ public final class Display {
         return impl.existsDB(databaseName);
     }
     
+    /**
+     * Returns the file path of the Database if exists and if supported on 
+     * the platform.
+     * @return the file path of the database or null if not exists
+     */
+    public String getDatabasePath(String databaseName) {
+        return impl.getDatabasePath(databaseName);
+    }
     
     /**
      * Sets the frequency for polling the server in case of polling based push notification
@@ -3016,4 +3024,5 @@ public final class Display {
     public String[] getAvailableRecordingMimeTypes() {
         return impl.getAvailableRecordingMimeTypes();
     }
+
 }
