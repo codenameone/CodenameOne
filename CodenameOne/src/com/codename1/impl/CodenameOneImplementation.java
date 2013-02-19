@@ -4362,18 +4362,6 @@ public abstract class CodenameOneImplementation {
     /**
      * Creates a Media recorder Object which will record from the device mic to
      * a file in the given path.
-     * The output format will be amr-nb if supported by the platform.
-     * 
-     * @param path a file path to where to store the recording, if the file does
-     * not exists it will be created.
-     */
-    public Media createMediaRecorder(String path) throws IOException{
-        return null;
-    }
-    
-    /**
-     * Creates a Media recorder Object which will record from the device mic to
-     * a file in the given path.
      * 
      * @param path a file path to where to store the recording, if the file does
      * not exists it will be created.
@@ -4381,7 +4369,7 @@ public abstract class CodenameOneImplementation {
      * getAvailableRecordingMimeTypes()
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
-        return createMediaRecorder(path);
+        return null;
     }
     
     /**
@@ -4571,20 +4559,10 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
-     * Gets the recording mime type for the returned Media from the 
-     * createMediaRecorder method
-     * 
-     * @return the recording mime type
-     */
-    public String getMediaRecorderingMimeType() {
-        return "audio/amr";
-    }
-    
-    /**
      * Gets the available recording MimeTypes
      */ 
     public String [] getAvailableRecordingMimeTypes(){
-        return new String[]{getMediaRecorderingMimeType()};
+        return new String[]{"audio/amr"};
     }
     
     /**

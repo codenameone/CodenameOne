@@ -103,9 +103,10 @@ public class MediaManager {
      * 
      * @param path a file path to where to store the recording, if the file does
      * not exists it will be created.
+     * @deprecated see createMediaRecorder(String path, String mimeType) instead
      */
     public static Media createMediaRecorder(String path) throws IOException {
-        return Display.getInstance().createMediaRecorder(path);
+        return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);
     }
     
     /**
@@ -113,6 +114,7 @@ public class MediaManager {
      * createMediaRecorder method
      * 
      * @return the recording mime type
+     * @deprecated see getAvailableRecordingMimeTypes() instead
      */
     public static String getMediaRecorderingMimeType(){
         return Display.getInstance().getMediaRecorderingMimeType();
