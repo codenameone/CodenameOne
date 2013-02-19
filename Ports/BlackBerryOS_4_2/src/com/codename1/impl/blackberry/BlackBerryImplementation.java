@@ -2943,13 +2943,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
     
     /**
-     * @inheritDoc
-     */
-    public Media createMediaRecorder(String path) throws IOException {
-        return new MediaRecorder(path);        
-    }
-
-    /**
      * @inheritDoc 
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
