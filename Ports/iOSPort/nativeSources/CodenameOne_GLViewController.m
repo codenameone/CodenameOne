@@ -1610,9 +1610,7 @@ bool lockDrawing;
 }
 
 static BOOL skipNextTouch = NO;
-int shiftNextRelease = 0;
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-    shiftNextRelease = 0;
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
@@ -1630,10 +1628,14 @@ int shiftNextRelease = 0;
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
     }
+    pointerPressedC(xArray, yArray, [touches count]);
+    [pool release];
+}
+
+-(void)foldKeyboard:(CGPoint) point {
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
              editCompoentY + editCompoentH >= point.y)) {
-            shiftNextRelease = keyboardSlideOffset;
             if([editingComponent isKindOfClass:[UITextView class]]) {
                 UITextView* v = (UITextView*)editingComponent;
                 stringEdit(YES, -1, v.text);
@@ -1654,8 +1656,6 @@ int shiftNextRelease = 0;
             //return;
         }
     }
-    pointerPressedC(xArray, yArray, [touches count]);
-    [pool release];
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -1674,13 +1674,13 @@ int shiftNextRelease = 0;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue - shiftNextRelease;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
-        yArray[0] = (int)point.y * scaleValue - shiftNextRelease;
+        yArray[0] = (int)point.y * scaleValue;
     }
-    shiftNextRelease = 0;
+    [self foldKeyboard:point];
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
@@ -1701,13 +1701,13 @@ int shiftNextRelease = 0;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue - shiftNextRelease;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
-        yArray[0] = (int)point.y * scaleValue - shiftNextRelease;
+        yArray[0] = (int)point.y * scaleValue;
     }
-    shiftNextRelease = 0;
+    [self foldKeyboard:point];
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
@@ -1881,7 +1881,7 @@ extern SKPayment *paymentInstance;
 }
 
 -(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
-                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldnÃt update your UI on this, just process the payment data */
+                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldn√t update your UI on this, just process the payment data */
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
     com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(fromNSString(tid), amount);
@@ -1892,7 +1892,7 @@ extern SKPayment *paymentInstance;
 
 // Zooz callback methods
 -(void)paymentSuccessDialogClosed{
-    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: “ this is where you should update your UI on success transaction */
+    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: ì this is where you should update your UI on success transaction */
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();
     });
