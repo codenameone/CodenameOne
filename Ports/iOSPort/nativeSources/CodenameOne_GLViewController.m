@@ -65,6 +65,7 @@ BOOL forceSlideUpField;
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
+int upsideDownMultiplier = -1;
 
 
 NSAutoreleasePool *globalCodenameOnePool;
@@ -1041,15 +1042,15 @@ int keyboardSlideOffset;
     keyboardSlideOffset = 0;
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y += keyboardSize.height / 2;
+            viewFrame.origin.y += keyboardSize.height / 2 * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x -= keyboardSize.height / 2;
+            viewFrame.origin.x -= keyboardSize.height / 2 * upsideDownMultiplier;
         }
     } else {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y += keyboardSize.height;
+            viewFrame.origin.y += keyboardSize.height * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x -= keyboardSize.height;
+            viewFrame.origin.x -= keyboardSize.height * upsideDownMultiplier;
         }
     }
     /*float y = editingComponent.frame.origin.y;
@@ -1093,19 +1094,19 @@ int keyboardSlideOffset;
     
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y -= (keyboardSize.height / 2);
-            keyboardSlideOffset = -(keyboardSize.height / 2);
+            viewFrame.origin.y -= (keyboardSize.height / 2) * upsideDownMultiplier;
+            keyboardSlideOffset = -(keyboardSize.height / 2) * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x += (keyboardSize.height / 2);
-            keyboardSlideOffset = (keyboardSize.height / 2);
+            viewFrame.origin.x += (keyboardSize.height / 2) * upsideDownMultiplier;
+            keyboardSlideOffset = (keyboardSize.height / 2) * upsideDownMultiplier;
         }
     } else {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y -= keyboardSize.height;
-            keyboardSlideOffset = -keyboardSize.height;
+            viewFrame.origin.y -= keyboardSize.height * upsideDownMultiplier;
+            keyboardSlideOffset = -keyboardSize.height * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x += keyboardSize.height;
-            keyboardSlideOffset = keyboardSize.height;
+            viewFrame.origin.x += keyboardSize.height * upsideDownMultiplier;
+            keyboardSlideOffset = keyboardSize.height * upsideDownMultiplier;
         }
     }
     
@@ -1237,18 +1238,28 @@ bool lockDrawing;
 
 - (BOOL)shouldAutorotate {
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
+    upsideDownMultiplier = 1;
     switch (orientationLock) {
         case 0:
+            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                upsideDownMultiplier = -1;
+            }
             return YES;
             
         case 1:
             if(interfaceOrientation == UIInterfaceOrientationPortrait) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                    upsideDownMultiplier = -1;
+                }
                 return YES;
             }
             return NO;
             
         default:
             if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                    upsideDownMultiplier = -1;
+                }
                 return YES;
             }
     }
@@ -1257,18 +1268,28 @@ bool lockDrawing;
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
+    upsideDownMultiplier = 1;
     switch (orientationLock) {
         case 0:
+            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                upsideDownMultiplier = -1;
+            }
             return YES;
             
         case 1:
             if(interfaceOrientation == UIInterfaceOrientationPortrait) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                    upsideDownMultiplier = -1;
+                }
                 return YES;
             }
             return NO;
             
         default:
             if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                    upsideDownMultiplier = -1;
+                }
                 return YES;
             }
     }
