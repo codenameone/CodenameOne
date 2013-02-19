@@ -3023,7 +3023,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-    public Media createMediaRecorder(String path) throws IOException {
+    public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return new MediaRecorder(path);        
     }
     
