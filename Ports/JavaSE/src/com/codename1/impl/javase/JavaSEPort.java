@@ -4452,7 +4452,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public Media createMediaRecorder(String path) throws IOException {
+    public Media createMediaRecorder(String path, String mime) throws IOException {
         throw new IOException("Not supported on Simulator");
     }
 
@@ -5112,4 +5112,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return super.convertToPixels(dipCount, horizontal);
     }
+    
+   
 }
