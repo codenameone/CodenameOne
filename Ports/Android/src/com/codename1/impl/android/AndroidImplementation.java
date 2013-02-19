@@ -1741,11 +1741,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public Media createMediaRecorder(final String path) throws IOException {
-        return createMediaRecorder(path, "audio/amr");
-    }
-    
-    @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
 
         final AndroidRecorder[] record = new AndroidRecorder[1];
