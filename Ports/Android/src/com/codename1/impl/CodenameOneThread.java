@@ -67,7 +67,7 @@ public class CodenameOneThread extends Thread {
         }, threadName, STACK_FRAME_SIZE);
         this.r = r;
     }
-    
+        
     public boolean hasStackFrame() {
         return stackPointer > 0;
     }

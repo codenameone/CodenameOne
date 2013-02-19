@@ -86,7 +86,7 @@
         <delete dir="build/tmp" />
     </target>
 
-    <target name="-post-jar">
+    <target name="jar" depends="compile">
         <!-- delete file="${dist.jar}.old" />
         <move file="${dist.jar}" tofile="${dist.jar}.old" />
         <jar jarfile="${dist.jar}">
@@ -105,14 +105,11 @@
             classpath="${javac.classpath}:${build.classes.dir}">
             <src path="../../CodenameOne/src" />
         </javac>        
-        <delete file="build/tmp/com/codename1/impl/CodenameOneThread*" />
+        <delete file="build/tmp/com/codename1/impl/CodenameOneThread.class" />
         <javac destdir="build/tmp"
             classpath="${javac.classpath}:build/tmp">
             <src path="${src.dir}" />
         </javac>        
-        <!-- delete file="build/tmp/com/android/vending/billing/IMarketBillingService.class" />
-        <delete file="build/tmp/com/android/vending/billing/IMarketBillingService$Stub$Proxy.class" />
-        <delete file="build/tmp/com/android/vending/billing/IMarketBillingService$Stub.class" / -->
         <jar jarfile="${dist.jar}" basedir="build/tmp">
             <fileset dir="src" includes="*.res" />
             <fileset dir="../../CodenameOne/src" includes="*.res" />
