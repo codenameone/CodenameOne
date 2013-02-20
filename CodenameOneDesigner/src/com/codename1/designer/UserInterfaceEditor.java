@@ -2676,9 +2676,11 @@ public class UserInterfaceEditor extends BaseForm {
             out.writeBoolean(cmp.getComponentForm().getBackCommand() == cmd || cmd.isBackCommand());
         }
         if(isPropertyModified(cmp, PROPERTY_LABEL_FOR)) {
-            out.writeUTF(cmp.getName());
-            out.writeInt(PROPERTY_LABEL_FOR);
-            out.writeUTF(cmp.getLabelForComponent().getName());
+            if(cmp.getLabelForComponent() != null) {
+                out.writeUTF(cmp.getName());
+                out.writeInt(PROPERTY_LABEL_FOR);
+                out.writeUTF(cmp.getLabelForComponent().getName());
+            }
         }
         if(isPropertyModified(cmp, PROPERTY_LEAD_COMPONENT) && ((com.codename1.ui.Container)cmp).getLeadComponent() != null) {
             out.writeUTF(cmp.getName());

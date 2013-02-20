@@ -60,6 +60,10 @@ public class ImageRGBEditor extends BaseForm {
             setOverrideMode(true, view.getComponent());
         }
         initComponents();
+        if(!isEditResourceSupported()) {
+            editExternal.setEnabled(false);
+            editExternal.setToolTipText("Editing isn't supported on this platform");
+        }
         this.res = res;
         this.view = view;
         this.name = name;

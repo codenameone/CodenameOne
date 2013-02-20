@@ -186,6 +186,10 @@ public class BaseForm extends JPanel {
         }
     }
     
+    public boolean isEditResourceSupported() {
+        return Desktop.getDesktop().isSupported(Desktop.Action.EDIT);
+    }
+    
     public static void editResource(java.awt.Component ui, String name, String extension, byte[] data, final UpdatedFile up) {
         try {
             final File tempImage = File.createTempFile(name, extension);
