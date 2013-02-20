@@ -282,6 +282,23 @@ public class UIBuilder {
         }
     }
     
+    /**
+     * Pops the navigation stack until it finds form name and the back button will match form name
+     * if form name isn't in the stack this method will fail
+     * @param formName the name of the form to navigate back to.
+     */
+    protected void setBackDestination(String formName) {
+        if(baseFormNavigationStack != null) {
+            while(baseFormNavigationStack.size() > 0) {
+                Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
+                if(formName.equalsIgnoreCase((String)h.get(FORM_STATE_KEY_NAME))) {
+                    break;
+                }
+                baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
+            }
+        }
+    }
+    
     private Vector getFormNavigationStackForComponent(Component c) {
         if(baseFormNavigationStack == null) {
             return null;

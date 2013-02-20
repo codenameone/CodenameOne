@@ -716,4 +716,12 @@ public class ImageDownloadService extends ConnectionRequest {
     public void setDownloadToStyles(boolean downloadToStyles) {
         this.downloadToStyles = downloadToStyles;
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public boolean equals(Object o) {
+        return (o instanceof ImageDownloadService) && ((ImageDownloadService)o).cacheId != null && 
+                ((ImageDownloadService)o).cacheId.equals(cacheId);
+    }
 }

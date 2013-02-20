@@ -963,8 +963,12 @@ public class CloudStorage {
                 for(int iter = 0 ; iter < storageQueue.size() ; iter++) {
                     Object o = storageQueue.elementAt(iter);
                     if(o instanceof CloudObject) {
-                        ((CloudObject)o).setLastModified(timeStamp);
-                        ((CloudObject)o).setStatus(CloudObject.STATUS_COMMITTED);
+                        CloudObject c = (CloudObject)o;
+                        if(c.getObjectId() == null) {
+                            c.setCloudId(di.readUTF());
+                        }
+                        c.setLastModified(timeStamp);
+                        c.setStatus(CloudObject.STATUS_COMMITTED);
                     }
                 }
             }

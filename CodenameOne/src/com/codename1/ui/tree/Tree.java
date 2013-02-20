@@ -220,7 +220,7 @@ public class Tree extends Container {
         Label dummy = new Label();
         parent.addComponent(BorderLayout.CENTER, dummy);
         buildBranch(o, depth, dest);
-        parent.replace(dummy, dest, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+        parent.replaceAndWait(dummy, dest, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
     }
 
     private void collapseNode(Component c) {

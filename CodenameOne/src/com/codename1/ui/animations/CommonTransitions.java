@@ -330,7 +330,7 @@ public final class CommonTransitions extends Transition {
                 byte bgt = stl.getBgTransparency();
                 stl.setBgTransparency(0xff);
                 drawDialogCmp(buffer.getGraphics(), dlg);
-                stl.setBgTransparency(bgt, true);
+                stl.setBgTransparency(bgt & 0xff, true);
                 return;
             }
             transitionType = TYPE_EMPTY;
