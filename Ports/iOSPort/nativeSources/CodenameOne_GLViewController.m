@@ -1042,9 +1042,9 @@ int keyboardSlideOffset;
     keyboardSlideOffset = 0;
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y += keyboardSize.height / 2 * upsideDownMultiplier;
+            viewFrame.origin.y += keyboardSize.height / 3 * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x -= keyboardSize.height / 2 * upsideDownMultiplier;
+            viewFrame.origin.x -= keyboardSize.height / 3 * upsideDownMultiplier;
         }
     } else {
         if(displayHeight > displayWidth) {
@@ -1089,16 +1089,20 @@ int keyboardSlideOffset;
         } else {
             patch = YES;
         }
+    } else {
+        if(editCompoentY < keyboardSize.height) {
+            patch = YES;
+        }
     }
     modifiedViewHeight = YES;
     
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y -= (keyboardSize.height / 2) * upsideDownMultiplier;
-            keyboardSlideOffset = -(keyboardSize.height / 2) * upsideDownMultiplier;
+            viewFrame.origin.y -= (keyboardSize.height / 3) * upsideDownMultiplier;
+            keyboardSlideOffset = -(keyboardSize.height / 3) * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x += (keyboardSize.height / 2) * upsideDownMultiplier;
-            keyboardSlideOffset = (keyboardSize.height / 2) * upsideDownMultiplier;
+            viewFrame.origin.x += (keyboardSize.height / 3) * upsideDownMultiplier;
+            keyboardSlideOffset = (keyboardSize.height / 3) * upsideDownMultiplier;
         }
     } else {
         if(displayHeight > displayWidth) {
