@@ -18,10 +18,10 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
-/** 
- * This is Menu Bar that displays it's commands on a side bar navigation similar 
+/**
+ * This is Menu Bar that displays it's commands on a side bar navigation similar
  * to Google+/Facbook apps navigation
- * 
+ *
  * @author Chen
  */
 public class SideMenuBar extends MenuBar {
@@ -35,6 +35,7 @@ public class SideMenuBar extends MenuBar {
     private Transition in;
     private Transition out;
     private Container sidePanel;
+
     /**
      * Empty Constructor
      */
@@ -43,7 +44,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     protected void initMenuBar(Form parent) {
         if (parent.getClientProperty("Menu") != null) {
             return;
@@ -54,7 +55,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     protected void installMenuBar() {
         if (parent.getClientProperty("Menu") != null) {
             return;
@@ -80,7 +81,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     public void addCommand(Command cmd) {
         super.addCommand(cmd);
         addOpenButton();
@@ -88,7 +89,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     protected void addCommand(Command cmd, int index) {
         super.addCommand(cmd, index);
         addOpenButton();
@@ -102,7 +103,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
         if (getCommandCount() == 0) {
@@ -117,7 +118,7 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * Close the menu if it is currently open
-     */ 
+     */
     public void closeMenu() {
         if (Display.getInstance().getCurrent() == menu) {
             parent.show();
@@ -126,8 +127,9 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * Returns true if the Menu is currently open
+     *
      * @return true if menu open
-     */ 
+     */
     public boolean isMenuOpen() {
         return Display.getInstance().getCurrent() == menu;
     }
@@ -141,7 +143,6 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-
     private void clean() {
         parent.setTransitionOutAnimator(out);
         parent.setTransitionInAnimator(in);
@@ -151,9 +152,10 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * Creates the side navigation component with the Commands
+     *
      * @param commands the Command objects
      * @return the Component to display on the navigation
-     */ 
+     */
     protected Container createSideNavigationComponent(Vector commands) {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         menu.setUIID("SideNavigationPanel");
@@ -161,19 +163,19 @@ public class SideMenuBar extends MenuBar {
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
             Component cmp = (Component) c.getClientProperty("SideComponent");
-            if(cmp != null){
-                if(cmp.getParent() != null){
+            if (cmp != null) {
+                if (cmp.getParent() != null) {
                     cmp.getParent().removeAll();
                 }
-                if(c.getClientProperty("Actionable") != null){
+                if (c.getClientProperty("Actionable") != null) {
                     Container cnt = new Container(new BorderLayout());
                     cnt.addComponent(BorderLayout.CENTER, cmp);
                     cnt.setLeadComponent(createTouchCommandButton(c));
-                    menu.addComponent(cnt);                
-                }else{
-                    menu.addComponent(cmp);                
+                    menu.addComponent(cnt);
+                } else {
+                    menu.addComponent(cmp);
                 }
-            }else{
+            } else {
                 menu.addComponent(createTouchCommandButton(c));
             }
         }
@@ -182,39 +184,28 @@ public class SideMenuBar extends MenuBar {
 
     /**
      * @inheritDoc
-     */ 
+     */
     protected Button createTouchCommandButton(final Command c) {
-        Command cmd = new Command(c.getCommandName(), c.getIcon()){
-
-            public void actionPerformed(final ActionEvent evt) {
-                closeMenu();
-                clean();
-                Display.getInstance().callSerially(new Runnable() {
-
-                    public void run() {
-                        ActionEvent e = new ActionEvent(c);
-                        c.actionPerformed(e);
-                    }
-                });
-            }
-            
-        };
-        Button b = super.createTouchCommandButton(cmd);
+        
+        CommandWrapper wrapper = new CommandWrapper(c);
+        Button b = super.createTouchCommandButton(wrapper);
         b.setTextPosition(Label.RIGHT);
         b.setUIID("SideCommand");
         return b;
     }
-    
-    
 
     private Form createMenu() {
-        final Form m = new Form(){
+        final Form m = new Form() {
 
             @Override
             void actionCommandImpl(Command cmd, ActionEvent ev) {
+                if(cmd instanceof CommandWrapper){
+                    cmd = ((CommandWrapper)cmd).cmd;
+                    ev =  new ActionEvent(cmd);
+                }
                 parent.actionCommandImpl(cmd, ev);
+                
             }
-            
         };
         m.putClientProperty("Menu", "true");
         m.setTransitionInAnimator(CommonTransitions.createEmpty());
@@ -354,6 +345,28 @@ public class SideMenuBar extends MenuBar {
                 dest.paintComponent(g, true);
                 g.translate(-position, 0);
             }
+        }
+    }
+
+    class CommandWrapper extends Command {
+
+        Command cmd;
+
+        public CommandWrapper(Command cmd) {
+            super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());
+            this.cmd = cmd;
+        }
+
+        public void actionPerformed(final ActionEvent evt) {
+            closeMenu();
+            clean();
+            Display.getInstance().callSerially(new Runnable() {
+
+                public void run() {
+                    ActionEvent e = new ActionEvent(cmd);
+                    cmd.actionPerformed(e);
+                }
+            });
         }
     }
 }
