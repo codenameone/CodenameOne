@@ -56,7 +56,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("includeNativeBool", "Indicates whether the theme should derive the native OS theme as the basis. This means the current theme will look different in every OS.");
         helpMap.put("centeredPopupBool", "Valid values: true/false. Indicates that a combo box popup should be centered on the screen.");
         helpMap.put("comboImage", "Valid values: image name. Indicates the image of the combo box down arrow");
-        helpMap.put("commandBehavior", "Valid values: SoftKey, Touch, Bar, Title, Native. <ol><li>Softkey - indicates the standard default non-touch optimized menus<li>touch - indicates the touch optimized menus<li>bar - indicates a constantly showing bar at the bottom of the screen<li>Title - same as bar, only with a back command embedded in the title<li>Native - indicates a native command when applicable</ol>");
+        helpMap.put("commandBehavior", "Valid values: SoftKey, Touch, Bar, Title, Side, Native. <ol><li>Softkey - indicates the standard default non-touch optimized menus<li>touch - indicates the touch optimized menus<li>bar - indicates a constantly showing bar at the bottom of the screen<li>Title - same as bar, only with a back command embedded in the title<li>Side - Google+/Facebook like side menu<li>Native - indicates a native command when applicable</ol>");
         helpMap.put("checkBoxCheckedImage", "Valid values: image name. Indicates the image of the checked check box");
         helpMap.put("checkBoxUncheckedImage", "Valid values: image name. Indicates the image of the unchecked check box");
         helpMap.put("radioSelectedImage", "Valid values: image name. Indicates the image of the selected radio button");
