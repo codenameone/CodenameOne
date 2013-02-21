@@ -3942,6 +3942,10 @@ public class Component implements Animation, StyleListener {
                     int iH = bgImage.getHeight();
                     switch (s.getBackgroundType()) {
                         case Style.BACKGROUND_NONE:
+                            if(s.getBgTransparency() != 0) {
+                                g.setColor(s.getBgColor());
+                                g.fillRect(x, y, width, height, s.getBgTransparency());
+                            }
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED:
                             if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
