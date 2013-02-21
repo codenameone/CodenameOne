@@ -741,7 +741,7 @@ public class Form extends Container {
             if (isInitialized() && this.title.isTickerEnabled()) {
                 int b = Display.getInstance().getCommandBehavior();
                 if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
-                        || b == Display.COMMAND_BEHAVIOR_ICS) {
+                        || b == Display.COMMAND_BEHAVIOR_ICS || b == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
                     titleArea.revalidate();
                 }
                 if (this.title.shouldTickerStart()) {

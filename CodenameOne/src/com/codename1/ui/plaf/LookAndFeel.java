@@ -998,6 +998,11 @@ public abstract class LookAndFeel {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_ICS);
                 return;
             }
+            if(c.equalsIgnoreCase("SIDE")) {
+                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+                setMenuBarClass(SideMenuBar.class);
+                return;
+            }
         } else {
             if(complete) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);

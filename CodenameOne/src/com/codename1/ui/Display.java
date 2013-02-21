@@ -394,6 +394,11 @@ public final class Display {
     public static final int COMMAND_BEHAVIOR_ICS = 7;
 
     /**
+     * Commands are placed in a side menu similar to Facebook/Google+ apps
+     */
+    public static final int COMMAND_BEHAVIOR_SIDE_NAVIGATION = 8;
+    
+    /**
      * Indicates that commands should try to add themselves to the native menus
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;

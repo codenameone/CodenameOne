@@ -300,6 +300,7 @@ public class UIManager {
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
         Integer centerAlign = new Integer(Component.CENTER);
         Integer rightAlign = new Integer(Component.RIGHT);
+        Integer leftAlign = new Integer(Component.LEFT);
 
         // global settings
         themeProps.put("sel#transparency", "255");
@@ -714,6 +715,27 @@ public class UIManager {
         themeProps.put("MapZoomIn.sel#derive", "Button.sel");
         themeProps.put("MapZoomIn.press#derive", "Button.press");        
 
+        if (installedTheme == null || !installedTheme.containsKey("SideCommand.derive")) {
+            themeProps.put("SideCommand.derive", "TouchCommand");
+            themeProps.put("SideCommand.align", leftAlign);
+        }
+        if (installedTheme == null || !installedTheme.containsKey("SideCommand.sel#.derive")) {
+            themeProps.put("SideCommand.sel#derive", "TouchCommand.sel");
+            themeProps.put("SideCommand.sel#align", leftAlign);
+        }
+        if (installedTheme == null || !installedTheme.containsKey("SideCommand.press#.derive")) {
+            themeProps.put("SideCommand.press#derive", "TouchCommand.press");
+            themeProps.put("SideCommand.press#align", leftAlign);
+        }
+        
+        if(installedTheme == null || !installedTheme.containsKey("SideNavigationPanel.derive")) {
+            themeProps.put("SideNavigationPanel.padding", "0,0,0,0");
+            themeProps.put("SideNavigationPanel.margin", "0,0,0,0");
+            themeProps.put("SideNavigationPanel.bgColor", "343434");
+            themeProps.put("SideNavigationPanel.transparency", "255");
+        }
+        
+        
     }
 
     /**
