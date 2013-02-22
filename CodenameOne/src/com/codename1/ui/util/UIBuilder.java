@@ -1966,6 +1966,7 @@ public class UIBuilder {
             if(!h.containsKey(FORM_STATE_KEY_CONTAINER)) {
                 Form f = (Form)createContainer(fetchResourceFile(), formName);
                 initBackForm(f);
+                onBackNavigation();
                 beforeShow(f);
                 f.showBack();
                 postShowImpl(f);
@@ -2216,6 +2217,7 @@ public class UIBuilder {
                     initBackForm(f);
                 }
             }
+            onBackNavigation();
             beforeShow(f);
             f.showBack();
             postShowImpl(f);
@@ -2336,6 +2338,14 @@ public class UIBuilder {
     protected void beforeShow(Form f) {
     }
 
+    /**
+     * This callback is invoked to indicate that the upcoming form is shown as part of a "back" navigation.
+     * This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the 
+     * UI, in that case this method can be used to pop out the breadcrumb stack.
+     */
+    protected void onBackNavigation() {
+    }
+    
     /**
      * This method allows binding an action that should occur immediately after showing the given
      * form
@@ -2530,10 +2540,12 @@ public class UIBuilder {
                     String firstScreen = action.substring(0, pos);
                     String nextScreen = action.substring(pos + 1, action.length());
                     Form f = (Form)createContainer(fetchResourceFile(), firstScreen);
-                    beforeShow(f);
                     if(Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                        onBackNavigation();
+                        beforeShow(f);
                         f.showBack();
                     } else {
+                        beforeShow(f);
                         f.show();
                     }
                     postShowImpl(f);
@@ -2548,10 +2560,12 @@ public class UIBuilder {
                         exitForm(currentForm);
                     }
                     Form f = (Form)createContainer(fetchResourceFile(), action);
-                    beforeShow(f);
                     if(Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                        onBackNavigation();
+                        beforeShow(f);
                         f.showBack();
                     } else {
+                        beforeShow(f);
                         f.show();
                     }
                     postShowImpl(f);
