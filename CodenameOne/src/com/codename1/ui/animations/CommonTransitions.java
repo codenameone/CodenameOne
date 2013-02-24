@@ -618,6 +618,9 @@ public final class CommonTransitions extends Transition {
                     int clipY = g.getClipY();
                     int clipW = g.getClipWidth();
                     int clipH = g.getClipHeight();
+                    if(clipW <= 0 || clipH <= 0) {
+                        return;
+                    }
                     g.translate(0, sourceForm.getTitleArea().getHeight());
                     Container sourcePane = ((Form)getSource()).getContentPane();
                     Container destPane = ((Form)getDestination()).getContentPane();

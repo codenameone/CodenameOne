@@ -1199,6 +1199,25 @@ public class Container extends Component {
         return null;
     }
 
+    Component findDropTargetAt(int x, int y) {
+        int count = getComponentCount();
+        for (int i = count - 1; i >= 0; i--) {
+            Component cmp = getComponentAt(i);
+            if (cmp.contains(x, y)) {
+                if (cmp.isDropTarget()) {
+                    return cmp;
+                }
+                if (cmp instanceof Container) {
+                    Component component = ((Container) cmp).findDropTargetAt(x, y);
+                    if(component != null) {
+                        return component;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -1672,8 +1691,21 @@ public class Container extends Component {
                     }
                 }
             }
+            animateLayout(400);
+        } else {
+            Container oldParent = dragged.getParent();
+            if(oldParent != null) {
+                oldParent.removeComponent(dragged);
+            }
+            Component pos = getComponentAt(x, y);
+            i = getComponentIndex(pos);
+            if(i > -1) {
+                addComponent(i, dragged);
+            } else {
+                addComponent(dragged);
+            }
+            getComponentForm().animateHierarchy(400);
         }
-        animateLayout(400);
     }
 
     /**
