@@ -129,14 +129,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
  int constraint, const char* str, int len, BOOL forceSlideUp,
  int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
-    if(editingComponent != nil) {
-        [editingComponent resignFirstResponder];
-        [editingComponent removeFromSuperview];
-        [editingComponent release];
-        editingComponent = nil;
-        repaintUI();
-    }
     dispatch_sync(dispatch_get_main_queue(), ^{
+        if(editingComponent != nil) {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+        }
         float scale = scaleValue;
         editCompoentX = (x + padLeft) / scale;
         editCompoentY = (y + padTop) / scale;
@@ -1024,6 +1023,10 @@ BOOL patch = NO;
 int keyboardSlideOffset;
 - (void)keyboardWillHide:(NSNotification *)n
 {
+    @synchronized([CodenameOne_GLViewController instance]) {
+        [currentTarget removeAllObjects];
+    }
+    com_codename1_impl_ios_IOSImplementation_paintNow__();
     keyboardIsShown = NO;
     if(!modifiedViewHeight) {
         return;
