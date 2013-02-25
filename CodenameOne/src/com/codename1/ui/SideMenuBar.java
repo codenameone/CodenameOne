@@ -27,7 +27,6 @@ import java.util.Vector;
 public class SideMenuBar extends MenuBar {
 
     private Button openButton;
-    private Button closeButton;
     private Form parent;
     private Form menu;
     private Container rightPanel;
@@ -189,6 +188,9 @@ public class SideMenuBar extends MenuBar {
         
         CommandWrapper wrapper = new CommandWrapper(c);
         Button b = super.createTouchCommandButton(wrapper);
+        if(c.getIcon() == null){
+            b.setIcon(null);
+        }
         b.setTextPosition(Label.RIGHT);
         b.setUIID("SideCommand");
         return b;
@@ -207,6 +209,8 @@ public class SideMenuBar extends MenuBar {
                 
             }
         };
+        m.setScrollable(false);
+        m.removeComponentFromForm(m.getTitleArea());
         m.putClientProperty("Menu", "true");
         m.setTransitionInAnimator(CommonTransitions.createEmpty());
         m.setTransitionOutAnimator(CommonTransitions.createEmpty());
@@ -219,17 +223,7 @@ public class SideMenuBar extends MenuBar {
         BorderLayout bl = new BorderLayout();
         m.setLayout(bl);
         rightPanel = new Container(new BorderLayout());
-        closeButton = new Button();
-        closeButton.setUIID("MenuButton");
-        closeButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
-        closeButton.setPreferredSize(new Dimension(openButton.getWidth(), openButton.getHeight()));
-        closeButton.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                parent.show();
-            }
-        });
-        rightPanel.addComponent(BorderLayout.NORTH, closeButton);
+        rightPanel.setPreferredW(openButton.getWidth());
         if (sidePanel != null) {
             sidePanel.removeAll();
             sidePanel = null;
@@ -314,11 +308,11 @@ public class SideMenuBar extends MenuBar {
             if (fwd) {
                 Graphics g = buffer.getGraphics();
                 getSource().paintComponent(g);
-                motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - closeButton.getWidth(), speed);
+                motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);
                 rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
                 rightPanel.getStyle().setBgImage(buffer);
             } else {
-                motion = Motion.createEaseInOutMotion(buffer.getWidth() - closeButton.getWidth(), 0, speed);
+                motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);
             }
             position = 0;
             motion.start();

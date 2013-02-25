@@ -359,7 +359,9 @@ public class MenuBar extends Container implements ActionListener {
             }
         }
         if (!(parent instanceof Dialog)) {
-            if ((commandBehavior == Display.COMMAND_BEHAVIOR_ICS || commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)
+            if ((commandBehavior == Display.COMMAND_BEHAVIOR_ICS || 
+                    commandBehavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION ||
+                    commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)
                     && parent.getTitle() != null && parent.getTitle().length() > 0) {
                 synchronizeCommandsWithButtonsInBackbutton();
 
@@ -933,7 +935,9 @@ public class MenuBar extends Container implements ActionListener {
                     return;
                 }
                 if (parent.getBackCommand() != cmd) {
-                    if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS)
+                    if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || 
+                            behavior == Display.COMMAND_BEHAVIOR_ICS ||
+                            behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)
                             && parent.getTitle() != null && parent.getTitle().length() > 0) {
                         synchronizeCommandsWithButtonsInBackbutton();
                         return;
@@ -994,11 +998,13 @@ public class MenuBar extends Container implements ActionListener {
             if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR
                     || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
                     || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
-                    || behavior == Display.COMMAND_BEHAVIOR_ICS) {
+                    || behavior == Display.COMMAND_BEHAVIOR_ICS
+                    || behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
                 if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && cmd == parent.getBackCommand()) {
                     return;
                 }
-                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS)
+                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS
+                        || behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)
                         && parent.getTitle() != null && parent.getTitle().length() > 0) {
                     synchronizeCommandsWithButtonsInBackbutton();
                     return;
