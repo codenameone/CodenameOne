@@ -1720,7 +1720,7 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-    if(skipNextTouch) {
+    if(skipNextTouch || editingComponent != nil) {
         return;
     }
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
