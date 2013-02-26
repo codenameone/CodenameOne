@@ -62,7 +62,12 @@ public class SideMenuBar extends MenuBar {
         super.installMenuBar();
         openButton = new Button();
         openButton.setUIID("MenuButton");
-        openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+        Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
+        if(i != null){
+            openButton.setIcon(i);                
+        }else{
+            openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));        
+        }
         openButton.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
