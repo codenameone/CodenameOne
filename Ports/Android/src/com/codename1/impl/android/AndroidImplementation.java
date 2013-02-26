@@ -1471,7 +1471,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return ua;
         }
         try {
-            if ("IMEI".equals(key)) {
+            if ("IMEI".equals(key) || "UDID".equals(key)) {
                 TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
                 return tm.getDeviceId();
             }
