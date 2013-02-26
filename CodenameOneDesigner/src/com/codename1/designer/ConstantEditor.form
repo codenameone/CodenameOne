@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <AuxValues>
@@ -76,7 +76,7 @@
       <Properties>
         <Property name="editable" type="boolean" value="true"/>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="70">
+          <StringArray count="71">
             <StringItem index="0" value="alwaysTensileBool"/>
             <StringItem index="1" value="centeredPopupBool"/>
             <StringItem index="2" value="checkBoxCheckDisImage"/>
@@ -133,20 +133,21 @@
             <StringItem index="53" value="radioUnselectedImage"/>
             <StringItem index="54" value="rendererShowsNumbersBool"/>
             <StringItem index="55" value="reverseSoftButtonsBool"/>
-            <StringItem index="56" value="slideDirection"/>
-            <StringItem index="57" value="slideInDirBool"/>
-            <StringItem index="58" value="slideOutDirBool"/>
-            <StringItem index="59" value="snapGridBool"/>
-            <StringItem index="60" value="tabPlacementInt"/>
-            <StringItem index="61" value="tabsFillRowsBool"/>
-            <StringItem index="62" value="tabsGridBool"/>
-            <StringItem index="63" value="textCmpVAlignInt"/>
-            <StringItem index="64" value="textFieldCursorColorInt"/>
-            <StringItem index="65" value="tickerSpeedInt"/>
-            <StringItem index="66" value="tintColor"/>
-            <StringItem index="67" value="touchCommandFillBool"/>
-            <StringItem index="68" value="touchCommandFlowBool"/>
-            <StringItem index="69" value="transitionSpeedInt"/>
+            <StringItem index="56" value="sideMenuImage"/>
+            <StringItem index="57" value="slideDirection"/>
+            <StringItem index="58" value="slideInDirBool"/>
+            <StringItem index="59" value="slideOutDirBool"/>
+            <StringItem index="60" value="snapGridBool"/>
+            <StringItem index="61" value="tabPlacementInt"/>
+            <StringItem index="62" value="tabsFillRowsBool"/>
+            <StringItem index="63" value="tabsGridBool"/>
+            <StringItem index="64" value="textCmpVAlignInt"/>
+            <StringItem index="65" value="textFieldCursorColorInt"/>
+            <StringItem index="66" value="tickerSpeedInt"/>
+            <StringItem index="67" value="tintColor"/>
+            <StringItem index="68" value="touchCommandFillBool"/>
+            <StringItem index="69" value="touchCommandFlowBool"/>
+            <StringItem index="70" value="transitionSpeedInt"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="constant" noResource="true"/>
