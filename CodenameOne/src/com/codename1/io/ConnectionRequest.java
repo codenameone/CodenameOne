@@ -788,9 +788,9 @@ public class ConnectionRequest implements IOProgressListener {
     public void addArgument(String key, byte[] value) {
         key = key.intern();
         if(post) {
-            addArg(key, Util.encodeBody(value));
+            addArg(Util.encodeBody(key), Util.encodeBody(value));
         } else {
-            addArg(key, Util.encodeUrl(value));
+            addArg(Util.encodeUrl(key), Util.encodeUrl(value));
         }
     }
 
@@ -831,9 +831,9 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void addArgument(String key, String value) {
         if(post) {
-            addArg(key, Util.encodeBody(value));
+            addArg(Util.encodeBody(key), Util.encodeBody(value));
         } else {
-            addArg(key, Util.encodeUrl(value));
+            addArg(Util.encodeUrl(key), Util.encodeUrl(value));
         }
     }
 
