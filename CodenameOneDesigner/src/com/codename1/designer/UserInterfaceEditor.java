@@ -3978,6 +3978,7 @@ public class UserInterfaceEditor extends BaseForm {
                         com.codename1.ui.Form form = (com.codename1.ui.Form)cmps[0];
                         com.codename1.ui.Command[] cmds = (com.codename1.ui.Command[])aValue;
                         form.removeAllCommands();
+                        form.setBackCommand(null);
                         for(int iter = cmds.length - 1 ; iter >= 0 ; iter--) {
                             form.addCommand(cmds[iter]);
                             if(cmds[iter] instanceof ActionCommand) {
