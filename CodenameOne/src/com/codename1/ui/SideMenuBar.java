@@ -204,7 +204,6 @@ public class SideMenuBar extends MenuBar {
     private Form createMenu() {
         final Form m = new Form() {
 
-            @Override
             void actionCommandImpl(Command cmd, ActionEvent ev) {
                 if(cmd instanceof CommandWrapper){
                     cmd = ((CommandWrapper)cmd).cmd;
@@ -213,7 +212,16 @@ public class SideMenuBar extends MenuBar {
                 parent.actionCommandImpl(cmd, ev);
                 
             }
+
+            @Override
+            protected void sizeChanged(int w, int h) {
+                closeMenu();
+                super.sizeChanged(w, h);
+            }
+            
+            
         };
+        
         m.setScrollable(false);
         m.removeComponentFromForm(m.getTitleArea());
         m.putClientProperty("Menu", "true");
@@ -228,7 +236,21 @@ public class SideMenuBar extends MenuBar {
         BorderLayout bl = new BorderLayout();
         m.setLayout(bl);
         rightPanel = new Container(new BorderLayout());
-        rightPanel.setPreferredW(openButton.getWidth());
+        
+        
+        if(Display.getInstance().isPortrait()){
+            if(Display.getInstance().isTablet()){
+                rightPanel.setPreferredW(m.getWidth()*2/3);
+            }else{
+                rightPanel.setPreferredW(openButton.getWidth());            
+            }
+        }else{
+            if(Display.getInstance().isTablet()){
+                rightPanel.setPreferredW(m.getWidth()*3/4);
+            }else{
+                rightPanel.setPreferredW(m.getWidth()*4/10);            
+            }            
+        }
         if (sidePanel != null) {
             sidePanel.removeAll();
             sidePanel = null;
