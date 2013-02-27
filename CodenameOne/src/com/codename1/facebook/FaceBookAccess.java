@@ -472,7 +472,7 @@ public class FaceBookAccess {
         checkAuthentication();
 
         FacebookRESTService fb = new FacebookRESTService(token, photoId, FacebookRESTService.PICTURE, false);
-        fb.addArgument("type", "thumbnail");
+        fb.addArgument("type", "small");
         String cacheKey = photoId;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
