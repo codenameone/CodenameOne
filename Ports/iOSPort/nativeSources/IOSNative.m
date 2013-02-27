@@ -1347,6 +1347,9 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(JAVA_OBJECT instanceOb
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         AudioPlayer* pl = (AudioPlayer*)peer;
+        if([pl isPlaying]) {
+            return;
+        }
         [pl release];
         [pool release];
     });
