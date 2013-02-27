@@ -110,6 +110,8 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         jToolBar1 = new javax.swing.JToolBar();
         refreshTree = new javax.swing.JButton();
 
+        FormListener formListener = new FormListener();
+
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Component Tree Inspector");
 
@@ -182,12 +184,28 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         refreshTree.setFocusable(false);
         refreshTree.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
         refreshTree.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        refreshTree.addActionListener(formListener);
         jToolBar1.add(refreshTree);
 
         getContentPane().add(jToolBar1, java.awt.BorderLayout.PAGE_START);
 
         pack();
+    }
+
+    // Code for dispatching events from components to event handlers.
+
+    private class FormListener implements java.awt.event.ActionListener {
+        FormListener() {}
+        public void actionPerformed(java.awt.event.ActionEvent evt) {
+            if (evt.getSource() == refreshTree) {
+                ComponentTreeInspector.this.refreshTreeActionPerformed(evt);
+            }
+        }
     }// </editor-fold>//GEN-END:initComponents
+
+private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshTreeActionPerformed
+    refreshComponentTree();
+}//GEN-LAST:event_refreshTreeActionPerformed
 
     class ComponentTreeModel implements javax.swing.tree.TreeModel {
         private Form root;
