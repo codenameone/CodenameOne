@@ -34,6 +34,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import java.util.Vector;
 
 /**
  * A powerful button like component that allows multiple rows/and an icon to be added
@@ -51,6 +52,7 @@ public class MultiButton extends Container {
     private Button emblem = new Button();
     private boolean invert;
     private String group;  
+    private Vector actionListeners = new Vector();
     
     /**
      * Default constructor allowing the designer to create an instance of this class
@@ -120,6 +122,9 @@ public class MultiButton extends Container {
             }
             emblem.setUIID(old.getUIID());
             emblem.setName(old.getName());
+            for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
+                emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+            }
             if(old.getCommand() != null) {
                 Image img = old.getIcon();
                 emblem.setCommand(old.getCommand());
@@ -138,6 +143,7 @@ public class MultiButton extends Container {
      */
     public void addActionListener(ActionListener al) {
         emblem.addActionListener(al);
+        actionListeners.addElement(al);
     }
 
     /**
@@ -147,6 +153,7 @@ public class MultiButton extends Container {
      */
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
+        actionListeners.removeElement(al);
     }
     
     /**
@@ -198,6 +205,9 @@ public class MultiButton extends Container {
             }
             emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
+            for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
+                emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+            }
             if(old.getCommand() != null) {
                 Image img = old.getIcon();
                 emblem.setCommand(old.getCommand());
