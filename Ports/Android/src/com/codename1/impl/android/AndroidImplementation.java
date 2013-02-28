@@ -194,14 +194,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
         } else {
-            activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
-            
+            activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));            
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
-
+            activity.runOnUiThread(new NotifyActionBar(activity, false));
         }
         if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -1394,7 +1393,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
         if (hasActionBar()) {
-            activity.runOnUiThread(new NotifyActionBar(activity, commandBehavior));
+            //activity.runOnUiThread(new NotifyActionBar(activity, commandBehavior));
         }
     }
     
