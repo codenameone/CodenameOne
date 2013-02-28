@@ -203,6 +203,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
         }
+        if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
+            activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        }
+        
 
         if (m instanceof CodenameOneActivity) {
             ((CodenameOneActivity) m).setIntentResultListener(this);
