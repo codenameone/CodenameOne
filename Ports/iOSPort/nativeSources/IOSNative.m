@@ -1397,9 +1397,9 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    int horizontal = 2;
+    int horizontal = 3;
     if(n7) {
-        horizontal = 3;
+        horizontal = 2;
     }
     DrawGradient* d = [[DrawGradient alloc] initWithArgs:horizontal startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
     [CodenameOne_GLViewController upcoming:d];
@@ -2872,3 +2872,50 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
     return out;
 }
 
+JAVA_OBJECT java_util_TimeZone_getTimezoneId__() {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSTimeZone *tzone = [NSTimeZone defaultTimeZone];
+    NSString* n = [tzone name];
+    //NSLog(@"java_util_TimeZone_getTimezoneId__ %@", n);
+    JAVA_OBJECT str = fromNSString(n);
+    [pool release];
+    return str;
+}
+
+JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int(JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(name);
+    //NSLog(@"java_util_TimeZone_getTimezoneOffset___java_lang_String_long %@, %i", n, timeMillis / 1000);
+    NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
+    NSDateComponents *comps = [[NSDateComponents alloc] init];
+    [comps setDay:day];
+    [comps setYear:year];
+    [comps setMonth:month];
+    [comps setMinute:timeOfDayMillis/60000];
+    NSCalendar* cal = [NSCalendar currentCalendar];
+    NSDate *date = [cal dateFromComponents:comps];
+    JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
+    [pool release];
+    return result;
+}
+
+JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String(JAVA_OBJECT name) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(name);
+    //NSLog(@"java_util_TimeZone_getTimezoneRawOffset___java_lang_String %@", n);
+    NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
+    JAVA_INT result = [tzone secondsFromGMT] * 1000;
+    [pool release];
+    return result;
+}
+
+JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long(JAVA_OBJECT name, JAVA_LONG millis) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(name);
+    //NSLog(@"java_util_TimeZone_isTimezoneDST___java_lang_String_long %@, %i", n, millis / 1000);
+    NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(millis / 1000)];
+    JAVA_BOOLEAN result = [tzone isDaylightSavingTimeForDate:date];
+    [pool release];
+    return result;
+}
