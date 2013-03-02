@@ -3667,7 +3667,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
         }
-        callback.fireActionEvent(null);
+        if(callback != null) {
+            callback.fireActionEvent(null);
+        }
     }
 
     @Override
