@@ -141,8 +141,8 @@
                                   </Group>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Group type="103" groupAlignment="1" attributes="0">
-                                          <Component id="borderType" alignment="0" pref="375" max="32767" attributes="2"/>
-                                          <Component id="thickness" alignment="0" pref="375" max="32767" attributes="2"/>
+                                          <Component id="borderType" alignment="0" pref="739" max="32767" attributes="2"/>
+                                          <Component id="thickness" alignment="0" pref="739" max="32767" attributes="2"/>
                                           <Group type="102" alignment="0" attributes="0">
                                               <Component id="highlightColor" linkSize="1" min="-2" max="-2" attributes="0"/>
                                               <EmptySpace max="-2" attributes="0"/>
@@ -159,7 +159,7 @@
                                   </Group>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Group type="103" groupAlignment="1" attributes="0">
-                                          <Component id="jPanel4" alignment="0" pref="375" max="32767" attributes="2"/>
+                                          <Component id="jPanel4" alignment="0" pref="739" max="32767" attributes="2"/>
                                           <Group type="102" alignment="0" attributes="0">
                                               <Component id="shadowColor" linkSize="1" min="-2" max="-2" attributes="0"/>
                                               <EmptySpace max="-2" attributes="0"/>
@@ -241,7 +241,7 @@
                           <Component id="jPanel4" min="-2" pref="93" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace min="-2" max="-2" attributes="0"/>
-                      <Component id="imageBorderPreview" pref="93" max="32767" attributes="0"/>
+                      <Component id="imageBorderPreview" max="32767" attributes="0"/>
                       <EmptySpace min="-2" pref="5" max="-2" attributes="0"/>
                   </Group>
               </Group>
@@ -328,7 +328,7 @@
                     <StringItem index="2" value="Bevel"/>
                     <StringItem index="3" value="Etched"/>
                     <StringItem index="4" value="Line"/>
-                    <StringItem index="5" value="Round"/>
+                    <StringItem index="5" value="Round - Deprecated! (use image borders instead)"/>
                     <StringItem index="6" value="Image"/>
                     <StringItem index="7" value="Horizontal Image"/>
                     <StringItem index="8" value="Vertical Image"/>
@@ -491,8 +491,8 @@
             </Component>
             <Container class="javax.swing.JPanel" name="jPanel4">
               <Properties>
-                <Property name="opaque" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="jPanel4" noResource="true"/>
+                <Property name="opaque" type="boolean" value="false"/>
               </Properties>
 
               <Layout class="org.netbeans.modules.form.compat2.layouts.DesignGridLayout">

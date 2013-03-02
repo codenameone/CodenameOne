@@ -408,7 +408,7 @@ public class BorderEditor extends javax.swing.JPanel {
         changeLineColor.setEnabled(false);
         changeLineColor.setName("changeLineColor"); // NOI18N
 
-        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Round", "Image", "Horizontal Image", "Vertical Image" }));
+        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Round - Deprecated! (use image borders instead)", "Image", "Horizontal Image", "Vertical Image" }));
         borderType.setName("borderType"); // NOI18N
         borderType.addActionListener(formListener);
 
@@ -568,8 +568,8 @@ public class BorderEditor extends javax.swing.JPanel {
                                 .add(113, 113, 113))
                             .add(jPanel2Layout.createSequentialGroup()
                                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(org.jdesktop.layout.GroupLayout.LEADING, borderType, 0, 375, Short.MAX_VALUE)
-                                    .add(org.jdesktop.layout.GroupLayout.LEADING, thickness, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 375, Short.MAX_VALUE)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, borderType, 0, 739, Short.MAX_VALUE)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, thickness, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 739, Short.MAX_VALUE)
                                     .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
                                         .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -583,7 +583,7 @@ public class BorderEditor extends javax.swing.JPanel {
                                 .add(8, 8, 8))
                             .add(jPanel2Layout.createSequentialGroup()
                                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 375, Short.MAX_VALUE)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 739, Short.MAX_VALUE)
                                     .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
                                         .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -653,7 +653,7 @@ public class BorderEditor extends javax.swing.JPanel {
                     .add(jLabel11)
                     .add(jPanel4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 93, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(imageBorderPreview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 93, Short.MAX_VALUE)
+                .add(imageBorderPreview, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .add(5, 5, 5))
         );
 
@@ -683,32 +683,8 @@ public class BorderEditor extends javax.swing.JPanel {
             else if (evt.getSource() == cancelButton) {
                 BorderEditor.this.cancelButtonActionPerformed(evt);
             }
-            else if (evt.getSource() == center) {
-                BorderEditor.this.centerActionPerformed(evt);
-            }
-            else if (evt.getSource() == right) {
-                BorderEditor.this.rightActionPerformed(evt);
-            }
-            else if (evt.getSource() == left) {
-                BorderEditor.this.leftActionPerformed(evt);
-            }
-            else if (evt.getSource() == topRight) {
-                BorderEditor.this.topRightActionPerformed(evt);
-            }
-            else if (evt.getSource() == bottomRight) {
-                BorderEditor.this.bottomRightActionPerformed(evt);
-            }
             else if (evt.getSource() == borderType) {
                 BorderEditor.this.borderTypeActionPerformed(evt);
-            }
-            else if (evt.getSource() == bottomLeft) {
-                BorderEditor.this.bottomLeftActionPerformed(evt);
-            }
-            else if (evt.getSource() == top) {
-                BorderEditor.this.topActionPerformed(evt);
-            }
-            else if (evt.getSource() == bottom) {
-                BorderEditor.this.bottomActionPerformed(evt);
             }
             else if (evt.getSource() == imageMode) {
                 BorderEditor.this.imageModeActionPerformed(evt);
@@ -716,11 +692,35 @@ public class BorderEditor extends javax.swing.JPanel {
             else if (evt.getSource() == raisedBorder) {
                 BorderEditor.this.raisedBorderActionPerformed(evt);
             }
+            else if (evt.getSource() == themeColors) {
+                BorderEditor.this.themeColorsActionPerformed(evt);
+            }
             else if (evt.getSource() == topLeft) {
                 BorderEditor.this.topLeftActionPerformed(evt);
             }
-            else if (evt.getSource() == themeColors) {
-                BorderEditor.this.themeColorsActionPerformed(evt);
+            else if (evt.getSource() == top) {
+                BorderEditor.this.topActionPerformed(evt);
+            }
+            else if (evt.getSource() == topRight) {
+                BorderEditor.this.topRightActionPerformed(evt);
+            }
+            else if (evt.getSource() == left) {
+                BorderEditor.this.leftActionPerformed(evt);
+            }
+            else if (evt.getSource() == center) {
+                BorderEditor.this.centerActionPerformed(evt);
+            }
+            else if (evt.getSource() == right) {
+                BorderEditor.this.rightActionPerformed(evt);
+            }
+            else if (evt.getSource() == bottomLeft) {
+                BorderEditor.this.bottomLeftActionPerformed(evt);
+            }
+            else if (evt.getSource() == bottom) {
+                BorderEditor.this.bottomActionPerformed(evt);
+            }
+            else if (evt.getSource() == bottomRight) {
+                BorderEditor.this.bottomRightActionPerformed(evt);
             }
         }
 
