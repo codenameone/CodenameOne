@@ -3663,7 +3663,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 callback.fireActionEvent(new ActionEvent(filePath));
                 return;
             } else {
-                callback.fireActionEvent(new ActionEvent("ok"));
+                if(callback != null) {
+                    callback.fireActionEvent(new ActionEvent("ok"));
+                }
                 return;
             }
         }
