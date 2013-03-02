@@ -560,6 +560,8 @@ public class Border {
      * @param arcWidth the horizontal diameter of the arc at the four corners.
      * @param arcHeight the vertical diameter of the arc at the four corners.
      * @return new border instance
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight) {
         Border b = new Border();
@@ -597,6 +599,8 @@ public class Border {
      * @param arcHeight the vertical diameter of the arc at the four corners.
      * @param color the color for the border
      * @return new border instance
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight, int color) {
         Border b = new Border();
