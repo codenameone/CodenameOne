@@ -57,7 +57,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
-import com.codename1.ui.Label;
+import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
@@ -2738,7 +2738,8 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     public void capturePhoto(ActionListener response) {
         captureResponse = response;
         final Form current = Display.getInstance().getCurrent();
-        Form cam = new Form();
+        final Form cam = new Form();
+        cam.setScrollable(false);
         cam.setTransitionInAnimator(CommonTransitions.createEmpty());
         cam.setTransitionOutAnimator(CommonTransitions.createEmpty());
         cam.setLayout(new BorderLayout());
@@ -2766,42 +2767,67 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         MIDPVideoComponent video = new MIDPVideoComponent(player);
         video.play();
         video.setVisible(true);
-        cam.addComponent(BorderLayout.CENTER, video);
-        cam.revalidate();
-        ActionListener l = new ActionListener() {
+        
+        cam.addCommand(new com.codename1.ui.Command("Cancel"){
+
+            public void actionPerformed(ActionEvent evt) {
+                if(player != null){
+                    player.cleanup();
+                }
+                captureResponse.actionPerformed(null);
+                current.showBack();
+            }            
+        });
+        final ActionListener l = new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
                 try {
+                    cam.removeAll();
                     VideoControl cnt = (VideoControl) player.nativePlayer.getControl("VideoControl");
-                    byte[] pic = cnt.getSnapshot("encoding=jpeg");
+                    byte[] pic = cnt.getSnapshot("encoding=jpeg&width="+current.getWidth()+"&height=" + current.getHeight());
                     String imagePath = getOutputMediaFile() + ".jpg";
                     OutputStream out = null;
                     try {
-                        out = FileSystemStorage.getInstance().openOutputStream(imagePath);
-                        out.write(pic);
+                        if(pic != null){
+                            out = FileSystemStorage.getInstance().openOutputStream(imagePath);
+                            out.write(pic);
+                        }
                     } catch (Throwable ex) {
                         ex.printStackTrace();
                         System.out.println("failed to store picture to " + imagePath);
                     } finally {
-                        if (out != null) {
-                            try {
+                        try {
+                            if (out != null) {
                                 out.close();
-                                player.cleanup();
-                            } catch (Throwable ex) {
-                                ex.printStackTrace();
                             }
+                            player.cleanup();
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
                         }
+
                     }
                     captureResponse.actionPerformed(new ActionEvent(imagePath));
                     current.showBack();
                 } catch (Throwable ex) {
                     ex.printStackTrace();
                     System.out.println("failed to take picture");
+                    current.showBack();
                 }
             }
         };
         cam.addGameKeyListener(Display.GAME_FIRE, l);
-        cam.addPointerReleasedListener(l);
+        Container cn = new Container(new BorderLayout()){
+
+            public void pointerReleased(int x, int y) {
+                l.actionPerformed(null);
+            }
+            
+        };
+        cn.setFocusable(true);
+        cn.addComponent(BorderLayout.CENTER, video);
+        cam.addComponent(BorderLayout.CENTER, cn);
+        cam.revalidate();
+        //cam.addPointerReleasedListener(l);
     }
 
     public void captureVideo(ActionListener response) {
@@ -2921,9 +2947,16 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     
         /** Create a File for saving an image or video */
     private String getOutputMediaFile() {
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-        return FileSystemStorage.getInstance().getRoots()[0] + System.currentTimeMillis();
+        String dir = System.getProperty("fileconn.dir.private");
+        if(dir == null){
+            dir = FileSystemStorage.getInstance().getRoots()[0];
+        }
+        char separatpor = FileSystemStorage.getInstance().getFileSystemSeparator();
+        if(dir.endsWith("" + separatpor)){
+            return dir + System.currentTimeMillis();
+        }else{
+            return dir + separatpor + System.currentTimeMillis();            
+        }
     }
 
     public void sendMessage(String[] recieptents, String subject, Message msg) {
