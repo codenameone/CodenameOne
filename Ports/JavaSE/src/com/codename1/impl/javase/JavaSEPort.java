@@ -280,6 +280,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean subscriptionSupported;
     private boolean refundSupported;
 
+    private boolean includeHeaderInScreenshot = true;
+    
     public static void blockMonitors() {
         blockMonitors = true;
     }
@@ -1229,6 +1231,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         } else {
                             headerImage = headerLandscape;
                         }
+                        if(!includeHeaderInScreenshot) {
+                            headerImage = null;
+                        }
                         int headerHeight = 0;
                         if (headerImage != null) {
                             headerHeight = headerImage.getHeight();
@@ -1262,6 +1267,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
+
+            includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
+            final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
+            includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
+            includeHeaderMenu.setSelected(includeHeaderInScreenshot);
+            simulatorMenu.add(includeHeaderMenu);
+            includeHeaderMenu.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    includeHeaderInScreenshot = includeHeaderMenu.isSelected();
+                    pref.putBoolean("includeHeaderScreenshot", includeHeaderInScreenshot);
+                }
+            });
+            
 
             JMenuItem networkMonitor = new JMenuItem("Network Monitor");
             networkMonitor.addActionListener(new ActionListener() {
