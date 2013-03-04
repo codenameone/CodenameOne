@@ -31,6 +31,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
@@ -237,6 +238,7 @@ public class Component implements Animation, StyleListener {
     private String cloudBoundProperty;
     private String cloudDestinationProperty;
     boolean noBind;
+    private Runnable refreshTask;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -986,6 +988,11 @@ public class Component implements Animation, StyleListener {
         paintBackground(g);
 
         if (isScrollable()) {
+            if(refreshTask != null && (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
+                if(paintPullToRefresh(g)){
+                    return;
+                }
+            }
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             g.translate(-scrollX, -scrollY);
@@ -1044,6 +1051,27 @@ public class Component implements Animation, StyleListener {
             paintScrollbarY(g);
         }
     }
+    
+    private boolean paintPullToRefresh(Graphics g){
+        if (!dragActivated && scrollY == -getUIManager().getLookAndFeel().getPullToRefreshHeight()
+                && getClientProperty("$pullToRelease") != null 
+                && getClientProperty("$pullToRelease").equals("update")) {
+            
+                putClientProperty("$pullToRelease", "updating");
+                draggedMotionY = null;
+                //execute the task
+                Display.getInstance().invokeAndBlock(refreshTask);
+                //once the task has finished scroll to 0
+                startTensile(scrollY, 0, true);
+                putClientProperty("$pullToRelease", null);
+                return true;                        
+        }
+        boolean updating = getClientProperty("$pullToRelease") != null && 
+                getClientProperty("$pullToRelease").equals("updating");
+        getUIManager().getLookAndFeel().drawPullToRefresh(g, this, updating);
+        return false;
+    }
+    
 
     /**
      * Paints the UI for the scrollbar on the X axis, this method allows component
@@ -1162,7 +1190,8 @@ public class Component implements Animation, StyleListener {
         if (background) {
             paintBackgrounds(g);
         }
-
+        
+        
         g.translate(translateX, translateY);
         paintInternal(g);
         g.translate(-translateX, -translateY);
@@ -1852,6 +1881,10 @@ public class Component implements Animation, StyleListener {
         if(parent != null){
             parent.clearDrag();
         }
+        if (getClientProperty("$pullToRelease") != null
+                && !getClientProperty("$pullToRelease").equals("updating")) {
+            putClientProperty("$pullToRelease", null);
+        }
     }
 
     /**
@@ -2006,6 +2039,16 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * This method adds a refresh task to the Component, the task will be 
+     * executed if the user has pulled the scroll beyond a certain height.
+     * 
+     * @param task the refresh task to execute.
+     */ 
+    public void addPullToRefresh(Runnable task){
+        this.refreshTask = task;
+    }
+    
+    /**
      * If this Component is focused, the pointer dragged event
      * will call this method
      * 
@@ -2063,7 +2106,7 @@ public class Component implements Animation, StyleListener {
             // and pulling it in the reverse direction of the drag
             if (isScrollableY()) {
                 int tl;
-                if(getTensileLength() > -1) {
+                if(getTensileLength() > -1 && refreshTask == null) {
                     tl = getTensileLength();
                 } else {
                     tl = getHeight() / 2;
@@ -2072,6 +2115,7 @@ public class Component implements Animation, StyleListener {
                     tl = 0;
                 }
                 int scroll = getScrollY() + (lastScrollY - y);
+                
                 if(isAlwaysTensile() && getScrollDimension().getHeight() <= getHeight()) {
                     if (scroll >= -tl && scroll < getHeight() + tl) {
                         setScrollY(scroll);
@@ -2298,6 +2342,14 @@ public class Component implements Animation, StyleListener {
                 }
             } else {
                 if (scroll < 0) {
+                    if(refreshTask != null){
+                        putClientProperty("$pullToRelease", "normal");
+                        if(scroll < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
+                            putClientProperty("$pullToRelease", "update");                  
+                            startTensile(scroll, -getUIManager().getLookAndFeel().getPullToRefreshHeight(), true);
+                            return;
+                        }
+                    }
                     startTensile(scroll, 0, true);
                     return;
                 } else {
@@ -2808,6 +2860,11 @@ public class Component implements Animation, StyleListener {
         if(animateY || animateX){
             return true;
         }
+        
+        if(getClientProperty("$pullToRelease") != null){
+            return true;
+        }
+        
         
         Painter bgp = getStyle().getBgPainter();
         animateBackground = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();

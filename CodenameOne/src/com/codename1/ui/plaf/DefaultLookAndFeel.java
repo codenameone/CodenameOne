@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -36,8 +37,12 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.Font;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.util.Resources;
 
 /**
  * Used to render the default look of Codename One
@@ -52,6 +57,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] rButtonImagesFocus = null;
     private boolean tickWhenFocused = true;
     private char passwordChar = '\u25CF'; 
+    
+    //used for the pull to refresh feature
+    private Container pull;
+    private Component updating;
+    private Component pullDown;
+    private Component releaseToRefresh;
+    
     
     /** Creates a new instance of DefaultLookAndFeel */
     public DefaultLookAndFeel(UIManager manager) {
@@ -1490,6 +1502,95 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         g.drawLine(cursorX + x, cursorY, cursorX + x, cursorY + f.getHeight());
         g.setColor(oldColor);
     }
+     
+
+    /**
+     * @inheritDoc
+     */
+    public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
+        final int scrollY = cmp.getScrollY();
+        Component cmpToDraw;
+        if (taskExecuted) {
+            cmpToDraw = updating;
+        } else {
+            if (-scrollY > getPullToRefreshHeight()) {
+                cmpToDraw = releaseToRefresh;
+            } else {
+                cmpToDraw = pullDown;
+            }
+        }
+
+        if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) {
+            cmp.getComponentForm().registerAnimated(new Animation() {
+
+                int counter = 0;
+                Image i = Resources.getSystemResource().getImage("refresh-icon.png");
+ 
+                public boolean animate() {
+                    counter++;
+
+                    if (pull.getComponentAt(0) == releaseToRefresh) {
+                        ((Label) releaseToRefresh).setIcon(i.rotate(180 - (180 / 6)*counter));
+                    } else {
+                        ((Label) pullDown).setIcon(i.rotate(180 *counter/ 6));
+                    }
+                    if (counter == 6) {
+                        ((Label) releaseToRefresh).setIcon(i);
+                        ((Label) pullDown).setIcon(i.rotate(180));                        
+                        cmp.getComponentForm().deregisterAnimated(this);
+                    }
+                    return true;
+                }
+
+                public void paint(Graphics g) {
+                    cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(), 
+                            getPullToRefreshHeight());
+                }
+            });
+        }
+        pull.replace(pull.getComponentAt(0), cmpToDraw, null);
+
+        pull.setWidth(cmp.getWidth());
+        pull.setX(cmp.getAbsoluteX());
+        pull.setY(-scrollY - getPullToRefreshHeight());
+        pull.layoutContainer();
+        pull.paintComponent(g);
+
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int getPullToRefreshHeight() {
+        if (pull == null) {
+            BorderLayout bl = new BorderLayout();
+            bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+            pull = new Container(bl);
+        }
+        if (pullDown == null) {
+            pullDown = new Label(getUIManager().localize("pull.down", "Pull down do refresh..."));
+            pullDown.getStyle().setAlignment(Component.CENTER);
+            Image i = Resources.getSystemResource().getImage("refresh-icon.png");
+            i = i.rotate(180);
+            ((Label) pullDown).setIcon(i);
+        }
+        if (releaseToRefresh == null) {
+            releaseToRefresh = new Label(getUIManager().localize("pull.release", "Release to refresh..."));
+            releaseToRefresh.getStyle().setAlignment(Component.CENTER);
+            ((Label) releaseToRefresh).setIcon(Resources.getSystemResource().getImage("refresh-icon.png"));
+        }
+        if (updating == null) {
+            updating = new Container(new BoxLayout(BoxLayout.X_AXIS));
+            ((Container) updating).addComponent(new InfiniteProgress());
+            ((Container) updating).addComponent(new Label(getUIManager().localize("pull.refresh", "Updating...")));
+
+            pull.addComponent(BorderLayout.CENTER, updating);
+            pull.layoutContainer();
+            pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));
+        }
+        return pull.getHeight();
+    }
+     
 
     /**
      * @inheritDoc

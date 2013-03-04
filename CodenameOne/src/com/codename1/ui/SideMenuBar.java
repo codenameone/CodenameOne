@@ -210,7 +210,6 @@ public class SideMenuBar extends MenuBar {
                     ev =  new ActionEvent(cmd);
                 }
                 parent.actionCommandImpl(cmd, ev);
-                
             }
 
             @Override
@@ -218,8 +217,6 @@ public class SideMenuBar extends MenuBar {
                 closeMenu();
                 super.sizeChanged(w, h);
             }
-            
-            
         };
         
         m.setScrollable(false);
@@ -288,7 +285,7 @@ public class SideMenuBar extends MenuBar {
                     return;
                 }
                 int x = rightPanel.getX();
-                final Motion motion = Motion.createEaseInOutMotion(x, 0, 200);
+                final Motion motion = Motion.createEaseInOutMotion(x, 0, 300);
                 motion.start();
                 m.registerAnimated(new Animation() {
 
@@ -298,16 +295,18 @@ public class SideMenuBar extends MenuBar {
                         pos = motion.getValue();
                         if (motion.isFinished()) {
                             dragActivated = false;
-                            parent.setTransitionInAnimator(CommonTransitions.createEmpty());
-                            parent.show();
                         }
-                        return !motion.isFinished();
+                        return true;
                     }
 
                     public void paint(Graphics g) {
-                        rightPanel.setX(pos);
-                        rightPanel.setWidth(m.getWidth() - rightPanel.getX());
-                        rightPanel.repaint();
+                        Image i = rightPanel.getStyle().getBgImage();
+                        g.drawImage(i, pos, 0);
+                        if (pos == 0) {
+                            parent.setTransitionInAnimator(CommonTransitions.createEmpty());
+                            parent.show();
+                            m.deregisterAnimated(this);
+                        }
                     }
                 });
             }
@@ -339,6 +338,8 @@ public class SideMenuBar extends MenuBar {
                 rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
                 rightPanel.getStyle().setBgImage(buffer);
             } else {
+                Graphics g = buffer.getGraphics();
+                getDestination().paintComponent(g);
                 motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);
             }
             position = 0;
@@ -362,9 +363,7 @@ public class SideMenuBar extends MenuBar {
                 g.drawImage(buffer, position, 0);
             } else {
                 src.paintComponent(g, true);
-                g.translate(position, 0);
-                dest.paintComponent(g, true);
-                g.translate(-position, 0);
+                g.drawImage(buffer, position, 0);
             }
         }
     }

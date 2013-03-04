@@ -1350,4 +1350,18 @@ public abstract class LookAndFeel {
     public void setBackgroundImageDetermineSize(boolean backgroundImageDetermineSize) {
         this.backgroundImageDetermineSize = backgroundImageDetermineSize;
     }
+
+    /**
+     * Paints the pull to refresh 
+     * @param g graphics context
+     * @param cmp the Component which we draw the pull to refresh beneath it
+     * @param taskExecuted an indication if the refresh task is currently running
+     */ 
+    public abstract void drawPullToRefresh(Graphics g, Component cmp, boolean taskExecuted);
+    
+    /**
+     * Returns the required height of the pull to refresh feature
+     */ 
+    public abstract int getPullToRefreshHeight();
+    
 }
