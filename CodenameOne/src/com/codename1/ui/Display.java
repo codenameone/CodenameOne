@@ -275,7 +275,7 @@ public final class Display {
      */
     private boolean thirdSoftButton = false;
 
-    private boolean editingText;
+    private Component editingText;
 
     /**
      * Ignore all calls to show occurring during edit, they are discarded immediately
@@ -1138,7 +1138,7 @@ public final class Display {
             return;
         }
         
-        if(editingText) {
+        if(editingText != null) {
             switch(showDuringEdit) {
                 case SHOW_DURING_EDIT_ALLOW_DISCARD:
                     break;
@@ -1331,17 +1331,17 @@ public final class Display {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        editingText = true;
+        editingText = cmp;
         keyRepeatCharged = false;
         longPressCharged = false;
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         impl.editString(cmp, maxSize, constraint, text, initiatingKeycode);
-        editingText = false;
+        editingText = null;
     }
     
-    boolean isTextEditing() {
-        return editingText;
+    boolean isTextEditing(Component c) {
+        return editingText == c;
     }
 
     /**

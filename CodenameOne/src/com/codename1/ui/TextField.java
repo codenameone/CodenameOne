@@ -1448,7 +1448,7 @@ public class TextField extends TextArea {
         
         //the native input will show the string.
         if(useNativeTextInput && Display.getInstance().isNativeInputSupported() &&
-                Display.getInstance().isTextEditing() && hasFocus()) {
+                Display.getInstance().isTextEditing(this)) {
             return;
         }
 

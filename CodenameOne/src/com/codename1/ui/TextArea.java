@@ -972,7 +972,7 @@ public class TextArea extends Component {
     public void paint(Graphics g) {
         
         if(Display.getInstance().isNativeInputSupported() &&
-                Display.getInstance().isTextEditing() && hasFocus()) {
+                Display.getInstance().isTextEditing(this)) {
             return;
         }
         
@@ -981,7 +981,7 @@ public class TextArea extends Component {
     }
 
     void paintHint(Graphics g) {
-        if(Display.getInstance().isTextEditing() && hasFocus()) {
+        if(Display.getInstance().isTextEditing(this)) {
             return;
         }
         super.paintHint(g);

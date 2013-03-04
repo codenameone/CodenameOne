@@ -79,7 +79,11 @@ public class Ads extends Container implements HTMLCallback {
     public Ads() {
         setUIID("Ads");
         setLayout(new BorderLayout());
-        setFocusable(true);
+        
+        // special case for iOS. It seems the ad component can inadvertedly steal focus from 
+        // the text field being edited thus blocking the hiding of the lightweight text.
+        // I'm guessing this can affect Android too in some cases
+        setFocusable(!Display.getInstance().isTouchScreenDevice());
         Label filler = new Label(" ");
         filler.setPreferredSize(new Dimension(400, 2));
         filler.getStyle().setBgTransparency(0);
