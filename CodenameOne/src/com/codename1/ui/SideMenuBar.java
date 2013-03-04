@@ -281,7 +281,7 @@ public class SideMenuBar extends MenuBar {
         m.addPointerReleasedListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                if (!rightPanel.contains(evt.getX(), evt.getY())) {
+                if (!dragActivated) {
                     return;
                 }
                 int x = rightPanel.getX();
