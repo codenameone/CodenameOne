@@ -2084,6 +2084,10 @@ public class UIBuilder {
 
         if (backCommand != null) {
             newForm.setBackCommand(backCommand);
+
+            // trigger listener creation if this is the only command in the form
+            getFormListenerInstance(newForm, null);
+            
             for(int iter = 0 ; iter < currentForm.getCommandCount() ; iter++) {
                 if(backCommand == currentForm.getCommand(iter)) {
                     newForm.addCommand(backCommand, newForm.getCommandCount());
