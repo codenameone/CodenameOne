@@ -106,16 +106,16 @@ public class AndroidDB extends Database {
             for (int i = 0; i < params.length; i++) {
                 Object p = params[i];
                 if(p == null){
-                    s.bindNull(i);
+                    s.bindNull(i + 1);
                 }else{
                     if(p instanceof String){
                         s.bindString(i + 1, (String)p);                    
                     }else if(p instanceof byte[]){
-                        s.bindBlob(i, (byte [])p);
+                        s.bindBlob(i + 1, (byte [])p);
                     }else if(p instanceof Double){
-                        s.bindDouble(i, ((Double)p).doubleValue());
+                        s.bindDouble(i + 1, ((Double)p).doubleValue());
                     }else if(p instanceof Long){
-                        s.bindLong(i, ((Long)p).longValue());
+                        s.bindLong(i + 1, ((Long)p).longValue());
                     }
                 }
             }
