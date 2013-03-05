@@ -455,7 +455,13 @@ public class UIBuilder {
         } else {
             btn = ((Button)c);
         }
+        boolean e = btn.isEnabled();
         btn.setCommand(cmd);
+        
+        // special case since setting the command implicitly gets the enabled state from the command
+        if(!e) {
+            btn.setEnabled(false);
+        }
 
         // prevent duplicate action handling only in the case of a component form
         // the embeded component doesn't have a global command listener since it has
