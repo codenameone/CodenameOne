@@ -237,6 +237,13 @@ public class Container extends Component {
             shouldLayout = layout;
             shouldCalcPreferredSize = layout;
             shouldCalcScrollSize = layout;
+            int size = components.size();
+            for(int iter = 0 ; iter < size ; iter++) {
+                Component cmp = (Component) components.elementAt(iter);
+                if(cmp instanceof Container){
+                    cmp.setShouldCalcPreferredSize(shouldCalcPreferredSize);
+                }
+            }
             Container parent = getParent();
             if(parent != null){
                 parent.setShouldLayout(layout);
