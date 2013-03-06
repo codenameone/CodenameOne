@@ -1397,9 +1397,9 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    int horizontal = 3;
+    int horizontal = 2;
     if(n7) {
-        horizontal = 2;
+        horizontal = 3;
     }
     DrawGradient* d = [[DrawGradient alloc] initWithArgs:horizontal startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
     [CodenameOne_GLViewController upcoming:d];
@@ -2805,7 +2805,12 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSHTTPCookieStorage *cstore = [NSHTTPCookieStorage sharedHTTPCookieStorage];
 
-    NSURL *url = [NSURL URLWithString:toNSString(urlStr)];
+    NSString* nsStr = toNSString(urlStr);
+    NSURL *url = [NSURL URLWithString:nsStr];
+    if(url == nil) {
+        NSLog(@"Invalid URL! You need to escape the characters of the URL in order for it work properly! %@", nsStr);
+        return;
+    }
     NSArray *cookies = [cstore cookiesForURL:url];
     int count = cookies.count;
     for(int iter = 0 ; iter < count ; iter++) {
