@@ -117,6 +117,7 @@ public class AndroidContactsManager {
             while (pCur.moveToNext()) {
                 String type = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));
                 String phone = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                boolean isPrimary = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.IS_PRIMARY)) != 0;
                 if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME).equals(type)) {
                     type = "home";
                 } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).equals(type)) {
@@ -127,6 +128,9 @@ public class AndroidContactsManager {
                     type = "fax";
                 } else {
                     type = "other";
+                }
+                if(isPrimary){
+                    retVal.setPrimaryPhoneNumber(phone);
                 }
                 phones.put(type, phone);
             }
@@ -148,6 +152,8 @@ public class AndroidContactsManager {
                     emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));
             String type = emailCur.getString(
                     emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE));
+            boolean isPrimary = emailCur.getInt(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.IS_PRIMARY)) != 0;
+
             if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_HOME).equals(type)) {
                 type = "home";
             } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_MOBILE).equals(type)) {
@@ -156,6 +162,9 @@ public class AndroidContactsManager {
                 type = "work";
             } else {
                 type = "other";
+            }
+            if(isPrimary){
+                retVal.setPrimaryEmail(email);
             }
             emails.put(type, email);
         }
