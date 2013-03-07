@@ -232,11 +232,7 @@ public class Ads extends Container implements HTMLCallback {
 
         html.setHTMLCallback(this);
         html.setBodyText("<html><body><div align='center'>" + ad + "</div></body></html>");
-        if (isInitialized()) {
-            replaceAndWait(getComponentAt(0), html, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
-        } else {
-            replace(getComponentAt(0), html, null);
-        }
+        replace(getComponentAt(0), html, null);
         revalidate();
         html.setPageUIID("Container");
         html.getStyle().setBgTransparency(0);
