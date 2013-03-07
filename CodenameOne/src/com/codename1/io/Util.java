@@ -278,6 +278,7 @@ public class Util {
         }
         
         if (o instanceof EncodedImage) {
+            out.writeUTF("EncodedImage");
             EncodedImage e = (EncodedImage)o;
             out.writeInt(e.getWidth());
             out.writeInt(e.getHeight());

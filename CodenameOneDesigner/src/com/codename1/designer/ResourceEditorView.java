@@ -2277,7 +2277,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                                     return null;
                                 }
                             };
-                            b.createContainer(loadedResources, currentResourceName);
+                            b.createContainer(er, currentResourceName);
                         }
                     } catch(IOException ioErr) {
                         ioErr.printStackTrace();
