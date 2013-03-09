@@ -1231,6 +1231,21 @@ bool lockDrawing;
     if(firstTime) {
         return;
     }
+    if(editingComponent != nil) {
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            UITextView* v = (UITextView*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        } else {
+            UITextField* v = (UITextView*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        }
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+        [editingComponent release];
+        editingComponent = nil;
+        displayWidth = (int)self.view.bounds.size.width * scaleValue;
+        displayHeight = (int)self.view.bounds.size.height * scaleValue;
+    }
     @synchronized([CodenameOne_GLViewController instance]) {
         [currentTarget removeAllObjects];
         lockDrawing = YES;
@@ -1307,21 +1322,6 @@ bool lockDrawing;
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
-    if(editingComponent != nil) {
-        if([editingComponent isKindOfClass:[UITextView class]]) {
-            UITextView* v = (UITextView*)editingComponent;
-            stringEdit(YES, -1, v.text);
-        } else {
-            UITextField* v = (UITextView*)editingComponent;
-            stringEdit(YES, -1, v.text);
-        }
-        [editingComponent resignFirstResponder];
-        [editingComponent removeFromSuperview];
-        [editingComponent release];
-        editingComponent = nil;
-        displayWidth = (int)self.view.bounds.size.width * scaleValue;
-        displayHeight = (int)self.view.bounds.size.height * scaleValue;
-    }
     lockDrawing = NO;
     screenSizeChanged(displayWidth, displayHeight);
 }
