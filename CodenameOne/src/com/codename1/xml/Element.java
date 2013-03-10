@@ -123,7 +123,7 @@ public class Element {
      *
      * @return the attributes Hashtable
      */
-    protected Hashtable getAttributes() {
+    public Hashtable getAttributes() {
         return attributes;
     }
 

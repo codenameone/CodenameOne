@@ -44,6 +44,7 @@ package com.codename1.processing;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -98,7 +99,8 @@ public class Result {
 	private static final Object SELECT_PARENT = "..";
 
 	private StructuredContent root;
-
+        private Hashtable namespaceAliases;
+        
 	/**
 	 * Internal method, do not use.
 	 * 
@@ -505,7 +507,7 @@ public class Result {
 	 * @throws IllegalArgumentException
 	 */
 	private Object _internalGet(final String path) throws IllegalArgumentException {
-		final Vector tokens = new ResultTokenizer(path).tokenize();
+		final Vector tokens = new ResultTokenizer(path).tokenize(namespaceAliases);
 		final StructuredContent obj = apply(root, tokens, 0);
 		if (obj == null) {
 			return null;
@@ -821,7 +823,7 @@ public class Result {
 	 */
 	private Vector _internalGetAsArray(final String path)
 			throws IllegalArgumentException {
-		final Vector tokens = new ResultTokenizer(path).tokenize();
+		final Vector tokens = new ResultTokenizer(path).tokenize(namespaceAliases);
 		if (tokens.isEmpty()) {
 			return new Vector();
 		}
@@ -968,4 +970,25 @@ public class Result {
 
 		return start;
 	}
+        
+    public void mapNamespaceAlias(String namespaceURI, String alias) {
+        Hashtable attributes = root.getChild(0).getAttributes();
+        if (attributes == null) {
+            return;
+        }
+        Enumeration e = attributes.keys();
+        while (e.hasMoreElements()) {
+            String key = (String)e.nextElement();
+            if (key.startsWith("xmlns:") == false) {
+                continue;
+            }
+            if (namespaceURI.equals(attributes.get(key))) {
+                if (namespaceAliases == null) {
+                    namespaceAliases = new Hashtable();
+                }
+                namespaceAliases.put(alias, key.substring(6));
+                break;
+            }
+        }
+    }        
 }

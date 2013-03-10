@@ -22,6 +22,7 @@
  */
 package com.codename1.processing;
 
+import java.util.Hashtable;
 import java.util.Vector;
 
 /**
@@ -70,6 +71,14 @@ interface StructuredContent {
 	 */
 	public String getAttribute(String name);
 
+        /**
+         * Select all attributes from the current node.
+         *
+         * @return all attributes, or null if no attributes are
+         * present.
+         */
+        public Hashtable getAttributes();
+        
 	/**
 	 * Select the parent of the current node.
 	 * 

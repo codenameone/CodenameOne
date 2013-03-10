@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Enumeration;
+import java.util.Hashtable;
 import java.util.Vector;
 
 import com.codename1.xml.Element;
@@ -122,6 +123,13 @@ class XMLContent implements StructuredContent {
 		return root.getAttribute(name);
 	}
 
+        /* (non-Javadoc)
+         * @see com.codename1.processing.StructuredContent#getAttributes()
+         */
+        public Hashtable getAttributes() {
+            return root.getAttributes();
+        }        
+        
 	/* (non-Javadoc)
 	 * @see com.codename1.processing.StructuredContent#getParent()
 	 */

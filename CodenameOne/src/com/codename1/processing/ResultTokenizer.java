@@ -38,6 +38,8 @@ Derivative Revision History:
 
 package com.codename1.processing;
 
+import java.util.Enumeration;
+import java.util.Hashtable;
 import java.util.Vector;
 
 /**
@@ -67,10 +69,17 @@ class ResultTokenizer {
         predicate = false;
     }
     
-    Vector tokenize() {
+    Vector tokenize(Hashtable namespaceAliases) {
         final Vector tokens = new Vector();
         String tok;
+        int i;
         for (pos = 0, tok = next(); !"".equals(tok); tok = next()) {
+            if (namespaceAliases != null && ((i = tok.indexOf(':')) != -1)) {
+                String mapto = (String)namespaceAliases.get(tok.substring(0, i));
+                if (mapto != null) {
+                    tok = mapto + tok.substring(i);
+                }
+            }
             tokens.addElement(tok);
         }
         return tokens;

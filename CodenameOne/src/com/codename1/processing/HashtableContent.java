@@ -275,12 +275,18 @@ class HashtableContent implements StructuredContent {
 	 * @see com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
 	 */
 	public String getAttribute(String name) {
-		if (root instanceof Hashtable) {
-			((Hashtable) root).get(name);
-		}
-		return null;
+            return null;
 	}
 
+        /*
+         * (non-Javadoc)
+         *
+         * @see com.codename1.processing.StructuredContent#getAttributes()
+         */
+        public Hashtable getAttributes() {
+            return null;
+        }
+        
 	/*
 	 * (non-Javadoc)
 	 * 
