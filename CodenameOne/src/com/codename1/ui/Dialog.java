@@ -938,14 +938,9 @@ public class Dialog extends Form {
                 }
             }
 
-            // for the special case of one command map it to the back button
-            if(cmds.length == 1) {
+            // maps the first command to back
+            if(cmds.length == 1 || cmds.length == 2) {
                 dialog.setBackCommand(cmds[0]);
-            } else {
-                // maps the second command to back
-                if(cmds.length == 2) {
-                    dialog.setBackCommand(cmds[1]);
-                }
             }
         }
         if(defaultCommand != null) {
