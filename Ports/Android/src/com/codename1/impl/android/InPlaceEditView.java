@@ -556,6 +556,16 @@ public class InPlaceEditView extends FrameLayout {
         }
 
         @Override
+        public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false);
+                return true;
+            }
+            return super.onKeyPreIme(keyCode, event);
+        }
+
+        
+        @Override
         public boolean onKeyDown(int keyCode, KeyEvent event) {
             // If the user presses the back button, or the menu button
             // we must terminate editing, to allow EDT to handle events
@@ -564,7 +574,6 @@ public class InPlaceEditView extends FrameLayout {
                     || keyCode == KeyEvent.KEYCODE_MENU) {
                 endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false);
             }
-
             return super.onKeyDown(keyCode, event);
         }
     }
