@@ -320,10 +320,10 @@ public class InPlaceEditView extends FrameLayout {
             showVirtualKeyboard(false);
         }
         mIsEditing = false;
-        mTextArea = null;
         mLastEditText = mEditText.getText().toString();
         removeView(mEditText);
         mEditText = null;
+        mTextArea = null;
     }
 
     /**
@@ -353,7 +353,7 @@ public class InPlaceEditView extends FrameLayout {
      * @param actionCode
      */
     void onEditorAction(int actionCode) {
-        if (actionCode == EditorInfo.IME_ACTION_NEXT) {
+        if (actionCode == EditorInfo.IME_ACTION_NEXT && mTextArea != null) {
             Component next = mTextArea.getNextFocusDown();
             if (next == null) {
                 next = mTextArea.getComponentForm().findNextFocusVertical(true);
