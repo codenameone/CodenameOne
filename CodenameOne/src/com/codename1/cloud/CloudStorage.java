@@ -964,7 +964,7 @@ public class CloudStorage {
                     Object o = storageQueue.elementAt(iter);
                     if(o instanceof CloudObject) {
                         CloudObject c = (CloudObject)o;
-                        if(c.getObjectId() == null) {
+                        if(c.getCloudId() == null) {
                             c.setCloudId(di.readUTF());
                         }
                         c.setLastModified(timeStamp);
