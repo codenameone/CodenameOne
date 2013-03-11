@@ -11,6 +11,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
@@ -34,6 +35,7 @@ public class SideMenuBar extends MenuBar {
     private Transition in;
     private Transition out;
     private Container sidePanel;
+    private int draggedX;
 
     /**
      * Empty Constructor
@@ -63,10 +65,10 @@ public class SideMenuBar extends MenuBar {
         openButton = new Button();
         openButton.setUIID("MenuButton");
         Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
-        if(i != null){
-            openButton.setIcon(i);                
-        }else{
-            openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));        
+        if (i != null) {
+            openButton.setIcon(i);
+        } else {
+            openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
         }
         openButton.addActionListener(new ActionListener() {
 
@@ -125,7 +127,7 @@ public class SideMenuBar extends MenuBar {
      */
     public void closeMenu() {
         if (Display.getInstance().getCurrent() == menu) {
-            parent.show();
+            parent.showBack();
         }
     }
 
@@ -152,6 +154,26 @@ public class SideMenuBar extends MenuBar {
         parent.setTransitionInAnimator(in);
         out = null;
         in = null;
+    }
+
+    private void setMenuGlassPane(Form m) {
+        final boolean isRTL = m.isRTL();
+        final Image i = rightPanel.getStyle().getBgImage();
+
+        if (m.getGlassPane() == null) {
+            m.setGlassPane(new Painter() {
+
+                public void paint(Graphics g, Rectangle rect) {
+                    if (isRTL) {
+                        g.drawImage(i, Math.max(draggedX, rightPanel.getWidth()) - i.getWidth(), 0);
+                    } else {
+                        g.drawImage(i, Math.min(draggedX, rightPanel.getX()), 0);
+                    }
+                }
+            });
+        }
+
+
     }
 
     /**
@@ -190,10 +212,10 @@ public class SideMenuBar extends MenuBar {
      * @inheritDoc
      */
     protected Button createTouchCommandButton(final Command c) {
-        
+
         CommandWrapper wrapper = new CommandWrapper(c);
         Button b = super.createTouchCommandButton(wrapper);
-        if(c.getIcon() == null){
+        if (c.getIcon() == null) {
             b.setIcon(null);
         }
         b.setTextPosition(Label.RIGHT);
@@ -205,20 +227,71 @@ public class SideMenuBar extends MenuBar {
         final Form m = new Form() {
 
             void actionCommandImpl(Command cmd, ActionEvent ev) {
-                if(cmd instanceof CommandWrapper){
-                    cmd = ((CommandWrapper)cmd).cmd;
-                    ev =  new ActionEvent(cmd);
+                if (cmd instanceof CommandWrapper) {
+                    cmd = ((CommandWrapper) cmd).cmd;
+                    ev = new ActionEvent(cmd);
                 }
                 parent.actionCommandImpl(cmd, ev);
             }
 
-            @Override
             protected void sizeChanged(int w, int h) {
                 closeMenu();
                 super.sizeChanged(w, h);
             }
+
+            public void pointerPressed(int x, int y) {
+                super.pointerPressed(x, y);
+                if (rightPanel.contains(x, y)) {
+                    dragActivated = true;
+                }
+            }
+
+            public void pointerDragged(int[] x, int[] y) {
+                if (dragActivated) {
+                    setMenuGlassPane(menu);
+                    draggedX = x[0];
+                    repaint();
+                    return;
+                }
+                super.pointerDragged(x, y);
+            }
+            
+            public void pointerReleased(int x, int y) {
+                super.pointerReleased(x, y);
+                if (dragActivated || rightPanel.contains(x, y)) {
+                    setMenuGlassPane(menu);
+                    draggedX = x;
+                    int start = x;
+                    int end = 0;
+                    if (isRTL()) {
+                        end = getWidth();
+                    }
+                    final Motion motion = Motion.createEaseInOutMotion(start, end, 300);
+                    motion.start();
+                    registerAnimated(new Animation() {
+
+                        public boolean animate() {
+                            draggedX = motion.getValue();
+                            if (motion.isFinished()) {
+                                dragActivated = false;
+                            }
+                            return true;
+                        }
+
+                        public void paint(Graphics g) {
+                            repaint();
+                            if (draggedX == motion.getDestinationValue() && motion.isFinished()) {
+                                parent.setTransitionInAnimator(CommonTransitions.createEmpty());
+                                parent.show();
+                                deregisterAnimated(this);
+                            }
+
+                        }
+                    });
+                }
+            }
         };
-        
+
         m.setScrollable(false);
         m.removeComponentFromForm(m.getTitleArea());
         m.putClientProperty("Menu", "true");
@@ -230,23 +303,22 @@ public class SideMenuBar extends MenuBar {
                 closeMenu();
             }
         });
-        BorderLayout bl = new BorderLayout();
-        m.setLayout(bl);
+        m.setLayout(new BorderLayout());
         rightPanel = new Container(new BorderLayout());
-        
-        
-        if(Display.getInstance().isPortrait()){
-            if(Display.getInstance().isTablet()){
-                rightPanel.setPreferredW(m.getWidth()*2/3);
-            }else{
-                rightPanel.setPreferredW(openButton.getWidth());            
+
+
+        if (Display.getInstance().isPortrait()) {
+            if (Display.getInstance().isTablet()) {
+                rightPanel.setPreferredW(m.getWidth() * 2 / 3);
+            } else {
+                rightPanel.setPreferredW(openButton.getWidth());
             }
-        }else{
-            if(Display.getInstance().isTablet()){
-                rightPanel.setPreferredW(m.getWidth()*3/4);
-            }else{
-                rightPanel.setPreferredW(m.getWidth()*4/10);            
-            }            
+        } else {
+            if (Display.getInstance().isTablet()) {
+                rightPanel.setPreferredW(m.getWidth() * 3 / 4);
+            } else {
+                rightPanel.setPreferredW(m.getWidth() * 4 / 10);
+            }
         }
         if (sidePanel != null) {
             sidePanel.removeAll();
@@ -255,62 +327,6 @@ public class SideMenuBar extends MenuBar {
         sidePanel = createSideNavigationComponent(getCommands());
         m.addComponent(BorderLayout.CENTER, sidePanel);
         m.addComponent(BorderLayout.EAST, rightPanel);
-        m.addPointerPressedListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (rightPanel.contains(evt.getX(), evt.getY())) {
-                    dragActivated = true;
-                }
-            }
-        });
-        m.addPointerDraggedListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (dragActivated) {
-                    int x = rightPanel.getX();
-                    rightPanel.setX(Math.min(evt.getX(), sidePanel.getWidth()));
-                    rightPanel.setWidth(m.getWidth() - rightPanel.getX());
-                    if (x > rightPanel.getX()) {
-                        rightPanel.repaint();
-                    } else {
-                        m.repaint();
-                    }
-                }
-            }
-        });
-        m.addPointerReleasedListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!dragActivated) {
-                    return;
-                }
-                int x = rightPanel.getX();
-                final Motion motion = Motion.createEaseInOutMotion(x, 0, 300);
-                motion.start();
-                m.registerAnimated(new Animation() {
-
-                    int pos;
-
-                    public boolean animate() {
-                        pos = motion.getValue();
-                        if (motion.isFinished()) {
-                            dragActivated = false;
-                        }
-                        return true;
-                    }
-
-                    public void paint(Graphics g) {
-                        Image i = rightPanel.getStyle().getBgImage();
-                        g.drawImage(i, pos, 0);
-                        if (pos == 0) {
-                            parent.setTransitionInAnimator(CommonTransitions.createEmpty());
-                            parent.show();
-                            m.deregisterAnimated(this);
-                        }
-                    }
-                });
-            }
-        });
 
         return m;
     }
@@ -326,23 +342,29 @@ public class SideMenuBar extends MenuBar {
         public MenuTransition(int speed, boolean fwd) {
             this.speed = speed;
             this.fwd = fwd;
+
         }
 
         public void initTransition() {
             super.initTransition();
             buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+            boolean isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
             if (fwd) {
                 Graphics g = buffer.getGraphics();
                 getSource().paintComponent(g);
                 motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);
-                rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
-                rightPanel.getStyle().setBgImage(buffer);
             } else {
                 Graphics g = buffer.getGraphics();
                 getDestination().paintComponent(g);
                 motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);
             }
-            position = 0;
+            if (isRTL) {
+                rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT);
+            } else {
+                rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
+            }
+            rightPanel.getStyle().setBgImage(buffer);
+
             motion.start();
         }
 
@@ -358,6 +380,9 @@ public class SideMenuBar extends MenuBar {
         public void paint(Graphics g) {
             Component src = getSource();
             Component dest = getDestination();
+            if (src.isRTL()) {
+                position = position * -1;
+            }
             if (fwd) {
                 dest.paintComponent(g, true);
                 g.drawImage(buffer, position, 0);
