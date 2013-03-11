@@ -32,7 +32,7 @@ import java.io.IOException;
  */
 public abstract class LocationManager {
     
-    private LocationListener listener;
+    private static LocationListener listener;
 
     public static int AVAILABLE = 0;
     
@@ -87,10 +87,10 @@ public abstract class LocationManager {
      * from getting updates
      */
     public void setLocationListener(final LocationListener l) {
-        if(this.listener != null){
+        if(listener != null){
             clearListener();
         }
-        this.listener = l;
+        listener = l;
         if(l == null){
             return;
         }
