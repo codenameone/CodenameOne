@@ -27,10 +27,17 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     private String bestProvider;
     private Context context;
     private boolean searchForProvider = false;
-    
-    public AndroidLocationManager(Object ctx) {
-        this.context = (Context) ctx;
+    private static AndroidLocationManager instance;
+    private AndroidLocationManager(Context ctx) {
+        this.context = ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+    }
+    
+    static AndroidLocationManager getInstance(Context context){
+        if(instance == null){
+            instance = new AndroidLocationManager(context);
+        }
+        return instance;
     }
     
     private void findBestProvider(boolean includeNetwork){

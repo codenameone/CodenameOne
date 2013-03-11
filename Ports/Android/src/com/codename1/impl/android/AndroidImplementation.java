@@ -3329,7 +3329,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        return new AndroidLocationManager(activity);
+        return AndroidLocationManager.getInstance(activity);
     }
 
     /**
