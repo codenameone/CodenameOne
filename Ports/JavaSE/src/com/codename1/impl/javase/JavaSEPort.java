@@ -553,7 +553,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                 g.setColor(Color.WHITE);
                 g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
                 g.fillRect(x, y + (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
-                g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                if(isEnabled()){
+                    g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                }else{
+                    java.awt.Graphics g1 = buffer.getGraphics();
+                    g1.setColor(Color.WHITE);
+                    g1.fillRect(0, 0, buffer.getWidth(), buffer.getHeight());                    
+                    g1.setColor(Color.BLACK);  
+                   
+                    java.awt.Font f = new java.awt.Font("Arial", Font.STYLE_BOLD, 20);
+                    g1.setFont(f);
+                    g1.drawString("Paused", buffer.getWidth()/2 - stringWidth(f, "Paused")/2, buffer.getHeight()/2 - f.getSize()/2);
+                    g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                }
                 updateGraphicsScale(g);
                 g.drawImage(getSkin(), x, y, this);
             } else {
@@ -564,7 +576,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void paintComponent(java.awt.Graphics g) {
             super.paintComponent(g);            
             if (buffer != null) {
-                //g = getGraphics();
                 drawScreenBuffer(g);
                 updateBufferSize();
                 if (Display.getInstance().isInitialized()) {
@@ -652,6 +663,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyPressed(KeyEvent e) {
+            if(!isEnabled()){
+                return;
+            }
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -664,6 +678,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
+            if(!isEnabled()){
+                return;
+            }
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -696,6 +713,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mousePressed(MouseEvent e) {
             e.consume();
+            if(!isEnabled()){
+                return;
+            }
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
@@ -746,6 +766,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseReleased(MouseEvent e) {
             e.consume();
+            if(!isEnabled()){
+                return;
+            }
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -778,6 +801,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseDragged(MouseEvent e) {
             e.consume();
+            if(!isEnabled()){
+                return;
+            }
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -806,6 +832,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseMoved(MouseEvent e) {
             e.consume();
+            if(!isEnabled()){
+                return;
+            }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                 if (getSkinHotspots().containsKey(p)) {
@@ -1474,8 +1503,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
             });
+            
+            final JMenuItem pause = new JMenuItem("Pause App");
+            simulatorMenu.add(pause);
+            pause.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if(pause.getText().startsWith("Pause")){
+                        Executor.stopApp();
+                        canvas.setEnabled(false);
+                        pause.setText("Resume App");
+                    }else{
+                        Executor.startApp();    
+                        canvas.setEnabled(true);
+                        pause.setText("Pause App");
+                    }
+                }
+            });
 
             simulatorMenu.addSeparator();
+            
+            
             JMenuItem exit = new JMenuItem("Exit");
             simulatorMenu.add(exit);
             

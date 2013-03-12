@@ -37,8 +37,12 @@ import java.util.Properties;
  * @author Shai Almog
  */
 public class Executor {
+    
+    private static Class c;
+    private static Object app;
+    
     public static void main(final String[] argv) throws Exception {
-        final Class c = Class.forName(argv[0]);
+        c = Class.forName(argv[0]);
         try {
             Method m = c.getDeclaredMethod("main", String[].class);
             m.invoke(null, new Object[]{null});
@@ -51,19 +55,19 @@ public class Executor {
                     Display.deinitialize();
                 }
                 final Method m = c.getDeclaredMethod("init", Object.class);
-                final Object o = c.newInstance();
-                if(o instanceof PushCallback) {
-                    CodenameOneImplementation.setPushCallback((PushCallback)o);
+                app = c.newInstance();
+                if(app instanceof PushCallback) {
+                    CodenameOneImplementation.setPushCallback((PushCallback)app);
                 }
-                if(o instanceof PurchaseCallback) {
-                    CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)o);
+                if(app instanceof PurchaseCallback) {
+                    CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
                 }
                 Display.init(null);
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            m.invoke(o, new Object[]{null});
+                            m.invoke(app, new Object[]{null});
                             String currentDir = System.getProperty("user.dir");
                             File props = new File(currentDir, "codenameone_settings.properties");
                             if(props.exists()) {
@@ -88,7 +92,7 @@ public class Executor {
                                 }
                             }
                             Method start = c.getDeclaredMethod("start", new Class[0]);
-                            start.invoke(o, new Object[0]);
+                            start.invoke(app, new Object[0]);
                         } catch (NoSuchMethodException err) {
                             System.out.println("Couldn't find a main or a startup in " + argv[0]);
                         } catch (Exception err) {
@@ -101,4 +105,27 @@ public class Executor {
         }
     }
 
+    public static void stopApp(){
+        if(c != null && app != null){
+            try {
+                Method stop = c.getDeclaredMethod("stop", new Class[0]);
+                stop.invoke(app, new Object[0]);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } 
+        }
+    }
+    
+    public static void startApp(){
+        if(c != null && app != null){
+            try {
+                Method start = c.getDeclaredMethod("start", new Class[0]);
+                start.invoke(app, new Object[0]);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } 
+        }
+    
+    }
+    
 }
