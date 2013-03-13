@@ -216,6 +216,9 @@ public class EncodedImage extends Image {
         try {
             byte[] b = getImageData();
             i = Image.createImage(b, 0, b.length);
+            if(opaqueChecked) {
+                i.setOpaque(opaque);
+            }
             CodenameOneImplementation impl = Display.getInstance().getImplementation();
             impl.setImageName(i.getImage(), getImageName());
         } catch(Exception err) {
