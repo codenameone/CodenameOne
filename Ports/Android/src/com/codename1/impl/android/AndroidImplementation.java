@@ -285,16 +285,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
         activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        if (isTablet()) {
+        /*if (isTablet()) {
             if(getDisplayWidth() > 1400) {
                 return Display.DENSITY_VERY_HIGH;
             }
             return Display.DENSITY_MEDIUM;
-        }
+        }*/
         switch (metrics.densityDpi) {
             case DisplayMetrics.DENSITY_LOW:
                 return Display.DENSITY_LOW;
             case DisplayMetrics.DENSITY_HIGH:
+            case 213: // DENSITY_TV 
                 return Display.DENSITY_HIGH;
             case DisplayMetrics.DENSITY_XHIGH:
                 return Display.DENSITY_VERY_HIGH;
