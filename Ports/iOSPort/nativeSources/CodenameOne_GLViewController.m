@@ -561,15 +561,21 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
     pSize *= scaleValue;
     
     UIFont* fnt;
-    // bold
-    if((style & 1) == 1) {
-        fnt = [UIFont boldSystemFontOfSize:pSize];
+    
+    // if this is a monospace font
+    if((style & 32) == 32) {
+        fnt = [UIFont fontWithName:@"Courier" size:pSize];
     } else {
-        // italic
-        if((style & 2) == 2) {
-            fnt = [UIFont italicSystemFontOfSize:pSize];
+        // bold
+        if((style & 1) == 1) {
+            fnt = [UIFont boldSystemFontOfSize:pSize];
         } else {
-            fnt = [UIFont systemFontOfSize:pSize];
+            // italic
+            if((style & 2) == 2) {
+                fnt = [UIFont italicSystemFontOfSize:pSize];
+            } else {
+                fnt = [UIFont systemFontOfSize:pSize];
+            }
         }
     }
     [fnt retain];
