@@ -294,4 +294,14 @@ public class VServAds extends FullScreenAdService {
     public void setZoneId(String zoneId) {
         this.zoneId = zoneId;
     }
+
+
+    /**
+     * @inheritDoc
+     */
+    public boolean isAllowSkipping() {
+        return true;
+    }
+    
+    
 }
