@@ -44,6 +44,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.MathUtil;
 
+
 /**
  * All communication with the map and layers should be done in WGS84, it takes
  * care of coordinates transformation.
@@ -236,7 +237,7 @@ public class MapComponent extends Container {
         refreshLayers = true;
         _needTiles = true;
         buffer = null;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -270,7 +271,7 @@ public class MapComponent extends Container {
         translateY += (draggedy - y);
         draggedx = x;
         draggedy = y;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -313,7 +314,7 @@ public class MapComponent extends Container {
                 scaleX = (int) (scale * scaleX);
                 scaleY = (int) (scale * scaleY);
                 oldDistance = currentDis;
-                repaint();
+                super.repaint();
             }
         } else {
             super.pointerDragged(x, y);
@@ -375,7 +376,7 @@ public class MapComponent extends Container {
                 buffer.dispose();
                 buffer = null;
             }
-            repaint();
+            super.repaint();
             return;
         }
         Coord scale = _map.scale(_zoom);
@@ -400,7 +401,7 @@ public class MapComponent extends Container {
                 ((PointsLayer) layer.layer).fireActionEvent(bbox);
             }
         }
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -463,7 +464,7 @@ public class MapComponent extends Container {
         if (_center != oldCenter || _zoom != oldZoom) {
             _needTiles = true;
         }
-        repaint();
+        super.repaint();
     }
 
     private void paintmap(Graphics g) {
@@ -600,7 +601,7 @@ public class MapComponent extends Container {
     public void addLayer(Layer layer, int minZoomLevel, int maxZoomLevel) {
         _layers.addElement(new LayerWithZoomLevels(layer, minZoomLevel, maxZoomLevel));
         refreshLayers = true;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -618,7 +619,7 @@ public class MapComponent extends Container {
         }
         _layers.removeElementAt(no);
         refreshLayers = true;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -627,7 +628,7 @@ public class MapComponent extends Container {
     public void removeAllLayers() {
         _layers.removeAllElements();
         refreshLayers = true;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -657,6 +658,15 @@ public class MapComponent extends Container {
     public MapProvider getProvider() {
         return _map;
     }
+
+    @Override
+    public void repaint() {
+        refreshLayers = true;
+        _needTiles = true;
+        super.repaint();
+    }
+    
+    
 
     /**
      * move the map 25% left
@@ -740,7 +750,7 @@ public class MapComponent extends Container {
         _zoom = _map.maxZoomFor(tile);
         _center = tile.position(tile.dimension().getWidth() / 2, tile.dimension().getHeight() / 2);
         _needTiles = true;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -758,7 +768,7 @@ public class MapComponent extends Container {
         _center = _map.projection().fromWGS84(coord);
         _zoom = zoomLevel;
         _needTiles = true;
-        repaint();
+        super.repaint();
     }
 
     /**
@@ -814,7 +824,7 @@ public class MapComponent extends Container {
         if (zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
             _zoom = zoom;
             _needTiles = true;
-            repaint();
+            super.repaint();
         } else {
             System.out.println("zoom level must be bigger then the min zoom "
                     + "level and smaller then the max zoom level");
@@ -955,7 +965,7 @@ public class MapComponent extends Container {
         if (Double.isNaN(latitude) && Double.isNaN(longitude)) {
             _center = _map.projection().fromWGS84(new Coord(latitude, longitude));
             _needTiles = true;
-            repaint();
+            super.repaint();
         }
     }
 
@@ -1008,7 +1018,6 @@ public class MapComponent extends Container {
         return super.setPropertyValue(name, value);
     }
 }
-
 class LayerWithZoomLevels {
 
     public Layer layer;
