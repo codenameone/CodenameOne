@@ -372,7 +372,7 @@ public class Table extends Container {
         } else {
             s = c.getUnselectedStyle();
         }
-        s.setBgTransparency(0);
+        //s.setBgTransparency(0);
         //s.setMargin(0, 0, 0, 0);
         s.setMargin(verticalBorderSpacing, verticalBorderSpacing, horizontalBorderSpacing, horizontalBorderSpacing);
         return c;
