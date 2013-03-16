@@ -4587,6 +4587,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public String getDatabasePath(String databaseName) {
+        return getStorageDir() + "/database/" + databaseName;
+    }
+
+    @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
         try {
             // Load the HSQL Database Engine JDBC driver
