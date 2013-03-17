@@ -600,7 +600,9 @@ public class ImageDownloadService extends ConnectionRequest {
             Dimension pref = parentLabel.getPreferredSize();
             if(parentLabel.getComponentForm() != null) {
                 if(isDownloadToStyles()) {
+                    parentLabel.getUnselectedStyle().setBgImage(image);
                     parentLabel.getSelectedStyle().setBgImage(image);
+                    parentLabel.getPressedStyle().setBgImage(image);
                 } else {
                     parentLabel.setIcon(image);
                 }
@@ -614,7 +616,9 @@ public class ImageDownloadService extends ConnectionRequest {
                 }
             } else {
                 if(isDownloadToStyles()) {
+                    parentLabel.getUnselectedStyle().setBgImage(image);
                     parentLabel.getSelectedStyle().setBgImage(image);
+                    parentLabel.getPressedStyle().setBgImage(image);
                 } else {
                     parentLabel.setIcon(image);
                 }

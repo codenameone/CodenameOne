@@ -272,7 +272,7 @@ public abstract class FullScreenAdService {
         }
 
         public void show() {
-            super.show();
+            super.showBack();
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     try {
