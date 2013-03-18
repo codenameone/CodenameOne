@@ -129,24 +129,27 @@ public class InPlaceEditView extends FrameLayout {
         }
         return type;
     }
-
+    
+    
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        
-        boolean leaveVKBOpen = false;
-        
-        if(mTextArea != null && mTextArea.getComponentForm() != null){
-            Component c = mTextArea.getComponentForm().getComponentAt((int)event.getX(), (int)event.getY());
-            if(c != null && c instanceof TextArea && ((TextArea)c).isEditable() && ((TextArea)c).isEnabled())  {
-                leaveVKBOpen = true;
-            }
-        }
-        // When the user touches the screen outside the text-area, finish editing
-        endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen);
+        if(event.getAction() == android.view.MotionEvent.ACTION_UP){        
+            boolean leaveVKBOpen = false;
 
-        // Return false so that the event will propagate to the underlying view
-        // We don't want to consume this event
-        return false;
+            if(mTextArea != null && mTextArea.getComponentForm() != null){
+                Component c = mTextArea.getComponentForm().getComponentAt((int)event.getX(), (int)event.getY());
+                if(c != null && c instanceof TextArea && ((TextArea)c).isEditable() && ((TextArea)c).isEnabled())  {
+                    leaveVKBOpen = true;
+                }
+            }
+            // When the user touches the screen outside the text-area, finish editing
+            endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen);
+
+            // Return false so that the event will propagate to the underlying view
+            // We don't want to consume this event
+            return false;
+        }
+        return true;
     }
 
     /**
