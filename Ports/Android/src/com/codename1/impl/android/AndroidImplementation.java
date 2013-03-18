@@ -40,7 +40,6 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -69,7 +68,6 @@ import java.net.URISyntaxException;
 import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
 import android.graphics.drawable.BitmapDrawable;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
@@ -91,22 +89,16 @@ import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
-import com.codename1.io.NetworkManager;
-import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
-import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
-import com.codename1.ui.util.ImageIO;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -128,15 +120,15 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
+import java.io.*;
+import java.util.*;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
@@ -3171,12 +3163,78 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
-        File f = Environment.getExternalStorageDirectory();
-        if (f != null && f.exists()) {
-            return new String[]{Environment.getRootDirectory().getAbsolutePath(), f.getAbsolutePath()};
+        String [] storageDirs = getStorageDirectories();
+        if(storageDirs != null){
+            String [] roots = new String[storageDirs.length + 1];
+            System.arraycopy(storageDirs, 0, roots, 0, storageDirs.length);
+            roots[roots.length - 1] = Environment.getRootDirectory().getAbsolutePath();
+            return roots;
         }
         return new String[]{Environment.getRootDirectory().getAbsolutePath()};
     }
+    
+    private String[] getStorageDirectories() {
+        String [] storageDirs = null;
+        
+        String storageDev = Environment.getExternalStorageDirectory().getPath();
+        String storageRoot = storageDev.substring(0, storageDev.length() - 1);
+        BufferedReader bufReader = null;
+        
+        try {
+            bufReader = new BufferedReader(new FileReader("/proc/mounts"));
+            ArrayList<String> list = new ArrayList<String>();
+            String line;
+            
+            while ((line = bufReader.readLine()) != null) {
+                if (line.contains("vfat") || line.contains("/mnt") || line.contains("/storage")) {
+                    StringTokenizer tokens = new StringTokenizer(line, " ");
+                    String s = tokens.nextToken();
+                    s = tokens.nextToken(); // Take the second token, i.e. mount point
+                    
+                    if (s.indexOf("secure") != -1) {
+                        continue;
+                    }
+
+                    if (s.startsWith(storageRoot) == true) {
+                        list.add(s);
+                        continue;
+                    }
+
+                    if (line.contains("vfat") && line.contains("/mnt")) {
+                        list.add(s);
+                        continue;
+                    }
+                }
+            }
+
+            int count = list.size();
+            
+            if (count < 2) {
+                storageDirs = new String[] {
+                    storageDev
+                };
+            }
+            else {
+                storageDirs = new String[count];
+
+                for (int i = 0; i < count; i++) {
+                    storageDirs[i] = (String) list.get(i);
+                }
+            }
+        }
+        catch (FileNotFoundException e) {}
+        catch (IOException e) {}
+        finally {
+            if (bufReader != null) {
+                try {
+                    bufReader.close();
+                }
+                catch (IOException e) {}
+            }
+
+            return storageDirs;
+        }
+    }    
 
     /**
      * @inheritDoc
