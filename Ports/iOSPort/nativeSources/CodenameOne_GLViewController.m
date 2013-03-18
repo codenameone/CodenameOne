@@ -563,7 +563,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
     UIFont* fnt;
     
     // if this is a monospace font
-    if((style & 32) == 32) {
+    if((face & 32) == 32) {
         fnt = [UIFont fontWithName:@"Courier" size:pSize];
     } else {
         // bold
