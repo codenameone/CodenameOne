@@ -33,6 +33,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
 import java.io.InputStream;
@@ -208,6 +209,7 @@ public class Oauth2 {
             }
         }
         
+        DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);
         WebBrowser web = new WebBrowser(){
 
             public void onStart(String url) {
