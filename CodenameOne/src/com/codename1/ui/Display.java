@@ -1331,6 +1331,7 @@ public final class Display {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        cmp.getComponentForm().scrollComponentToVisible(cmp);
         editingText = cmp;
         keyRepeatCharged = false;
         longPressCharged = false;
