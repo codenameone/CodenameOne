@@ -3716,7 +3716,7 @@ public class Component implements Animation, StyleListener {
      * @return the alwaysTensile
      */
     public boolean isAlwaysTensile() {
-        return alwaysTensile && !isScrollableX();
+        return alwaysTensile && !isScrollableX() || refreshTask != null;
     }
 
     /**
