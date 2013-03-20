@@ -111,7 +111,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             } catch (InterruptedException ex) {
             }
         }
-        globalGraphics = new GlobalGraphics();
+        if(globalGraphics == null) {
+            globalGraphics = new GlobalGraphics();
+        }
     }
 
     private static Runnable callback;
@@ -229,17 +231,39 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                nativeInstance.editStringAt(cmp.getAbsoluteX(),
-                        cmp.getAbsoluteY(),
-                        cmp.getWidth(),
-                        cmp.getHeight(),
+                int x = cmp.getAbsoluteX();
+                int y = cmp.getAbsoluteY();
+                int w = cmp.getWidth();
+                int h = cmp.getHeight();
+                int pt = stl.getPadding(false, Component.TOP);
+                int pb = stl.getPadding(false, Component.BOTTOM);
+                int pl = stl.getPadding(rtl, Component.LEFT);
+                int pr = stl.getPadding(rtl, Component.RIGHT);
+                if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
+                    switch(currentEditing.getVerticalAlignment()) {
+                        case TextArea.CENTER:
+                            if(h > cmp.getPreferredH()) {
+                                y += (h / 2 - cmp.getPreferredH() / 2);
+                            }
+                            break;
+                        case TextArea.BOTTOM:
+                            if(h > cmp.getPreferredH()) {
+                                y += (h - cmp.getPreferredH());
+                            }
+                            break;
+                    }
+                }
+                nativeInstance.editStringAt(x,
+                        y,
+                        w,
+                        h,
                         fnt.peer, currentEditing.isSingleLineTextArea(),
                         currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
                         stl.getFgColor(), 0,//peer, 
-                        stl.getPadding(false, Component.TOP),
-                        stl.getPadding(false, Component.BOTTOM),
-                        stl.getPadding(rtl, Component.LEFT),
-                        stl.getPadding(rtl, Component.RIGHT));
+                        pt,
+                        pb,
+                        pl,
+                        pr);
             }
         });
         editNext = false;
@@ -565,14 +589,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public int getClipWidth(Object graphics) {
-        if(((NativeGraphics)graphics).clipW < 0) {
+        if(((NativeGraphics)graphics).clipW < 0 && ((NativeGraphics)graphics).associatedImage != null) {
             return ((NativeGraphics)graphics).associatedImage.width;
         }
         return ((NativeGraphics)graphics).clipW;
     }
 
     public int getClipHeight(Object graphics) {
-        if(((NativeGraphics)graphics).clipH < 0) {
+        if(((NativeGraphics)graphics).clipH < 0 && ((NativeGraphics)graphics).associatedImage != null) {
             return ((NativeGraphics)graphics).associatedImage.height;
         }
         return ((NativeGraphics)graphics).clipH;
@@ -772,6 +796,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public Object getNativeGraphics() {
+        if(globalGraphics == null) {
+            globalGraphics = new GlobalGraphics();
+        }
         return globalGraphics;
     }
 
@@ -2204,7 +2231,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean isScaledImageDrawingSupported() {
         return true;
     }
-
+    
     @Override
     public boolean isNativeVideoPlayerControlsIncluded() {
         return true;
