@@ -4310,7 +4310,7 @@ public abstract class CodenameOneImplementation {
      * 
      * @param c the component about to be painted
      */
-    public void beforeComponentPaint(Component c) {
+    public void beforeComponentPaint(Component c, Graphics g) {
     }
 
     /**
@@ -4318,7 +4318,7 @@ public abstract class CodenameOneImplementation {
      * 
      * @param c the component that was painted
      */
-    public void afterComponentPaint(Component c) {
+    public void afterComponentPaint(Component c, Graphics g) {
     }
     
     /**

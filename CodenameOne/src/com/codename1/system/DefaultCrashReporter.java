@@ -131,7 +131,7 @@ public class DefaultCrashReporter implements CrashReport {
             Log.sendLog();
             Preferences.set("$CN1_pendingCrash", false);
         }
-        if(Log.getReportingLevel() >= Log.REPORTING_DEBUG && frequency > 0) {
+        if(Log.getReportingLevel() == Log.REPORTING_DEBUG && frequency > 0) {
             java.util.Timer t = new java.util.Timer();
             t.schedule(new TimerTask() {
                 public void run() {

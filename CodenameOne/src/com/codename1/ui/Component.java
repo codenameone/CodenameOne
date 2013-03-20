@@ -933,7 +933,6 @@ public class Component implements Animation, StyleListener {
     final void paintInternal(Graphics g, boolean paintIntersects) {
         Display d = Display.getInstance();
         CodenameOneImplementation impl = d.getImplementation();
-        impl.beforeComponentPaint(this);
         if (!isVisible()) {
             return;
         }
@@ -959,8 +958,9 @@ public class Component implements Animation, StyleListener {
             }
             return;
         }
+        impl.beforeComponentPaint(this, g);
         paintInternalImpl(g, paintIntersects);
-        impl.afterComponentPaint(this);
+        impl.afterComponentPaint(this, g);
     }
 
     private void paintInternalImpl(Graphics g, boolean paintIntersects) {
@@ -4005,7 +4005,7 @@ public class Component implements Animation, StyleListener {
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED:
                             if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(s.getBgImage(), x, y, width, height);
+                                g.drawImage(bgImage, x, y, width, height);
                             } else {
                                 if (iW != width || iH != height) {
                                     bgImage = bgImage.scaled(width, height);
