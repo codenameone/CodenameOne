@@ -207,7 +207,12 @@ public class ComboBox extends List {
      * @return a dialog instance
      */
     protected Dialog createPopupDialog(List l) {
-        Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle");
+        Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle"){
+
+            protected void autoAdjust(int w, int h) {
+            }
+            
+        };
         popupDialog.setScrollable(false);
         popupDialog.getContentPane().setAlwaysTensile(false);
         popupDialog.setAlwaysTensile(false);
