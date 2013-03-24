@@ -97,15 +97,21 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
     }
 
     public void locationUpdated(LocationProvider lp, javax.microedition.location.Location lctn) {
-        com.codename1.location.LocationListener l = getLocationListener();
-        if(lctn != null){
-            l.locationUpdated(convert(lctn));
+        synchronized(this){
+            com.codename1.location.LocationListener l = getLocationListener();
+            if(lctn != null){
+                l.locationUpdated(convert(lctn));
+            }
         }
     }
 
     public void providerStateChanged(LocationProvider lp, int newState) {
-        com.codename1.location.LocationListener l = getLocationListener();
-        l.providerStateChanged(converState(newState));
+        synchronized (this) {
+            com.codename1.location.LocationListener l = getLocationListener();
+            if (l != null) {
+                l.providerStateChanged(converState(newState));
+            }
+        }
     }
 
     private int converState(int state){
