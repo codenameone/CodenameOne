@@ -3284,6 +3284,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
         }
+        
         final java.awt.Container c = cnt;
 
         final Media[] media = new Media[1];
@@ -4163,13 +4164,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame frm;
         private boolean playing = false;
 
-        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, Runnable onCompletion) throws IOException {
-            this.onCompletion = onCompletion;
+        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
+            if(onCompletion != null){
+                this.onCompletion = new Runnable() {
+
+                    @Override
+                    public void run() {
+                        Display.getInstance().scheduleBackgroundTask(onCompletion);
+                    }
+                };
+            }
             this.isVideo = isVideo;
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
-                player.setOnEndOfMedia(onCompletion);
+                player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
                 }
@@ -4180,7 +4189,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             String suffix = "";
             if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
                 suffix = ".mp3";
@@ -4213,12 +4222,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             stream.close();
 
-            this.onCompletion = onCompletion;
+            if(onCompletion != null){
+                this.onCompletion = new Runnable() {
+
+                    @Override
+                    public void run() {
+                        Display.getInstance().scheduleBackgroundTask(onCompletion);
+                    }
+                };
+            }
             this.isVideo = mimeType.contains("video");
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
-                player.setOnEndOfMedia(onCompletion);
+                player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
                 }
