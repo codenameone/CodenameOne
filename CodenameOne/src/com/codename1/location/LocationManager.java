@@ -87,14 +87,16 @@ public abstract class LocationManager {
      * from getting updates
      */
     public void setLocationListener(final LocationListener l) {
-        if(listener != null){
-            clearListener();
+        synchronized (this) {
+            if (this.listener != null) {
+                clearListener();
+            }
+            this.listener = l;
+            if (l == null) {
+                return;
+            }
+            bindListener();
         }
-        listener = l;
-        if(l == null){
-            return;
-        }
-        bindListener();
     }
 
     /**
