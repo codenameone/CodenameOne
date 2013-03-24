@@ -191,6 +191,7 @@ public class Ads extends Container implements HTMLCallback {
         Component c = getComponentAt(0);
         if (c instanceof HTMLComponent) {
             HTMLComponent h = (HTMLComponent) c;
+            h.setSupressExceptions(true);
             HTMLElement dom = h.getDOM();
             Vector links = dom.getDescendantsByTagName("a");
             if (links.size() > 0) {
@@ -230,7 +231,7 @@ public class Ads extends Container implements HTMLCallback {
                 return req;
             }
         });
-
+        html.setSupressExceptions(true);
         html.setHTMLCallback(this);
         html.setBodyText("<html><body><div align='center'>" + ad + "</div></body></html>");
         replace(getComponentAt(0), html, null);

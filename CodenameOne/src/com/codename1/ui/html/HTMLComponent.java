@@ -67,7 +67,7 @@ import java.util.Vector;
  * @author Ofir Leitner
  */
 public class HTMLComponent extends Container implements ActionListener,IOCallback {
-
+    private boolean supressExceptions;
 //    long startTime;
 //    String msg="";
 //    long textTime;
@@ -1120,7 +1120,17 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
         }
         cleanup();
         document=newDocument;
-        rebuildPage();
+        if(supressExceptions) {
+            // can happen because page is rebuilt on a separate thread!
+            try {
+                rebuildPage();
+            } catch(Throwable t) {
+                t.printStackTrace();
+                return;
+            }
+        } else {
+            rebuildPage();
+        }
         //clickTimer("rebuilt");
         
         if ((!cancelled) || (cancelledCaught)) {
@@ -4037,6 +4047,20 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
         }
         Object obj=counters.get(counterName);
         return obj==null?0:((Integer)obj).intValue();
+    }
+
+    /**
+     * @return the supressExceptions
+     */
+    public boolean isSupressExceptions() {
+        return supressExceptions;
+    }
+
+    /**
+     * @param supressExceptions the supressExceptions to set
+     */
+    public void setSupressExceptions(boolean supressExceptions) {
+        this.supressExceptions = supressExceptions;
     }
 
     /*********
