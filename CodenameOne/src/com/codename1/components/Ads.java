@@ -220,6 +220,7 @@ public class Ads extends Container implements HTMLCallback {
 
             protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
                 ConnectionRequest req = super.createConnectionRequest(docInfo, callback, response);
+                req.setFailSilently(true);
                 req.addResponseCodeListener(new ActionListener() {
 
                     public void actionPerformed(ActionEvent evt) {
