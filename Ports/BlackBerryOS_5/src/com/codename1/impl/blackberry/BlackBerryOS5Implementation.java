@@ -167,17 +167,17 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             bff.addListener(new BrowserFieldListener() {
 
                 public void documentError(BrowserField browserField, Document document) throws Exception {
-                    cmp.fireWebEvent("onError", new ActionEvent(document));
+                    cmp.fireWebEvent("onError", new ActionEvent(document.getDocumentURI()));
                     super.documentError(browserField, document);
                 }
 
                 public void documentCreated(BrowserField browserField, ScriptEngine scriptEngine, Document document) throws Exception {
-                    cmp.fireWebEvent("onStart", new ActionEvent(document));
+                    cmp.fireWebEvent("onStart", new ActionEvent(document.getDocumentURI()));
                     super.documentCreated(browserField, scriptEngine, document);
                 }
                 
                 public void documentLoaded(BrowserField browserField, Document document) throws Exception {
-                    cmp.fireWebEvent("onLoad", new ActionEvent(document));
+                    cmp.fireWebEvent("onLoad", new ActionEvent(document.getDocumentURI()));
                     super.documentLoaded(browserField, document);
                 }
             });
