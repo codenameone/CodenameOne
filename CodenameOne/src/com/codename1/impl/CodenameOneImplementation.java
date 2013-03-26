@@ -3261,7 +3261,7 @@ public abstract class CodenameOneImplementation {
      * @param javaScript the JavaScript string
      */
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
-        setBrowserURL(browserPeer, "javascript:(" + javaScript + ")()");
+        setBrowserURL(browserPeer, "javascript:(function(){" + javaScript + "})()");
     }
 
     /**
