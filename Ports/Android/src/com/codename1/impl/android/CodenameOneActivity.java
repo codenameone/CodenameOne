@@ -445,6 +445,24 @@ public class CodenameOneActivity extends Activity {
                 BitmapDrawable d = new BitmapDrawable(b);
                 item.setIcon(d);
             }
+            
+            if (android.os.Build.VERSION.SDK_INT >= 11 && command.getClientProperty("android:showAsAction") != null) {
+                String androidShowAsAction = command.getClientProperty("android:showAsAction").toString();
+                // From https://developer.android.com/guide/topics/resources/menu-resource.html
+                // "ifRoom" | "never" | "withText" | "always" | "collapseActionView"
+                if (androidShowAsAction.equalsIgnoreCase("ifRoom")) {
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+                } else if (androidShowAsAction.equalsIgnoreCase("never")) {
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+                } else if (androidShowAsAction.equalsIgnoreCase("withText")) {
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+                } else if (androidShowAsAction.equalsIgnoreCase("always")) {
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+                } else if (android.os.Build.VERSION.SDK_INT >= 14 && androidShowAsAction.equalsIgnoreCase("collapseActionView")) {
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+                }
+            }
+            
         }
                 
         return nativeMenu;
