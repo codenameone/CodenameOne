@@ -2303,8 +2303,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                         Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
                                         return true;
                                     case KeyEvent.KEYCODE_MENU:
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                        return true;
+                                        //if the native commands are used don't handle the keycode
+                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                            return true;
+                                        }
                                 }
                                 return super.onKeyDown(keyCode, event);
                             }
@@ -2315,8 +2318,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                         Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
                                         return true;
                                     case KeyEvent.KEYCODE_MENU:
-                                        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                        return true;
+                                        //if the native commands are used don't handle the keycode
+                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                            return true;
+                                        }
                                 }
                                 return super.onKeyUp(keyCode, event);
                             }
