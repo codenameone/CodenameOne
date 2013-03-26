@@ -43,6 +43,7 @@ import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -4749,5 +4750,16 @@ public abstract class CodenameOneImplementation {
      */
     public boolean shouldPaintBackground() {
         return true;
+    }
+    
+    /**
+     * This method allows a native implementation to implement a native version of a given transition that
+     * can be faster
+     * 
+     * @param t the transition that is about to execute
+     * @return the given transition or a native version of that transition
+     */
+    public Transition getNativeTransition(Transition t) {
+       return t; 
     }
 }

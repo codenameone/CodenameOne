@@ -98,6 +98,54 @@ public final class CommonTransitions extends Transition {
     }
 
     /**
+     * Returns true if this is a horizontal slide transition
+     * @return true if this is a horizontal slide transition
+     */
+    public boolean isHorizontalSlide() {
+        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
+    }
+
+    /**
+     * Returns true if this is a vertical slide transition
+     * @return true if this is a vertical slide transition
+     */
+    public boolean isVerticalSlide() {
+        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
+    }
+    
+    /**
+     * Returns true if this is a horizontal cover transition
+     * @return true if this is a horizontal cover transition
+     */
+    public boolean isHorizontalCover() {
+        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
+    }
+
+    /**
+     * Returns true if this is a vertical cover transition
+     * @return true if this is a vertical cover transition
+     */
+    public boolean isVerticalCover() {
+        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
+    }
+
+    /**
+     * Indicates the slide/cover transition direction
+     * @return true for forward
+     */
+    public boolean isForwardSlide() {
+        return forward;
+    }
+    
+    /**
+     * Returns the speed of the transition in milliseconds
+     * @return The speed of the transition in milliseconds
+     */
+    public int getTransitionSpeed() {
+        return speed;
+    }
+    
+    /**
      * Creates an empty transition that does nothing. This has the same effect as
      * setting a transition to null.
      * 

@@ -1251,6 +1251,9 @@ public final class Display {
             if(dest != null) {
                 dest.setLightweightMode(true);
             }
+            
+            // if a native transition implementation exists then substitute it into place
+            transition = impl.getNativeTransition(transition);
             animationQueue.addElement(transition);
 
             if (animationQueue.size() == 1) {
