@@ -487,6 +487,20 @@ public class Button extends Label {
         }
     }
 
+    void initComponentImpl() {
+        super.initComponentImpl();
+        if(getIcon() != null) {
+            getIcon().lock();
+        }
+    }
+
+    void deinitializeImpl() {
+        super.deinitializeImpl();
+        if(getIcon() != null) {
+            getIcon().unlock();
+        }
+    }
+    
     /**
      * @inheritDoc
      */

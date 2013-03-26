@@ -157,7 +157,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     public Object getImage() {
-        return getInternal().getImage();
+        return getInternalImpl().getImage();
     }
     
     /**
