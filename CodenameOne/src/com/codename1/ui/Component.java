@@ -880,9 +880,11 @@ public class Component implements Animation, StyleListener {
      * @param g the graphics object
      */
     public void paintBackgrounds(Graphics g) {
-        drawPainters(g, this.getParent(), this, getAbsoluteX() + getScrollX(),
-                getAbsoluteY() + getScrollY(),
-                getWidth(), getHeight());
+        if(Display.getInstance().getImplementation().shouldPaintBackground()) {
+            drawPainters(g, this.getParent(), this, getAbsoluteX() + getScrollX(),
+                    getAbsoluteY() + getScrollY(),
+                    getWidth(), getHeight());
+        }
     }
 
     /**

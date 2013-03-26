@@ -275,6 +275,19 @@ public final class Graphics {
     }
 
     /**
+     * Draws a rectangle in the given coordinates with the given thickness
+     * 
+     * @param x the x coordinate of the rectangle to be drawn.
+     * @param y the y coordinate of the rectangle to be drawn.
+     * @param width the width of the rectangle to be drawn.
+     * @param height the height of the rectangle to be drawn.
+     * @param thickness the thickness in pixels
+     */
+    public void drawRect(int x, int y, int width, int height, int thickness) {
+        impl.drawRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+    }
+    
+    /**
      * Draws a rounded corner rectangle in the given coordinates with the arcWidth/height
      * matching the last two arguments respectively.
      * 

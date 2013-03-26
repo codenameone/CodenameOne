@@ -1326,12 +1326,7 @@ public class Border {
         switch(type) {
             case TYPE_LINE:
                 if (borderTitle==null) {
-                    width--;
-                    height--;
-                    for(int iter = 0 ; iter < thickness ; iter++) {
-                        g.drawRect(x + iter, y + iter, width, height);
-                        width -= 2; height -= 2;
-                    }
+                    g.drawRect(x, y, width, height, thickness);
                 } else {
                     Font f=c.getStyle().getFont();
                     int titleW=f.stringWidth(borderTitle);

@@ -1017,6 +1017,25 @@ public abstract class CodenameOneImplementation {
     public abstract void drawRect(Object graphics, int x, int y, int width, int height);
 
     /**
+     * Draws a rectangle in the given coordinates
+     * 
+     * @param graphics the graphics context
+     * @param x the x coordinate of the rectangle to be drawn.
+     * @param y the y coordinate of the rectangle to be drawn.
+     * @param width the width of the rectangle to be drawn.
+     * @param height the height of the rectangle to be drawn.
+     * @param thickness the thickness in pixels
+     */
+    public void drawRect(Object graphics, int x, int y, int width, int height, int thickness) {
+        width--;
+        height--;
+        for(int iter = 0 ; iter < thickness ; iter++) {
+            drawRect(graphics, x + iter, y + iter, width, height);
+            width -= 2; height -= 2;
+        }
+    }
+
+    /**
      * Draws a rounded corner rectangle in the given coordinates with the arcWidth/height
      * matching the last two arguments respectively.
      * 
@@ -4723,4 +4742,12 @@ public abstract class CodenameOneImplementation {
         this.useNativeCookieStore = useNativeCookieStore;
     }
 
+    /**
+     * Indicates the implementation is capable of keeping the background painted by being non-destructive.
+     * 
+     * @return whether to paint the background
+     */
+    public boolean shouldPaintBackground() {
+        return true;
+    }
 }
