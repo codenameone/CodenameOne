@@ -12,6 +12,7 @@ import org.json.JSONObject;
 
 import android.text.TextUtils;
 import android.util.Log;
+import com.codename1.ui.Display;
 import java.io.UnsupportedEncodingException;
 
 import java.security.InvalidKeyException;
@@ -125,16 +126,14 @@ public class Security {
              * Generally, encryption keys / passwords should only be kept in memory
              * long enough to perform the operation they need to perform.
              */
-            String base64EncodedPublicKey = getBase64EncodedPublicKey();
-            if(base64EncodedPublicKey == null) {
-                Log.w(TAG, "could not find public key");
-                return null;
-            }
-            PublicKey key = Security.generatePublicKey(base64EncodedPublicKey);
-            verified = Security.verify(key, signedData, signature);
-            if (!verified) {
-                Log.w(TAG, "signature does not match data.");
-                return null;
+            String base64EncodedPublicKey = Display.getInstance().getProperty("android.licenseKey", null);
+            if(base64EncodedPublicKey != null) {
+                PublicKey key = Security.generatePublicKey(base64EncodedPublicKey);
+                verified = Security.verify(key, signedData, signature);
+                if (!verified) {
+                    Log.w(TAG, "signature does not match data.");
+                    return null;
+                }
             }
         }
 

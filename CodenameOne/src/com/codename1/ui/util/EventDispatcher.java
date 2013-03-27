@@ -42,6 +42,12 @@ public class EventDispatcher {
     private Vector listeners;
     private Object[] pending;
     private Object pendingEvent;
+    boolean actionListenerArray;
+    boolean styleListenerArray;
+    boolean bindTargetArray;
+    boolean dataChangeListenerArray;
+    boolean focusListenerArray;
+    boolean selectionListenerArray;
 
     private static boolean fireStyleEventsOnNonEDT = false;
 
@@ -59,66 +65,7 @@ public class EventDispatcher {
     public static void setFireStyleEventsOnNonEDT(boolean fire) {
         fireStyleEventsOnNonEDT = fire;
     }
-
-    private static boolean isXMLVMWorkaround() {
-        if(xmlVMTested) {
-            return xmlVMWorkaround;
-        }
-     
-        xmlVMTested = true;
-        try {
-            DataChangedListener[] d = new DataChangedListener[1];
-            if(d instanceof ActionListener[] || !(d instanceof DataChangedListener[])) {
-                xmlVMWorkaround = true;
-            }
-        } catch(Throwable t) {
-            xmlVMWorkaround = true;
-        }
-        return xmlVMWorkaround;
-    }
     
-    boolean isActionListenerArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new ActionListener[1].getClass();
-        }
-        return o instanceof ActionListener[];
-    }
-
-    boolean isDataChangedListenerArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new DataChangedListener[1].getClass();
-        }
-        return o instanceof DataChangedListener[];
-    }
-
-    boolean isFocusListenerArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new FocusListener[1].getClass();
-        }
-        return o instanceof FocusListener[];
-    }
-    
-    boolean isSelectionListenerArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new SelectionListener[1].getClass();
-        }
-        return o instanceof SelectionListener[];
-    }
-    
-    boolean isStyleListenerArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new StyleListener[1].getClass();
-        }
-        return o instanceof StyleListener[];
-    }
-
-    boolean isBindTargetArray(Object o) {
-        if(isXMLVMWorkaround()) {
-            return o.getClass() == new BindTarget[1].getClass();
-        }
-        return o instanceof BindTarget[];
-    }
-
     class CallbackClass implements Runnable {
         private Object[] iPending;
         private Object iPendingEvent;
@@ -143,7 +90,7 @@ public class EventDispatcher {
                 iPending = pending;
             }
 
-            if(isStyleListenerArray(iPending)) {
+            if(styleListenerArray) {
                 Object[] p = (Object[])iPendingEvent;
                 fireStyleChangeSync((StyleListener[])iPending, (String)p[0], (Style)p[1]);
                 pendingEvent = null;
@@ -151,27 +98,27 @@ public class EventDispatcher {
                 return;
             }
 
-            if(isActionListenerArray(iPending)) {
+            if(actionListenerArray) {
                 fireActionSync((ActionListener[])iPending, (ActionEvent)iPendingEvent);
                 return;
             }
 
-            if(isFocusListenerArray(iPending)) {
+            if(focusListenerArray) {
                 fireFocusSync((FocusListener[])iPending, (Component)iPendingEvent);
                 return;
             }
 
-            if(isDataChangedListenerArray(iPending)) {
+            if(dataChangeListenerArray) {
                 fireDataChangeSync((DataChangedListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1]);
                 return;
             }
 
-            if(isSelectionListenerArray(iPending)) {
+            if(selectionListenerArray) {
                 fireSelectionSync((SelectionListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1]);
                 return;
             }
 
-            if(isBindTargetArray(iPending)) {
+            if(bindTargetArray) {
                 Object[] a = (Object[])iPendingEvent;
                 fireBindTargetChangeSync((BindTarget[])iPending, (Component)a[0], (String)a[1], a[2], a[3]);
                 return;
@@ -236,6 +183,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireDataChangeSync(array, type, index);
         } else {
+            dataChangeListenerArray = true;
             pending = array;
             pendingEvent = new int[] {type, index};
             if(blocking) {
@@ -271,6 +219,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireBindTargetChangeSync(array, source, propertyName, oldValue, newValue);
         } else {
+            bindTargetArray = true;
             pending = array;
             pendingEvent = new Object[] {source, propertyName, oldValue, newValue};
             if(blocking) {
@@ -318,6 +267,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireStyleChangeSync(array, property, source);
         } else if (fireStyleEventsOnNonEDT) {
+            styleListenerArray = true;
             pending = array;
             pendingEvent = new Object[] {property, source};
             Display.getInstance().callSerially(new CallbackClass());
@@ -373,6 +323,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireActionSync(array, ev);
         } else {
+            actionListenerArray = true;
             pending = array;
             pendingEvent = ev;
             if(blocking) {
@@ -408,6 +359,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireSelectionSync(array, oldSelection, newSelection);
         } else {
+            selectionListenerArray = true;
             pending = array;
             pendingEvent = new int[] {oldSelection, newSelection};
             if(blocking) {
@@ -451,6 +403,7 @@ public class EventDispatcher {
         if(Display.getInstance().isEdt()) {
             fireFocusSync(array, c);
         } else {
+            focusListenerArray = true;
             pending = array;
             pendingEvent = c;
             if(blocking) {
