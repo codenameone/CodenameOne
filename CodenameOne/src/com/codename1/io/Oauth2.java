@@ -270,11 +270,10 @@ public class Oauth2 {
                                 + "?client_id=" + clientId
                                 + "&redirect_uri=" + Util.encodeUrl(redirectURI)
                                 + "&client_secret=" + clientSecret
-                                + "&code=" + params.get("code");
-
-                        req.setUrl(URL);
+                                + "&code=" + Util.encodeUrl((String)params.get("code"));
+                        
                         req.setPost(false);
-
+                        req.setUrl(URL);
                         NetworkManager.getInstance().addToQueue(req);
                     } else if (url.indexOf("error_reason=") > -1) {
                         Hashtable table = getParamsFromURL(url);                        
