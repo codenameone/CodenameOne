@@ -459,7 +459,7 @@ public class CodenameOneActivity extends Activity {
                 } else if (androidShowAsAction.equalsIgnoreCase("always")) {
                     item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
                 } else if (android.os.Build.VERSION.SDK_INT >= 14 && androidShowAsAction.equalsIgnoreCase("collapseActionView")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+                    item.setShowAsAction(8); //MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW
                 }
             }
             
