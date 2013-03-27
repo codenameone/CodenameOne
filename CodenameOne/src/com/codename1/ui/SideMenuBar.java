@@ -96,6 +96,21 @@ public class SideMenuBar extends MenuBar {
     /**
      * @inheritDoc
      */
+    public void setBackCommand(Command backCommand) {
+        super.setBackCommand(backCommand);
+        addOpenButton();
+        if (getBackCommand() != null
+                && getCommandCount() > 0
+                && !UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)
+                && !getCommands().contains(getBackCommand())) {
+            getCommands().insertElementAt(getBackCommand(), 0);
+        }
+    }
+    
+    
+    /**
+     * @inheritDoc
+     */
     protected void addCommand(Command cmd, int index) {
         super.addCommand(cmd, index);
         addOpenButton();
