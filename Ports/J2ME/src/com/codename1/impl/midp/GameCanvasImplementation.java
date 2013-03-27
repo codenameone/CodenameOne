@@ -62,6 +62,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.Resources;
+import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -2107,7 +2108,35 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         while (c.getHeaderFieldKey(i) != null) {
             if (c.getHeaderFieldKey(i).equalsIgnoreCase(name)) {
                 String val = c.getHeaderField(i);
-                r.addElement(val);
+                //some J2ME devices such as Nokia send all the cookies in one 
+                //header spereated by commas
+                if(name.equalsIgnoreCase("Set-Cookie")){
+                    //it is not possible to simply tokenize on comma, because 
+                    //the expiration date of each cookie contains a comma, therefore 
+                    //we temporary remove this comma tokenize all the cookies and then 
+                    //fixing the comma in the expiration date
+                    String cookies = "";
+                    Vector v = StringUtil.tokenizeString(val, ';');
+                    for (int j = 0; j < v.size(); j++) {
+                        String keyval = (String) v.elementAt(j);
+                        if(keyval.indexOf("expires") > -1){
+                            keyval = StringUtil.replaceAll(keyval, ",", "@__@");
+                        }
+                        cookies += keyval + ";";
+                    }
+                    cookies = cookies.substring(0, cookies.length() - 1);
+                    
+                    if(cookies.indexOf(",") > -1){
+                       Vector v2 = StringUtil.tokenizeString(cookies, ',');
+                        for (int j = 0; j < v2.size(); j++) {
+                            String value = (String) v2.elementAt(j);
+                            value = StringUtil.replaceAll(value, "@__@", ",");
+                            r.addElement(value);
+                        }
+                    }
+                }else{
+                    r.addElement(val);
+                }
             }
             i++;
         }
