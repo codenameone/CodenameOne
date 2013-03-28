@@ -284,7 +284,7 @@ public final class Graphics {
      * @param thickness the thickness in pixels
      */
     public void drawRect(int x, int y, int width, int height, int thickness) {
-        impl.drawRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+        impl.drawRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height, thickness);
     }
     
     /**
