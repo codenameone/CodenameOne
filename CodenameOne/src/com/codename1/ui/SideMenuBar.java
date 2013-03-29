@@ -246,7 +246,34 @@ public class SideMenuBar extends MenuBar {
                     cmd = ((CommandWrapper) cmd).cmd;
                     ev = new ActionEvent(cmd);
                 }
-                parent.actionCommandImpl(cmd, ev);
+                final Command c = cmd;
+                final ActionEvent e = ev;
+                
+                Display.getInstance().scheduleBackgroundTask(new Runnable() {
+
+                    public void run() {
+                        Display.getInstance().invokeAndBlock(new Runnable() {
+
+                            public void run() {
+                                while (Display.getInstance().getCurrent() != parent){
+                                    try {
+                                        Thread.sleep(40);
+                                    } catch (Exception ex) {
+
+                                    }
+                                }
+                            }
+                        });
+                        
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            public void run() {
+                                parent.actionCommandImpl(c, e);
+                            }
+                        });
+                    }
+                });
+
             }
 
             protected void sizeChanged(int w, int h) {
@@ -384,8 +411,11 @@ public class SideMenuBar extends MenuBar {
         }
 
         public boolean animate() {
-            position = motion.getValue();
-            return !motion.isFinished();
+            if(motion != null){
+                position = motion.getValue();
+                return !motion.isFinished();
+            }
+            return false;
         }
 
         public void cleanup() {
@@ -420,13 +450,32 @@ public class SideMenuBar extends MenuBar {
         public void actionPerformed(final ActionEvent evt) {
             closeMenu();
             clean();
-            Display.getInstance().callSerially(new Runnable() {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
-                    ActionEvent e = new ActionEvent(cmd);
-                    cmd.actionPerformed(e);
+                    Display.getInstance().invokeAndBlock(new Runnable() {
+
+                        public void run() {
+                            while (Display.getInstance().getCurrent() != parent) {
+                                try {
+                                    Thread.sleep(40);
+                                } catch (Exception ex) {
+                                    
+                                }
+                            }
+                        }
+                    });
+
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        public void run() {
+                            ActionEvent e = new ActionEvent(cmd);
+                            cmd.actionPerformed(e);
+                        }
+                    });
                 }
             });
+
         }
     }
 }
