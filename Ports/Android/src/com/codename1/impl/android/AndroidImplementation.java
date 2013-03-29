@@ -1911,6 +1911,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             clear.setStyle(Style.FILL);
             v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                     MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            doSetVisibility(false);
         }
 
         @Override
@@ -2717,7 +2718,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 
             });
         }
-
+        
         @Override
         protected void initComponent() {
             super.initComponent();
@@ -2739,6 +2740,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         protected void setLightweightMode(boolean l) {
+            doSetVisibility(!l);
             if (lightweightMode == l) {
                 return;
             }
