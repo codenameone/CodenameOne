@@ -40,7 +40,7 @@
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
     float time = ((float)timeout) / 1000.0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
-                                              cachePolicy:NSURLRequestUseProtocolCachePolicy
+                                              cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];
     [request retain];
     return self;

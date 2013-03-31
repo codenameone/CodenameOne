@@ -25,6 +25,7 @@
 
 
 @implementation DrawStringTextureCache
+static int MAX_CACHE_SIZE = 100;
 -(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
     str = s;
     [str retain];
@@ -34,12 +35,14 @@
     textureName = t;
     color = c;
     alpha = a;
+    if(UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        MAX_CACHE_SIZE = 200;
+    }
     return self;
 }
 
 static NSMutableArray* cachedStrings = nil;
 static NSMutableArray* pendingDeleteStrings = nil;
-static int MAX_CACHE_SIZE = 60;
 
 +(void)cache:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
     DrawStringTextureCache* d = [[DrawStringTextureCache alloc] initWithString:s f:f t:t c:c a:a];

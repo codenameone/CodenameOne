@@ -17,11 +17,19 @@
     glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     glEnable(GL_TEXTURE_2D);
     GLErrorLog;
-    int w = nextPowerOf2(width);
-    int h = nextPowerOf2(height);
-    GLuint tex = [img getTexture:width texHeight:height];
+    int w = width;
+    int h = height;
+    float actualImageWidth = [img getImage].size.width;
+    float actualImageHeight = [img getImage].size.height;
+    int actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+    int actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glBindTexture(GL_TEXTURE_2D, tex);
     GLErrorLog;
+    float blankPixelsW = actualImageWidthP2 - actualImageWidth;
+    float blankPixelsH = actualImageHeightP2 - actualImageHeight;
+    w += blankPixelsW * (w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
+    h += blankPixelsH * (h / actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
     GLfloat vertexes[] = {
         x, y,
         x + w, y,
@@ -29,14 +37,14 @@
         x + w, y + h
     };
     //NSLog(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
-
+    
     static const GLshort textureCoordinates[] = {
         0, 1,
         1, 1,
         0, 0,
         1, 0,
     };
-
+    
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

@@ -46,6 +46,7 @@
 #import "ScanCodeImpl.h"
 //#import "QRCodeReaderOC.h"
 #import "ZooZ.h"
+#import "Rotate.h"
 
 extern void initVMImpl();
 

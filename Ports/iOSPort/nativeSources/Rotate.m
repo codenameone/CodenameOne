@@ -51,7 +51,7 @@ float currentRotateY = 1;
 
 
 -(NSString*)getName {
-    return @"Scale";
+    return @"Rotate";
 }
 
 

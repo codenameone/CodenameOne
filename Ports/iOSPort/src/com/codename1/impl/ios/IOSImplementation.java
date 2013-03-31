@@ -1470,10 +1470,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((NativeGraphics)nativeGraphics).scale(x, y);
     }
 
-    public void rotate(Object nativeGraphics, float angle) {
-        ((NativeGraphics)nativeGraphics).rotate(angle);
-    }
-
     public void rotate(Object nativeGraphics, float angle, int x, int y) {
         ((NativeGraphics)nativeGraphics).rotate(angle, x, y);
     }
