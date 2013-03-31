@@ -108,9 +108,39 @@ public class ImageDownloadService extends ConnectionRequest {
     private Dimension toScale;
     private String cacheId;
     private boolean keep;
+    private ListModel targetModel;
     
     private static boolean fastScale = true;
     private Image placeholder;
+    
+    /**
+     * This method is invoked when an image finished downloading and should be set to an offset in the list
+     * model. This is useful for special cases with complex list model hierarchies or proxies.
+     * 
+     * @param offset the offset in the list given when creating the service
+     * @param img the image
+     */
+    protected void setEntryInListModel(int offset, Image img) {
+        Hashtable h;
+        ListModel model;
+        if(targetModel != null) {
+            model = targetModel;
+        } else {
+            if(targetList instanceof List) {
+                model = ((List)targetList).getModel();
+            } else {
+                model = ((ContainerList)targetList).getModel();
+            }
+        }
+        h = (Hashtable)model.getItemAt(targetOffset);
+        if(!fastScale && toScale != null){
+            img = img.scaled(toScale.getWidth(), toScale.getHeight());
+        }
+        h.put(targetKey, img);
+        if(model instanceof DefaultListModel) {
+             ((DefaultListModel)model).setItem(targetOffset, h);
+        }
+    }
     
     /**
      * Accepts the url to bind to the list renderer, on completion the action listener
@@ -207,7 +237,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
             String targetKey, String destFile, Dimension toScale, byte priority) {
-        createImageToFileSystem(url, targetList, targetOffset, targetKey, destFile, toScale, priority, null);
+        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, toScale, priority, null);
     }
 
     /**
@@ -225,7 +255,26 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
             String targetKey, String destFile, Image placeholder, byte priority) {
-        createImageToFileSystem(url, targetList, targetOffset, targetKey, destFile, null, priority, placeholder);
+        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, null, priority, placeholder);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given list
+     * when the response arrives, it will cache the file locally as a file
+     * in the file storage.
+     * This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param url the image URL
+     * @param targetList the list that should be updated when the data arrives
+     * @param model the list model
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey the key for the hashtable in the target offset
+     * @param destFile local file to store the data into the given path
+     */
+    public static void createImageToFileSystem(String url, Component targetList, ListModel model, int targetOffset, 
+            String targetKey, String destFile, Image placeholder, byte priority) {
+        createImageToFileSystem(url, targetList, model, targetOffset, targetKey, destFile, null, priority, placeholder);
     }
 
     /**
@@ -241,13 +290,13 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param targetKey the key for the hashtable in the target offset
      * @param destFile local file to store the data into the given path
      */
-    private static void createImageToFileSystem(final String url, final Component targetList, final int targetOffset,
+    private static void createImageToFileSystem(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
             final String targetKey, final String destFile, final Dimension toScale, final byte priority, final Image placeholderImage) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
-                    createImageToFileSystem(url, targetList, targetOffset,
+                    createImageToFileSystem(url, targetList, targetModel, targetOffset,
                             targetKey, destFile, toScale, priority, placeholderImage);
                 }
             });
@@ -255,29 +304,16 @@ public class ImageDownloadService extends ConnectionRequest {
         }
 
 
+        //image not found on cache go and download from the url
+        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
+        i.targetModel = targetModel;
         Image im = cacheImage(null, false, destFile, toScale, placeholderImage);
         if (im != null) {
-            Hashtable h;
-            ListModel model;
-            if(targetList instanceof List) {
-                model = ((List)targetList).getModel();
-            } else {
-                model = ((ContainerList)targetList).getModel();
-            }
-            h = (Hashtable)model.getItemAt(targetOffset);
-            if(!fastScale && toScale != null){
-                im = im.scaled(toScale.getWidth(), toScale.getHeight());
-            }
-            h.put(targetKey, im);
-            if(model instanceof DefaultListModel) {
-                 ((DefaultListModel)model).setItem(targetOffset, h);
-            }
+            i.setEntryInListModel(targetOffset, im);
             targetList.repaint();
             
             return;
         }
-        //image not found on cache go and download from the url
-        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
         i.cacheImages = true;
         i.destinationFile = destFile;
         i.toScale = toScale;
@@ -321,7 +357,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Dimension scale, byte priority) {
-        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, false, scale, priority, null);
+        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, scale, priority, null);
     }
 
     /**
@@ -340,7 +376,27 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Image placeholderImage, byte priority) {
-        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
+        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
+    }
+
+    /**
+     * Constructs an image request that will automatically populate the given list
+     * when the response arrives, it will cache the file locally as a file
+     * in the file storage.
+     * This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param url the image URL
+     * @param targetList the list that should be updated when the data arrives
+     * @param model the model destination
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey the key for the hashtable in the target offset
+     * @param cacheId a unique identifier to be used to store the image into storage
+     * @param placeholderImage the image placeholder
+     */
+    public static void createImageToStorage(String url, Component targetList, ListModel model, int targetOffset, 
+            String targetKey, String cacheId, Image placeholderImage, byte priority) {
+        createImageToStorage(url, targetList, model, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
     }
     
     /**
@@ -352,47 +408,35 @@ public class ImageDownloadService extends ConnectionRequest {
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
+     * @param targetModel the model
      * @param targetOffset the offset within the list to insert the image
      * @param targetKey the key for the hashtable in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param keep if set to true keeps the file in RAM once loaded
      * @param scale the scale of the image to put in the List or null
      */
-    private static void createImageToStorage(final String url, final Component targetList, final int targetOffset,
+    private static void createImageToStorage(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
             final String targetKey, final String cacheId, final boolean keep, final Dimension scale, final byte priority, final Image placeholderImage) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
-                    createImageToStorage(url, targetList, targetOffset,
+                    createImageToStorage(url, targetList, targetModel, targetOffset,
                             targetKey, cacheId, keep, scale, priority, placeholderImage);
                 }
             });
             return;
         }
         Image im = cacheImage(cacheId, keep, null, scale, placeholderImage);
+        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
+        i.targetModel = targetModel;
         if (im != null) {
-            Hashtable h;
-            ListModel model;
-            if (targetList instanceof List) {
-                model = ((List) targetList).getModel();
-            } else {
-                model = ((ContainerList)targetList).getModel();
-            }
-            h = (Hashtable)model.getItemAt(targetOffset);
-            if(!fastScale && scale != null){
-                im = im.scaled(scale.getWidth(), scale.getHeight());
-            }
-            h.put(targetKey, im);
-            if(model instanceof DefaultListModel) {
-                 ((DefaultListModel)model).setItem(targetOffset, h);
-            }
+            i.setEntryInListModel(targetOffset, im);
             targetList.repaint();            
             
             return;
         }
         //image not found on cache go and download from the url
-        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
         i.cacheImages = true;
         i.cacheId = cacheId;
         i.keep = keep;
@@ -627,16 +671,8 @@ public class ImageDownloadService extends ConnectionRequest {
             return;
         } else {
             if(targetList != null) {
-                Hashtable h;
-                ListModel model;
-                if(targetList instanceof List) {
-                    model = ((List)targetList).getModel();
-                } else {
-                    model = ((ContainerList)targetList).getModel();
-                }
-                h = (Hashtable)model.getItemAt(targetOffset);
-                h.put(targetKey, image);
-                
+                setEntryInListModel(targetOffset, image);
+                                
                 // revalidate only once to avoid multiple revalidate refreshes during scroll
                 if(targetList.getParent() != null) {
                     if(alwaysRevalidate) {
@@ -646,9 +682,6 @@ public class ImageDownloadService extends ConnectionRequest {
                             targetList.putClientProperty("$imgDSReval", Boolean.TRUE);
                             targetList.getParent().revalidate();
                         } else {
-                            if(model instanceof DefaultListModel) {
-                                 ((DefaultListModel)model).setItem(targetOffset, h);
-                            }
                             targetList.repaint();
                         }
                     }
