@@ -21,7 +21,9 @@
  * need additional information or have any questions.
  */
 #import "NetworkConnectionImpl.h"
+#import <UIKit/UIKit.h>
 
+int connections = 0;
 @implementation NetworkConnectionImpl
 
 - (id)init
@@ -38,6 +40,8 @@
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
+    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+    connections++;
     float time = ((float)timeout) / 1000.0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
@@ -97,6 +101,10 @@ extern void connectionError(void* peer, NSString* message);
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     connectionError(self, [error localizedDescription]);
+    connections--;
+    if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+    }
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
@@ -105,6 +113,10 @@ extern void connectionError(void* peer, NSString* message);
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     connectionComplete(self);
+    connections--;
+    if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+    }
 }
 
 - (int)getResponseHeaderCount {
