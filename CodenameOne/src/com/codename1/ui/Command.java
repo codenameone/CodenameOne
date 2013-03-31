@@ -133,6 +133,14 @@ public class Command implements ActionListener{
     public Image getIcon() {
         return icon;
     }
+
+    /**
+     * Sets the icon for the command
+     * @param icon the new icon
+     */
+    public void setIcon(Image icon) {
+        this.icon = icon;
+    }
     
     /**
      * Returns a string representation of the object
@@ -140,7 +148,7 @@ public class Command implements ActionListener{
      * @return Returns a string representation of the object
      */
     public String toString() {
-        return command;
+        return getCommandName();
     }
 
     /**
