@@ -22,6 +22,8 @@
  */
 package com.codename1.ui.spinner;
 
+import com.codename1.ui.layouts.BorderLayout;
+
 /**
  * A spinner class that allows picking a number
  *
@@ -38,6 +40,7 @@ public class NumericSpinner extends BaseSpinner {
      * Default constructor
      */
     public NumericSpinner() {
+        setLayout(new BorderLayout());
     }
     
     /**
@@ -46,7 +49,7 @@ public class NumericSpinner extends BaseSpinner {
     void initSpinner() {
         if(spin == null) {
             spin = createSpinner();
-            addComponent(spin);
+            addComponent(BorderLayout.CENTER, spin);
         }
     }
 
