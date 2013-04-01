@@ -574,6 +574,6 @@ public class BorderLayout extends Layout {
      * @inheritDoc
      */
     public boolean isConstraintTracking() {
-        return true;
+        return false;
     }    
 }
