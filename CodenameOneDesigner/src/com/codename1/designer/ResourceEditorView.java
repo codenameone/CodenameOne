@@ -3332,33 +3332,6 @@ private void showPasswordDialog(String password) {
     EditableResources.setCurrentPassword(ptext);
 }
 
-    private void compileAndUploadToBlackberry(final String jdeDir, final File previewMIDletDir, final JTextArea progress) {
-        final RunOnDevice rd = RunOnDevice.showRunDialog(mainPanel, "/help/runOnBlackberryHelp.html");
-        new Thread() {
-            public void run() {
-                try {
-                    Process p = new ProcessBuilder(jdeDir + "\\bin\\rapc.exe",
-                        "import=" + jdeDir + "\\lib\\net_rim_api.jar",
-                        "codename=PreviewMIDlet", "-cldc",
-                        "jad=" + previewMIDletDir.getAbsolutePath() + "\\PreviewMIDlet.jad" ,
-                        previewMIDletDir.getAbsolutePath() + "\\PreviewMIDlet.jar").
-                        directory(previewMIDletDir).redirectErrorStream(true).start();
-                    rd.waitForProcess(p, false, null);
-                    
-                    p = new ProcessBuilder(jdeDir + "\\bin\\JavaLoader.exe",
-                        "-u", "load",
-                        previewMIDletDir.getAbsolutePath() + "\\PreviewMIDlet.cod").directory(previewMIDletDir).
-                        redirectErrorStream(true).start();
-                    
-                    rd.waitForProcess(p, true, null);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(mainPanel, "Error " + ex, "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        }.start();
-    }
-
 /**
  * Opens the given file in an IDE (currently netbeans) on the given line number unless the line number is
  * less than 0

@@ -2137,7 +2137,7 @@ public class UserInterfaceEditor extends BaseForm {
                             if(arr == null) {
                                 arr = new String[0];
                             }
-                            ArrayEditorDialog arrEdit = new ArrayEditorDialog(ed, res, arr, "String", "/help/ArrayOfStrings.html");
+                            ArrayEditorDialog arrEdit = new ArrayEditorDialog(this, res, arr, "String", "/help/ArrayOfStrings.html");
                             if(arrEdit.isOK()) {
                                 List l = arrEdit.getResult();
                                 String[] res = new String[l.size()];
@@ -4084,7 +4084,7 @@ public class UserInterfaceEditor extends BaseForm {
                     invoke(propertySetters.get(rowIndex), cmp, new Object[]{ aValue });
                 }
 
-                if(propertyId == PROPERTY_LAYOUT) {
+                /*if(propertyId == PROPERTY_LAYOUT) {
                     if(aValue instanceof com.codename1.ui.layouts.BorderLayout) {
                         // assign a layout constraint to all the components and revalidate
                         // try to maintain existing constraints if some of the components already had them
@@ -4120,16 +4120,24 @@ public class UserInterfaceEditor extends BaseForm {
                                 cnt = ((com.codename1.ui.Form)cnt).getContentPane();
                             }
                             List<com.codename1.ui.Component> cmps = new ArrayList<com.codename1.ui.Component>();
+                            List<Object> constraints = new ArrayList<Object>();
                             for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                                cmps.add(cnt.getComponentAt(iter));
+                                com.codename1.ui.Component currentCmp = cnt.getComponentAt(iter);
+                                cmps.add(currentCmp);
+                                constraints.add(cnt.getLayout().getComponentConstraint(currentCmp));
                             }
                             cnt.removeAll();
-                            for(com.codename1.ui.Component c : cmps) {
-                                cnt.addComponent(c);
+                            for(int iter = 0 ; iter < cmps.size() ; iter++) {
+                                Object cons = constraints.get(iter);
+                                if(cons != null) {
+                                    cnt.addComponent(cons, cmps.get(iter));
+                                } else {
+                                    cnt.addComponent(cmps.get(iter));
+                                }
                             }
                         }
                     }
-                }
+                }*/
 
                 cmps[0].getComponentForm().revalidate();
                 refreshLocaleTable();
