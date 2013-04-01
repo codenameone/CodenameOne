@@ -1014,6 +1014,11 @@ public class Component implements Animation, StyleListener {
         if (paintIntersects && parent != null) {
             paintIntersectingComponentsAbove(g);
         }
+        int tx = g.getTranslateX();
+        int ty = g.getTranslateY();
+        g.translate(-tx, -ty);
+        paintGlassImpl(g);
+        g.translate(tx, ty);        
     }
 
     private void paintIntersectingComponentsAbove(Graphics g) {
@@ -1197,8 +1202,6 @@ public class Component implements Animation, StyleListener {
         g.translate(translateX, translateY);
         paintInternal(g);
         g.translate(-translateX, -translateY);
-
-        paintGlassImpl(g);
 
         g.setClip(clipX, clipY, clipW, clipH);
     }
