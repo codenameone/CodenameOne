@@ -839,21 +839,6 @@ public class Container extends Component {
         g.translate(-getX(), -getY());
     }
 
-    /**
-     * This method can be overriden by a component to draw on top of itself or its children
-     * after the component or the children finished drawing in a similar way to the glass
-     * pane but more refined per component
-     *
-     * @param g the graphics context
-     */
-    void paintGlassImpl(Graphics g) {
-        super.paintGlassImpl(g);
-        int tx = g.getTranslateX();
-        int ty = g.getTranslateY();
-        g.translate(-tx, -ty);
-        paintGlass(g);
-        g.translate(tx, ty);
-    }
 
     /**
      * This method can be overriden by a component to draw on top of itself or its children
