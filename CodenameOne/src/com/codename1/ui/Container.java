@@ -831,6 +831,11 @@ public class Container extends Component {
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
         }
+        int tx = g.getTranslateX();
+        int ty = g.getTranslateY();
+        g.translate(-tx, -ty);
+        paintGlass(g);
+        g.translate(tx, ty);
         g.translate(-getX(), -getY());
     }
 
