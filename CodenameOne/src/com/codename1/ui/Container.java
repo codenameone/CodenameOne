@@ -210,6 +210,13 @@ public class Container extends Component {
      * @param layout the specified layout manager
      */
     public void setLayout(Layout layout) {
+        if(layout.isConstraintTracking()) {
+            for(int iter = 0 ; iter < getComponentCount() ; iter++) {
+                Component c = getComponentAt(iter);
+                Object cons = this.layout.getComponentConstraint(c);
+                layout.addLayoutComponent(cons, c, this);
+            }
+        }
         this.layout = layout;
         if(layout instanceof BorderLayout && isScrollable()) {
             setScrollable(false);

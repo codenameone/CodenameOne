@@ -106,4 +106,13 @@ public abstract class Layout {
     public int hashCode() {
         return getClass().getName().hashCode();
     }
+    
+    /**
+     * If this method returns true, the addLayoutComponent method will be called when replacing a 
+     * layout for every component within the container
+     * @return false by default
+     */
+    public boolean isConstraintTracking() {
+        return false;
+    }
 }

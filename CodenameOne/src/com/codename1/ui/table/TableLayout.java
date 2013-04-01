@@ -596,7 +596,17 @@ public class TableLayout extends Layout {
             con = createConstraint();
         } else {
             if(con.parent != null) {
-                throw new IllegalArgumentException("Constraint already associated with component!");
+                Constraint con2 = createConstraint();
+                con2.align = con.align;
+                con2.column = con.column;
+                con2.height = con.height;
+                con2.parent = c;
+                con2.row = con.row;
+                con2.spanHorizontal = con.spanHorizontal;
+                con2.spanVertical = con.spanVertical;
+                con2.valign = con.valign;
+                con2.width = con.width;
+                con = con2;
             }
         }
         con.actualRow = con.row;
@@ -870,4 +880,11 @@ public class TableLayout extends Layout {
     public boolean equals(Object o) {
         return super.equals(o) && ((TableLayout)o).getRows() == getRows() && ((TableLayout)o).getColumns() == getColumns();
     }
+        
+    /**
+     * @inheritDoc
+     */
+    public boolean isConstraintTracking() {
+        return true;
+    }    
 }

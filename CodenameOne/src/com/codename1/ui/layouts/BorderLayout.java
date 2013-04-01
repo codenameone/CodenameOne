@@ -569,4 +569,11 @@ public class BorderLayout extends Layout {
     public void setScaleEdges(boolean scaleEdges) {
         this.scaleEdges = scaleEdges;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean isConstraintTracking() {
+        return true;
+    }    
 }
