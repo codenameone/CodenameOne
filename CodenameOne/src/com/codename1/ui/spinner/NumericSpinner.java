@@ -71,6 +71,9 @@ public class NumericSpinner extends BaseSpinner {
      */
     public void setMin(double min) {
         this.min = min;
+        if(min > value) {
+            value = min;
+        }
         if(spin != null) {
             spin.setModel(new SpinnerNumberModel(min, max, value, step));
         }
@@ -90,6 +93,9 @@ public class NumericSpinner extends BaseSpinner {
      */
     public void setMax(double max) {
         this.max = max;
+        if(max < value) {
+            value = max;
+        }
         if(spin != null) {
             spin.setModel(new SpinnerNumberModel(min, max, value, step));
         }
