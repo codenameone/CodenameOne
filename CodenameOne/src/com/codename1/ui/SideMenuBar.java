@@ -160,7 +160,11 @@ public class SideMenuBar extends MenuBar {
             Container titleArea = parent.getTitleArea();
             titleArea.removeAll();
             titleArea.addComponent(BorderLayout.WEST, openButton);
-            titleArea.addComponent(BorderLayout.CENTER, parent.getTitleComponent());
+            Label l = parent.getTitleComponent();
+            if (l.getParent() != null) {
+                l.getParent().removeComponent(l);
+            }
+            titleArea.addComponent(BorderLayout.CENTER, l);
         }
     }
 
