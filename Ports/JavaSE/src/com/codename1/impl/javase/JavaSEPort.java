@@ -279,6 +279,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean managedPurchaseSupported;
     private boolean subscriptionSupported;
     private boolean refundSupported;
+    private int timeout = -1;
 
     private boolean includeHeaderInScreenshot = true;
     
@@ -3489,13 +3490,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         return storageDir;
     }
 
+    @Override
+    public boolean isTimeoutSupported() {
+        return true;
+    }
+
+    @Override
+    public void setTimeout(int t) {
+        timeout = t;
+    }
+
     /**
      * @inheritDoc
      */
-    public Object connect(String url, boolean read, boolean write) throws IOException {
-        /*if(currentAp == null || !currentAp.equals("22")){
-         throw new IOException("apn error");
-         }*/
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
 
         URLConnection con = u.openConnection();
@@ -3505,6 +3513,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
             c.setInstanceFollowRedirects(false);
+            if(timeout > -1) {
+                c.setConnectTimeout(timeout);
+            }
         }
 
         con.setDoInput(read);
@@ -3517,6 +3528,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             netMonitor.addRequest(con, nr);
         }
         return con;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object connect(String url, boolean read, boolean write) throws IOException {
+        return connect(url, read, write, timeout);
     }
 
     /**
