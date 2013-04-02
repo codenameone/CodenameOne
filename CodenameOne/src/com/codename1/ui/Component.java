@@ -2154,6 +2154,16 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+    /**
+     * Returns true if the component is interested in receiving drag/pointer release events even
+     * after the gesture exceeded its boundaries. This is useful for spinners etc. where the motion
+     * might continue beyond the size of the component
+     * @return false by default
+     */
+    protected boolean isStickyDrag() {
+        return false;
+    }
+    
     private void initScrollMotion() {
         // the component might not be registered for animation if it started off 
         // as smaller than the screen and grew (e.g. by adding components to the container

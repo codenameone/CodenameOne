@@ -175,6 +175,13 @@ class Spinner extends List {
     }
 
     /**
+     * @inheritDoc
+     */
+    protected boolean isStickyDrag() {
+        return true;
+    }
+    
+    /**
      * Creates a new spinner instance with the given spinner model
      *
      * @param spinner model such as SpinnerDateModel or SpinnerNumberModel

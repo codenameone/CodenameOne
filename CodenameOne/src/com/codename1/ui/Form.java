@@ -143,7 +143,8 @@ public class Form extends Container {
     int initialPressY;
     private EventDispatcher orientationListener;
     private UIManager uiManager;
-
+    private Component stickyDrag;
+    
     /**
      * Default constructor creates a simple form
      */
@@ -1731,6 +1732,7 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
+        stickyDrag = null;
         if (pointerPressedListeners != null) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
@@ -1886,6 +1888,11 @@ public class Form extends Container {
             return;
         }
 
+        if(stickyDrag != null) {
+            stickyDrag.pointerDragged(x, y);
+            repaint();
+            return;
+        }
         Component cmp = contentPane.getComponentAt(x, y);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -1893,6 +1900,9 @@ public class Form extends Container {
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
+            if(cmp.isStickyDrag()) {
+                stickyDrag = cmp;
+            }
         }
     }
 
@@ -1908,6 +1918,12 @@ public class Form extends Container {
             return;
         }
 
+        if(stickyDrag != null) {
+            stickyDrag.pointerDragged(x, y);
+            repaint();
+            return;
+        }
+
         Component cmp = contentPane.getComponentAt(x[0], y[0]);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -1915,6 +1931,9 @@ public class Form extends Container {
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
+            if(cmp.isStickyDrag()) {
+                stickyDrag = cmp;
+            }
         }
     }
     
@@ -2046,32 +2065,37 @@ public class Form extends Container {
                 return;
             }
 
-            if (y >= contentPane.getY()) {
-                Component cmp = contentPane.getComponentAt(x, y);
-                if (cmp != null && cmp.isEnabled()) {
-                    if (cmp.hasLead) {
-                        Container leadParent;
-                        if (cmp instanceof Container) {
-                            leadParent = ((Container) cmp).getLeadParent();
-                        } else {
-                            leadParent = cmp.getParent().getLeadParent();
-                        }
-                        leadParent.repaint();
-                        setFocused(leadParent);
-                        cmp.getLeadComponent().pointerReleased(x, y);
-                    } else {
-                        if (cmp.isEnabled()) {
-                            if (cmp.isFocusable()) {
-                                setFocused(cmp);
+            if(stickyDrag != null) {
+                stickyDrag.pointerReleased(x, y);
+                repaint();
+            } else {
+                if (y >= contentPane.getY()) {
+                    Component cmp = contentPane.getComponentAt(x, y);
+                    if (cmp != null && cmp.isEnabled()) {
+                        if (cmp.hasLead) {
+                            Container leadParent;
+                            if (cmp instanceof Container) {
+                                leadParent = ((Container) cmp).getLeadParent();
+                            } else {
+                                leadParent = cmp.getParent().getLeadParent();
                             }
-                            cmp.pointerReleased(x, y);
+                            leadParent.repaint();
+                            setFocused(leadParent);
+                            cmp.getLeadComponent().pointerReleased(x, y);
+                        } else {
+                            if (cmp.isEnabled()) {
+                                if (cmp.isFocusable()) {
+                                    setFocused(cmp);
+                                }
+                                cmp.pointerReleased(x, y);
+                            }
                         }
                     }
-                }
-            } else {
-                Component cmp = titleArea.getComponentAt(x, y);
-                if (cmp != null && cmp.isEnabled()) {
-                    cmp.pointerReleased(x, y);
+                } else {
+                    Component cmp = titleArea.getComponentAt(x, y);
+                    if (cmp != null && cmp.isEnabled()) {
+                        cmp.pointerReleased(x, y);
+                    }
                 }
             }
         } else {
@@ -2083,6 +2107,7 @@ public class Form extends Container {
                 dragged = null;
             }
         }
+        stickyDrag = null;
         if (buttonsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
             for (int iter = 0; iter < buttonsAwatingRelease.size(); iter++) {
                 Button b = (Button) buttonsAwatingRelease.elementAt(iter);
