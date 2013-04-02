@@ -378,10 +378,10 @@ public class Slider extends Label {
         if(vertical) {
             // turn the coordinate to a local coordinate and invert it
             y = Math.abs(getHeight() - (y - getAbsoluteY()));
-            setProgressInternal((byte)(Math.min(100, ((float)y) / ((float)getHeight()) * 100)));
+            setProgressInternal((byte)(Math.min(maxValue, ((float)y) / ((float)getHeight()) * maxValue)));
         } else {
             x = Math.abs(x - getAbsoluteX());
-            setProgressInternal((byte)(Math.min(100, ((float)x) / ((float)getWidth()) * 100)));
+            setProgressInternal((byte)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue)));
         }
         
         if(vertical) {
@@ -421,10 +421,10 @@ public class Slider extends Label {
         if(vertical) {
             // turn the coordinate to a local coordinate and invert it
             y = Math.abs(getHeight() - (y - getAbsoluteY()));
-            per = (byte)(Math.min(100, ((float)y) / ((float)getHeight()) * 100));
+            per = (byte)(Math.min(maxValue, ((float)y) / ((float)getHeight()) * maxValue));
         } else {
             x = Math.abs(x - getAbsoluteX());
-            per = (byte)(Math.min(100, ((float)x) / ((float)getWidth()) * 100));
+            per = (byte)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue));
         }
         if(per != getProgress()) {
             setProgressInternal(per);
