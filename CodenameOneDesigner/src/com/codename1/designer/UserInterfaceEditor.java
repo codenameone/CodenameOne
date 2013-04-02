@@ -4084,7 +4084,7 @@ public class UserInterfaceEditor extends BaseForm {
                     invoke(propertySetters.get(rowIndex), cmp, new Object[]{ aValue });
                 }
 
-                /*if(propertyId == PROPERTY_LAYOUT) {
+                if(propertyId == PROPERTY_LAYOUT) {
                     if(aValue instanceof com.codename1.ui.layouts.BorderLayout) {
                         // assign a layout constraint to all the components and revalidate
                         // try to maintain existing constraints if some of the components already had them
@@ -4113,31 +4113,8 @@ public class UserInterfaceEditor extends BaseForm {
                             cnt.addComponent(i, availableConstraints.get(0), current);
                             availableConstraints.remove(0);
                         }
-                    } else {
-                        if(aValue instanceof com.codename1.ui.table.TableLayout) {
-                            com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmps[0];
-                            if(cnt instanceof com.codename1.ui.Form) {
-                                cnt = ((com.codename1.ui.Form)cnt).getContentPane();
-                            }
-                            List<com.codename1.ui.Component> cmps = new ArrayList<com.codename1.ui.Component>();
-                            List<Object> constraints = new ArrayList<Object>();
-                            for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                                com.codename1.ui.Component currentCmp = cnt.getComponentAt(iter);
-                                cmps.add(currentCmp);
-                                constraints.add(cnt.getLayout().getComponentConstraint(currentCmp));
-                            }
-                            cnt.removeAll();
-                            for(int iter = 0 ; iter < cmps.size() ; iter++) {
-                                Object cons = constraints.get(iter);
-                                if(cons != null) {
-                                    cnt.addComponent(cons, cmps.get(iter));
-                                } else {
-                                    cnt.addComponent(cmps.get(iter));
-                                }
-                            }
-                        }
-                    }
-                }*/
+                    } 
+                }
 
                 cmps[0].getComponentForm().revalidate();
                 refreshLocaleTable();
