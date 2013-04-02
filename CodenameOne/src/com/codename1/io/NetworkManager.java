@@ -413,6 +413,9 @@ public class NetworkManager {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
                             if(c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());
+                                if(c.getTimeout() < 0) {
+                                    cTimeout = timeout;
+                                }
                                 if(c.getTimeSinceLastActivity() > cTimeout) {
                                     // we have a timeout problem on our hands! We need to try and kill!
                                     c.kill();

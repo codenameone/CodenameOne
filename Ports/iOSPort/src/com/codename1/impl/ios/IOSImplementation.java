@@ -2741,6 +2741,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setTimeout(int t) {
         timeout = t;
     }
+
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
+        return new NetworkConnection(nativeInstance.openConnection(url, timeout));
+    }
     
     /**
      * @inheritDoc

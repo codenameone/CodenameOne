@@ -3503,11 +3503,25 @@ public abstract class CodenameOneImplementation {
      * later
      *
      * @param url the URL to connect to
-     * @param read indicates wheher the connection will be read from
-     * @param write indicates whether writing will ocurre into the connection
+     * @param read indicates whether the connection will be read from
+     * @param write indicates whether writing will occur into the connection
      * @return a URL instance
      */
     public abstract Object connect(String url, boolean read, boolean write) throws IOException;
+
+    /**
+     * Connects to a given URL, returns a connection object to be used with the implementation
+     * later
+     *
+     * @param url the URL to connect to
+     * @param read indicates whether the connection will be read from
+     * @param write indicates whether writing will occur into the connection
+     * @param timeout the timeout version of this method
+     * @return a URL instance
+     */
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
+        return connect(url, read, write);
+    }
 
     /**
      * Requests special http method such as put or delete

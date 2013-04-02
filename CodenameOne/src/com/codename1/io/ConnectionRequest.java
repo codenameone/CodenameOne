@@ -108,7 +108,7 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean killed = false;
     private static boolean defaultFollowRedirects = true;
     private boolean followRedirects = defaultFollowRedirects;
-    private int timeout = 300000;
+    private int timeout = -1;
     private InputStream input;
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
@@ -224,7 +224,11 @@ public class ConnectionRequest implements IOProgressListener {
         output = null;
         try {
             String actualUrl = createRequestURL();
-            connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());
+            if(timeout > 0) {
+                connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest(), timeout);
+            } else {
+                connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());
+            }
             if(shouldStop()) {
                 return;
             }
@@ -1249,7 +1253,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * Indicates the number of times to silentry retyr a connection that failed
+     * Indicates the number of times to silently retry a connection that failed
      * before prompting
      *
      * @return the silentRetryCount
@@ -1259,7 +1263,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * Indicates the number of times to silentry retyr a connection that failed
+     * Indicates the number of times to silently retry a connection that failed
      * before prompting
      * @param silentRetryCount the silentRetryCount to set
      */

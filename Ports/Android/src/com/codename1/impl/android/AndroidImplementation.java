@@ -2965,10 +2965,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return activity;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public Object connect(String url, boolean read, boolean write) throws IOException {
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
         URLConnection con = u.openConnection();
         if (con instanceof HttpURLConnection) {
@@ -2983,6 +2980,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         con.setDoInput(read);
         con.setDoOutput(write);
         return con;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Object connect(String url, boolean read, boolean write) throws IOException {
+        return connect(url, read, write, timeout);
     }
 
     /**
