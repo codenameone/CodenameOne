@@ -777,16 +777,21 @@ public class TextField extends TextArea {
      */
     public void setText(String text) {
         super.setText(text);
-        fireDataChanged(DataChangedListener.CHANGED, -1);
-        int pos = getCursorPosition();
-        if(pos < 0) {
-            pos = text.length();
-        } else {
-            if(pos > text.length()) {
+        if(text != null) {
+            fireDataChanged(DataChangedListener.CHANGED, -1);
+            int pos = getCursorPosition();
+            if(pos < 0) {
                 pos = text.length();
+            } else {
+                if(pos > text.length()) {
+                    pos = text.length();
+                }
             }
+            setCursorPosition(pos);
+        } else {
+            fireDataChanged(DataChangedListener.CHANGED, -1);
+            setCursorPosition(0);
         }
-        setCursorPosition(pos);
     }
 
     /**
