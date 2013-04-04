@@ -170,14 +170,17 @@ public class Oauth2 {
      * @return a component that should be displayed to the user in order to perform the authentication
      */
     public void showAuthentication(ActionListener al) {
+        final Form old = Display.getInstance().getCurrent();
         InfiniteProgress inf = new InfiniteProgress();
-        Dialog progress = inf.showInifiniteBlocking();
+        final Dialog progress = inf.showInifiniteBlocking();
         Form authenticationForm = new Form("Login");
         authenticationForm.setScrollable(false);
-        final Form old = Display.getInstance().getCurrent();
         if(old != null) {
             Command cancel = new Command("Cancel") {
                 public void actionPerformed(ActionEvent ev) {
+                    if(Display.getInstance().getCurrent() == progress) {
+                        progress.dispose();
+                    }
                     old.showBack();
                 }
             };

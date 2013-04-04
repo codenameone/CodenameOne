@@ -122,8 +122,10 @@ public class FaceBookAccess {
     /**
      * This method shows an authentication for login form
      * 
-     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to perform the authentication
+     * @param al a listener that will receive at its source either a token for 
+     * the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to 
+     * perform the authentication
      */
     public void showAuthentication(final ActionListener al) {
         createOAuth().showAuthentication(new ActionListener() {
