@@ -24,20 +24,20 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.ui.*;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
-import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DefaultHTMLCallback;
 import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.util.Base64;
 import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.ui.geom.Rectangle;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -148,8 +148,22 @@ public class WebBrowser extends Container {
             });
             h.setIgnoreCSS(true);
             h.setHTMLCallback(new DefaultHTMLCallback() {
-
+                
+                private Loading loading;
+                
                 public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
+                    Form f = htmlC.getComponentForm();
+                    if(f != null){
+                        if(status == STATUS_REQUESTED || (loading == null && status == STATUS_CONNECTED)){
+                            loading = new Loading(f);
+                            loading.install();
+                        }else{
+                            if(loading != null && ( status == STATUS_DISPLAYED || 
+                                    status == STATUS_ERROR || status == STATUS_CANCELLED)){
+                                loading.unInstall();
+                            }
+                        }
+                    }
                     if (status == STATUS_REQUESTED && url != null) {
                         onStart(url);
                     } else if (status == STATUS_DISPLAYED && url != null) {
@@ -374,5 +388,45 @@ public class WebBrowser extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+    
+    class Loading implements Painter, Animation{
+
+        private Form f;
+        
+        private InfiniteProgress progress = new InfiniteProgress();
+        
+        Loading(Form f){
+            this.f = f;
+        }
+        
+        public void paint(Graphics g, Rectangle rect) {
+            int x = f.getWidth()/2 - progress.getPreferredW()/2;
+            int y = f.getHeight()/2 - progress.getPreferredH()/2;
+            progress.setX(x);
+            progress.setY(y);
+            progress.setWidth(progress.getPreferredW());
+            progress.setHeight(progress.getPreferredH());
+            progress.paintComponent(g, true);
+        }
+
+        public boolean animate() {
+            return true;
+        }
+
+        public void paint(Graphics g) {
+            paint(g, null);
+        }
+        
+        void install(){
+            f.setGlassPane(this);
+            f.registerAnimated(this);
+        }
+        
+        void unInstall(){
+            f.setGlassPane(null);
+            f.deregisterAnimated(this);
+        }
+    
     }
 }
