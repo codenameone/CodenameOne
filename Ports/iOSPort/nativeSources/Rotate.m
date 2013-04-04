@@ -30,7 +30,7 @@ float currentRotateY = 1;
 
 @implementation Rotate
 
--(id)initWithArgs:(int)ang xx:(float)xx yy:(float)yy {
+-(id)initWithArgs:(float)ang xx:(int)xx yy:(int)yy {
     x = xx;
     y = yy;
     angle = ang;
@@ -38,7 +38,9 @@ float currentRotateY = 1;
 }
 
 -(void)execute {
-    glRotatef(angle, x, y, 0);
+    glTranslatef(x, y, 0);
+    glRotatef(angle, 0, 0, 1);
+    glTranslatef(-x, -y, 0);
     currentRotateX = x;
     currentRotateY = y;
     currentRotate = angle;

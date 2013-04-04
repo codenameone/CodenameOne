@@ -665,7 +665,9 @@ void com_codename1_impl_ios_IOSNative_rotateGlobal___float(JAVA_OBJECT instanceO
 }
 
 void com_codename1_impl_ios_IOSNative_rotateGlobal___float_int_int(JAVA_OBJECT instanceObject, JAVA_FLOAT angle, JAVA_INT x, JAVA_INT y) {
-    
+    Rotate* f = [[Rotate alloc] initWithArgs:angle xx:x yy:y];
+    [CodenameOne_GLViewController upcoming:f];
+    [f release];
 }
 
 void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(JAVA_OBJECT instanceObject, JAVA_FLOAT x, JAVA_FLOAT y) {
@@ -2184,7 +2186,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
     });
 }
 
-#define INCLUDE_CN1_PUSH2
+
 
 void com_codename1_impl_ios_IOSNative_registerPush__(JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
@@ -2653,7 +2655,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(JAVA_OBJECT ins
 }
 
 void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    /*dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         ZBarReaderViewController *reader = [ZBarReaderViewController new];
         ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
@@ -2672,7 +2674,7 @@ void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) 
         [[CodenameOne_GLViewController instance] presentModalViewController:reader animated:NO];
         [reader release];
         [pool release];
-    });
+    });*/
 }
 
 void com_codename1_impl_ios_IOSNative_scanQRCode__(JAVA_OBJECT instanceObject) {
