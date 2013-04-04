@@ -2559,6 +2559,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void networkError(long peer, String error) {
         NetworkConnection n = connections.get(peer);
         synchronized(n.LOCK) {
+            if(error == null) {
+                n.error = "Unknown server error";
+            } else {
+                n.error = error;
+            }
             n.connected = true;
             n.LOCK.notifyAll();
         }
@@ -2572,9 +2577,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         private Hashtable headers = new Hashtable();
         private boolean connected;
         private boolean ensureConnectionLock;
+        String error;
         public final Object LOCK = new Object();
         
-        public void ensureConnection() {
+        public void ensureConnection() throws IOException {
             synchronized(LOCK) {
                 if(connected) {
                     return;
@@ -2604,6 +2610,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         LOCK.wait();
                     } catch (InterruptedException ex) {
                     }
+                }
+                if(error != null) {
+                    throw new IOException(error);
                 }
             }
         }
@@ -2644,6 +2653,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
                         }
+                        if(error != null) {
+                            throw new IOException(error);
+                        }
                         if(completed && pendingData.size() == 0) {
                             return -1;
                         }
@@ -2659,12 +2671,18 @@ public class IOSImplementation extends CodenameOneImplementation {
                     System.arraycopy(chunk, 1, b, 0, b.length);
                     pendingData.setElementAt(b, 0);
                 }
+                if(error != null) {
+                    throw new IOException(error);
+                }
                 return val;
             }
         }
 
         @Override
         public int available() throws IOException {
+            if(error != null) {
+                throw new IOException(error);
+            }
             synchronized(LOCK) {
                 int count = 0;
                 for(int iter = 0 ; iter < pendingData.size() ; iter++) {
@@ -2727,6 +2745,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     byte[] b = new byte[chunk.length - len];
                     System.arraycopy(chunk, len, b, 0, b.length);
                     pendingData.setElementAt(b, 0);
+                }
+                if(error != null) {
+                    throw new IOException(error);
                 }
                 return len;            
             }
@@ -2838,8 +2859,12 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public int getContentLength(Object connection) {
         NetworkConnection n = (NetworkConnection)connection;
-        n.ensureConnection();
-        return nativeInstance.getContentLength(n.peer);
+        try {
+            n.ensureConnection();
+            return nativeInstance.getContentLength(n.peer);
+        } catch(IOException err) {
+            return -1;
+        }
     }
 
     /**
