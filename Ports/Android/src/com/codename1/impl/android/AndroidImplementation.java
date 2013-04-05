@@ -1929,6 +1929,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 }
             });
+            if(visible){
+                onPositionSizeChange();
+            }
         }
         
         protected void deinitialize() {
