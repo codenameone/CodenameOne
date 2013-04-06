@@ -1030,7 +1030,9 @@ public class MenuBar extends Container implements ActionListener {
     protected void installMenuBar() {
         if (getParent() == null) {
             int type = Display.getInstance().getCommandBehavior();
-            if (type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT || type == Display.COMMAND_BEHAVIOR_ICS) {
+            if (type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT 
+                    || type == Display.COMMAND_BEHAVIOR_ICS
+                    || type == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
                 //parent.getTitleArea().addComponent(BorderLayout.EAST, this);
                 return;
             }
