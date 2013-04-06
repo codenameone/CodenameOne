@@ -991,9 +991,7 @@ public class Component implements Animation, StyleListener {
 
         if (isScrollable()) {
             if(refreshTask != null && (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
-                if(paintPullToRefresh(g)){
-                    return;
-                }
+                paintPullToRefresh(g);
             }
             int scrollX = getScrollX();
             int scrollY = getScrollY();
@@ -1054,26 +1052,29 @@ public class Component implements Animation, StyleListener {
         }
     }
     
-    private boolean paintPullToRefresh(Graphics g){
+    private void paintPullToRefresh(Graphics g) {
         if (!dragActivated && scrollY == -getUIManager().getLookAndFeel().getPullToRefreshHeight()
-                && getClientProperty("$pullToRelease") != null 
+                && getClientProperty("$pullToRelease") != null
                 && getClientProperty("$pullToRelease").equals("update")) {
-            
-                putClientProperty("$pullToRelease", "updating");
-                draggedMotionY = null;
-                //execute the task
-                Display.getInstance().invokeAndBlock(refreshTask);
-                //once the task has finished scroll to 0
-                startTensile(scrollY, 0, true);
-                putClientProperty("$pullToRelease", null);
-                return true;                        
+
+            putClientProperty("$pullToRelease", "updating");
+            draggedMotionY = null;
+            //execute the task
+            Display.getInstance().callSerially(new Runnable() {
+
+                public void run() {
+                    refreshTask.run();
+                    //once the task has finished scroll to 0
+                    startTensile(scrollY, 0, true);
+                    putClientProperty("$pullToRelease", null);                    
+                }
+            });
         }
-        boolean updating = getClientProperty("$pullToRelease") != null && 
-                getClientProperty("$pullToRelease").equals("updating");
+        boolean updating = getClientProperty("$pullToRelease") != null
+                && getClientProperty("$pullToRelease").equals("updating");
         getUIManager().getLookAndFeel().drawPullToRefresh(g, this, updating);
-        return false;
     }
-    
+
 
     /**
      * Paints the UI for the scrollbar on the X axis, this method allows component
