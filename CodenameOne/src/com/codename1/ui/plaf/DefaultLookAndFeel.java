@@ -1539,14 +1539,19 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         ((Label) pullDown).setIcon(i.rotate(180));                        
                         cmp.getComponentForm().deregisterAnimated(this);
                     }
-                    return true;
+                    cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(), 
+                            getPullToRefreshHeight());
+                    return false;
                 }
 
                 public void paint(Graphics g) {
-                    cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(), 
-                            getPullToRefreshHeight());
                 }
             });
+        }
+        if(pull.getComponentAt(0) != cmpToDraw 
+                && cmpToDraw instanceof Label 
+                && (pull.getComponentAt(0) instanceof Label)){
+            ((Label)cmpToDraw).setIcon(((Label)pull.getComponentAt(0)).getIcon());
         }
         pull.replace(pull.getComponentAt(0), cmpToDraw, null);
 
