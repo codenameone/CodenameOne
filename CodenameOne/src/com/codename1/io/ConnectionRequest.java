@@ -295,6 +295,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
             
             if(responseCode - 200 < 0 || responseCode - 200 > 100) {
+                readErrorCodeHeaders(connection);
                 // redirect to new location
                 if(followRedirects && (responseCode == 301 || responseCode == 302
                         || responseCode == 303)) {
@@ -389,6 +390,14 @@ public class ConnectionRequest implements IOProgressListener {
      * @throws java.io.IOException thrown on failure
      */
     protected void readHeaders(Object connection) throws IOException {
+    }
+
+    /**
+     * Allows reading the headers from the connection by calling the getHeader() method when a response that isn't 200 OK is sent. 
+     * @param connection used when invoking getHeader
+     * @throws java.io.IOException thrown on failure
+     */
+    protected void readErrorCodeHeaders(Object connection) throws IOException {
     }
 
     /**
