@@ -198,6 +198,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         }
         
+        if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
+            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
 
         if (m instanceof CodenameOneActivity) {
             ((CodenameOneActivity) m).setIntentResultListener(this);
