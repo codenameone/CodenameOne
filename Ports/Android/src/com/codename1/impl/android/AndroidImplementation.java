@@ -3531,18 +3531,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void copyToClipboard(Object obj) {
-        ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(activity.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
-        clipboard.setPrimaryClip(clip);
+        
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        if (sdk < 11) {
+            android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            clipboard.setText(obj.toString());
+        } else {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
+            clipboard.setPrimaryClip(clip);
+        }        
     }
 
     /**
      * @inheritDoc
      */
     public Object getPasteDataFromClipboard() {
-        ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(activity.CLIPBOARD_SERVICE);
-        ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-        return item.getText();    
+        
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        if (sdk < 11) {
+            android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            return clipboard.getText().toString();
+        } else {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+            return item.getText();    
+        }
     }
     
     
