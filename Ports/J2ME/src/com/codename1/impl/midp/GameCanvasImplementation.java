@@ -1718,7 +1718,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     public void exitApplication() {
         mid.notifyDestroyed();
     }
-
+    
     /**
      * @inheritDoc
      */
@@ -1945,6 +1945,8 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setHeader(Object connection, String key, String val) {
+        System.out.println("key == " + key);
+        System.out.println("val == " + val);
         try {
             ((HttpConnection)connection).setRequestProperty(key, val);
         } catch(IOException err) {
@@ -3045,7 +3047,25 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean hasNativeTheme() {
-        InputStream i = getResourceAsStream(getClass(), "/nativeJ2METheme.res");
+        InputStream i = getResourceAsStream(getClass(), "/nokia_touch_theme.res");
+        try {
+            if(i != null) {
+                i.close();
+                return true;
+            }
+        } catch (IOException ex) {
+        }
+        
+        i = getResourceAsStream(getClass(), "/nokia_non_touch.res");
+        try {
+            if(i != null) {
+                i.close();
+                return true;
+            }
+        } catch (IOException ex) {
+        }
+        
+        i = getResourceAsStream(getClass(), "/nativeJ2METheme.res");
         try {
             if(i != null) {
                 i.close();
@@ -3060,11 +3080,21 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void installNativeTheme() {
-        try {
-            Resources r = Resources.open("/nativeJ2METheme.res");
-            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
-        } catch(Throwable t) {
-            t.printStackTrace();
+        
+        InputStream i = getResourceAsStream(getClass(), "/nokia_touch_theme.res");
+        if(i == null){
+            i = getResourceAsStream(getClass(), "/nokia_non_touch.res");
+        }
+        if(i == null){
+            i = getResourceAsStream(getClass(), "/nativeJ2METheme.res");
+        }
+        if(i != null){
+            try {
+                Resources r = Resources.open(i);
+                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+            } catch(Throwable t) {
+                t.printStackTrace();
+            }
         }
     }
 
