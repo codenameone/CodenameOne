@@ -1118,14 +1118,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     } else {
                         try {
+                            boolean isJ2me = props.getProperty("platformName", "").equals("me");
                             String t = props.getProperty("nativeThemeAttribute", null);
                             if (t != null) {
                                 Properties cnop = new Properties();
                                 File cnopFile = new File("codenameone_settings.properties");
                                 if (cnopFile.exists()) {
                                     cnop.load(new FileInputStream(cnopFile));
-                                    t = cnop.getProperty(t, null);
-                                    if (t != null && new File(t).exists()) {
+                                    int themeConst = Integer.parseInt(cnop.getProperty("codename1.j2me.nativeThemeConst", "3"));
+                                    t = cnop.getProperty(t, null); 
+                                    if (isJ2me && themeConst == 3 && t != null && new File(t).exists()) {
                                         nativeThemeRes = Resources.open(new FileInputStream(t));
                                     }
                                 }
