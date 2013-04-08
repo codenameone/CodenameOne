@@ -46,6 +46,7 @@ public class MultipartRequest extends ConnectionRequest {
     private static final String CRLF = "\r\n"; 
     private long contentLength = -1L;
     private boolean manualRedirect = true;
+    private static boolean canFlushStream = true;
     
     /**
      * Initialize variables
@@ -189,10 +190,14 @@ public class MultipartRequest extends ConnectionRequest {
                 writer.write("Content-Type: text/plain; charset=UTF-8");
                 writer.write(CRLF);
                 writer.write(CRLF);
-                writer.flush();
+                if(canFlushStream){
+                    writer.flush();
+                }                
                 writer.write(Util.encodeBody((String)value));
                 writer.write(CRLF);
-                writer.flush();
+                if(canFlushStream){
+                    writer.flush();
+                }
             } else {
                 writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) +"\"");
                 writer.write(CRLF);
@@ -202,7 +207,9 @@ public class MultipartRequest extends ConnectionRequest {
                 writer.write("Content-Transfer-Encoding: binary");
                 writer.write(CRLF);
                 writer.write(CRLF);
-                writer.flush();
+                if(canFlushStream){
+                    writer.flush();
+                }
                 InputStream i;
                 if (value instanceof InputStream) {
                 	i = (InputStream)value;
@@ -216,7 +223,9 @@ public class MultipartRequest extends ConnectionRequest {
                 		break;
                 	}
                 	os.write(buffer, 0, s);
-                	os.flush();
+                        if(canFlushStream){
+                            writer.flush();
+                        }
                 	s = i.read(buffer);
                 }
                 // (when passed by stream, leave for caller to clean up).
@@ -225,10 +234,14 @@ public class MultipartRequest extends ConnectionRequest {
                 }
                 args.remove(key);
                 value = null;
-                writer.flush();
+                if(canFlushStream){
+                    writer.flush();
+                }
             }
             writer.write(CRLF);
-            writer.flush();
+            if(canFlushStream){
+                writer.flush();
+            }
         }
         
         writer.write("--" + boundary + "--");
@@ -265,5 +278,15 @@ public class MultipartRequest extends ConnectionRequest {
      */
     public void setManualRedirect(boolean autoRedirect) {
         this.manualRedirect = autoRedirect;
+    }
+    
+    /**
+     * Sending large files requires flushing the writer once in a while to prevent
+     * Out Of Memory Errors, Some J2ME implementation are not able to flush the 
+     * streams causing the upload to fail.
+     * This method can indicate to the upload to not use the flushing mechanism.
+     */ 
+    public static void setCanFlushStream(boolean flush){
+        canFlushStream = flush;
     }
 }
