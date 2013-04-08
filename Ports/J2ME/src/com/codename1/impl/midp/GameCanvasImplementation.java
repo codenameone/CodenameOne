@@ -54,6 +54,7 @@ import javax.microedition.media.control.VideoControl;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.MultipartRequest;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -378,6 +379,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             // Symbian devices should yield a bit to let the paint thread complete its work
             // problem is we can't differentiate S40 from S60...
             Display.getInstance().setTransitionYield(1);
+            //nokia devices cannot use OutputStreamWriter flush when using 
+            //MultipartRequest
+            MultipartRequest.setCanFlushStream(false);
         } else {
             flushGraphicsBug = true;
             Display.getInstance().setTransitionYield(-1);
