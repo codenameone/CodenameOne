@@ -4776,4 +4776,26 @@ public abstract class CodenameOneImplementation {
     public Transition getNativeTransition(Transition t) {
        return t; 
     }
+
+    /**
+     * Checks if the device supports locking the screen display from dimming, allowing 
+     * the developer to keep the screen display on.
+     */ 
+    public boolean isScreenLockSupported() {
+        return false;
+    }
+    
+    /**
+     * If Locking isScreenLockSupported() returns true calling this method will 
+     * lock the screen display on
+     */
+    public void lockScreen(){
+    }
+    
+    /**
+     * Unlock the screen display allowing the screen to dim.
+     */ 
+    public void unlockScreen(){
+    }
+    
 }

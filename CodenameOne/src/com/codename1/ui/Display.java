@@ -3035,5 +3035,28 @@ public final class Display {
     public String[] getAvailableRecordingMimeTypes() {
         return impl.getAvailableRecordingMimeTypes();
     }
+    
+    /**
+     * Checks if the device supports locking the screen display from dimming, allowing 
+     * the developer to keep the screen display on.
+     */ 
+    public boolean isScreenLockSupported(){
+        return impl.isScreenLockSupported();
+    }
+    
+    /** 
+     * If isScreenLockSupported() returns true calling this method will 
+     * lock the screen display on
+     */
+    public void lockScreen(){
+        impl.lockScreen();
+    }
+    
+    /**
+     * Unlock the screen display allowing the screen to dim.
+     */ 
+    public void unlockScreen(){
+        impl.unlockScreen();    
+    }
 
 }
