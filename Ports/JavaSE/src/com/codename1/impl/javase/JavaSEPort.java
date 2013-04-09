@@ -1639,20 +1639,34 @@ public class JavaSEPort extends CodenameOneImplementation {
                 try {
                     DocumentBuilder db = dbf.newDocumentBuilder();
 
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    
                     URL u = new URL("https://codenameone.googlecode.com/svn/trunk/Skins/OTA/Skins.xml");
                     URLConnection uc = u.openConnection();
                     InputStream is = uc.getInputStream();
                     doc[0] = db.parse(is);
                     NodeList skins = doc[0].getElementsByTagName("Skin");
+                    
                     for (int i = 0; i < skins.getLength(); i++) {
                         Node skin = skins.item(i);
                         NamedNodeMap attr = skin.getAttributes();
                         String url = attr.getNamedItem("url").getNodeValue();
-                        if (!(new File(skinDir.getAbsolutePath() + url).exists())) {
+                        int ver = 0;
+                        Node n = attr.getNamedItem("version");
+                        if(n != null){
+                            ver = Integer.parseInt(n.getNodeValue());
+                        }
+                        boolean exists = new File(skinDir.getAbsolutePath() + url).exists();
+                        if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
                             Vector row = new Vector();
                             row.add(new Boolean(false));
                             row.add(new ImageIcon(new URL("https://codenameone.googlecode.com/svn/trunk/Skins/OTA" + attr.getNamedItem("icon").getNodeValue())));
                             row.add(attr.getNamedItem("name").getNodeValue());
+                            if(exists){
+                                row.add("Update");                                                        
+                            }else{
+                                row.add("New");                            
+                            }
                             data.add(row);
                         }
                     }
@@ -1670,6 +1684,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 cols.add("Install");
                 cols.add("Icon");
                 cols.add("Name");
+                cols.add("");
 
                 final DefaultTableModel tableModel = new DefaultTableModel(data, cols) {
 
@@ -1711,7 +1726,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     NamedNodeMap attr = skin.getAttributes();
                                     if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
                                         String url = attr.getNamedItem("url").getNodeValue();
-                                        toDowload.add("https://codenameone.googlecode.com/svn/trunk/Skins/OTA" + url);
+                                        String [] data = new String[2];
+                                        data[0] = "https://codenameone.googlecode.com/svn/trunk/Skins/OTA" + url;
+                                        data[1] = attr.getNamedItem("version").getNodeValue();                                        
+                                        toDowload.add(data);
                                         break;
                                     }                                    
                                 }
@@ -1732,14 +1750,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 @Override
                                 public void run() {
                                     for (Iterator it = toDowload.iterator(); it.hasNext();) {
-                                        String url = (String) it.next();
+                                        String [] data = (String []) it.next();
+                                        String url = data[0];
                                         details.setText(url.substring(url.lastIndexOf("/")));
                                         details.repaint();
                                         progress.setText("");
                                         progress.repaint();
 
                                         try {
-                                            File skin = downloadSkin(skinDir, url, progress);
+                                            File skin = downloadSkin(skinDir, url, data[1], progress);
                                             if (skin.exists()) {
                                                 addSkinName(skin.toURI().toString());
                                             }
@@ -5439,7 +5458,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.convertToPixels(dipCount, horizontal);
     }
 
-    private File downloadSkin(File skinDir, String url, JLabel label) throws IOException {
+    private File downloadSkin(File skinDir, String url, String version, JLabel label) throws IOException {
         String fileName = url.substring(url.lastIndexOf("/"));
         File skin = new File(skinDir.getAbsolutePath() + "/" + fileName);
         HttpURLConnection.setFollowRedirects(true);
@@ -5477,6 +5496,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         is.close();
         os.close();
+        
+        //store the skin version
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        pref.put(fileName, version);
+
+        
         return skin;
     }
 }
