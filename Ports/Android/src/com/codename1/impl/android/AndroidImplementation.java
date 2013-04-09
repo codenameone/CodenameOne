@@ -73,6 +73,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.telephony.SmsManager;
@@ -251,6 +252,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         HttpURLConnection.setFollowRedirects(false);
+        
     }
     
     private static class InvalidateOptionsMenuImpl implements Runnable {
@@ -4071,6 +4073,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
         }
+    }
+    
+    @Override
+    public boolean isScreenLockSupported() {
+        return true;
+    }
+    
+    @Override
+    public void lockScreen(){
+        ((CodenameOneActivity)activity).lockScreen();
+    }
+    
+    @Override
+    public void unlockScreen(){
+        ((CodenameOneActivity)activity).unlockScreen();
     }
     
     private static class SetCurrentFormImpl implements Runnable {

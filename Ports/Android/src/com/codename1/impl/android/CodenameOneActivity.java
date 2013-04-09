@@ -33,6 +33,7 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -67,8 +68,9 @@ public class CodenameOneActivity extends Activity {
     private boolean inAppBillingSupported = false;
     private boolean subscriptionSupported = false;
     
+    private PowerManager.WakeLock wakeLock;
     
-        /**
+    /**
      * Each product in the catalog is either MANAGED or UNMANAGED.  MANAGED
      * means that the product can be purchased only once per user (such as a new
      * level in a game). The purchase is remembered by Android Market and
@@ -383,9 +385,6 @@ public class CodenameOneActivity extends Activity {
         }
     }
     
-    /**
-     * Called when this activity is no longer visible.
-     */
     @Override
     protected void onStop() {
         super.onStop();
@@ -393,6 +392,7 @@ public class CodenameOneActivity extends Activity {
         if(isBillingEnabled()) {
             ResponseHandler.unregister(cnPurchaseObserver);
         }
+        unlockScreen();
     }
 
     @Override
@@ -402,6 +402,7 @@ public class CodenameOneActivity extends Activity {
             purchaseDB.close();
             billing.unbind();
         }
+        unlockScreen();
     }
 
 
@@ -555,4 +556,27 @@ public class CodenameOneActivity extends Activity {
         unregIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0));
         startService(unregIntent);
     }
+    
+    
+    public void lockScreen(){
+        unlockScreen();
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
+            wakeLock = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP | android.os.PowerManager.ON_AFTER_RELEASE, "Codename One");
+        } catch (Exception excp) {
+            excp.printStackTrace();
+        }
+        if(wakeLock != null){
+            wakeLock.acquire();
+        }
+    }
+    
+    public void unlockScreen(){
+        if(wakeLock != null && wakeLock.isHeld()){
+            wakeLock.release();
+            wakeLock = null;
+        }
+    }
+    
+    
 }
