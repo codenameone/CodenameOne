@@ -2651,14 +2651,14 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Makes sure the component is up to date with the current style object
+     * Makes sure the component is up to date with the current theme, ONLY INVOKE THIS METHOD IF YOU CHANGED THE THEME!
      */
     public void refreshTheme() {
         refreshTheme(true);
     }
 
     /**
-     * Makes sure the component is up to date with the current style object
+     * Makes sure the component is up to date with the current theme, ONLY INVOKE THIS METHOD IF YOU CHANGED THE THEME!
      * @param merge indicates if the current styles should be merged with the new styles
      */
     public void refreshTheme(boolean merge) {

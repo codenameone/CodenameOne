@@ -1845,6 +1845,7 @@ public final class Display {
      * Return the number of alpha levels supported by the implementation.
      *
      * @return the number of alpha levels supported by the implementation
+     * @deprecated this method isn't implemented in most modern devices
      */
     public int numAlphaLevels(){
         return impl.numAlphaLevels();
@@ -1855,6 +1856,7 @@ public final class Display {
      * does not support gray scale devices.
      *
      * @return the number of colors applicable on the device
+     * @deprecated this method isn't implemented in most modern devices
      */
     public int numColors() {
         return impl.numColors();

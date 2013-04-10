@@ -289,6 +289,7 @@ public abstract class CodenameOneImplementation {
      * Return the number of alpha levels supported by the implementation.
      * 
      * @return the number of alpha levels supported by the implementation
+     * @deprecated this method isn't implemented in most modern devices
      */
     public int numAlphaLevels() {
         return 255;
@@ -299,6 +300,7 @@ public abstract class CodenameOneImplementation {
      * does not support gray scale devices.
      * 
      * @return the number of colors applicable on the device
+     * @deprecated this method isn't implemented in most modern devices
      */
     public int numColors() {
         return 65536;
@@ -2080,129 +2082,6 @@ public abstract class CodenameOneImplementation {
     public Object createNativeIndexed(Image image) {
         return null;
     }
-
-    /**
-     * Create a video/media component
-     * 
-     * @param player object responsible for playback lifecycle
-     * @return the video control
-     * @deprecated replaced by the new video component
-     */
-    public Object createVideoComponent(Object player) {
-        return null;
-    }
-
-
-    /**
-     * Returns the video width
-     * 
-     * @param videoControl the control for the video
-     * @return the width
-     * @deprecated replaced by the new video component
-     */
-    public int getVideoWidth(Object videoControl) {
-        return 0;
-    }
-
-    /**
-     * Returns the video height
-     * 
-     * @param videoControl the control for the video
-     * @return the height
-     * @deprecated replaced by the new video component
-     */
-    public int getVideoHeight(Object videoControl) {
-        return 0;
-    }
-
-
-    /**
-     * Sets the video visibility
-     * 
-     * @param vc video control instance
-     * @param visible whether the video is visible
-     * @deprecated replaced by the new video component
-     */
-    public void setVideoVisible(Object vc, boolean visible) {
-    }
-
-    /**
-     * Starts the video
-     * 
-     * @param player the player object
-     * @param videoControl the video control
-     * @deprecated replaced by the new video component
-     */
-    public void startVideo(Object player, Object videoControl) {
-    }
-
-    /**
-     * Stop the video
-     * 
-     * @param player the player object
-     * @param videoControl the video control
-     * @deprecated replaced by the new video component
-     */
-    public void stopVideo(Object player, Object videoControl) {
-    }
-
-    /**
-     * Set the number of times the media should loop
-     * 
-     * @param player the player object
-     * @param count the number of times the media should loop
-     * @deprecated replaced by the new video component
-     */
-    public void setVideoLoopCount(Object player, int count) {
-    }
-
-    /**
-     * Return the duration of the media
-     * 
-     * @param player the player object
-     * @return the duration of the media
-     * @deprecated replaced by the new video component
-     */
-    public long getMediaTime(Object player) {
-        return 0;
-    }
-
-    /**
-     * "Jump" to a point in time within the media
-     * 
-     * @param player the player object
-     * @param now the point in time to "Jump" to
-     * @return the media time in microseconds
-     * @deprecated replaced by the new video component
-     */
-    public long setMediaTime(Object player, long now) {
-        return 0;
-    }
-
-    /**
-     * Toggles the fullscreen mode
-     * 
-     * @param player the player object
-     * @param fullscreen true for fullscreen mode
-     * @deprecated replaced by the new video component
-     */
-    public void setVideoFullScreen(Object player, boolean fullscreen) {
-    }
-
-    /**
-     * Paint the video for the media component
-     * 
-     * @param cmp the media component
-     * @param fullScreen indicates whether this is fullscreen or not
-     * @param nativeGraphics the native graphics object
-     * @param video the native videoo control
-     * @param player the native player object
-     * @deprecated replaced by the version that accepts the video component instance
-     */
-    public void paintVideo(Component cmp, boolean fullScreen, Object nativeGraphics, Object video,
-            Object player) {
-    }
-
 
     /**
      * Returns true if the image was opaque
@@ -4353,6 +4232,15 @@ public abstract class CodenameOneImplementation {
      * @param c the component that was painted
      */
     public void afterComponentPaint(Component c, Graphics g) {
+    }
+    
+    /**
+     * Indicates to the port that the component was removed from the view and its
+     * UI should be removed in the next flush operation. 
+     * 
+     * @param c the removed component.
+     */
+    public void componentRemoved(Component c) {
     }
     
     /**

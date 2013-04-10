@@ -710,6 +710,7 @@ public class Container extends Component {
             cmp.setVisible(false);
         }
         setShouldCalcPreferredSize(true);
+        Display.getInstance().getImplementation().componentRemoved(cmp);
     }
 
     

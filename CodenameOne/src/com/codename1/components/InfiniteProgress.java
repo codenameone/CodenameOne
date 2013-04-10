@@ -124,7 +124,13 @@ public class InfiniteProgress extends Component {
         }
         int v = angle+=20 % 360;
         Style s = getStyle();
-        g.drawImage(animation.rotate(v), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
+        /*if(g.isAffineSupported()) {
+            g.rotate(((float)v) / 57.2957795f, getAbsoluteX() + s.getPadding(LEFT) + getWidth() / 2, getAbsoluteY() + s.getPadding(TOP) + getHeight() / 2);
+            g.drawImage(getAnimation(), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
+            g.resetAffine();
+        } else {*/
+            g.drawImage(animation.rotate(v), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));            
+        //}
     }
     
     /**
