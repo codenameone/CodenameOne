@@ -52,7 +52,6 @@ public class MultiButton extends Container {
     private Button emblem = new Button();
     private boolean invert;
     private String group;  
-    private Vector actionListeners = new Vector();
     
     /**
      * Default constructor allowing the designer to create an instance of this class
@@ -122,6 +121,7 @@ public class MultiButton extends Container {
             }
             emblem.setUIID(old.getUIID());
             emblem.setName(old.getName());
+            Vector actionListeners = old.getActionListeners();
             for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
                 emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
             }
@@ -143,7 +143,6 @@ public class MultiButton extends Container {
      */
     public void addActionListener(ActionListener al) {
         emblem.addActionListener(al);
-        actionListeners.addElement(al);
     }
 
     /**
@@ -153,7 +152,6 @@ public class MultiButton extends Container {
      */
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
-        actionListeners.removeElement(al);
     }
     
     /**
@@ -205,6 +203,7 @@ public class MultiButton extends Container {
             }
             emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
+            Vector actionListeners = old.getActionListeners();
             for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
                 emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
             }

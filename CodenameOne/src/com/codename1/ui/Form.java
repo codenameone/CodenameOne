@@ -1156,6 +1156,33 @@ public class Form extends Container {
         }
     }
 
+    /**
+     * Invoked to allow subclasses of form to handle a command from one point
+     * rather than implementing many command instances
+     */
+    void actionCommandImplNoRecurseComponent(Command cmd, ActionEvent ev) {
+        if (cmd == null) {
+            return;
+        }
+
+        if (comboLock) {
+            if (cmd == menuBar.getCancelMenuItem()) {
+                actionCommand(cmd);
+                return;
+            }
+            return;
+        }
+        if (cmd != menuBar.getSelectCommand()) {
+            if (commandListener != null) {
+                commandListener.fireActionEvent(ev);
+                if (ev.isConsumed()) {
+                    return;
+                }
+            }
+            actionCommand(cmd);
+        } 
+    }
+
     void initFocused() {
         if (focused == null) {
             setFocused(contentPane.findFirstFocusable());

@@ -309,6 +309,14 @@ public class Button extends Label {
     }
 
     /**
+     * Returns a vector containing the action listeners for this button
+     * @return the action listeners
+     */
+    public Vector getActionListeners() {
+        return dispatcher.getListenerVector();
+    }
+    
+    /**
      * Returns the icon for the button based on its current state
      *
      * @return the button icon based on its current state
@@ -360,7 +368,7 @@ public class Button extends Label {
             if(!ev.isConsumed()) {
                 Form f = getComponentForm();
                 if(f != null) {
-                    f.actionCommandImpl(cmd, ev);
+                    f.actionCommandImplNoRecurseComponent(cmd, ev);
                 }
             }
         } else {
