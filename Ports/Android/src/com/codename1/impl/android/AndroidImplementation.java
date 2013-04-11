@@ -1432,6 +1432,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ("androidId".equals(key)) {
             return Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID);
         }
+        
+        if ("AppArg".equals(key)) {
+             android.content.Intent intent = activity.getIntent();
+             if(intent != null){
+                 Uri u = intent.getData();
+                 if(u != null){
+                     return u.getEncodedPath();
+                 }
+             }             
+        }
+        
         if ("cellId".equals(key)) {
             try {
                 String serviceName = Context.TELEPHONY_SERVICE;
