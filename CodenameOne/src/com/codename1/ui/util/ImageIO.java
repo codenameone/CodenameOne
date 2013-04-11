@@ -99,7 +99,8 @@ public abstract class ImageIO {
     /**
      * Gets the ImageIO instance 
      * 
-     * @return ImageIO instance
+     * @return the image IO instance or null if image IO isn't supported for the 
+     * given platform
      */
     public static ImageIO getImageIO(){
         return Display.getInstance().getImageIO();
