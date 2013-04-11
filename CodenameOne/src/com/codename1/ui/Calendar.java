@@ -182,7 +182,7 @@ public class Calendar extends Container {
             month.getStyle().setBgTransparency(0);
             int y = cal.get(java.util.Calendar.YEAR);
             Vector years = new Vector();
-            for (int i = 2100; i > 1900; i--) {
+            for (int i = 2100; i >= 1900; i--) {
                 years.addElement("" + i);
             }
             ListModel yearModel = new DefaultListModel(years);
@@ -257,6 +257,30 @@ public class Calendar extends Container {
         mv.setSelectedDay(d.getTime());
         mv.setCurrentDay(mv.currentDay, true);
         componentChanged();
+    }
+
+    /**
+     * Sets the Calendar min and max years
+     * @param minYear the min year
+     * @param maxYear the max year
+     */ 
+    public void setYearRange(int minYear, int maxYear) {
+        if (minYear > maxYear) {
+            throw new IllegalArgumentException("Max year should be bigger or equal than min year!");
+        }
+        //The year combobox may not exist in the current context
+        if (year != null) {
+            Object previouslySelectedYear = year.getSelectedItem();
+            Vector years = new Vector();
+            for (int i = maxYear; i >= minYear; i--) {
+                years.addElement("" + i);
+            }
+            ListModel yearModel = new DefaultListModel(years);
+            year.setModel(yearModel);
+            if (years.contains(previouslySelectedYear)) {
+                year.setSelectedItem(previouslySelectedYear);
+            }
+        }
     }
 
     /**
