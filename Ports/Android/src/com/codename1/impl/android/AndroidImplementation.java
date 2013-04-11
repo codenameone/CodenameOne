@@ -1437,8 +1437,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
              android.content.Intent intent = activity.getIntent();
              if(intent != null){
                  Uri u = intent.getData();
-                 if(u != null){
-                     return u.getEncodedPath();
+                 if (u != null) {
+                     if ("content".equals(u.getScheme())) {
+                         Cursor cursor = activity.getContentResolver().query(u, new String[]{android.provider.MediaStore.Images.ImageColumns.DATA}, null, null, null);
+                         cursor.moveToFirst();
+                         String filePath = cursor.getString(0);
+                         cursor.close();
+                         return filePath;
+                     }else{
+                        return u.getEncodedPath();
+                     }
                  }
              }             
         }
