@@ -4904,8 +4904,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isNativeBrowserComponentSupported() {
-        return false;
-        //return fxExists;
+        return fxExists;
     }
 
     public PeerComponent createBrowserComponent(final Object parent) {
