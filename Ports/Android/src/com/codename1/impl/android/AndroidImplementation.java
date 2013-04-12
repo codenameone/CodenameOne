@@ -2569,11 +2569,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void rotate(Object nativeGraphics, float angle) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().rotate(angle);
+        ((AndroidGraphics) nativeGraphics).getCanvas().rotate((float)Math.toDegrees(angle));
     }
 
     public void rotate(Object nativeGraphics, float angle, int x, int y) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().rotate(angle, x, y);
+        ((AndroidGraphics) nativeGraphics).getCanvas().rotate((float)Math.toDegrees(angle), x, y);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
