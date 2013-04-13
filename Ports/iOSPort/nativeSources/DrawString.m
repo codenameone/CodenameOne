@@ -116,9 +116,9 @@
 }
 
 -(void)dealloc {
-	[super dealloc];
     [str release];
     [font release];
+    [super dealloc];
 }
 
 -(NSString*)getName {
