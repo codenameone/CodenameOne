@@ -361,6 +361,28 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
+     * @inheritDoc
+     */ 
+    public void setHeight(int height) {
+        float percent = ((float)height/(float)Display.getInstance().getDisplayHeight());
+        percent *= 100;
+        //if the banner height is more then 25% it's a bad ad we need to 
+        //remove it.
+        if(percent > 25){
+            removeAll();
+            Label filler = new Label(" ");
+            filler.setPreferredSize(new Dimension(400, 2));
+            filler.getStyle().setBgTransparency(0);
+            addComponent(BorderLayout.CENTER, filler);
+            revalidate();
+        }else{
+            super.setHeight(height);
+        }
+    }
+
+    
+    
+    /**
      * Simple setter of the unique identifier of the app on the ads service 
      * network, no need to manually use this the createAdsService uses this.
      * 
