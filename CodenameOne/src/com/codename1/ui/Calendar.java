@@ -700,7 +700,9 @@ public class Calendar extends Container {
                 for (int iter = 0; iter < buttons.length; iter++) {
                     if (src == buttons[iter]) {
 
-                        selected.setUIID("CalendarDay");
+                        if(selected != null){
+                            selected.setUIID("CalendarDay");
+                        }
                         buttons[iter].setUIID("CalendarSelectedDay");
                         selectedDay = dates[iter];
                         selected = buttons[iter];
