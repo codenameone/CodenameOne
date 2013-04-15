@@ -3039,26 +3039,24 @@ public final class Display {
     }
     
     /**
-     * Checks if the device supports locking the screen display from dimming, allowing 
+     * Checks if the device supports disabling the screen display from dimming, allowing 
      * the developer to keep the screen display on.
      */ 
-    public boolean isScreenLockSupported(){
+    public boolean isScreenSaverDisableSupported() {
         return impl.isScreenLockSupported();
     }
     
     /** 
-     * If isScreenLockSupported() returns true calling this method will 
+     * If isScreenSaverDisableSupported() returns true calling this method will 
      * lock the screen display on
+     * @param e when set to true the screen saver will work as usual and when set to false the screen
+     * will not turn off automatically
      */
-    public void lockScreen(){
-        impl.lockScreen();
+    public void setScreenSaverEnabled(boolean e){
+        if(e) {
+            impl.unlockScreen();    
+        } else {
+            impl.lockScreen();
+        }
     }
-    
-    /**
-     * Unlock the screen display allowing the screen to dim.
-     */ 
-    public void unlockScreen(){
-        impl.unlockScreen();    
-    }
-
 }

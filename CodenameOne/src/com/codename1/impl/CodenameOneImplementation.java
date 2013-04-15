@@ -4325,26 +4325,28 @@ public abstract class CodenameOneImplementation {
      */
     public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
-        Preferences.set("push_key", id);
-        ConnectionRequest r = new ConnectionRequest() {
-            protected void readResponse(InputStream input) throws IOException  {
-                DataInputStream d = new DataInputStream(input);
-                Preferences.set("push_id", d.readLong());
+        if(Preferences.get("push_id", (long)-1) == -1) {
+            Preferences.set("push_key", id);
+            ConnectionRequest r = new ConnectionRequest() {
+                protected void readResponse(InputStream input) throws IOException  {
+                    DataInputStream d = new DataInputStream(input);
+                    Preferences.set("push_id", d.readLong());
+                }
+            };
+            r.setPost(false);
+            r.setUrl("https://codename-one.appspot.com/registerPush");
+            long val = Preferences.get("push_id", (long)-1);
+            if(val > -1) {
+                r.addArgument("i", "" + val);
             }
-        };
-        r.setPost(false);
-        r.setUrl("https://codename-one.appspot.com/registerPush");
-        long val = Preferences.get("push_id", (long)-1);
-        if(val > -1) {
-            r.addArgument("i", "" + val);
+            r.addArgument("p", id);
+            r.addArgument("k", applicationKey);
+            r.addArgument("os", Display.getInstance().getPlatformName());
+            r.addArgument("t", "" + pushType);
+            r.addArgument("ud", udid);
+            r.addArgument("r", packageName);
+            NetworkManager.getInstance().addToQueue(r);
         }
-        r.addArgument("p", id);
-        r.addArgument("k", applicationKey);
-        r.addArgument("os", Display.getInstance().getPlatformName());
-        r.addArgument("t", "" + pushType);
-        r.addArgument("ud", udid);
-        r.addArgument("r", packageName);
-        NetworkManager.getInstance().addToQueue(r);
     }
 
     /**

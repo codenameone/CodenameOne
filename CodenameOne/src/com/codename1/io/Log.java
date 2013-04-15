@@ -143,7 +143,7 @@ public class Log {
         
         String buildKey = Display.getInstance().getProperty("build_key", null);
         if(buildKey == null) {
-            return -1;
+            buildKey = "";
         }
         // request the device id from the server
         com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {

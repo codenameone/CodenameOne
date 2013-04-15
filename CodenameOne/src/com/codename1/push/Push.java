@@ -24,6 +24,7 @@ package com.codename1.push;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 
 /**
@@ -110,6 +111,10 @@ public class Push {
      * @return the device key that can be used to push to this specific device.
      */
     public static String getDeviceKey() {
-        return Display.getInstance().getProperty("pushDeviceKey", null);
+        long l = Preferences.get("push_id", (long)-1);
+        if(l == -1) {
+            return null;
+        }
+        return "" + l;
     }
 }
