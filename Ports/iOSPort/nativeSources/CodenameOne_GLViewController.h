@@ -36,9 +36,16 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+#define INCLUDE_ZOOZ
+#ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
+#endif
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, ZooZPaymentCallbackDelegate> {
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate 
+#ifdef INCLUDE_ZOOZ
+        ,ZooZPaymentCallbackDelegate
+#endif
+> {
 @private
     EAGLContext *context;
     GLuint program;

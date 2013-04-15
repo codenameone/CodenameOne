@@ -1471,7 +1471,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void rotate(Object nativeGraphics, float angle, int x, int y) {
-        ((NativeGraphics)nativeGraphics).rotate(angle, x, y);
+        ((NativeGraphics)nativeGraphics).rotate(angle * 57.2957795f, x, y);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
@@ -1788,6 +1788,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.browserReload(get(browserPeer));
     }
 
+    @Override
+    public void lockScreen(){
+        nativeInstance.lockScreen();
+    }
+    
+    @Override
+    public void unlockScreen(){
+        nativeInstance.unlockScreen();
+    }
+    
+    
     @Override
     public boolean canForceOrientation() {
         return true;

@@ -39,20 +39,26 @@ extern UIView *editingComponent;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    // Override point for customization after application launch.
+    self.window.rootViewController = self.viewController;
+    NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
+    if(url != nil) {
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
+        JAVA_OBJECT key = fromNSString(@"AppArg");
+        JAVA_OBJECT value = fromNSString([url absoluteString]);
+        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(o, key, value);
+    }
+    com_codename1_impl_ios_IOSImplementation_callback__();
 #ifdef INCLUDE_CN1_PUSH
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if( [apsInfo objectForKey:@"alert"] != NULL)
     {
-	NSLog(@"Received notification: %@", userInfo);
-	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
+        NSLog(@"Received notification: %@", userInfo);
+        NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
-        return YES;
     }
 #endif
-    // Override point for customization after application launch.
-    self.window.rootViewController = self.viewController;
-    com_codename1_impl_ios_IOSImplementation_callback__();
     return YES;
 }
 

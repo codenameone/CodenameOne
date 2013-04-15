@@ -123,6 +123,8 @@ final class IOSNative {
 
     native void lockOrientation(boolean portrait);
     native void unlockOrientation();
+    native void lockScreen();
+    native void unlockScreen();
 
     native void vibrate(int duration);
 

@@ -45,7 +45,10 @@
 #import "StoreKit/StoreKit.h"
 #import "ScanCodeImpl.h"
 //#import "QRCodeReaderOC.h"
+#define INCLUDE_CN1_PUSH2
+#ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
+#endif
 #import "Rotate.h"
 
 extern void initVMImpl();
@@ -1167,6 +1170,16 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(JAVA_OBJECT inst
 void com_codename1_impl_ios_IOSNative_unlockOrientation__(JAVA_OBJECT instanceObject)
 {
     orientationLock = 0;
+}
+
+void com_codename1_impl_ios_IOSNative_lockScreen__(JAVA_OBJECT instanceObject)
+{
+    [UIApplication sharedApplication].idleTimerDisabled = YES;
+}
+
+void com_codename1_impl_ios_IOSNative_unlockScreen__(JAVA_OBJECT instanceObject)
+{
+    [UIApplication sharedApplication].idleTimerDisabled = NO;
 }
 
 extern void vibrateDevice();
@@ -2655,7 +2668,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(JAVA_OBJECT ins
 }
 
 void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) {
-    /*dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         ZBarReaderViewController *reader = [ZBarReaderViewController new];
         ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
@@ -2674,7 +2687,7 @@ void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) 
         [[CodenameOne_GLViewController instance] presentModalViewController:reader animated:NO];
         [reader release];
         [pool release];
-    });*/
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_scanQRCode__(JAVA_OBJECT instanceObject) {
@@ -2857,6 +2870,7 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
 }
 
 void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_java_lang_String_boolean_java_lang_String(JAVA_OBJECT instanceObject, JAVA_DOUBLE amount, JAVA_OBJECT currency, JAVA_OBJECT appKey, JAVA_BOOLEAN sandbox, JAVA_OBJECT invoiceNumber) {
+#ifdef INCLUDE_ZOOZ
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         ZooZ *zooz = [ZooZ sharedInstance];
@@ -2867,6 +2881,7 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         [zooz openPayment:req forAppKey:toNSString(appKey)];
         [pool release];
     });
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___long_java_lang_String(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript){

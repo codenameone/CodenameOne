@@ -85,6 +85,8 @@
         </jar>
         <zip zipfile="dist/nativeios.jar" basedir="nativeSources">
         </zip>
+        <zip zipfile="dist/zoozIosSources.jar" basedir="Zooz">
+        </zip>
         <delete file="${dist.jar}.old" />
     </target>    
 

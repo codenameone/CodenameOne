@@ -1893,6 +1893,7 @@ extern SKPayment *paymentInstance;
     }
 }
 
+#ifdef INCLUDE_ZOOZ
 -(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
                                                                      the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldn√t update your UI on this, just process the payment data */
     NSString* tid = response.transactionID;
@@ -1925,4 +1926,5 @@ extern SKPayment *paymentInstance;
         repaintUI();
     });
 }
+#endif
 @end
