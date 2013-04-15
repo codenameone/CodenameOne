@@ -381,10 +381,12 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                     type = BasicEditField.FILTER_EMAIL;
                 } else if ((constraint & TextArea.NUMERIC) == TextArea.NUMERIC) {
                     type = BasicEditField.FILTER_NUMERIC;
-                } else if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
+                }
+                if ((constraint & TextArea.PHONENUMBER) == TextArea.PHONENUMBER) {
                     type = BasicEditField.FILTER_PHONE;
-                } else if ((constraint & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE) {
-                    type = BasicEditField.NO_COMPLEX_INPUT;
+                }
+                if ((constraint & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE) {
+                    type |= BasicEditField.NO_COMPLEX_INPUT;
                 }
 
                 if (lightweightEditTmp.isSingleLineTextArea()) {
@@ -1479,6 +1481,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         public BBEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | Field.SPELLCHECKABLE | type);
             this.lightweightEdit = lightweightEdit;
+            systemOut("BBEditField");
         }
 
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
