@@ -474,7 +474,7 @@ public class SideMenuBar extends MenuBar {
 
                         public void run() {
                             ActionEvent e = new ActionEvent(cmd);
-                            cmd.actionPerformed(e);
+                            parent.dispatchCommand(cmd, e);
                         }
                     });
                 }
