@@ -161,6 +161,9 @@ public class ConnectionRequest implements IOProgressListener {
             userHeaders = new Hashtable();
         }
         userHeaders.put(key, value);
+        if(key.equalsIgnoreCase("content-type")) {
+            setContentType(contentType);
+        }
     }
 
     /**
