@@ -40,8 +40,8 @@ import javax.swing.table.DefaultTableModel;
  */
 public class CloudObjectConsole extends javax.swing.JFrame {
 
-    private int index = 1;
     private int page = 0;
+    
     private int [] scopeOptions = new int [] {
         CloudObject.ACCESS_PUBLIC,
         CloudObject.ACCESS_PUBLIC_READ_ONLY,
@@ -115,7 +115,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
 
         jLabel2.setText("Page");
 
-        pageNumber.setText("1");
+        pageNumber.setText("0");
 
         jLabel3.setText("Scope");
 
@@ -131,9 +131,9 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addGap(0, 0, Short.MAX_VALUE)
-                        .addComponent(jLabel2)
+                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(pageNumber, javax.swing.GroupLayout.PREFERRED_SIZE, 14, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(pageNumber, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(2, 2, 2)
                         .addComponent(jButton2)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -179,29 +179,18 @@ public class CloudObjectConsole extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        loadData();
+        loadData(null);
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-        
-        index += 10;
-        page++;
-        pageNumber.setText("" + page);
-        loadData();        
+       loadData(new Boolean(true));        
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        index -= 10;
-        page--;
-        if(page < 0){
-            page = 0;
-            index = 1;
-        }
-        pageNumber.setText("" + page);
-        loadData();
+        loadData(new Boolean(false));        
     }//GEN-LAST:event_jButton2ActionPerformed
 
-    private void loadData() {
+    private void loadData(Boolean nextPage) {
         final JDialog d = new JDialog(this);
         d.setModal(false);
         d.setLocationRelativeTo(this);
@@ -209,14 +198,26 @@ public class CloudObjectConsole extends javax.swing.JFrame {
         d.add(new JLabel("Loading..."));
         d.pack();
         d.setVisible(true);
-
+        final int [] requestPage = new int [1];
+        requestPage[0] = page;
+        if(nextPage != null){
+            if(nextPage.booleanValue()){
+                requestPage[0] += 10;
+            }else{
+                requestPage[0] -= 10;            
+                if(requestPage[0] < 0){
+                    requestPage[0] = 0;
+                }
+            }
+        }
+        
         new Thread() {
 
             @Override
             public void run() {
                 String t = type.getText();
                 try {
-                    CloudObject[] objects = CloudStorage.getInstance().querySorted(t, index, true, page, 10, scopeOptions[scope.getSelectedIndex()]);
+                    CloudObject[] objects = CloudStorage.getInstance().querySorted(t, 1, true, requestPage[0], 10, scopeOptions[scope.getSelectedIndex()]);
 
                     if (objects.length > 0) {
                         Hashtable vals = objects[0].getValues();
@@ -265,7 +266,8 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                                     }
                                 };
                                 dataTable.setModel(tableModel);
-
+                                page = requestPage[0];
+                                pageNumber.setText("" + (page /10));
                             }
                         });
 
