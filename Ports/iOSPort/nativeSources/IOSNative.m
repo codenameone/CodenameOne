@@ -2928,6 +2928,9 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String(JAVA_OBJECT 
     //NSLog(@"java_util_TimeZone_getTimezoneRawOffset___java_lang_String %@", n);
     NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
     JAVA_INT result = [tzone secondsFromGMT] * 1000;
+    if([tzone isDaylightSavingTime]) {
+        result -= (int)([tzone daylightSavingTimeOffset] * 1000);
+    }
     [pool release];
     return result;
 }
