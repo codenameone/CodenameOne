@@ -2516,9 +2516,17 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             for(String currentName : allComponents.keySet()) {
                 String value = allComponents.get(currentName);
                 if(value.equals("com.codename1.ui.List") || value.equals("com.codename1.ui.ComboBox") ||
-                        value.equals("com.codename1.ui.list.ContainerList") || value.equals("com.codename1.ui.list.MultiList") ||
+                        value.equals("com.codename1.ui.list.MultiList") ||
                         value.equals("com.codename1.ui.Calendar")) {
                     listComponents.add(currentName);
+                }
+            }
+
+            List<String> containerListComponents = new ArrayList<String>();
+            for(String currentName : allComponents.keySet()) {
+                String value = allComponents.get(currentName);
+                if(value.equals("com.codename1.ui.list.ContainerList")) {
+                    containerListComponents.add(currentName);
                 }
             }
 
@@ -2538,6 +2546,26 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                     w.write("    protected boolean initListModel");
                     w.write(normalizeFormName(listName));
                     w.write("(List cmp) {\n");
+                    w.write("        return false;\n    }\n\n");
+                }
+            }
+
+            if(containerListComponents.size() > 0) {
+                w.write("    protected boolean setListModel(com.codename1.ui.list.ContainerList cmp) {\n");
+                w.write("        String listName = cmp.getName();\n");
+                for(String listName : containerListComponents) {
+                    w.write("        if(\"");
+                    w.write(listName);
+                    w.write("\".equals(listName)) {\n");
+                    w.write("            return initListModel");
+                    w.write(normalizeFormName(listName));
+                    w.write("(cmp);\n        }\n");
+                }
+                w.write("        return super.setListModel(cmp);\n    }\n\n");
+                for(String listName : containerListComponents) {
+                    w.write("    protected boolean initListModel");
+                    w.write(normalizeFormName(listName));
+                    w.write("(com.codename1.ui.list.ContainerList cmp) {\n");
                     w.write("        return false;\n    }\n\n");
                 }
             }

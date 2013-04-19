@@ -5474,20 +5474,24 @@ public class UserInterfaceEditor extends BaseForm {
                     pos = fileContent.lastIndexOf('}');
 
                     line = charIndexToFileLine(pos, fileContent) + 4;
+                    String type = "List";
+                    if(c instanceof com.codename1.ui.list.ContainerList) {
+                        type = "com.codename1.ui.list.ContainerList";
+                    }
                     if(getLanguageLevel() > 4) {
                         fileContent = fileContent.substring(0, pos) +
                                 "\n    @Override\n" +
-                                "    protected boolean " + methodName + "(List cmp) {\n" +
-                                "        cmp.setModel(new DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
+                                "    protected boolean " + methodName + "(" + type + " cmp) {\n" +
+                                "        cmp.setModel(new com.codename1.ui.list.DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
                                 "        return true;\n" +
                                 "    }\n" +
                                 fileContent.substring(pos);
                     } else {
                         fileContent = fileContent.substring(0, pos) +
-                                "\n    protected boolean " + methodName + "(List cmp) {\n" +
+                                "\n    protected boolean " + methodName + "(" + type + " cmp) {\n" +
                                 "        // If the resource file changes the names of components this call will break notifying you that you should fix the code\n" +
                                 "        super." + methodName +"(cmp);\n" +
-                                "        cmp.setModel(new DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
+                                "        cmp.setModel(new com.codename1.ui.list.DefaultListModel(new String[] {\"Item 1\", \"Item 2\", \"Item 3\"}));\n" +
                                 "        return true;\n" +
                                 "    }\n" +
                                 fileContent.substring(pos);

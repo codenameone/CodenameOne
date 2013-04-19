@@ -42,7 +42,7 @@ public class L10NManager {
     }
     
     /**
-     * Returns the current locale language
+     * Returns the current locale language as an ISO 639 two letter code
      * 
      * @return iso language string
      */
@@ -156,7 +156,7 @@ public class L10NManager {
     }
 
     /**
-     * Determines the locale (location)
+     * Determines the locale (location) as an ISO 3166 country code
      * 
      * @return the locale
      */

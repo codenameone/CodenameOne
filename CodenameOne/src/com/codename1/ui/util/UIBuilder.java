@@ -670,6 +670,16 @@ public class UIBuilder {
         return false;
     }
 
+    /**
+     * Allows a subclass to set the list model for the given component
+     * 
+     * @param cmp the list whose model may be set
+     * @return true if a model was set by this method
+     */
+    protected boolean setListModel(ContainerList cmp) {
+        return false;
+    }
+
     private void readCommands(DataInputStream in, Component cmp, Resources res, boolean legacy) throws IOException {
         int commandCount = in.readInt();
         final String[] commandActions = new String[commandCount];
@@ -986,11 +996,15 @@ public class UIBuilder {
                         cmp.setPropertyValue(customPropertyName, null);
                         break;
                     }
+                    boolean cl = cmp instanceof ContainerList;
                     String[] propertyNames = cmp.getPropertyNames();
                     for(int iter = 0 ; iter < propertyNames.length ; iter++) {
                         if(propertyNames[iter].equals(customPropertyName)) {
                             Class type = cmp.getPropertyTypes()[iter];
                             Object value = readCustomPropertyValue(in, type, res, propertyNames[iter]);
+                            if(cl && customPropertyName.equals("ListItems") && setListModel((ContainerList)cmp)) {
+                                break;
+                            }
                             cmp.setPropertyValue(customPropertyName, value);
                             break;
                         }

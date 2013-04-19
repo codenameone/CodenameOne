@@ -38,7 +38,7 @@ public class Push {
      * Key for the hashtable argument when pushing to the google play store
      */
     public static final String GOOGLE_PUSH_KEY = "googlePlay";
-    
+
     /**
      * Sends a push message and returns true if server delivery succeeded, notice that the 
      * push message isn't guaranteed to reach all devices.
