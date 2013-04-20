@@ -398,6 +398,17 @@ public class UIManager {
         themeProps.put("Container.sel#derive", "Container");
         themeProps.put("Container.dis#derive", "Container");
 
+        if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.derive")) {
+            themeProps.put("OnOffSwitch.transparency", "255");
+            themeProps.put("OnOffSwitch.bgColor", "222222");
+            themeProps.put("OnOffSwitch.padding", "0,0,0,0");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.sel#derive")) {
+            themeProps.put("OnOffSwitch.sel#transparency", "255");
+            themeProps.put("OnOffSwitch.sel#bgColor", "222222");
+            themeProps.put("OnOffSwitch.sel#padding", "0,0,0,0");
+        }
+        
         if(installedTheme == null || !installedTheme.containsKey("ContentPane.derive")) {
             themeProps.put("ContentPane.transparency", "0");
             themeProps.put("ContentPane.margin", "0,0,0,0");
