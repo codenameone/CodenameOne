@@ -2736,7 +2736,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 for (long i = USN - 1; i >= lastUSN; --i) {
                     FileSystemJournalEntry entry = FileSystemJournal.getEntry(i);
                     if (entry != null) {
-                        if (entry.getEvent() == FileSystemJournalEntry.FILE_CHANGED) {
+                        if (entry.getEvent() == FileSystemJournalEntry.FILE_ADDED) {
                             if (entry.getPath().indexOf(".jpg") != -1) {
                                 lastUSN = USN;
                                 String path = entry.getPath();
