@@ -37,6 +37,8 @@ public class Message {
     
     private String mimeType = MIME_TEXT;
     
+    private String attachmentMimeType = MIME_IMAGE_JPG;
+    
     public static final String MIME_TEXT = "text/plain";
     
     public static final String MIME_HTML = "text/html";
@@ -79,20 +81,38 @@ public class Message {
     }
     
     /**
-     * Gets the message attachment file path
-     * @return the file path of the attachment
-     */
-    public String getAttachment() {
-        return fileUri;
-    }
-
-    /**
      * Gets the message mime type
      * 
      * @return 
      */
     public String getMimeType() {
         return mimeType;
+    }
+    
+    /**
+     * Sets the attachment mime type.
+     * 
+     * @param mimeType 
+     */
+    public void setAttachmentMimeType(String mimeType) {
+        this.attachmentMimeType = mimeType;
+    }
+    
+    /**
+     * Gets the attachment mime type
+     * 
+     * @return 
+     */
+    public String getAttachmentMimeType() {
+        return attachmentMimeType;
+    }
+    
+    /**
+     * Gets the message attachment file path
+     * @return the file path of the attachment
+     */
+    public String getAttachment() {
+        return fileUri;
     }
     
     /**
