@@ -41,6 +41,7 @@ import javax.swing.table.DefaultTableModel;
 public class CloudObjectConsole extends javax.swing.JFrame {
 
     private int page = 0;
+    private boolean isQuery = false; 
     
     private int [] scopeOptions = new int [] {
         CloudObject.ACCESS_PUBLIC,
@@ -65,8 +66,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        jLabel1 = new javax.swing.JLabel();
-        type = new javax.swing.JTextField();
+        buttonGroup1 = new javax.swing.ButtonGroup();
         jButton1 = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
         dataTable = new javax.swing.JTable();
@@ -76,11 +76,17 @@ public class CloudObjectConsole extends javax.swing.JFrame {
         pageNumber = new javax.swing.JLabel();
         jLabel3 = new javax.swing.JLabel();
         scope = new javax.swing.JComboBox();
+        jLabel1 = new javax.swing.JLabel();
+        typeTxt = new javax.swing.JTextField();
+        jLabel4 = new javax.swing.JLabel();
+        indexCombo = new javax.swing.JComboBox();
+        jRadioButton1 = new javax.swing.JRadioButton();
+        jRadioButton2 = new javax.swing.JRadioButton();
+        queryCombo = new javax.swing.JComboBox();
+        queryTxt = new javax.swing.JTextField();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Cloud Storage");
-
-        jLabel1.setText("Type");
 
         jButton1.setText("Load");
         jButton1.addActionListener(new java.awt.event.ActionListener() {
@@ -121,58 +127,108 @@ public class CloudObjectConsole extends javax.swing.JFrame {
 
         scope.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "PUBLIC", "PUBLIC_READ_ONLY", "APPLICATION", "APPLICATION_READ_ONLY", "PRIVATE" }));
 
+        jLabel1.setText("Type");
+
+        jLabel4.setText("Index");
+
+        indexCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }));
+
+        buttonGroup1.add(jRadioButton1);
+        jRadioButton1.setSelected(true);
+        jRadioButton1.setText("Sort");
+        jRadioButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jRadioButton1ActionPerformed(evt);
+            }
+        });
+
+        buttonGroup1.add(jRadioButton2);
+        jRadioButton2.setText("Query");
+        jRadioButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jRadioButton2ActionPerformed(evt);
+            }
+        });
+
+        queryCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Equals", "Greater", "Lesser" }));
+        queryCombo.setEnabled(false);
+
+        queryTxt.setEnabled(false);
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 442, Short.MAX_VALUE)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
-                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(pageNumber, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(2, 2, 2)
-                        .addComponent(jButton2)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButton3)
-                        .addGap(1, 1, 1))
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, 69, Short.MAX_VALUE)
-                            .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 55, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel1)
+                            .addComponent(jLabel4))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(scope, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(type))
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(indexCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(jRadioButton1)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jRadioButton2)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(queryCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 75, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(queryTxt)
+                                .addGap(1, 1, 1))
+                            .addComponent(typeTxt)
+                            .addComponent(scope, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 93, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addContainerGap())))
+                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(pageNumber, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 65, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 545, Short.MAX_VALUE))
+                .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(type, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(7, 7, 7)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(jLabel3)
-                            .addComponent(scope, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(6, 6, 6)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 242, Short.MAX_VALUE)
+                            .addComponent(scope, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel1)
+                            .addComponent(typeTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel4)
+                            .addComponent(indexCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jRadioButton1)
+                            .addComponent(jRadioButton2)
+                            .addComponent(queryCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(queryTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addComponent(jButton1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jButton2)
-                    .addComponent(jButton3)
-                    .addComponent(jLabel2)
-                    .addComponent(pageNumber)))
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 205, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(jButton2)
+                        .addComponent(jLabel2)
+                        .addComponent(pageNumber))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                        .addComponent(jButton3)
+                        .addContainerGap())))
         );
 
         pack();
@@ -190,6 +246,20 @@ public class CloudObjectConsole extends javax.swing.JFrame {
         loadData(new Boolean(false));        
     }//GEN-LAST:event_jButton2ActionPerformed
 
+    private void jRadioButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButton1ActionPerformed
+        isQuery = false;
+        queryCombo.setEnabled(false);
+        queryTxt.setEnabled(false);
+        
+    }//GEN-LAST:event_jRadioButton1ActionPerformed
+
+    private void jRadioButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButton2ActionPerformed
+        isQuery = true;
+        queryCombo.setEnabled(true);
+        queryTxt.setEnabled(true);
+    }//GEN-LAST:event_jRadioButton2ActionPerformed
+
+    
     private void loadData(Boolean nextPage) {
         final JDialog d = new JDialog(this);
         d.setModal(false);
@@ -202,24 +272,53 @@ public class CloudObjectConsole extends javax.swing.JFrame {
         requestPage[0] = page;
         if(nextPage != null){
             if(nextPage.booleanValue()){
-                requestPage[0] += 10;
+                requestPage[0] += 30;
             }else{
-                requestPage[0] -= 10;            
+                requestPage[0] -= 30;            
                 if(requestPage[0] < 0){
                     requestPage[0] = 0;
                 }
             }
+        }else{
+            page = 0;
+            requestPage[0] = 0;        
         }
         
         new Thread() {
 
             @Override
             public void run() {
-                String t = type.getText();
                 try {
-                    CloudObject[] objects = CloudStorage.getInstance().querySorted(t, 1, true, requestPage[0], 10, scopeOptions[scope.getSelectedIndex()]);
+                    String q = "*";
+                    String queryType = typeTxt.getText();
+                    if(queryType != null && queryType.length() > 0){
+                        q = queryType;
+                    }
+                    int index = indexCombo.getSelectedIndex();
+                    
+                    CloudObject[] objects = null; 
+                    
+                    if(isQuery){
+                        int queryComboVal = queryCombo.getSelectedIndex();
+                        String queryVal = queryTxt.getText();
+                        switch(queryComboVal){
+                            case 0:
+                                objects = CloudStorage.getInstance().queryEquals(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                break;
+                            case 1:
+                                objects = CloudStorage.getInstance().queryGreaterThan(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                break;
+                            case 2:
+                                objects = CloudStorage.getInstance().queryLessThan(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                break;
+                        }
+                    }else{
+                        objects = CloudStorage.getInstance().querySorted(q, index + 1, true, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                    }
+                    
+                    
 
-                    if (objects.length > 0) {
+                    if (objects != null && objects.length > 0) {
                         Hashtable vals = objects[0].getValues();
 
                         final Vector cols = new Vector();
@@ -232,7 +331,11 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                             if (key.equals("CN1Type")) {
                                 continue;
                             }
-                            cols.add(key);
+                            if (key.startsWith("CN1")) {
+                                cols.add(key.substring(3, key.length()));
+                            }else{
+                                cols.add(key);
+                            }
                         }
 
                         final Vector data = new Vector();
@@ -267,7 +370,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                                 };
                                 dataTable.setModel(tableModel);
                                 page = requestPage[0];
-                                pageNumber.setText("" + (page /10));
+                                pageNumber.setText("" + (page /30));
                             }
                         });
 
@@ -334,16 +437,23 @@ public class CloudObjectConsole extends javax.swing.JFrame {
         });
     }
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JTable dataTable;
+    private javax.swing.JComboBox indexCombo;
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
+    private javax.swing.JLabel jLabel4;
+    private javax.swing.JRadioButton jRadioButton1;
+    private javax.swing.JRadioButton jRadioButton2;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JLabel pageNumber;
+    private javax.swing.JComboBox queryCombo;
+    private javax.swing.JTextField queryTxt;
     private javax.swing.JComboBox scope;
-    private javax.swing.JTextField type;
+    private javax.swing.JTextField typeTxt;
     // End of variables declaration//GEN-END:variables
 }
