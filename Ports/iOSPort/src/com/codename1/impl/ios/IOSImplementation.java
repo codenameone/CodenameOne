@@ -2246,8 +2246,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
+        String att = msg.getAttachment();
+        if(att != null && att.length() == 0) {
+            att = null;
+        }
         nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(),  
-                msg.getAttachment(), msg.getAttachmentMimeType(), msg.getMimeType().equals(Message.MIME_HTML));
+                att, msg.getAttachmentMimeType(), msg.getMimeType().equals(Message.MIME_HTML));
     }
     
     @Override

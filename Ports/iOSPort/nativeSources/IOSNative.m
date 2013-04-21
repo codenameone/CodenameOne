@@ -1714,6 +1714,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
         if(picker == nil || ![MFMailComposeViewController canSendMail]) {
             return;
         }
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
         
         // Recipient.
@@ -1727,10 +1728,21 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
         // Body.
         NSString *emailBody = toNSString(content);
         [picker setMessageBody:emailBody isHTML:htmlMail];
-        
+        if(attachment != nil) {
+            NSString* file = toNSString(attachment);
+            NSString* mime = toNSString(attachmentMimeType);
+            int pos = [file rangeOfString:@"/" options:NSBackwardsSearch].location + 1;
+            NSString* fileComponent = [file substringFromIndex:pos];
+            if([file hasPrefix:@"file:"]) {
+                file = [file substringFromIndex:5];
+            }
+            NSData* d = [NSData dataWithContentsOfFile:file];
+            [picker addAttachmentData:d mimeType:mime fileName:fileComponent];
+        }
         [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
         
         [picker release];
+        [pool release];
     });
 }
 
