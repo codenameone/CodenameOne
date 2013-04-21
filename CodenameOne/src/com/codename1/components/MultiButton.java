@@ -122,8 +122,10 @@ public class MultiButton extends Container {
             emblem.setUIID(old.getUIID());
             emblem.setName(old.getName());
             Vector actionListeners = old.getActionListeners();
-            for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+            if(actionListeners != null) {
+                for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
+                    emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+                }
             }
             if(old.getCommand() != null) {
                 Image img = old.getIcon();
@@ -204,8 +206,10 @@ public class MultiButton extends Container {
             emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
             Vector actionListeners = old.getActionListeners();
-            for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+            if(actionListeners != null) {
+                for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
+                    emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+                }
             }
             if(old.getCommand() != null) {
                 Image img = old.getIcon();
