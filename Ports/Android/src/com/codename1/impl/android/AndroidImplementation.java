@@ -78,6 +78,7 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
+import android.text.Html;
 import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
@@ -3437,15 +3438,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
         Intent emailIntent;
-
-        if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
-            emailIntent = new Intent(android.content.Intent.ACTION_SEND);
-            emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
-            emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
-            emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
-            emailIntent.setType(msg.getMimeType());
-            emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
-        } else {
+        
+        if(msg.getMimeType().equals(Message.MIME_TEXT)){
             StringBuilder to = new StringBuilder();
             for (int i = 0; i < recipients.length; i++) {
                 to.append(recipients[i]);
@@ -3455,9 +3449,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Uri.parse(
                     "mailto:" + to.toString()
                     + "?subject=" + Uri.encode(subject)
-                    + "&body=" + Uri.encode(msg.getContent())));
-
+                    + "&body=" + Uri.encode(msg.getContent())));        
+        }else{
+            emailIntent = new Intent(android.content.Intent.ACTION_SEND);
+            emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+            emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+            emailIntent.setType(msg.getMimeType());
+            if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
+                emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
+            } 
+            if(msg.getMimeType().equals(Message.MIME_HTML)){
+                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                
+            }else{
+                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+            }
         }
+
         activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
     }
 
