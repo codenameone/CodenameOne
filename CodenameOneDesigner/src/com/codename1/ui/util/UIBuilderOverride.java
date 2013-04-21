@@ -62,6 +62,7 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
         registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
         registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
+        registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
     }
 
     void modifyingProperty(com.codename1.ui.Component c, int p) {

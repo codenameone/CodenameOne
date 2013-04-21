@@ -54,7 +54,6 @@ public class OnOffSwitch extends Container {
     private boolean value;
     private Button button;
     private boolean dragged;
-    private boolean pressed;
     private int pressX;
     private int buttonWidth;
     private Image switchOnImage;
@@ -231,7 +230,6 @@ public class OnOffSwitch extends Container {
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
-        pressed = true;
         pressX = x;
     }
     
@@ -239,7 +237,6 @@ public class OnOffSwitch extends Container {
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
-        pressed = false;
         dragged = true;
         deltaX = pressX - x;
         if(!iosMode) {
@@ -283,7 +280,7 @@ public class OnOffSwitch extends Container {
                     if(f != null) {
                         f.deregisterAnimated(this);
                     }
-                    OnOffSwitch.this.value = value;
+                    OnOffSwitch.this.setValue(value);
                 }
                 repaint();
                 return false;
@@ -317,7 +314,6 @@ public class OnOffSwitch extends Container {
             } else {
                 animateTo(!value, 0);
             }
-            pressed = false;
             return;
         } else {
             if(!dragged) {
@@ -341,7 +337,112 @@ public class OnOffSwitch extends Container {
                 animateLayout(150);
             }
         }        
-        pressed = false;
         dragged = false;
+    }
+
+    /**
+     * Label for the on mode
+     * @return the on
+     */
+    public String getOn() {
+        return on;
+    }
+
+    /**
+     * Label for the on mode
+     * @param on the on to set
+     */
+    public void setOn(String on) {
+        this.on = on;
+    }
+
+    /**
+     * Label for the off mode
+     * @return the off
+     */
+    public String getOff() {
+        return off;
+    }
+
+    /**
+     * Label for the off mode
+     * @param off the off to set
+     */
+    public void setOff(String off) {
+        this.off = off;
+    }
+
+    /**
+     * The value of the switch
+     * @return the value
+     */
+    public boolean isValue() {
+        return value;
+    }
+
+    /**
+     * The value of the switch
+     * @param value the value to set
+     */
+    public void setValue(boolean value) {
+        this.value = value;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {
+            "value", "on", "off"
+        };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {
+           Boolean.class,
+           String.class,
+           String.class
+       };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("on")) {
+            return on;
+        }
+        if(name.equals("off")) {
+            return off;
+        }
+        if(name.equals("value")) {
+            if(value) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("on")) {
+            setOn((String)value);
+            return null;
+        }
+        if(name.equals("off")) {
+            setOff((String)value);
+            return null;
+        }
+        if(name.equals("value")) {
+            setValue(((Boolean)value).booleanValue());
+            return null;
+        }
+        return super.setPropertyValue(name, value);
     }
 }

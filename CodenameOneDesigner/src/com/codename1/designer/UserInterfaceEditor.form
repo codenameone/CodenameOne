@@ -692,6 +692,20 @@
                                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneShareActionPerformed"/>
                                       </Events>
                                     </Component>
+                                    <Component class="javax.swing.JButton" name="codenameOneOnOffSwitch">
+                                      <Properties>
+                                        <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                          <Image iconType="3" name="/org/jdesktop/swingx/resources/JXButton32.png"/>
+                                        </Property>
+                                        <Property name="text" type="java.lang.String" value="On/Off Switch"/>
+                                        <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;On/Off Switch&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS on/off switch component&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                        <Property name="horizontalAlignment" type="int" value="2"/>
+                                        <Property name="name" type="java.lang.String" value="codenameOneOnOffSwitch" noResource="true"/>
+                                      </Properties>
+                                      <Events>
+                                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneOnOffSwitchActionPerformed"/>
+                                      </Events>
+                                    </Component>
                                   </SubComponents>
                                 </Container>
                               </SubComponents>

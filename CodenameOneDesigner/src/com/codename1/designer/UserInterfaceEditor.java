@@ -1847,8 +1847,8 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
         makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
         makeDraggable(codenameOneCalendar, com.codename1.ui.Calendar.class, "Calendar", null);
+        makeDraggable(codenameOneOnOffSwitch, com.codename1.components.OnOffSwitch.class, "OnOffSwitch", null);
 
-        makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
                 createCustomComponentButton(currentCmp);
@@ -4276,6 +4276,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneAds = new javax.swing.JButton();
         codenameOneMap = new javax.swing.JButton();
         codenameOneShare = new javax.swing.JButton();
+        codenameOneOnOffSwitch = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4630,6 +4631,14 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneShare.setName("codenameOneShare"); // NOI18N
         codenameOneShare.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneShare);
+
+        codenameOneOnOffSwitch.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
+        codenameOneOnOffSwitch.setText("On/Off Switch");
+        codenameOneOnOffSwitch.setToolTipText("<html><body><b>On/Off Switch</b><br> \n<p>\nAn iOS on/off switch component</p> </body> </html>"); // NOI18N
+        codenameOneOnOffSwitch.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneOnOffSwitch.setName("codenameOneOnOffSwitch"); // NOI18N
+        codenameOneOnOffSwitch.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneOnOffSwitch);
 
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
@@ -4994,6 +5003,9 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneOnOffSwitch) {
+                UserInterfaceEditor.this.codenameOneOnOffSwitchActionPerformed(evt);
             }
         }
 
@@ -5661,6 +5673,14 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.ui.Calendar(), "Calendar");
     }//GEN-LAST:event_codenameOneCalendarActionPerformed
 
+private void codenameOneOnOffSwitchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneOnOffSwitchActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.OnOffSwitch(), "OnOffSwitch");
+}//GEN-LAST:event_codenameOneOnOffSwitchActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5780,6 +5800,7 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
     private javax.swing.JButton codenameOneMultiButton;
     private javax.swing.JButton codenameOneMultiList;
     private javax.swing.JButton codenameOneNumericSpinner;
+    private javax.swing.JButton codenameOneOnOffSwitch;
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneShare;
     private javax.swing.JButton codenameOneSlider;
