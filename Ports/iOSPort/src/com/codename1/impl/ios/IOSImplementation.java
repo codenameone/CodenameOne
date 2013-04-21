@@ -2246,7 +2246,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
-        nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(), msg.getAttachment(), msg.getMimeType());
+        nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(),  
+                msg.getAttachment(), msg.getMimeType(), msg.getMimeType().equals(Message.MIME_HTML));
     }
     
     @Override

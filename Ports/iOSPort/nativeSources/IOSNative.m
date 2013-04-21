@@ -1707,8 +1707,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(JAV
 }
 
 
-void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject,
-    JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType) {
+void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_boolean(JAVA_OBJECT instanceObject,
+    JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
         if(picker == nil || ![MFMailComposeViewController canSendMail]) {
@@ -1726,7 +1726,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
         
         // Body.
         NSString *emailBody = toNSString(content);
-        [picker setMessageBody:emailBody isHTML:NO];
+        [picker setMessageBody:emailBody isHTML:htmlMail];
         
         [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
         

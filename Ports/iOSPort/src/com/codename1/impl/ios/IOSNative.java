@@ -282,7 +282,7 @@ final class IOSNative {
     native void pauseAudioRecord(long peer);
     native void cleanupAudioRecord(long peer);
 
-    native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType);
+    native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType, boolean htmlMail);
 
     native int getContactCount(boolean withNumbers);
     native void getContactRefIds(int[] refs, boolean withNumbers);
