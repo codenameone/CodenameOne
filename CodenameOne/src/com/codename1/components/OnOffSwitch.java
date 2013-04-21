@@ -48,11 +48,11 @@ import com.codename1.ui.plaf.UIManager;
  * @author Shai Almog
  */
 public class OnOffSwitch extends Container {
-    private String on = "On";
-    private String off = "Off";
+    private String on = "ON";
+    private String off = "OFF";
     private boolean iosMode;
     private boolean value;
-    private Button button;
+    private CheckBox button;
     private boolean dragged;
     private int pressX;
     private int buttonWidth;
@@ -85,14 +85,17 @@ public class OnOffSwitch extends Container {
         setFocusable(true);
         if(iosMode) {
             button = null;
-            on = on.toUpperCase();
-            off = off.toUpperCase();
             switchMaskImage = UIManager.getInstance().getThemeImageConstant("switchMaskImage");
             switchOnImage = UIManager.getInstance().getThemeImageConstant("switchOnImage");
             switchOffImage = UIManager.getInstance().getThemeImageConstant("switchOffImage");
         } else {
             setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-            button = new Button(off);
+            button = new CheckBox(off);
+            button.setToggle(true);
+            button.setUIID("Button");
+            button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());
+            button.getSelectedStyle().setFont(getSelectedStyle().getFont());
+            button.getPressedStyle().setFont(getSelectedStyle().getFont());
             buttonWidth = button.getPreferredW();
             button.setFocusable(false);
             updateButton();
@@ -158,6 +161,7 @@ public class OnOffSwitch extends Container {
                 int strWidth = s.getFont().stringWidth(on);
                 int sX = onX + switchMaskImage.getWidth() / 2 - strWidth / 2 - switchButtonPadInt;
                 int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;
+                g.setFont(s.getFont());
                 g.setColor(0xffffff);
                 g.drawString(on, sX, sY, Style.TEXT_DECORATION_3D);
                 strWidth = s.getFont().stringWidth(off);
@@ -180,6 +184,7 @@ public class OnOffSwitch extends Container {
                 int strWidth = s.getFont().stringWidth(str);
                 int sX = x + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;
                 int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;
+                g.setFont(s.getFont());
                 g.drawString(str, sX, sY);
             }
             
@@ -192,17 +197,17 @@ public class OnOffSwitch extends Container {
     private void updateButton() {
         if(value) {
             button.setText(on);
-            getUnselectedStyle().setPadding(RIGHT, buttonWidth);
-            getUnselectedStyle().setPadding(LEFT, 0);
-        } else {
-            button.setText(off);            
             getUnselectedStyle().setPadding(LEFT, buttonWidth);
             getUnselectedStyle().setPadding(RIGHT, 0);
+        } else {
+            button.setText(off);            
+            getUnselectedStyle().setPadding(RIGHT, buttonWidth);
+            getUnselectedStyle().setPadding(LEFT, 0);
         }
     }
     
     private void flip() {
-        value = !value;
+        setValue(!value);
         if(iosMode) {
             repaint();
         } else {
@@ -249,7 +254,7 @@ public class OnOffSwitch extends Container {
             }
             getUnselectedStyle().setPadding(RIGHT, right);
             getUnselectedStyle().setPadding(LEFT, left);
-            if(right > left) {
+            if(right < left) {
                 button.setText(on);
             } else {
                 button.setText(off);
@@ -327,10 +332,10 @@ public class OnOffSwitch extends Container {
                     left = Math.min(buttonWidth, deltaX * -1);
                     right = Math.max(0, buttonWidth + deltaX);
                 }
-                if(right > left) {
-                    value = true;
+                if(right < left) {
+                    setValue(true);
                 } else {
-                    value = false;
+                    setValue(false);
                 }
                 
                 updateButton();
@@ -386,6 +391,9 @@ public class OnOffSwitch extends Container {
      */
     public void setValue(boolean value) {
         this.value = value;
+        if(button != null) {
+            button.setSelected(value);
+        }
     }
 
     /**

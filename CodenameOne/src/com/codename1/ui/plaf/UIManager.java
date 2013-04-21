@@ -402,11 +402,17 @@ public class UIManager {
             themeProps.put("OnOffSwitch.transparency", "255");
             themeProps.put("OnOffSwitch.bgColor", "222222");
             themeProps.put("OnOffSwitch.padding", "0,0,0,0");
+            themeProps.put("OnOffSwitch.font",
+                    Font.createSystemFont(Font.FACE_SYSTEM,
+                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
         }
         if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.sel#derive")) {
             themeProps.put("OnOffSwitch.sel#transparency", "255");
             themeProps.put("OnOffSwitch.sel#bgColor", "222222");
             themeProps.put("OnOffSwitch.sel#padding", "0,0,0,0");
+            themeProps.put("OnOffSwitch.sel#font",
+                    Font.createSystemFont(Font.FACE_SYSTEM,
+                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
         }
         
         if(installedTheme == null || !installedTheme.containsKey("ContentPane.derive")) {
