@@ -70,7 +70,8 @@ public class Message {
     }
 
     /**
-     * Sets the attachment mime type
+     * Sets the message mime type.
+     * 
      * @param mimeType 
      */
     public void setMimeType(String mimeType) {
@@ -86,7 +87,8 @@ public class Message {
     }
 
     /**
-     * Gets the attachment mime type
+     * Gets the message mime type
+     * 
      * @return 
      */
     public String getMimeType() {
