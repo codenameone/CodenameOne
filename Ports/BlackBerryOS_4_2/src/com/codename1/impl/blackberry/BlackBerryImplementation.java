@@ -2848,7 +2848,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
                 byte[] buf;
                 buf = IOUtilities.streamToBytes(stream);
                 stream.close();
-                SupportedAttachmentPart sap = new SupportedAttachmentPart(content, message.getContentType(), "image.png", buf);
+                String name = msg.getAttachment();
+                name = name.substring(name.lastIndexOf(getFileSystemSeparator()) + 1, name.length());
+                SupportedAttachmentPart sap = new SupportedAttachmentPart(content, msg.getAttachmentMimeType(), name, buf);
                 content.addBodyPart(sap);                
                 message.setContent(content);
             } else {
