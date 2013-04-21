@@ -3456,6 +3456,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
             emailIntent.setType(msg.getMimeType());
             if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
+                emailIntent.setType(msg.getAttachmentMimeType());
                 emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
             } 
             if(msg.getMimeType().equals(Message.MIME_HTML)){
