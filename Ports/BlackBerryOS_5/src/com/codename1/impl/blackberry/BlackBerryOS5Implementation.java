@@ -526,31 +526,40 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return ((Font)font).derive(weight, (int)size);
     }  
     
+    private void openParentImageGallery(final ActionListener response) {
+        super.openImageGallery(response);
+    }
+    
     public void openImageGallery(final ActionListener response) {
 
-        try {
-            final FilePicker picker = FilePicker.getInstance();
-            picker.setFilter(".jpg");
             app.invokeLater(new Runnable() {
 
                 public void run() {
-                    final String file = picker.show();
-                    Display.getInstance().callSerially(new Runnable() {
+                    try {
+                        final FilePicker picker = FilePicker.getInstance();
+                        picker.setFilter(".jpg");
+                        final String file = picker.show();
+                        Display.getInstance().callSerially(new Runnable() {
 
-                        public void run() {
-                            if (file != null) {
-                                response.actionPerformed(new ActionEvent(file));
-                            } else {
-                                response.actionPerformed(null);
+                            public void run() {
+                                if (file != null) {
+                                    response.actionPerformed(new ActionEvent(file));
+                                } else {
+                                    response.actionPerformed(null);
+                                }
                             }
-                        }
-                    });
+                        });
+                        
+                    } catch (Throwable e) {
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            public void run() {
+                                BlackBerryOS5Implementation.this.openParentImageGallery(response);
+                            }
+                        });
+                    }
                 }
             });
-            
-        } catch (Throwable e) {
-            super.openImageGallery(response);
-        }
     }
     
     /**
