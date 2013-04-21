@@ -755,7 +755,12 @@ public class XMLParser {
         StringBuffer text = new StringBuffer();
         boolean ended=false;
         while (!ended) {
-            char c=(char)is.read();
+            int in = is.read();
+            if(in == -1) {
+                // input stream ended abruptly
+                break;
+            }
+            char c=(char)in;
             if (c==endTagChars[endTagPos]) {
                 endTagPos++;
                 if (endTagPos==endTagChars.length) {
