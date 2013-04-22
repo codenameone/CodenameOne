@@ -44,11 +44,11 @@ public class CloudObjectConsole extends javax.swing.JFrame {
     private boolean isQuery = false; 
     
     private int [] scopeOptions = new int [] {
-        CloudObject.ACCESS_PUBLIC,
-        CloudObject.ACCESS_PUBLIC_READ_ONLY,
-        CloudObject.ACCESS_APPLICATION,
+        CloudObject.ACCESS_PRIVATE,
         CloudObject.ACCESS_APPLICATION_READ_ONLY,
-        CloudObject.ACCESS_PRIVATE
+        CloudObject.ACCESS_APPLICATION,
+        CloudObject.ACCESS_PUBLIC_READ_ONLY,
+        CloudObject.ACCESS_PUBLIC
     };
     /**
      * Creates new form CloudObjectConsole
@@ -125,7 +125,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
 
         jLabel3.setText("Scope");
 
-        scope.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "PUBLIC", "PUBLIC_READ_ONLY", "APPLICATION", "APPLICATION_READ_ONLY", "PRIVATE" }));
+        scope.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "PRIVATE", "APPLICATION_READ_ONLY", "APPLICATION", "PUBLIC_READ_ONLY", "PUBLIC" }));
 
         jLabel1.setText("Type");
 
@@ -168,19 +168,18 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                             .addComponent(jLabel1)
                             .addComponent(jLabel4))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createSequentialGroup()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(typeTxt, javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
                                 .addComponent(indexCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(jRadioButton1)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jRadioButton2)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(queryCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 75, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(queryCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 122, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(queryTxt)
-                                .addGap(1, 1, 1))
-                            .addComponent(typeTxt)
+                                .addComponent(queryTxt))
                             .addComponent(scope, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -193,7 +192,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                         .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 65, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 545, Short.MAX_VALUE))
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 556, Short.MAX_VALUE))
                 .addContainerGap())
         );
         layout.setVerticalGroup(

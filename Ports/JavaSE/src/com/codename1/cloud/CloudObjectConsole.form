@@ -28,7 +28,7 @@
     <DimensionLayout dim="0">
       <Group type="103" groupAlignment="0" attributes="0">
           <Group type="102" attributes="0">
-              <EmptySpace max="-2" attributes="0"/>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" alignment="0" attributes="0">
                       <Group type="103" groupAlignment="0" attributes="0">
@@ -37,23 +37,22 @@
                           <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace min="-2" max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Group type="102" attributes="0">
+                      <Group type="103" groupAlignment="1" attributes="0">
+                          <Component id="typeTxt" alignment="0" max="32767" attributes="0"/>
+                          <Group type="102" alignment="0" attributes="0">
                               <Component id="indexCombo" min="-2" max="-2" attributes="0"/>
                               <EmptySpace type="unrelated" min="-2" max="-2" attributes="0"/>
                               <Component id="jRadioButton1" min="-2" max="-2" attributes="0"/>
                               <EmptySpace min="-2" max="-2" attributes="0"/>
                               <Component id="jRadioButton2" min="-2" max="-2" attributes="0"/>
                               <EmptySpace min="-2" max="-2" attributes="0"/>
-                              <Component id="queryCombo" min="-2" pref="75" max="-2" attributes="0"/>
+                              <Component id="queryCombo" min="-2" pref="122" max="-2" attributes="0"/>
                               <EmptySpace min="-2" max="-2" attributes="0"/>
                               <Component id="queryTxt" max="32767" attributes="0"/>
-                              <EmptySpace min="-2" pref="1" max="-2" attributes="0"/>
                           </Group>
-                          <Component id="typeTxt" alignment="0" max="32767" attributes="0"/>
-                          <Component id="scope" alignment="0" max="32767" attributes="0"/>
+                          <Component id="scope" max="32767" attributes="0"/>
                       </Group>
-                      <EmptySpace max="-2" attributes="0"/>
+                      <EmptySpace min="-2" max="-2" attributes="0"/>
                       <Component id="jButton1" min="-2" pref="67" max="-2" attributes="0"/>
                   </Group>
                   <Group type="102" alignment="1" attributes="0">
@@ -66,9 +65,9 @@
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="jButton3" min="-2" pref="68" max="-2" attributes="0"/>
                   </Group>
-                  <Component id="jScrollPane1" alignment="1" pref="545" max="32767" attributes="0"/>
+                  <Component id="jScrollPane1" alignment="1" pref="556" max="32767" attributes="0"/>
               </Group>
-              <EmptySpace max="-2" attributes="0"/>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -183,11 +182,11 @@
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
           <StringArray count="5">
-            <StringItem index="0" value="PUBLIC"/>
-            <StringItem index="1" value="PUBLIC_READ_ONLY"/>
+            <StringItem index="0" value="PRIVATE"/>
+            <StringItem index="1" value="APPLICATION_READ_ONLY"/>
             <StringItem index="2" value="APPLICATION"/>
-            <StringItem index="3" value="APPLICATION_READ_ONLY"/>
-            <StringItem index="4" value="PRIVATE"/>
+            <StringItem index="3" value="PUBLIC_READ_ONLY"/>
+            <StringItem index="4" value="PUBLIC"/>
           </StringArray>
         </Property>
       </Properties>
