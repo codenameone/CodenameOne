@@ -131,7 +131,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
 
         jLabel4.setText("Index");
 
-        indexCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }));
+        indexCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Unsorted", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }));
 
         buttonGroup1.add(jRadioButton1);
         jRadioButton1.setSelected(true);
@@ -169,7 +169,7 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                             .addComponent(jLabel4))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(typeTxt, javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(typeTxt, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 415, Short.MAX_VALUE)
                             .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
                                 .addComponent(indexCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
@@ -179,12 +179,12 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(queryCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 122, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(queryTxt))
-                            .addComponent(scope, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addComponent(queryTxt, javax.swing.GroupLayout.DEFAULT_SIZE, 38, Short.MAX_VALUE))
+                            .addComponent(scope, 0, 415, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addGap(0, 340, Short.MAX_VALUE)
                         .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(pageNumber, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -302,17 +302,17 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                         String queryVal = queryTxt.getText();
                         switch(queryComboVal){
                             case 0:
-                                objects = CloudStorage.getInstance().queryEquals(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                objects = CloudStorage.getInstance().queryEquals(q, index, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
                                 break;
                             case 1:
-                                objects = CloudStorage.getInstance().queryGreaterThan(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                objects = CloudStorage.getInstance().queryGreaterThan(q, index, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
                                 break;
                             case 2:
-                                objects = CloudStorage.getInstance().queryLessThan(q, index + 1, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                                objects = CloudStorage.getInstance().queryLessThan(q, index, queryVal, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
                                 break;
                         }
                     }else{
-                        objects = CloudStorage.getInstance().querySorted(q, index + 1, true, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
+                        objects = CloudStorage.getInstance().querySorted(q, index, true, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
                     }
                     
                     
