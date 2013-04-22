@@ -314,8 +314,6 @@ public class CloudObjectConsole extends javax.swing.JFrame {
                     }else{
                         objects = CloudStorage.getInstance().querySorted(q, index, true, requestPage[0], 30, scopeOptions[scope.getSelectedIndex()]);                    
                     }
-                    
-                    
 
                     if (objects != null && objects.length > 0) {
                         Hashtable vals = objects[0].getValues();
