@@ -341,7 +341,7 @@ public class CloudStorage {
      * This operation executes immeditely without waiting for commit.
      * 
      * @param type the object type
-     * @param index the index on which the sore is based
+     * @param index the index on which the sort is based
      * @param ascending indicates if the sort order is ascending or descending 
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
@@ -360,7 +360,7 @@ public class CloudStorage {
      * This operation executes immeditely without waiting for commit.
      * 
      * @param type the object type
-     * @param index the index on which the sore is based
+     * @param index the index on which the sort is based
      * @param ascending indicates if the sort order is ascending or descending 
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
@@ -586,7 +586,7 @@ public class CloudStorage {
      * This operation executes immeditely without waiting for commit.
      * 
      * @param type the object type
-     * @param index the index on which the sore is based
+     * @param index the index on which the sort is based
      * @param ascending indicates if the sort order is ascending or descending 
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch
@@ -665,7 +665,7 @@ public class CloudStorage {
      * This operation executes immeditely without waiting for commit.
      * 
      * @param type the object type
-     * @param index the index on which the sore is based
+     * @param index the index on which the sort is based
      * @param ascending indicates if the sort order is ascending or descending 
      * @param page the page of responses (allows for paging)
      * @param limit number of responses to fetch

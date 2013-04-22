@@ -149,11 +149,11 @@ public class OnOffSwitch extends Container {
                 int onX;
                 int offX;
                 if(value) {
-                    onX = x - deltaX + switchButtonPadInt;
-                    offX = x - deltaX + switchOnImage.getWidth() - switchButtonPadInt;
+                    onX = x - deltaX;
+                    offX = x - deltaX + switchOnImage.getWidth() - 2*switchButtonPadInt;
                 } else {
-                    onX = x - deltaX - switchOnImage.getWidth() + switchButtonPadInt;
-                    offX = x - deltaX - switchButtonPadInt;
+                    onX = x - deltaX - switchOnImage.getWidth() + 2*switchButtonPadInt;
+                    offX = x - deltaX;
                 }
                 switchButtonPadInt /= 2;
                 g.drawImage(switchOnImage, onX, y);
@@ -269,7 +269,7 @@ public class OnOffSwitch extends Container {
             // is retina
             switchButtonPadInt *= 2;
         }
-        final Motion current = Motion.createEaseInOutMotion(Math.abs(position), switchMaskImage.getWidth() - switchButtonPadInt, 100);
+        final Motion current = Motion.createEaseInOutMotion(Math.abs(position), switchMaskImage.getWidth() - 2*switchButtonPadInt, 100);
         current.start();
         deltaX = position;
         getComponentForm().registerAnimated(new Animation() {
@@ -302,15 +302,16 @@ public class OnOffSwitch extends Container {
      */
     public void pointerReleased(int x, int y) {
         if(iosMode) {
+            int switchButtonPadInt = UIManager.getInstance().getThemeConstant("switchButtonPadInt", 16);
             if(dragged) {
                 if(deltaX > 0) {
-                    if(deltaX > switchMaskImage.getWidth() / 2) {
+                    if(deltaX > switchMaskImage.getWidth() / 2 - switchButtonPadInt) {
                         animateTo(false, deltaX);
                     } else {
                         animateTo(true, deltaX);
                     }
                 } else {
-                    if(deltaX * -1 > switchMaskImage.getWidth() / 2) {
+                    if(deltaX * -1 > switchMaskImage.getWidth() / 2 - switchButtonPadInt) {
                         animateTo(true, deltaX);
                     } else {
                         animateTo(false, deltaX);
