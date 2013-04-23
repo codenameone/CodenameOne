@@ -38,6 +38,7 @@ public class GenericSpinner extends BaseSpinner {
     private Spinner spin;
     private ListModel model = new DefaultListModel(new Object[] {"Value 1", "Value 2", "Value 3"});
     private ListCellRenderer renderer = new DefaultListCellRenderer(false);
+    private Object value;
     
     /**
      * Default constructor
@@ -54,6 +55,28 @@ public class GenericSpinner extends BaseSpinner {
             spin = createSpinner();
             setLayout(new BorderLayout());
             addComponent(BorderLayout.CENTER, spin);
+        }
+    }
+
+    /**
+     * The value for the spinner
+     * @return the value
+     */
+    public Object getValue() {
+        if(spin != null) {
+            return spin.getValue();
+        }
+        return value;
+    }
+
+    /**
+     * The value for the spinner
+     * @param value the value to set
+     */
+    public void setValue(Object value) {
+        this.value = value;
+        if(spin != null) {
+            spin.setValue(value);
         }
     }
 
