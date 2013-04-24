@@ -74,7 +74,7 @@ public class MapComponent extends Container {
     private int translateX;
     private int translateY;
     private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
-
+    
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last
      * known Location of the LocationManager
@@ -376,7 +376,12 @@ public class MapComponent extends Container {
                 buffer.dispose();
                 buffer = null;
             }
-            super.repaint();
+            if(Display.getInstance().areMutableImagesFast()) {
+                super.repaint();
+            } else {
+                // workaround for rounding error in scale/clipping
+                getComponentForm().repaint();
+            }
             return;
         }
         Coord scale = _map.scale(_zoom);
