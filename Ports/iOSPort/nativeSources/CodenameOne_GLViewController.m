@@ -457,8 +457,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
-    CGRect rect = CGRectMake(x, y, width, height);
-    CGContextAddEllipseInRect(context, rect);
+    if(width == height) {
+        int radius = MIN(width, height) / 2;
+        CGContextAddArc (context, x + radius, y + radius, radius, startAngle * PI / 180, (startAngle + angle) * PI / 180, 1);
+    } else {
+        CGRect rect = CGRectMake(x, y, width, height);
+        CGContextAddEllipseInRect(context, rect);
+    }
     return context;
 }
 
