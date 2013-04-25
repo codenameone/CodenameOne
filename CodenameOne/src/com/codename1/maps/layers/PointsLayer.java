@@ -93,6 +93,7 @@ public class PointsLayer extends AbstractLayer {
      * @param point a point to add
      */
     public void addPoint(PointLayer point) {
+        
         Image pointIcon = point.getIcon();
         if (pointIcon == null) {
             point.setIcon(icon);
@@ -111,7 +112,7 @@ public class PointsLayer extends AbstractLayer {
      * 
      * @param point to remove from the PointsLayer
      */
-    public void removePoint(PointLayer point) {
+    public void removePoint(PointLayer point) {        
         if(!point.isProjected()){
             Coord c = getProjection().fromWGS84(point);
             point.setLatitude(c.getLatitude());
@@ -156,10 +157,7 @@ public class PointsLayer extends AbstractLayer {
         for (int i = 0; i < points.size(); i++) {
             PointLayer point = (PointLayer) points.elementAt(i);
             if (box.contains(point)) {
-                Coord c = projection.toWGS84(point);
-                //unprojected point
-                PointLayer pl = new PointLayer(c, point.getName(), point.getIcon());
-                dispatcher.fireActionEvent(new ActionEvent(pl));
+                dispatcher.fireActionEvent(new ActionEvent(point));
                 return;
             }
         }
