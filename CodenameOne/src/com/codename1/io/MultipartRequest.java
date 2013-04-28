@@ -194,7 +194,7 @@ public class MultipartRequest extends ConnectionRequest {
                     writer.flush();
                 }                
                 writer.write(Util.encodeBody((String)value));
-                writer.write(CRLF);
+                //writer.write(CRLF);
                 if(canFlushStream){
                     writer.flush();
                 }
