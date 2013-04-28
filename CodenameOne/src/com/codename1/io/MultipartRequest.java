@@ -30,6 +30,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Vector;
 
 /**
  * A multipart post request allows a developer to submit large binary data 
@@ -47,6 +48,7 @@ public class MultipartRequest extends ConnectionRequest {
     private long contentLength = -1L;
     private boolean manualRedirect = true;
     private static boolean canFlushStream = true;
+    private Vector ignoreEncoding = new Vector();
     
     /**
      * Initialize variables
@@ -129,6 +131,17 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * @inheritDoc
      */
+    public void addArgumentNoEncoding(String key, String value) {
+        args.put(key, value);
+        if(!filenames.containsKey(key)) {
+            filenames.put(key, key);
+        }
+        ignoreEncoding.addElement(key);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public void addArgument(String name, String value) {
         args.put(name, value);
         if(!filenames.containsKey(name)) {
@@ -155,7 +168,11 @@ public class MultipartRequest extends ConnectionRequest {
             if(value instanceof String) {
                 length += baseTextLength;
                 length += key.length();
-                length += Util.encodeBody((String)value).length() + 2; // 2 = CRLF
+                if(ignoreEncoding.contains(key)) {
+                    length += ((String)value).length() + 2; // 2 = CRLF
+                } else {
+                    length += Util.encodeBody((String)value).length() + 2; // 2 = CRLF
+                }
             } else {
                 length += baseBinaryLength;
                 length += key.length();
@@ -193,7 +210,11 @@ public class MultipartRequest extends ConnectionRequest {
                 if(canFlushStream){
                     writer.flush();
                 }                
-                writer.write(Util.encodeBody((String)value));
+                if(ignoreEncoding.contains(key)) {
+                    writer.write((String)value);
+                } else {
+                    writer.write(Util.encodeBody((String)value));
+                }
                 //writer.write(CRLF);
                 if(canFlushStream){
                     writer.flush();
