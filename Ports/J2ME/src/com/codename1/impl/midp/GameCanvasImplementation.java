@@ -1949,8 +1949,6 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setHeader(Object connection, String key, String val) {
-        System.out.println("key == " + key);
-        System.out.println("val == " + val);
         try {
             ((HttpConnection)connection).setRequestProperty(key, val);
         } catch(IOException err) {
