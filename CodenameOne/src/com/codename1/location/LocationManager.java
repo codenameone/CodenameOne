@@ -34,11 +34,11 @@ public abstract class LocationManager {
     
     private static LocationListener listener;
 
-    public static int AVAILABLE = 0;
+    public static final int AVAILABLE = 0;
     
-    public static int OUT_OF_SERVICE = 1;
+    public static final int OUT_OF_SERVICE = 1;
     
-    public static int TEMPORARILY_UNAVAILABLE = 2;
+    public static final int TEMPORARILY_UNAVAILABLE = 2;
     
     private int status = TEMPORARILY_UNAVAILABLE;
     
