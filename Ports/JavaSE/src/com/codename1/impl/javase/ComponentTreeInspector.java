@@ -73,6 +73,19 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                         componentName.setText("" + c.getName());
                         componentUIID.setText("" + c.getUIID());
                         componentSelected.setSelected(c.hasFocus());
+                        if(c instanceof com.codename1.ui.Container) {
+                            layout.setText(((com.codename1.ui.Container)c).getLayout().getClass().getSimpleName());
+                        } else {
+                            layout.setText("");
+                        }
+                        com.codename1.ui.Container parent = c.getParent();
+                        constraint.setText("");
+                        if(parent != null) {
+                            Object o = parent.getLayout().getComponentConstraint(c);
+                            if(o != null) {
+                                constraint.setText(o.toString());
+                            }
+                        } 
                     }
                 }
             }
@@ -107,6 +120,10 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         componentName = new javax.swing.JTextField();
         componentUIID = new javax.swing.JTextField();
         componentSelected = new javax.swing.JCheckBox();
+        jLabel5 = new javax.swing.JLabel();
+        layout = new javax.swing.JTextField();
+        jLabel6 = new javax.swing.JLabel();
+        constraint = new javax.swing.JTextField();
         jToolBar1 = new javax.swing.JToolBar();
         refreshTree = new javax.swing.JButton();
 
@@ -135,22 +152,38 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
 
         componentSelected.setEnabled(false);
 
+        jLabel5.setText("Layout");
+
+        layout.setEditable(false);
+
+        jLabel6.setText("Constraint");
+        jLabel6.setToolTipText("Layout Constraint (for border layout)");
+
+        constraint.setEditable(false);
+        constraint.setToolTipText("Layout Constraint (for border layout)");
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel4)
-                    .addComponent(jLabel3)
-                    .addComponent(jLabel2)
-                    .addComponent(jLabel1))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(componentClass, javax.swing.GroupLayout.DEFAULT_SIZE, 316, Short.MAX_VALUE)
-                    .addComponent(componentName, javax.swing.GroupLayout.DEFAULT_SIZE, 316, Short.MAX_VALUE)
-                    .addComponent(componentUIID, javax.swing.GroupLayout.DEFAULT_SIZE, 316, Short.MAX_VALUE)
-                    .addComponent(componentSelected))
+                    .addComponent(jLabel5)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel4)
+                            .addComponent(jLabel3)
+                            .addComponent(jLabel2)
+                            .addComponent(jLabel1)
+                            .addComponent(jLabel6))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(componentSelected)
+                            .addComponent(componentClass, javax.swing.GroupLayout.DEFAULT_SIZE, 302, Short.MAX_VALUE)
+                            .addComponent(componentName, javax.swing.GroupLayout.DEFAULT_SIZE, 302, Short.MAX_VALUE)
+                            .addComponent(componentUIID, javax.swing.GroupLayout.DEFAULT_SIZE, 302, Short.MAX_VALUE)
+                            .addComponent(layout, javax.swing.GroupLayout.DEFAULT_SIZE, 302, Short.MAX_VALUE)
+                            .addComponent(constraint, javax.swing.GroupLayout.DEFAULT_SIZE, 302, Short.MAX_VALUE))))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -168,10 +201,18 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                     .addComponent(jLabel3)
                     .addComponent(componentUIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
-                    .addComponent(componentSelected)
-                    .addComponent(jLabel4))
-                .addContainerGap(220, Short.MAX_VALUE))
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel4)
+                    .addComponent(componentSelected))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel5)
+                    .addComponent(layout, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel6)
+                    .addComponent(constraint, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(148, Short.MAX_VALUE))
         );
 
         jSplitPane1.setRightComponent(jPanel1);
@@ -306,14 +347,18 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JCheckBox componentSelected;
     private javax.swing.JTree componentTree;
     private javax.swing.JTextField componentUIID;
+    private javax.swing.JTextField constraint;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel6;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JSplitPane jSplitPane1;
     private javax.swing.JToolBar jToolBar1;
+    private javax.swing.JTextField layout;
     private javax.swing.JButton refreshTree;
     // End of variables declaration//GEN-END:variables
 }

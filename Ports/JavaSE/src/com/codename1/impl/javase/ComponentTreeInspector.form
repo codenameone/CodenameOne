@@ -60,17 +60,25 @@
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" attributes="0">
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="componentClass" alignment="0" pref="316" max="32767" attributes="0"/>
-                          <Component id="componentName" alignment="0" pref="316" max="32767" attributes="0"/>
-                          <Component id="componentUIID" alignment="0" pref="316" max="32767" attributes="0"/>
-                          <Component id="componentSelected" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel5" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel6" alignment="0" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="componentSelected" min="-2" max="-2" attributes="0"/>
+                                  <Component id="componentClass" alignment="0" pref="302" max="32767" attributes="0"/>
+                                  <Component id="componentName" alignment="0" pref="302" max="32767" attributes="0"/>
+                                  <Component id="componentUIID" alignment="0" pref="302" max="32767" attributes="0"/>
+                                  <Component id="layout" alignment="0" pref="302" max="32767" attributes="0"/>
+                                  <Component id="constraint" alignment="0" pref="302" max="32767" attributes="0"/>
+                              </Group>
+                          </Group>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
@@ -94,11 +102,21 @@
                           <Component id="componentUIID" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="2" attributes="0">
-                          <Component id="componentSelected" alignment="2" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel4" alignment="2" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Component id="jLabel4" min="-2" max="-2" attributes="0"/>
+                          <Component id="componentSelected" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="220" max="32767" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel5" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="layout" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel6" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="constraint" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace pref="148" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -142,6 +160,28 @@
             <Component class="javax.swing.JCheckBox" name="componentSelected">
               <Properties>
                 <Property name="enabled" type="boolean" value="false"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel5">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Layout"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JTextField" name="layout">
+              <Properties>
+                <Property name="editable" type="boolean" value="false"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel6">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Constraint"/>
+                <Property name="toolTipText" type="java.lang.String" value="Layout Constraint (for border layout)"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JTextField" name="constraint">
+              <Properties>
+                <Property name="editable" type="boolean" value="false"/>
+                <Property name="toolTipText" type="java.lang.String" value="Layout Constraint (for border layout)"/>
               </Properties>
             </Component>
           </SubComponents>

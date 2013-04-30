@@ -1986,6 +1986,19 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void init(Object m) {
         inInit = true;
+        
+        // this is essential for push and other things to work in the simulator
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        String user = p.get("user", null);
+        if(user != null) {
+            Display d = Display.getInstance();
+            d.setProperty("built_by_user", user);
+            String mainClass = System.getProperty("MainClass");
+            if (mainClass != null) {
+                mainClass = mainClass.substring(0, mainClass.lastIndexOf('.'));
+                d.setProperty("package_name", mainClass);
+            }
+        }
         try {
             Class.forName("javafx.embed.swing.JFXPanel");
             Platform.setImplicitExit(false);
