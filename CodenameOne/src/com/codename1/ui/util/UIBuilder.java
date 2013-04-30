@@ -1727,7 +1727,7 @@ public class UIBuilder {
      * Warning: This method is invoked OFF the EDT and is intended for usage with asynchronous
      * command processing. This method is invoked when the UI indicates that an operation
      * should occur in the background. To finish the processing of the operation within the
-     * EDT one should overide the postAsyncCommand() method.
+     * EDT one should override the postAsyncCommand() method.
      *
      * @param cmd the command requiring background processing
      * @param sourceEvent the triggering event
@@ -1737,7 +1737,7 @@ public class UIBuilder {
 
     /**
      * This method is invoked in conjunction with asyncCommandProcess after the 
-     * command was handled asynchroniously on the separate thread. Here Codename One
+     * command was handled asynchronously on the separate thread. Here Codename One
      * code can be execute to update the UI with the results from the separate thread.
      * 
      * @param cmd the command
@@ -1782,7 +1782,10 @@ public class UIBuilder {
     protected Hashtable getFormState(Form f) {
         Component c = f.getFocused();
         Hashtable h = new Hashtable();
-        h.put(FORM_STATE_KEY_NAME, f.getName());
+        // can happen if we navigate away from a form that was shown without the GUI builder
+        if(f.getName() != null) {
+            h.put(FORM_STATE_KEY_NAME, f.getName());
+        }
         if(c != null) {
             if(c instanceof List) {
                 h.put(FORM_STATE_KEY_SELECTION, new Integer(((List)c).getSelectedIndex()));

@@ -125,6 +125,12 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean failSilently;
     boolean retrying;
 
+    public ConnectionRequest() {
+        if(NetworkManager.getInstance().isAPSupported()) {
+            silentRetryCount = 1;
+        }
+    }
+    
     /**
      * This method will return a valid value for only some of the responses and only after the response was processed
      * @return null or the actual data returned
@@ -567,6 +573,7 @@ public class ConnectionRequest implements IOProgressListener {
         err.printStackTrace();
         if(silentRetryCount > 0) {
             silentRetryCount--;
+            NetworkManager.getInstance().resetAPN();
             retry();
             return;
         }

@@ -88,6 +88,10 @@ public class NetworkManager {
 
     private NetworkManager() {
     }
+    
+    void resetAPN() {
+        autoDetected = false;
+    }
 
     private boolean handleException(ConnectionRequest r, Exception o) {
         if(errorListeners != null) {

@@ -56,6 +56,14 @@ public class TableLayout extends Layout {
         int actualColumn = -1;
 
         /**
+         * @inheritDoc
+         */
+        public String toString() {
+            return "row: " + row + " column: " + column + " width: " + width + " height: " + height + " hspan: " + 
+                    spanHorizontal + " vspan: " + spanVertical + " align " + align + " valign " + valign;
+        }
+        
+        /**
          * Sets the cells to span vertically, this number must never be smaller than 1
          *
          * @param span a number larger than 1
