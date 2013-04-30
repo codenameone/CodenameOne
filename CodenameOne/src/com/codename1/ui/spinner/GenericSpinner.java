@@ -64,7 +64,7 @@ public class GenericSpinner extends BaseSpinner {
      */
     public Object getValue() {
         if(spin != null) {
-            return spin.getValue();
+            return spin.getModel().getItemAt(spin.getModel().getSelectedIndex());
         }
         return value;
     }
