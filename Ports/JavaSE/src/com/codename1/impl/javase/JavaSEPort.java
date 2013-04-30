@@ -1431,11 +1431,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     if (pause.getText().startsWith("Pause")) {
-                        Executor.stopApp();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Executor.stopApp();
+                            }
+                        });
                         canvas.setEnabled(false);
                         pause.setText("Resume App");
                     } else {
-                        Executor.startApp();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Executor.startApp();
+                            }
+                        });
                         canvas.setEnabled(true);
                         pause.setText("Pause App");
                     }
