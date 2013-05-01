@@ -419,7 +419,7 @@ public class CommandEditor extends javax.swing.JPanel {
                 if(java5) {
                     fileContent = fileContent.substring(0, pos) +
                             "\n    @Override\n" +
-                            "\n    protected boolean " + methodName + "() {\n" +
+                            "    protected boolean " + methodName + "() {\n" +
                             "        \n" +
                             "        return true;\n" +
                             "    }\n" +

@@ -4635,6 +4635,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneOnOffSwitch.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
         codenameOneOnOffSwitch.setText("On/Off Switch");
         codenameOneOnOffSwitch.setToolTipText("<html><body><b>On/Off Switch</b><br> \n<p>\nAn iOS on/off switch component</p> </body> </html>"); // NOI18N
+        codenameOneOnOffSwitch.setBorder(null);
         codenameOneOnOffSwitch.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneOnOffSwitch.setName("codenameOneOnOffSwitch"); // NOI18N
         codenameOneOnOffSwitch.addActionListener(formListener);
@@ -4968,6 +4969,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneShare) {
                 UserInterfaceEditor.this.codenameOneShareActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneOnOffSwitch) {
+                UserInterfaceEditor.this.codenameOneOnOffSwitchActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
@@ -5003,9 +5007,6 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == initialForm) {
                 UserInterfaceEditor.this.initialFormActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneOnOffSwitch) {
-                UserInterfaceEditor.this.codenameOneOnOffSwitchActionPerformed(evt);
             }
         }
 
