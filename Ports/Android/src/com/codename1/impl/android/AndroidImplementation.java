@@ -1439,17 +1439,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
              if(intent != null){
                  Uri u = intent.getData();
                  if (u != null) {
-                     if ("content".equals(u.getScheme())) {
-                         Cursor cursor = activity.getContentResolver().query(u, new String[]{android.provider.MediaStore.Images.ImageColumns.DATA}, null, null, null);
-                         cursor.moveToFirst();
-                         String filePath = cursor.getString(0);
-                         cursor.close();
-                         return filePath;
-                     }else{
+                    if ("content".equals(intent.getScheme())) {
+                        try {
+                            InputStream attachment = activity.getContentResolver().openInputStream(u);
+                            if (attachment != null) {
+                                String name = getContentName(activity.getContentResolver(), u);
+                                if (name != null) {
+                                    String filePath = getAppHomePath()
+                                            + getFileSystemSeparator() + name;
+                                    File f = new File(filePath);
+                                    FileOutputStream tmp = new FileOutputStream(f);
+                                    byte[] buffer = new byte[1024];
+                                    while (attachment.read(buffer) > 0) {
+                                        tmp.write(buffer);
+                                    }
+                                    tmp.close();
+                                    attachment.close();
+                                    return filePath;
+                                }
+                            }
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
+                            return defaultValue;
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            return defaultValue;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return defaultValue;
+                        }
+                    } else {
                         return u.getEncodedPath();
-                     }
-                 }
-             }             
+                    }
+                }
+            }
         }
         
         if ("cellId".equals(key)) {
@@ -1518,6 +1541,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return System.getProperty(key, defaultValue);
     }
 
+    private String getContentName(ContentResolver resolver, Uri uri) {
+        Cursor cursor = resolver.query(uri, null, null, null, null);
+        cursor.moveToFirst();
+        int nameIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+        if (nameIndex >= 0) {
+            String name = cursor.getString(nameIndex);
+            cursor.close();
+            return name;
+        }
+        return null;
+    }
+    
     private String getUserAgent() {
         try {
             String userAgent = System.getProperty("http.agent");            
