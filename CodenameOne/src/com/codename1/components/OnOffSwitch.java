@@ -37,6 +37,8 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+import java.util.Vector;
 
 /**
  * The on/off switch is a checkbox of sort (although it derives container) that represents its state as 
@@ -60,6 +62,7 @@ public class OnOffSwitch extends Container {
     private Image switchOffImage;
     private Image switchMaskImage;
     private int deltaX;
+    private EventDispatcher dispatcher = new EventDispatcher();
     
     /**
      * Default constructor
@@ -113,6 +116,40 @@ public class OnOffSwitch extends Container {
      */
     protected boolean isStickyDrag() {
         return true;
+    }
+    
+    /**
+     * Adds a listener to the switch which will cause an event to dispatch on click
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void addActionListener(ActionListener l){
+        dispatcher.addListener(l);
+    }
+    
+    /**
+     * Removes the given action listener from the switch
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void removeActionListener(ActionListener l){
+        dispatcher.removeListener(l);
+    }
+
+    /**
+     * Returns a vector containing the action listeners for this button
+     * @return the action listeners
+     */
+    public Vector getActionListeners() {
+        return dispatcher.getListenerVector();
+    }
+    
+    private void fireActionEvent(){
+        dispatcher.fireActionEvent(new ActionEvent(this));
+        Display d = Display.getInstance();
+        if(d.isBuiltinSoundsEnabled()) {
+            d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);
+        }
     }
     
     /**
@@ -391,9 +428,13 @@ public class OnOffSwitch extends Container {
      * @param value the value to set
      */
     public void setValue(boolean value) {
+        boolean fireEvent = this.value != value;
         this.value = value;
         if(button != null) {
             button.setSelected(value);
+        }
+        if(fireEvent){
+            fireActionEvent();
         }
     }
 
