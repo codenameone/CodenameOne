@@ -273,6 +273,8 @@ public class FileSystemStorage {
 
     /**
      * This will return the application home directory.
+     * On some platforms such as Android this path may be visible only to the 
+     * application itself, other apps won't have permission to access this path
      * 
      * @return a writable directory that represent the application home directory
      */
