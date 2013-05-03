@@ -579,12 +579,11 @@ public class Button extends Label {
 
     /**
      * Returns true if the button is selected for toggle buttons,
-     * throws an exception if this is not a toggle button
      *
      * @return true if the button is selected
      */
     public boolean isSelected() {
-        throw new RuntimeException();
+        return false;
     }
 
     /**
