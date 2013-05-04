@@ -19,8 +19,6 @@
             // EXAMPLE: just grab the first barcode
             break;
         
-        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(fromNSString(symbol.data), fromNSString(symbol.typeName));
-        
         // EXAMPLE: do something useful with the barcode data
         //resultText.text = symbol.data;
         
@@ -29,6 +27,8 @@
         
         // ADD: dismiss the controller (NB dismiss from the *reader*!)
         [reader dismissModalViewControllerAnimated: YES];
+        
+        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(fromNSString(symbol.data), fromNSString(symbol.typeName));        
 }
 
 /*- (void)zxingController:(ZXingWidgetController*)controller didScanResult:(NSString *)result {

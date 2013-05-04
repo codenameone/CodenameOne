@@ -3620,6 +3620,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 scannerInstance.callback.scanCompleted(contents, formatName, null);
                 scannerInstance.callback = null;
+                Display.getInstance().getCurrent().revalidate();
+                Display.getInstance().getCurrent().repaint();
             }
         });
     }
@@ -3630,6 +3632,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 scannerInstance.callback.scanError(errorCode, message);
                 scannerInstance.callback = null;
+                Display.getInstance().getCurrent().revalidate();
+                Display.getInstance().getCurrent().repaint();
             }
         });
     }
@@ -3640,6 +3644,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 scannerInstance.callback.scanCanceled();
                 scannerInstance.callback = null;
+                Display.getInstance().getCurrent().revalidate();
+                Display.getInstance().getCurrent().repaint();
             }
         });
     }
