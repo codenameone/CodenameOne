@@ -39,6 +39,8 @@ extern UIView *editingComponent;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    //beforeDidFinishLaunchingWithOptionsMarkerEntry
+    
     // Override point for customization after application launch.
     self.window.rootViewController = self.viewController;
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
@@ -59,6 +61,8 @@ extern UIView *editingComponent;
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
     }
 #endif
+
+    //afterDidFinishLaunchingWithOptionsMarkerEntry
     return YES;
 }
 
@@ -145,6 +149,12 @@ extern UIView *editingComponent;
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
 }
 #endif
+
+extern void repaintUI();
+
+-(void)application:(UIApplication*)application didChangeStatusBarFrame:(CGRect)oldStatusBarFrame {
+    repaintUI();
+}
 
 - (void)dealloc
 {
