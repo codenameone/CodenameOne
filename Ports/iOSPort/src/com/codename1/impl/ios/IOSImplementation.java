@@ -3288,6 +3288,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
+                    globalGraphics.checkControl();
                     NativeImage ni = (NativeImage)img.getImage();
                     long p = nativeInstance.createImageFile(ni.peer, format == FORMAT_JPEG, img.getWidth(), img.getHeight(), quality);
                     writeNSData(p, response);
