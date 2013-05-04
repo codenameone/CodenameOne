@@ -157,10 +157,22 @@ public class ComponentGroup extends Container {
      * @param horizontal the horizontal to set
      */
     public void setHorizontal(boolean horizontal) {
-        if(horizontal) {
-            setLayout(new BoxLayout(BoxLayout.X_AXIS));
-        } else {
-            setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+        if(horizontal != isHorizontal()) {
+            if(horizontal) {
+                setLayout(new BoxLayout(BoxLayout.X_AXIS));
+                if("GroupElement".equals(elementUIID)) {
+                    elementUIID = "ToggleButton";
+                    buttonUIID = "ToggleButton";
+                    updateUIIDs();
+                }
+            } else {
+                setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+                if("ToggleButton".equals(elementUIID)) {
+                    elementUIID = "GroupElement";
+                    buttonUIID = "ButtonGroup";
+                    updateUIIDs();
+                }
+            }
         }
     }
 
