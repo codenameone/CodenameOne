@@ -27,6 +27,7 @@ package com.codename1.designer;
 import com.l2fprod.common.swing.JOutlookBar;
 import com.codename1.ui.resource.util.CodenameOneComponentWrapper;
 import com.codename1.ui.CodenameOneAccessor;
+import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.resource.util.SwingRenderer;
@@ -3957,177 +3958,182 @@ public class UserInterfaceEditor extends BaseForm {
             }
         }
 
-        public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-            try {
-                // prevent a property from being marked as modified when it is not
-                Object oldValue = getValueAt(rowIndex, columnIndex);
-                if(oldValue == aValue) {
-                    return;
-                }
-                if(oldValue != null && oldValue.equals(aValue)) {
-                    return;
-                }
-
-                int propertyId = propertyIds.get(rowIndex);
-                for(com.codename1.ui.Component cmp : cmps) {
-                    setPropertyModified(cmp, propertyId);
-                }
-                switch(propertyId) {
-                    case PROPERTY_COMMANDS:
-                    case PROPERTY_COMMANDS_LEGACY:
-                        com.codename1.ui.Form form = (com.codename1.ui.Form)cmps[0];
-                        com.codename1.ui.Command[] cmds = (com.codename1.ui.Command[])aValue;
-                        form.removeAllCommands();
-                        form.setBackCommand(null);
-                        for(int iter = cmds.length - 1 ; iter >= 0 ; iter--) {
-                            form.addCommand(cmds[iter]);
-                            if(cmds[iter] instanceof ActionCommand) {
-                                if(((ActionCommand)cmds[iter]).isBackCommand()) {
-                                    form.setBackCommand(cmds[iter]);
-                                }
-                            }
-                        }
-                        return;
-
-                    case PROPERTY_SCROLLABLE_X:
-                        for(com.codename1.ui.Component cmp : cmps) {
-                            CodenameOneAccessor.setScrollableX((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
-                        }
-                        return;
-
-                    case PROPERTY_SCROLLABLE_Y:
-                        for(com.codename1.ui.Component cmp : cmps) {
-                            CodenameOneAccessor.setScrollableY((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
-                        }
-                        return;
-
-                    case PROPERTY_NEXT_FORM:
-                        cmps[0].putClientProperty("%next_form%", aValue);
-                        return;
-
-                    case PROPERTY_BASE_FORM:
-                        cmps[0].putClientProperty("%base_form%", aValue);
-                        return;
-
-                    case PROPERTY_LAYOUT_CONSTRAINT:
-                        com.codename1.ui.Container parent = cmps[0].getParent();
-                        int index = parent.getComponentIndex(cmps[0]);
-                        if(parent.getLayout() instanceof com.codename1.ui.layouts.BorderLayout) {
-                            Object oldConstraint = parent.getLayout().getComponentConstraint(cmps[0]);
-                            removeComponentSync(parent, cmps[0]);
-                            for(int iter = 0 ; iter < parent.getComponentCount() ; iter++) {
-                                com.codename1.ui.Component current = parent.getComponentAt(iter);
-                                Object constraint = parent.getLayout().getComponentConstraint(current);
-                                if(constraint != null && constraint.equals(aValue)) {
-                                    removeComponentSync(parent, current);
-                                    parent.addComponent(iter, oldConstraint, current);
-                                    break;
-                                }
-                            }
-                        } else {
-                            // for a table layout we want to remove and re-add all the components on
-                            // a constraint change to allow the table to reflow properly
-                            com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmps[0].getParent();
-                            if(cnt instanceof com.codename1.ui.Form) {
-                                cnt = ((com.codename1.ui.Form)cnt).getContentPane();
-                            }
-                            List<com.codename1.ui.Component> cmpsList = new ArrayList<com.codename1.ui.Component>();
-                            List cons = new ArrayList();
-                            for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                                com.codename1.ui.Component currentCmp = cnt.getComponentAt(iter);
-                                cmpsList.add(currentCmp);
-                                if(currentCmp == cmps[0]) {
-                                    cons.add(aValue);
-                                } else {
-                                    cons.add(cnt.getLayout().getComponentConstraint(currentCmp));
-                                }
-                            }
-                            cnt.removeAll();
-                            for(int iter = 0 ; iter < cmpsList.size() ; iter++) {
-                                com.codename1.ui.Component currentCmp = cmpsList.get(iter);
-                                Object constraint = cons.get(iter);
-
-                                if(constraint != null) {
-                                    cnt.addComponent(constraint, currentCmp);
-                                } else {
-                                    cnt.addComponent(currentCmp);
-                                }
-                            }
+        public void setValueAt(final Object aValue, final int rowIndex, final int columnIndex) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        // prevent a property from being marked as modified when it is not
+                        Object oldValue = getValueAt(rowIndex, columnIndex);
+                        if(oldValue == aValue) {
                             return;
                         }
-                        try {
-                            parent.addComponent(index, aValue, cmps[0]);
-                        } catch(Exception err) {
-                            removeComponentSync(parent, cmps[0]);
-                            err.printStackTrace();
-                            parent.addComponent(index, oldValue, cmps[0]);
-                            JOptionPane.showMessageDialog(UserInterfaceEditor.this, "Error positioning component: " + err,
-                                    "Error", JOptionPane.ERROR_MESSAGE);
+                        if(oldValue != null && oldValue.equals(aValue)) {
+                            return;
                         }
-                        return;
 
-                    case PROPERTY_LIST_ITEMS:
-                        ((com.codename1.ui.List)cmps[0]).setModel(new com.codename1.ui.list.DefaultListModel((Object[])aValue));
-                        return;
-
-                    case PROPERTY_CUSTOM:
-                        String customName = propertyNames.get(rowIndex);
-                        setCustomPropertyModified(cmps[0], customName);
-                        String errorCode = cmps[0].setPropertyValue(customName, aValue);
-                        if(errorCode != null) {
-                            JOptionPane.showMessageDialog(UserInterfaceEditor.this, errorCode, "Error", JOptionPane.ERROR_MESSAGE);
+                        int propertyId = propertyIds.get(rowIndex);
+                        for(com.codename1.ui.Component cmp : cmps) {
+                            setPropertyModified(cmp, propertyId);
                         }
-                        return;
+                        switch(propertyId) {
+                            case PROPERTY_COMMANDS:
+                            case PROPERTY_COMMANDS_LEGACY:
+                                com.codename1.ui.Form form = (com.codename1.ui.Form)cmps[0];
+                                com.codename1.ui.Command[] cmds = (com.codename1.ui.Command[])aValue;
+                                form.removeAllCommands();
+                                form.setBackCommand(null);
+                                for(int iter = cmds.length - 1 ; iter >= 0 ; iter--) {
+                                    form.addCommand(cmds[iter]);
+                                    if(cmds[iter] instanceof ActionCommand) {
+                                        if(((ActionCommand)cmds[iter]).isBackCommand()) {
+                                            form.setBackCommand(cmds[iter]);
+                                        }
+                                    }
+                                }
+                                return;
+
+                            case PROPERTY_SCROLLABLE_X:
+                                for(com.codename1.ui.Component cmp : cmps) {
+                                    CodenameOneAccessor.setScrollableX((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
+                                }
+                                return;
+
+                            case PROPERTY_SCROLLABLE_Y:
+                                for(com.codename1.ui.Component cmp : cmps) {
+                                    CodenameOneAccessor.setScrollableY((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
+                                }
+                                return;
+
+                            case PROPERTY_NEXT_FORM:
+                                cmps[0].putClientProperty("%next_form%", aValue);
+                                return;
+
+                            case PROPERTY_BASE_FORM:
+                                cmps[0].putClientProperty("%base_form%", aValue);
+                                return;
+
+                            case PROPERTY_LAYOUT_CONSTRAINT:
+                                com.codename1.ui.Container parent = cmps[0].getParent();
+                                int index = parent.getComponentIndex(cmps[0]);
+                                if(parent.getLayout() instanceof com.codename1.ui.layouts.BorderLayout) {
+                                    Object oldConstraint = parent.getLayout().getComponentConstraint(cmps[0]);
+                                    removeComponentSync(parent, cmps[0]);
+                                    for(int iter = 0 ; iter < parent.getComponentCount() ; iter++) {
+                                        com.codename1.ui.Component current = parent.getComponentAt(iter);
+                                        Object constraint = parent.getLayout().getComponentConstraint(current);
+                                        if(constraint != null && constraint.equals(aValue)) {
+                                            removeComponentSync(parent, current);
+                                            parent.addComponent(iter, oldConstraint, current);
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // for a table layout we want to remove and re-add all the components on
+                                    // a constraint change to allow the table to reflow properly
+                                    com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmps[0].getParent();
+                                    if(cnt instanceof com.codename1.ui.Form) {
+                                        cnt = ((com.codename1.ui.Form)cnt).getContentPane();
+                                    }
+                                    List<com.codename1.ui.Component> cmpsList = new ArrayList<com.codename1.ui.Component>();
+                                    List cons = new ArrayList();
+                                    for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                                        com.codename1.ui.Component currentCmp = cnt.getComponentAt(iter);
+                                        cmpsList.add(currentCmp);
+                                        if(currentCmp == cmps[0]) {
+                                            cons.add(aValue);
+                                        } else {
+                                            cons.add(cnt.getLayout().getComponentConstraint(currentCmp));
+                                        }
+                                    }
+                                    cnt.removeAll();
+                                    for(int iter = 0 ; iter < cmpsList.size() ; iter++) {
+                                        com.codename1.ui.Component currentCmp = cmpsList.get(iter);
+                                        Object constraint = cons.get(iter);
+
+                                        if(constraint != null) {
+                                            cnt.addComponent(constraint, currentCmp);
+                                        } else {
+                                            cnt.addComponent(currentCmp);
+                                        }
+                                    }
+                                    return;
+                                }
+                                try {
+                                    parent.addComponent(index, aValue, cmps[0]);
+                                } catch(Exception err) {
+                                    removeComponentSync(parent, cmps[0]);
+                                    err.printStackTrace();
+                                    parent.addComponent(index, oldValue, cmps[0]);
+                                    JOptionPane.showMessageDialog(UserInterfaceEditor.this, "Error positioning component: " + err,
+                                            "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                                return;
+
+                            case PROPERTY_LIST_ITEMS:
+                                ((com.codename1.ui.List)cmps[0]).setModel(new com.codename1.ui.list.DefaultListModel((Object[])aValue));
+                                return;
+
+                            case PROPERTY_CUSTOM:
+                                String customName = propertyNames.get(rowIndex);
+                                setCustomPropertyModified(cmps[0], customName);
+                                String errorCode = cmps[0].setPropertyValue(customName, aValue);
+                                if(errorCode != null) {
+                                    JOptionPane.showMessageDialog(UserInterfaceEditor.this, errorCode, "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                                return;
+                        }
+
+                        for(com.codename1.ui.Component cmp : cmps) {
+                            invoke(propertySetters.get(rowIndex), cmp, new Object[]{ aValue });
+                        }
+
+                        if(propertyId == PROPERTY_LAYOUT) {
+                            if(aValue instanceof com.codename1.ui.layouts.BorderLayout) {
+                                // assign a layout constraint to all the components and revalidate
+                                // try to maintain existing constraints if some of the components already had them
+                                com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmps[0];
+                                if(cnt instanceof com.codename1.ui.Form) {
+                                    cnt = ((com.codename1.ui.Form)cnt).getContentPane();
+                                }
+                                List availableConstraints = new ArrayList();
+                                availableConstraints.add(com.codename1.ui.layouts.BorderLayout.NORTH);
+                                availableConstraints.add(com.codename1.ui.layouts.BorderLayout.SOUTH);
+                                availableConstraints.add(com.codename1.ui.layouts.BorderLayout.CENTER);
+                                availableConstraints.add(com.codename1.ui.layouts.BorderLayout.EAST);
+                                availableConstraints.add(com.codename1.ui.layouts.BorderLayout.WEST);
+                                List<com.codename1.ui.Component> cmps = new ArrayList<com.codename1.ui.Component>();
+                                for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                                    Object o = cnt.getLayout().getComponentConstraint(cnt.getComponentAt(iter));
+                                    if(o != null && availableConstraints.contains(o)) {
+                                        availableConstraints.remove(o);
+                                    } else {
+                                        cmps.add(cnt.getComponentAt(iter));
+                                    }
+                                }
+                                for(com.codename1.ui.Component current : cmps) {
+                                    int i = cnt.getComponentIndex(current);
+                                    removeComponentSync(cnt, current);
+                                    cnt.addComponent(i, availableConstraints.get(0), current);
+                                    availableConstraints.remove(0);
+                                }
+                            } 
+                        }
+
+                        cmps[0].getComponentForm().revalidate();
+                        refreshLocaleTable();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        if(propertyIds.get(rowIndex).intValue() == PROPERTY_NAME) {
+                            ((ComponentHierarchyModel)componentHierarchy.getModel()).fireTreeStructureChanged(new TreeModelEvent(componentHierarchy.getModel(), new TreePath(componentHierarchy.getModel().getRoot())));
+                            expandAll(componentHierarchy);
+                        }
+                        uiPreview.repaint();
+                        saveUI();
+                    }
                 }
-
-                for(com.codename1.ui.Component cmp : cmps) {
-                    invoke(propertySetters.get(rowIndex), cmp, new Object[]{ aValue });
-                }
-
-                if(propertyId == PROPERTY_LAYOUT) {
-                    if(aValue instanceof com.codename1.ui.layouts.BorderLayout) {
-                        // assign a layout constraint to all the components and revalidate
-                        // try to maintain existing constraints if some of the components already had them
-                        com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmps[0];
-                        if(cnt instanceof com.codename1.ui.Form) {
-                            cnt = ((com.codename1.ui.Form)cnt).getContentPane();
-                        }
-                        List availableConstraints = new ArrayList();
-                        availableConstraints.add(com.codename1.ui.layouts.BorderLayout.NORTH);
-                        availableConstraints.add(com.codename1.ui.layouts.BorderLayout.SOUTH);
-                        availableConstraints.add(com.codename1.ui.layouts.BorderLayout.CENTER);
-                        availableConstraints.add(com.codename1.ui.layouts.BorderLayout.EAST);
-                        availableConstraints.add(com.codename1.ui.layouts.BorderLayout.WEST);
-                        List<com.codename1.ui.Component> cmps = new ArrayList<com.codename1.ui.Component>();
-                        for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                            Object o = cnt.getLayout().getComponentConstraint(cnt.getComponentAt(iter));
-                            if(o != null && availableConstraints.contains(o)) {
-                                availableConstraints.remove(o);
-                            } else {
-                                cmps.add(cnt.getComponentAt(iter));
-                            }
-                        }
-                        for(com.codename1.ui.Component current : cmps) {
-                            int i = cnt.getComponentIndex(current);
-                            removeComponentSync(cnt, current);
-                            cnt.addComponent(i, availableConstraints.get(0), current);
-                            availableConstraints.remove(0);
-                        }
-                    } 
-                }
-
-                cmps[0].getComponentForm().revalidate();
-                refreshLocaleTable();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            } finally {
-                if(propertyIds.get(rowIndex).intValue() == PROPERTY_NAME) {
-                    ((ComponentHierarchyModel)componentHierarchy.getModel()).fireTreeStructureChanged(new TreeModelEvent(componentHierarchy.getModel(), new TreePath(componentHierarchy.getModel().getRoot())));
-                    expandAll(componentHierarchy);
-                }
-                uiPreview.repaint();
-                saveUI();
-            }
+            });
         }
 
         public void addTableModelListener(TableModelListener l) {
