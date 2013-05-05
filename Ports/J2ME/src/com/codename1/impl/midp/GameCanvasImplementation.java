@@ -3201,5 +3201,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         video.setFocusable(false);
         return new CodeScannerImpl(video);
     }
+    
+    public boolean hasCamera() {
+        String capture = System.getProperty("supports.video.capture");
+        return "true".equals(capture);
+    }
+
 
 }
