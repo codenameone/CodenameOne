@@ -41,6 +41,13 @@ import java.io.OutputStream;
 public class Capture {
     
     /**
+     * Returns true if the device has camera false otherwise.
+     */ 
+    public static boolean hasCamera(){
+        return Display.getInstance().hasCamera();
+    }
+    
+    /**
      * This method tries to invoke the device native camera to capture images.
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object

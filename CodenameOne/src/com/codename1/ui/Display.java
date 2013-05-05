@@ -3059,4 +3059,11 @@ public final class Display {
             impl.lockScreen();
         }
     }
+
+    /**
+     * Returns true if the device has camera false otherwise.
+     */ 
+    public boolean hasCamera() {
+        return impl.hasCamera();
+    }
 }

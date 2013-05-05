@@ -4687,5 +4687,12 @@ public abstract class CodenameOneImplementation {
      */ 
     public void unlockScreen(){
     }
+
+    /**
+     * Returns true if the device has camera false otherwise.
+     */ 
+    public boolean hasCamera() {
+        return true;
+    }
     
 }
