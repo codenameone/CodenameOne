@@ -1342,6 +1342,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 displayX = ta.getX() + ta.getWidth() - style.getPadding(false, Component.RIGHT) - f.stringWidth(displayText) + x;
             }
 
+            int cx = g.getClipX();
+            int cy = g.getClipY();
+            int cw = g.getClipWidth();
+            int ch = g.getClipHeight();
+            int clipx = ta.getX() + style.getPadding(ta.isRTL(), Component.LEFT);
+            int clipw = ta.getWidth() - style.getPadding(ta.isRTL(), Component.LEFT) - style.getPadding(ta.isRTL(), Component.RIGHT);
+            g.clipRect(clipx, cy, clipw, ch);
+
             switch(ta.getVerticalAlignment()) {
                 case Component.BOTTOM:
                     g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPadding(false, Component.BOTTOM) - f.getHeight(), ta.getStyle().getTextDecoration());
@@ -1353,6 +1361,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     g.drawString(displayText, displayX, ta.getY() + style.getPadding(false, Component.TOP), ta.getStyle().getTextDecoration());
                     break;
             }
+            g.setClip(cx, cy, cw, ch);
+            
         } else {
             drawTextArea(g, ta);
         }
