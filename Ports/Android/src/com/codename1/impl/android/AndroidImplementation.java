@@ -69,6 +69,7 @@ import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.drawable.BitmapDrawable;
+import android.hardware.Camera;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Environment;
@@ -4342,4 +4343,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
+    
+    public boolean hasCamera() {
+        int numCameras = Camera.getNumberOfCameras();
+        return numCameras > 0;
+    }
+    
 }
