@@ -3048,4 +3048,10 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         return home;
     }
     
+    public boolean hasCamera() {
+        String capture = System.getProperty("supports.video.capture");
+        return "true".equals(capture);
+    }
+    
+    
 }
