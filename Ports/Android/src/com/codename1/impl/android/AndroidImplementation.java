@@ -206,6 +206,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         if (m instanceof CodenameOneActivity) {
+            ((CodenameOneActivity) m).setDefaultIntentResultListener(this);
             ((CodenameOneActivity) m).setIntentResultListener(this);
         }
 
@@ -4339,7 +4340,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             
             // restore old activity handling
             if (activity instanceof CodenameOneActivity) {
-                ((CodenameOneActivity) activity).setIntentResultListener(AndroidImplementation.this);
+                ((CodenameOneActivity) activity).restoreIntentResultListener();
             }
         }
     }

@@ -50,6 +50,7 @@ public class CodenameOneActivity extends Activity {
     private Menu menu;
     private boolean nativeMenu = false;
     private IntentResultListener intentResultListener;
+    private IntentResultListener defaultResultListener;
     private boolean waitingForResult;
     private boolean background;
 
@@ -517,6 +518,14 @@ public class CodenameOneActivity extends Activity {
         this.intentResultListener = l;
     }
 
+    public void setDefaultIntentResultListener(IntentResultListener l) {
+        this.defaultResultListener = l;
+    }
+    
+    public void restoreIntentResultListener(){
+        setIntentResultListener(defaultResultListener);
+    }
+    
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
         waitingForResult = true;
