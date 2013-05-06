@@ -1051,7 +1051,7 @@ public class Style {
      * @return  the transparency level of the Component
      */
     public byte getBgTransparency() {
-        if(bgImage != null && backgroundType <= BACKGROUND_IMAGE_TILE_BOTH && (bgImage.isAnimation() || bgImage.isOpaque())) {
+        if(bgImage != null && backgroundType <= BACKGROUND_IMAGE_TILE_BOTH && backgroundType != BACKGROUND_NONE && (bgImage.isAnimation() || bgImage.isOpaque())) {
             return (byte)0xff;
         }
         return transparency;

@@ -126,13 +126,26 @@ public class Tabs extends Container {
         BorderLayout bd = (BorderLayout)super.getLayout();
         if(bd != null) {
             if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
-                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
+                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);
             } else {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
     }
 
+    private void checkTabsCanBeSeen() {
+        if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+            for(int iter = 0 ; iter < getTabCount() ; iter++) {
+                Component c = getTabComponentAt(iter);
+                if(c.isScrollableY()) {
+                    if(c.getStyle().getPadding(BOTTOM) < tabsContainer.getPreferredH()) {
+                        c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
+                    }
+                }
+            }
+        }
+    }
+    
     /**
      * @inheritDoc
      */
@@ -145,7 +158,10 @@ public class Tabs extends Container {
         BorderLayout bd = (BorderLayout)super.getLayout();
         if(bd != null) {
             if(manager.isThemeConstant("tabsOnTopBool", false)) {
-                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW);
+                if(bd.getCenterBehavior() != BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW) {
+                    bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);
+                    checkTabsCanBeSeen();
+                }
             } else {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
@@ -493,6 +509,7 @@ public class Tabs extends Container {
             }
             initTabsFocus();
         }
+        checkTabsCanBeSeen();
     }
 
     /**

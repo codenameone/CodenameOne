@@ -78,6 +78,10 @@ public class GridLayout extends Layout{
             } else {
                 columns = Math.max(width / maxWidth, 1);
             }
+            rows = numOfcomponents / columns;
+            if(numOfcomponents % columns > 0) {
+                rows++;
+            } 
         }
     }
 

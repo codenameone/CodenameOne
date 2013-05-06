@@ -789,6 +789,25 @@ public class Container extends Component {
             repaint();
         }
     }
+    
+    /**
+     * A more powerful form of revalidate that recursively lays out the full hierarchy
+     */
+    public void forceRevalidate() {
+        forceRevalidateImpl();
+        revalidate();
+    }
+
+    private void forceRevalidateImpl() {
+        setShouldCalcPreferredSize(true);
+        int c = getComponentCount();
+        for(int iter = 0 ; iter < c ; iter++) {
+            Component cmp = getComponentAt(iter);
+            if(cmp instanceof Container) {
+                ((Container)cmp).forceRevalidateImpl();
+            }
+        }
+    }
 
     private void paintContainerChildrenForAnimation(Container cnt, Graphics g) {
         int ourX = getAbsoluteX();

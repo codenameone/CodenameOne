@@ -86,6 +86,9 @@ public class GenericSpinner extends BaseSpinner {
         spin.setShouldCalcPreferredSize(true);
         spin.setListSizeCalculationSampleCount(30);
         spin.initSpinnerRenderer();
+        if(value != null) {
+            spin.setValue(value);
+        }
         return spin;
     }
 

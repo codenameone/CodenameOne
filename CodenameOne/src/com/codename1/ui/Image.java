@@ -976,7 +976,9 @@ public class Image {
      * calling this the image will become unusable.
      */
     public void dispose(){
-        Display.getInstance().getImplementation().releaseImage(image);
+        if(image != null) {
+            Display.getInstance().getImplementation().releaseImage(image);
+        }
         image = null;
     }
     

@@ -115,6 +115,21 @@ public class ActionEvent {
     }
 
     /**
+     * Creates a new instance of ActionEvent for a drop operation
+     *
+     * @param dragged the dragged component
+     * @param drop the drop target component
+     * @param x the x position of the pointer event
+     * @param y the y position of the pointer event
+     */
+    public ActionEvent(Component dragged, Component drop, int x, int y) {
+        this.source = dragged;
+        this.sourceComponent = drop;
+        this.keyEvent = x;
+        this.y = y;
+    }
+    
+    /**
      * The element that triggered the action event, useful for decoupling event
      * handling code
      * @return the element that triggered the action event
@@ -200,5 +215,21 @@ public class ActionEvent {
      */ 
     public boolean isLongEvent(){
         return longEvent;
+    }
+    
+    /**
+     * Set in the case of a drop listener, returns the component being dragged
+     * @return the component being dragged
+     */
+    public Component getDraggedComponent() {
+        return (Component)source;
+    }
+    
+    /**
+     * Set in the case of a drop listener, returns the component on which the drop occurs
+     * @return the component on which the drop occurs
+     */
+    public Component getDropTarget() {
+        return (Component)sourceComponent;
     }
 }

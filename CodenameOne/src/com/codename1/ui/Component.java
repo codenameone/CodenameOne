@@ -31,6 +31,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.StyleListener;
@@ -156,6 +157,7 @@ public class Component implements Animation, StyleListener {
 
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
+    private EventDispatcher dropListener;
 
     /**
      * Indicates the decrement units for the scroll opacity
@@ -2304,6 +2306,31 @@ public class Component implements Animation, StyleListener {
         return false;
     }
 
+    /**
+     * Binds an action listener to drop events which are invoked when this component is dropped on a target
+     * @param l the callback
+     */
+    public void addDropListener(ActionListener l) {
+        if(dropListener == null) {
+            dropListener = new EventDispatcher();
+        }
+        dropListener.addListener(l);
+    }
+    
+    /**
+     * Removes an action listener to drop events which are invoked when this component is dropped on a target
+     * @param l the callback
+     */
+    public void removeDropListener(ActionListener l) {
+        if(dropListener == null) {
+            return;
+        }
+        dropListener.removeListener(l);
+        if(!dropListener.hasListeners()) {
+            dropListener = null;
+        }
+    }
+    
     void dragFinished(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
@@ -2321,7 +2348,15 @@ public class Component implements Animation, StyleListener {
             if(dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
                 getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
-                dropTargetComponent.drop(this, x, y);
+                if(dropListener != null) {
+                    ActionEvent ev = new ActionEvent(this, dropTargetComponent, x, y);
+                    dropListener.fireActionEvent(ev);
+                    if(!ev.isConsumed()) {
+                        dropTargetComponent.drop(this, x, y);
+                    }
+                } else {
+                    dropTargetComponent.drop(this, x, y);
+                }
             } else {
                 p.repaint();
             }

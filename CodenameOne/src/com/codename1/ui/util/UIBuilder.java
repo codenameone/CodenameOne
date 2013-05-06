@@ -1801,7 +1801,16 @@ public class UIBuilder {
         return h;
     }
 
-    private void restoreComponentState(Component c, Hashtable destination) {
+    /**
+     * By default Codename One stores the states of components in the navigation graph
+     * as it moves between forms. However, some components aren't recognized by Codename One
+     * by default to enable smaller executable size. This method can be overriden to enable
+     * storing the state of custom components
+     * 
+     * @param c the component whose state should be restored
+     * @param destination the hashtable containing the state
+     */
+    protected void restoreComponentState(Component c, Hashtable destination) {
         if(shouldAutoStoreState()) {
             Enumeration e = destination.keys();
             while(e.hasMoreElements()) {
@@ -1823,7 +1832,16 @@ public class UIBuilder {
         }
     }
     
-    private void storeComponentState(Component c, Hashtable destination) {
+    /**
+     * By default Codename One stores the states of components in the navigation graph
+     * as it moves between forms. However, some components aren't recognized by Codename One
+     * by default to enable smaller executable size. This method can be overriden to enable
+     * storing the state of custom components
+     * 
+     * @param c the component whose state should be stored
+     * @param destination the destination hashtable
+     */
+    protected void storeComponentState(Component c, Hashtable destination) {
         if(shouldAutoStoreState()) {
             storeComponentStateImpl(c, destination);
         }

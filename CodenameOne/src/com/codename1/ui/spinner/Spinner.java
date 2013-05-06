@@ -314,7 +314,18 @@ class Spinner extends List {
         if (m instanceof SpinnerDateModel) {
             ((SpinnerDateModel) m).setValue((Date) o);
         } else {
-            ((SpinnerNumberModel) m).setValue(o);
+            if(m instanceof SpinnerNumberModel) {
+                ((SpinnerNumberModel) m).setValue(o);
+            } else {
+                int size = m.getSize();
+                for(int iter = 0 ; iter < size ; iter++) {
+                    Object c = m.getItemAt(iter);
+                    if(c == o || c != null && c.equals(o)) {
+                        m.setSelectedIndex(iter);
+                        return;
+                    }
+                }
+            }
         }
     }
 
