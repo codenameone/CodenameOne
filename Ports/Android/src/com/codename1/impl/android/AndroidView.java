@@ -199,7 +199,8 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
         if(!Display.isInitialized()) {
             return;
         }
-        if (this.width != w && (this.width < w || this.height < h)) {
+        if ((this.width != w && (this.width < w || this.height < h)) ||
+                (bitmap.getHeight() < h) ) {
             this.initBitmaps(w, h);
         }
         this.width = w;
