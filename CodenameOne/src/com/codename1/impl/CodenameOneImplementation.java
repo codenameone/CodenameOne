@@ -135,7 +135,10 @@ public abstract class CodenameOneImplementation {
         onCurrentFormChange = on;
     }
     
-    static void setOnExit(Runnable on) {
+    /**
+     * Set a task to be executed once the implementation is being destroyed
+     */ 
+    public static void setOnExit(Runnable on) {
         onExit = on;
     }
     
