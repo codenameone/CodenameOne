@@ -93,6 +93,7 @@ import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.Cookie;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -3475,7 +3476,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
         Intent emailIntent;
-        
+        String attachment = msg.getAttachment();
+            
         if(msg.getMimeType().equals(Message.MIME_TEXT)){
             StringBuilder to = new StringBuilder();
             for (int i = 0; i < recipients.length; i++) {
@@ -3492,18 +3494,64 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
             emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
             emailIntent.setType(msg.getMimeType());
-            if (msg.getAttachment() != null && msg.getAttachment().length() > 0) {
+            if (attachment != null && attachment.length() > 0) {
                 emailIntent.setType(msg.getAttachmentMimeType());
-                emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + msg.getAttachment()));
-            } 
-            if(msg.getMimeType().equals(Message.MIME_HTML)){
+                //if the attachment is in the uder home dir we need to copy it 
+                //to an accessible dir
+                if (attachment.contains(getAppHomePath())) {
+                    FileSystemStorage fs = FileSystemStorage.getInstance();
+                    final char sep = fs.getFileSystemSeparator();
+                    String fileName = attachment.substring(attachment.lastIndexOf(sep) + 1);
+                    String[] roots = FileSystemStorage.getInstance().getRoots();
+                    // iOS doesn't have an SD card
+                    String root = roots[0];
+                    for (int i = 0; i < roots.length; i++) {
+                        if (FileSystemStorage.getInstance().getRootType(roots[i]) == FileSystemStorage.ROOT_TYPE_SDCARD) {
+                            root = roots[i];
+                            break;
+                        }
+                    }
+                    String fileUri = root + sep + "tmp" + sep + fileName;
+                    FileSystemStorage.getInstance().mkdir(root + sep + "tmp");
+                    try {
+                        InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
+                        OutputStream os = FileSystemStorage.getInstance().openOutputStream(fileUri);
+                        byte [] buf = new byte[1024];
+                        int len;
+                        while((len = is.read(buf)) > -1){
+                            os.write(buf, 0, len);
+                        }
+                        is.close();
+                        os.close();
+                    } catch (IOException ex) {
+                        Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
+                    attachment = fileUri;
+                }
+                if (!attachment.startsWith("file://")) {
+                    attachment = "file://" + attachment;
+                }
+                emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(attachment));
+                
+            }
+            if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                
             }else{
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
             }
+            
         }
+        final String attach = attachment;
+        AndroidNativeUtil.startActivityForResult(Intent.createChooser(emailIntent, "Send mail..."), new IntentResultListener() {
 
-        activity.startActivity(Intent.createChooser(emailIntent, "Send mail..."));
+            @Override
+            public void onActivityResult(int requestCode, int resultCode, Intent data) {
+                if(attach != null && attach.length() > 0 && attach.contains("tmp")){
+                    FileSystemStorage.getInstance().delete(attach);
+                }
+            }
+        });
     }
 
     /**
