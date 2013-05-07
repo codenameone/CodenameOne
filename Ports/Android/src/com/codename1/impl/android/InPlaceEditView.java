@@ -271,10 +271,9 @@ public class InPlaceEditView extends FrameLayout {
         if (mTextArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
         }
-        if(password){
+        if (password) {
             //turn off suggestions for passwords
-            int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
-            mEditText.setInputType(type | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+            mEditText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
             //move the cursor to the end
             mEditText.setSelection(mEditText.getText().length());
