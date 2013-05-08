@@ -60,7 +60,7 @@ public class RSSReader extends List {
     private RSSService service;
     private int limit = 20;
     private boolean waitingForResponseLock;
-    private boolean blockList = true;
+    private boolean blockList;
     private String progressTitle = "Fetching RSS";
     private boolean displayProgressPercentage;
     private static final Hashtable MORE = new Hashtable();
