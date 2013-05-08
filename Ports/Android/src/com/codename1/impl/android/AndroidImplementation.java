@@ -3478,7 +3478,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent emailIntent;
         String attachment = msg.getAttachment();
             
-        if(msg.getMimeType().equals(Message.MIME_TEXT)){
+        if(msg.getMimeType().equals(Message.MIME_TEXT) && attachment == null){
             StringBuilder to = new StringBuilder();
             for (int i = 0; i < recipients.length; i++) {
                 to.append(recipients[i]);
