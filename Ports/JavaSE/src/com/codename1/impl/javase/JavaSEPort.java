@@ -4188,6 +4188,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
+        try {
+            Desktop.getDesktop().mail(new URI("mailto:"+ recieptents[0]));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
         System.out.println("sending message to " + recieptents[0]);
     }
 
@@ -4389,6 +4394,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setCurrentAccessPoint(String id) {
         //this.currentAp = id;
         super.setCurrentAccessPoint(id);
+    }
+
+    public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
+        capturePhoto(response);
     }
 
     /**
