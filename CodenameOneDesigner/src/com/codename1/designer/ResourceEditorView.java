@@ -82,6 +82,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2718,7 +2719,7 @@ private static boolean configureNetbeans() {
         if(f.exists()) {
             File[] files = f.listFiles(new java.io.FileFilter() {
                     public boolean accept(File pathname) {
-                        return pathname.getName().contains("NetBeans");
+                        return pathname.getName().toLowerCase().contains("netbeans");
                     }
                 });
             if(files.length > 0) {
@@ -3823,6 +3824,55 @@ public static void openInIDE(File f, int lineNumber) {
     }
 
     public static File[] showFileChooser(boolean multi, boolean open, boolean dir, String dialogTitle, final String label, final String... type) {
+        if(!dir && multi && ResourceEditorApp.IS_MAC) {
+            FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
+
+            // check if we can hack Java 7
+            try {
+                Method m = fd.getClass().getMethod("setMultipleMode", Boolean.TYPE);
+                m.invoke(fd, true);
+
+                fd.setFilenameFilter(new FilenameFilter() {
+
+                    public boolean accept(File dir, String name) {
+                        name = name.toLowerCase();
+                        for(String t : type) {
+                            if(name.endsWith(t)) {
+                                return true;
+                            }
+                        }
+                        return  false;
+
+                    }
+                });
+
+                if(open) {
+                    fd.setMode(FileDialog.LOAD);
+                } else {
+                    fd.setMode(FileDialog.SAVE);
+                }
+                if(dialogTitle != null) {
+                    fd.setTitle(dialogTitle);
+                }
+                String defaultDir = Preferences.userNodeForPackage(ResourceEditorView.class).get("lastDir", System.getProperty("user.home"));
+                fd.setDirectory(defaultDir);
+                fd.pack();
+                fd.setLocationByPlatform(true);
+                fd.setVisible(true);
+
+                m = fd.getClass().getMethod("getFiles");
+                File[] files = (File[])m.invoke(fd);
+                
+                if(files != null && files.length > 0) {
+                    Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", files[0].getAbsolutePath());
+                    return files;
+                }
+                return null;            
+            } catch(Throwable t) {
+                // failed... 
+                t.printStackTrace();
+            }
+        }
         if(ResourceEditorApp.IS_MAC && !dir && !multi) {
             // on Mac we prefer the native AWT file chooser which is far superior
             FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
@@ -3840,6 +3890,7 @@ public static void openInIDE(File f, int lineNumber) {
 
                 }
             });
+            
             if(open) {
                 fd.setMode(FileDialog.LOAD);
             } else {
