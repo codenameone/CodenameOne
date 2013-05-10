@@ -85,7 +85,7 @@ public class BoxLayout extends Layout{
                 
                 y += stl.getMargin(false, Component.TOP);
                 
-                if(y >= cmpBottom){
+                if(y >= cmpBottom && !parent.isScrollableY()){
                     cmpH = 0;
                 }else if(y + cmpH - parent.getStyle().getPadding(false, Component.TOP) > cmpBottom){
                     cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
@@ -101,7 +101,7 @@ public class BoxLayout extends Layout{
                 
                 x += stl.getMargin(false, Component.LEFT);
 
-                if(x >= cmpRight){
+                if(x >= cmpRight && !parent.isScrollableX()){
                     cmpW = 0;
                 } else {
                     if(x + cmpW - parent.getStyle().getPadding(false, Component.LEFT) > cmpRight){
