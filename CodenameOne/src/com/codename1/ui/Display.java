@@ -2375,7 +2375,11 @@ public final class Display {
         if(localProperties == null) {
             localProperties = new Hashtable();
         }
-        localProperties.put(key, value);
+        if(value == null) {
+            localProperties.remove(key);
+        } else {
+            localProperties.put(key, value);
+        }
     }
 
     /**
