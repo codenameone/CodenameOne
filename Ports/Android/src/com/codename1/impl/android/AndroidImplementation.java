@@ -2718,10 +2718,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 Cookie c = new Cookie();
                                 String[] parts = cookies[i].split("=");
                                 c.setName(parts[0].trim());
-                                c.setValue(parts[1].trim());
+                                if(parts.length > 1){
+                                    c.setValue(parts[1].trim());
+                                }else{
+                                    c.setValue("");                                
+                                }
                                 c.setDomain(domain);
                                 out.add(c);
-
                             }
                             Cookie[] cookiesArr = new Cookie[out.size()];
                             out.toArray(cookiesArr);
