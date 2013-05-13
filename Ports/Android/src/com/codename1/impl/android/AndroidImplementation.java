@@ -1974,7 +1974,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             clear.setStyle(Style.FILL);
             v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                     MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-            doSetVisibility(false);
         }
 
         @Override
@@ -2229,7 +2228,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 w = d.getMinimumWidth();
                 h = d.getMinimumHeight();
             }
-
+            w = Math.max(v.getMeasuredWidth(), w);
+            h = Math.max(v.getMeasuredHeight(), h);
             if (v instanceof TextView) {
                 w = (int) android.text.Layout.getDesiredWidth(((TextView) v).getText(), ((TextView) v).getPaint());
             }
@@ -2694,6 +2694,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
+            doSetVisibility(false);
             parent = (BrowserComponent) p;
             this.web = web;
             web.getSettings().setJavaScriptEnabled(true);
