@@ -200,13 +200,14 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      private static final int INPUT_IMAGE = 7; // image is not officially supported in XHTML-MP 1.0 but we support it
      private static final int INPUT_BUTTON = 8; //button is not supported in XHTML-MP 1.0
      //private static final int INPUT_FILE = 9; //file upload is not supported in XHTML-MP 1.0
+     private static final int INPUT_EMAIL = 9;
      
     /**
      * Defines the possible values for the type attribute in the input tag, ordered according to the INPUT_* constants
      */
     private static String[] INPUT_TYPE_STRINGS = {
             "checkbox","hidden","password","radio","reset",
-            "submit","text","image", "button"
+            "submit","text","image", "button", "email"
     };
 
     /**
@@ -2512,6 +2513,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
                     curForm.addInput(name, value,null);
                 }
                 break;
+            case INPUT_EMAIL:
             case INPUT_TEXT:
             case INPUT_PASSWORD:
                 TextField tf = new TextField(value);
@@ -2520,6 +2522,10 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
                     tf.setConstraint(TextField.PASSWORD);
                 }
 
+                if (typeID==INPUT_EMAIL) {
+                    tf.setConstraint(TextField.EMAILADDR);
+                }
+                
                 if (SUPPORT_INPUT_FORMAT) {
                     HTMLInputFormat inputFormat=HTMLInputFormat.getInputFormat(element.getAttributeById(HTMLElement.ATTR_FORMAT));
                     if (inputFormat!=null) {

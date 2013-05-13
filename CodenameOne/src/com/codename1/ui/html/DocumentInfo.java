@@ -147,7 +147,12 @@ public class DocumentInfo {
             hostURL="";
             protocol="";
         } else {
-            setBaseURL(pageURL.substring(0, index + 1));
+            int questionMark =pageURL.lastIndexOf('?');
+            if(questionMark > -1){
+                setBaseURL(pageURL.substring(0, questionMark));            
+            }else{
+                setBaseURL(pageURL.substring(0, index + 1));                        
+            }
             index=pageURL.indexOf("://");
             if (index!=-1) {
                 protocol=pageURL.substring(0, index+1); //The protocol will be http: , ftp: (without the //)
