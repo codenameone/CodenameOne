@@ -201,6 +201,7 @@ public class Storage {
             cache.put(name, o);
             return o;
         } catch(Exception err) {
+            err.printStackTrace();
             Util.getImplementation().cleanup(d);
             return null;
         }
