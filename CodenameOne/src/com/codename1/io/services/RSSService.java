@@ -27,6 +27,7 @@ package com.codename1.io.services;
 import com.codename1.ui.Dialog;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Image;
 import com.codename1.xml.Element;
 import com.codename1.xml.ParserCallback;
 import com.codename1.xml.XMLParser;
@@ -49,6 +50,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     private int startOffset = -1;
     private boolean hasMore;
     private boolean createPlainTextDetails = true;
+    private Image iconPlaceholder;
 
     /**
      * Simple constructor accepting the RSS url
@@ -94,15 +96,25 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         XMLParser p = new XMLParser() {
             private String lastTag;
             private Hashtable current;
+            private String url;
             protected boolean startTag(String tag) {
                 if("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
                     if(startOffset > 0) {
                         return true;
                     }
                     current = new Hashtable();
+                    if(iconPlaceholder != null) {
+                        current.put("icon", iconPlaceholder);
+                    }
                 }
                 lastTag = tag;
                 return true;
+            }
+
+            protected void attribute(String tag, String attributeName, String value) {
+                if("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
+                    current.put("thumb", value);
+                }
             }
 
             protected void textElement(String text) {
@@ -218,5 +230,19 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
      */
     public void setCreatePlainTextDetails(boolean createPlainTextDetails) {
         this.createPlainTextDetails = createPlainTextDetails;
+    }
+
+    /**
+     * @return the iconPlaceholder
+     */
+    public Image getIconPlaceholder() {
+        return iconPlaceholder;
+    }
+
+    /**
+     * @param iconPlaceholder the iconPlaceholder to set
+     */
+    public void setIconPlaceholder(Image iconPlaceholder) {
+        this.iconPlaceholder = iconPlaceholder;
     }
 }

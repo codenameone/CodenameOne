@@ -24,6 +24,7 @@
 
 package com.codename1.components;
 
+import com.codename1.io.ConnectionRequest;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -37,13 +38,13 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.services.ImageDownloadService;
 import com.codename1.io.services.RSSService;
+import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
-import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -56,13 +57,14 @@ import java.util.Vector;
  */
 public class RSSReader extends List {
     private Vector existingData;
-    private String url = "http://blogs.oracle.com/readingLists/oracleblogs.xml";
+    private String url = "http://codenameone.blogspot.com/feeds/posts/default?alt=rss";
     private RSSService service;
     private int limit = 20;
     private boolean waitingForResponseLock;
     private boolean blockList;
     private String progressTitle = "Fetching RSS";
     private boolean displayProgressPercentage;
+    private Image iconPlaceholder;
     private static final Hashtable MORE = new Hashtable();
     static {
         MORE.put("title", "More");
@@ -123,6 +125,16 @@ public class RSSReader extends List {
         description.setUIID("RSSDescription");
         description.setScrollVisible(false);
         entries.addComponent(description);
+        if(iconPlaceholder != null) {
+            Container wrap = new Container(new BorderLayout());
+            wrap.addComponent(BorderLayout.CENTER, entries);
+            Label icon = new Label();
+            icon.setIcon(iconPlaceholder);
+            icon.setUIID("RSSIcon");
+            icon.setName("icon");
+            wrap.addComponent(BorderLayout.WEST, icon);
+            entries = wrap;
+        }
         return entries;
     }
 
@@ -142,6 +154,9 @@ public class RSSReader extends List {
     public void sendRequest() {
         if(service == null) {
             service = new RSSService(url, limit);
+            if(iconPlaceholder != null) {
+                service.setIconPlaceholder(iconPlaceholder);
+            }
             service.addResponseListener(new EventHandler());
             if(blockList) {
                 Progress p = new Progress(progressTitle, service, displayProgressPercentage);
@@ -172,6 +187,24 @@ public class RSSReader extends List {
      */
     public String getURL() {
         return url;
+    }
+
+    /**
+     * @return the iconPlaceholder
+     */
+    public Image getIconPlaceholder() {
+        return iconPlaceholder;
+    }
+
+    /**
+     * @param iconPlaceholder the iconPlaceholder to set
+     */
+    public void setIconPlaceholder(Image iconPlaceholder) {
+        this.iconPlaceholder = iconPlaceholder;
+        if(service != null) {
+            service.setIconPlaceholder(iconPlaceholder);
+        }
+        setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));
     }
 
     class Listener implements ActionListener {
@@ -214,8 +247,8 @@ public class RSSReader extends List {
                         ((TextArea)current).setText(val);
                         continue;
                     }
-                    if(current instanceof HTMLComponent) {
-                        ((HTMLComponent)current).setHTML(val, "UTF-8", "", val.indexOf("<html") > -1);
+                    if(current instanceof WebBrowser) {
+                        ((WebBrowser)current).setPage(val, null);
                         continue;
                     }
                 }
@@ -252,10 +285,10 @@ public class RSSReader extends List {
             updateComponentValues(newForm, h);
         } else {
             newForm = new Form((String)h.get("title"));
-            HTMLComponent c = new HTMLComponent(new AsyncDocumentRequestHandlerImpl());
+            WebBrowser c = new WebBrowser();
             String s = (String)h.get("description");
             s = "<html><body>" + s + "</body></html>";
-            c.setBodyText(s);
+            c.setPage(s, null);
             newForm.setLayout(new BorderLayout());
             newForm.addComponent(BorderLayout.CENTER, c);
         }
@@ -436,6 +469,14 @@ public class RSSReader extends List {
 
 
     class EventHandler implements ActionListener {
+        private void downloadImage(Hashtable h, int offset) {
+            if(iconPlaceholder != null) { 
+                String url = (String)h.get("thumb");
+                if(url != null) {
+                    ImageDownloadService.createImageToStorage(url, RSSReader.this, getModel(), offset, "icon", url.replace('/', '_').replace(':', '_'), iconPlaceholder, ConnectionRequest.PRIORITY_REDUNDANT);
+                }
+            }
+        }
         public void actionPerformed(ActionEvent evt) {
             if(evt instanceof NetworkEvent) {
                 waitingForResponseLock = false;
@@ -446,7 +487,8 @@ public class RSSReader extends List {
                 if(existingData != null) {
                     existingData.removeElement(MORE);
                     for(int iter = 0 ; iter < v.size() ; iter++) {
-                        existingData.addElement(v.elementAt(iter));
+                        Hashtable h = (Hashtable)v.elementAt(iter);
+                        existingData.addElement(h);
                     }
                 } else {
                     existingData = v;
@@ -457,6 +499,14 @@ public class RSSReader extends List {
                 }
 
                 setModel(new DefaultListModel(existingData));
+
+                for(int iter = 0 ; iter < existingData.size() ; iter++) {
+                    Hashtable h = (Hashtable)existingData.elementAt(iter);
+                    Object icn = h.get("icon");
+                    if(icn != null && icn == iconPlaceholder) {
+                        downloadImage(h, iter);
+                    }
+                }
                 return;
             }
 
