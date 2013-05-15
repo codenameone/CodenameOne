@@ -112,8 +112,10 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             }
 
             protected void attribute(String tag, String attributeName, String value) {
-                if("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
-                    current.put("thumb", value);
+                if(current != null) {
+                    if("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
+                        current.put("thumb", value);
+                    }
                 }
             }
 
