@@ -237,6 +237,7 @@ public class SideMenuBar extends MenuBar {
         if (c.getIcon() == null) {
             b.setIcon(null);
         }
+        b.setText(c.getCommandName());
         b.setTextPosition(Label.RIGHT);
         b.setUIID("SideCommand");
         return b;
