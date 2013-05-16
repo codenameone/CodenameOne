@@ -63,7 +63,7 @@ public class RSSReader extends List {
     private boolean waitingForResponseLock;
     private boolean blockList;
     private String progressTitle = "Fetching RSS";
-    private boolean displayProgressPercentage;
+    private boolean displayProgressPercentage = true;
     private Image iconPlaceholder;
     private static final Hashtable MORE = new Hashtable();
     static {
@@ -517,8 +517,11 @@ public class RSSReader extends List {
                 }
                 waitingForResponseLock = true;
                 service = new RSSService(url, limit, existingData.size() - 1);
+                if(iconPlaceholder != null) {
+                    service.setIconPlaceholder(iconPlaceholder);
+                }
                 service.addResponseListener(new EventHandler());
-                Progress p = new Progress("Fetching RSS", service);
+                Progress p = new Progress("Fetching RSS", service, displayProgressPercentage);
                 p.setAutoShow(true);
                 p.setDisposeOnCompletion(true);
                 NetworkManager.getInstance().addToQueue(service);

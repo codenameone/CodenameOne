@@ -69,7 +69,7 @@ public class Progress extends Dialog implements ActionListener {
         super(title);
         this.request = request;
         SliderBridge b = new SliderBridge(request);
-        b.setRenderPercentageOnTop(false);
+        b.setRenderPercentageOnTop(showPercentage);
         b.setRenderValueOnTop(true);
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         addComponent(b);
@@ -105,8 +105,19 @@ public class Progress extends Dialog implements ActionListener {
         }
         // cancel was pressed
         request.kill();
+        dispose();
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void dispose() {
+        NetworkManager.getInstance().removeProgressListener(this);
+        super.dispose();
+        showing = false;
+        autoShow = false;
+    }
+    
     /**
      * @return the disposeOnCompletion
      */
@@ -121,6 +132,8 @@ public class Progress extends Dialog implements ActionListener {
         this.disposeOnCompletion = disposeOnCompletion;
     }
 
+    private boolean showing;
+    
     /**
      * @inheritDoc
      */
@@ -131,8 +144,9 @@ public class Progress extends Dialog implements ActionListener {
                  dispose();
                  return;
              }
-             if(autoShow && Display.getInstance().getCurrent() != this) {
-                 show();
+             if(autoShow && !showing) {
+                 showing = true;
+                 showModeless();
              }
          }
     }
