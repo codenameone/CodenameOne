@@ -59,6 +59,7 @@ public class SEDatabase extends Database{
     public void commitTransaction() throws IOException {
         try {
             conn.commit();
+            conn.setAutoCommit(true);
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
