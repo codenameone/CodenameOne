@@ -3164,30 +3164,32 @@ public class UserInterfaceEditor extends BaseForm {
                             }
                         }
 
-                        out.writeInt(PROPERTY_LIST_ITEMS);
-                        out.writeInt(lst.getModel().getSize());
-                        for(int iter = 0 ; iter < lst.getModel().getSize() ; iter++) {
-                            Object o = lst.getModel().getItemAt(iter);
-                            if(o instanceof String) {
-                                out.writeByte(1);
-                                out.writeUTF((String)o);
-                            } else {
-                                out.writeByte(2);
-                                Hashtable h = (Hashtable)o;
-                                out.writeInt(h.size());
-                                for(Object key : h.keySet()) {
-                                    Object val = h.get(key);
-                                    if(val instanceof com.codename1.ui.Image) {
-                                        out.writeInt(2);
-                                        out.writeUTF((String)key);
-                                        out.writeUTF(res.findId(val));
-                                    } else {
-                                        out.writeInt(1);
-                                        out.writeUTF((String)key);
-                                        if(val instanceof ActionCommand) {
-                                            out.writeUTF(((ActionCommand)val).getAction());
+                        if(!(cmp instanceof com.codename1.components.RSSReader)) {
+                            out.writeInt(PROPERTY_LIST_ITEMS);
+                            out.writeInt(lst.getModel().getSize());
+                            for(int iter = 0 ; iter < lst.getModel().getSize() ; iter++) {
+                                Object o = lst.getModel().getItemAt(iter);
+                                if(o instanceof String) {
+                                    out.writeByte(1);
+                                    out.writeUTF((String)o);
+                                } else {
+                                    out.writeByte(2);
+                                    Hashtable h = (Hashtable)o;
+                                    out.writeInt(h.size());
+                                    for(Object key : h.keySet()) {
+                                        Object val = h.get(key);
+                                        if(val instanceof com.codename1.ui.Image) {
+                                            out.writeInt(2);
+                                            out.writeUTF((String)key);
+                                            out.writeUTF(res.findId(val));
                                         } else {
-                                            out.writeUTF((String)val);
+                                            out.writeInt(1);
+                                            out.writeUTF((String)key);
+                                            if(val instanceof ActionCommand) {
+                                                out.writeUTF(((ActionCommand)val).getAction());
+                                            } else {
+                                                out.writeUTF((String)val);
+                                            }
                                         }
                                     }
                                 }
@@ -3673,7 +3675,7 @@ public class UserInterfaceEditor extends BaseForm {
                     propertyClasses.add(com.codename1.ui.Form.class);
                 }
 
-                if(cmp instanceof com.codename1.ui.List) {
+                if(cmp instanceof com.codename1.ui.List && !(cmp instanceof com.codename1.components.RSSReader)) {
                     propertyNames.add("ListItems");
                     propertyIds.add(PROPERTY_LIST_ITEMS);
                     propertyClasses.add(String.class);
@@ -3991,26 +3993,31 @@ public class UserInterfaceEditor extends BaseForm {
                                         }
                                     }
                                 }
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_SCROLLABLE_X:
                                 for(com.codename1.ui.Component cmp : cmps) {
                                     CodenameOneAccessor.setScrollableX((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
                                 }
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_SCROLLABLE_Y:
                                 for(com.codename1.ui.Component cmp : cmps) {
                                     CodenameOneAccessor.setScrollableY((com.codename1.ui.Container)cmp, ((Boolean)aValue).booleanValue());
                                 }
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_NEXT_FORM:
                                 cmps[0].putClientProperty("%next_form%", aValue);
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_BASE_FORM:
                                 cmps[0].putClientProperty("%base_form%", aValue);
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_LAYOUT_CONSTRAINT:
@@ -4057,6 +4064,7 @@ public class UserInterfaceEditor extends BaseForm {
                                             cnt.addComponent(currentCmp);
                                         }
                                     }
+                                    properties.repaint();
                                     return;
                                 }
                                 try {
@@ -4068,10 +4076,12 @@ public class UserInterfaceEditor extends BaseForm {
                                     JOptionPane.showMessageDialog(UserInterfaceEditor.this, "Error positioning component: " + err,
                                             "Error", JOptionPane.ERROR_MESSAGE);
                                 }
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_LIST_ITEMS:
                                 ((com.codename1.ui.List)cmps[0]).setModel(new com.codename1.ui.list.DefaultListModel((Object[])aValue));
+                                properties.repaint();
                                 return;
 
                             case PROPERTY_CUSTOM:
@@ -4081,6 +4091,7 @@ public class UserInterfaceEditor extends BaseForm {
                                 if(errorCode != null) {
                                     JOptionPane.showMessageDialog(UserInterfaceEditor.this, errorCode, "Error", JOptionPane.ERROR_MESSAGE);
                                 }
+                                properties.repaint();
                                 return;
                         }
 
@@ -4132,6 +4143,7 @@ public class UserInterfaceEditor extends BaseForm {
                         uiPreview.repaint();
                         saveUI();
                     }
+                    properties.repaint();
                 }
             });
         }
