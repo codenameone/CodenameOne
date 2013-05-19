@@ -67,7 +67,8 @@ public class FaceBookAccess {
     private Vector responseCodeListeners = new Vector();
     private static String token;
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
-
+    
+    
     private FaceBookAccess() {
     }
 
@@ -402,7 +403,12 @@ public class FaceBookAccess {
         checkAuthentication();
 
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
-        fb.addArgument("type", "small");
+        if(toScale != null){
+            fb.addArgument("width", "" + toScale.getWidth());
+            fb.addArgument("height", "" + toScale.getHeight());
+        }else{
+            fb.addArgument("type", "small");
+        }
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
@@ -417,13 +423,19 @@ public class FaceBookAccess {
      *
      * @param id the object id to query
      * @param callback the callback that should be updated when the data arrives
+     * @param toScale picture dimension or null
      * @param tempStorage if true place the image in a temp storage
      */
-    public void getPicture(String id, final ActionListener callback, boolean tempStorage) throws IOException {
+    public void getPicture(String id, final ActionListener callback, Dimension toScale, boolean tempStorage) throws IOException {
         checkAuthentication();
 
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
-        fb.addArgument("type", "small");
+        if(toScale != null){
+            fb.addArgument("width", "" + toScale.getWidth());
+            fb.addArgument("height", "" + toScale.getHeight());
+        }else{
+            fb.addArgument("type", "small");
+        }
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
@@ -452,7 +464,12 @@ public class FaceBookAccess {
         checkAuthentication();
 
         FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
-        fb.addArgument("type", "small");
+        if(toScale != null){
+            fb.addArgument("width", "" + toScale.getWidth());
+            fb.addArgument("height", "" + toScale.getHeight());
+        }else{
+            fb.addArgument("type", "small");
+        }
         String cacheKey = id;
         //check if this image is a temporarey resource and it is not saved
         //already has a permanent image
