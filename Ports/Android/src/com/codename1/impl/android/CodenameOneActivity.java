@@ -45,6 +45,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Vector;
 
 public class CodenameOneActivity extends Activity {
     private Menu menu;
@@ -53,7 +54,7 @@ public class CodenameOneActivity extends Activity {
     private IntentResultListener defaultResultListener;
     private boolean waitingForResult;
     private boolean background;
-
+    private Vector intentResult;
     /**
      * The SharedPreferences key for recording whether we initialized the
      * database.  If false, then we perform a RestoreTransactions request
@@ -508,12 +509,26 @@ public class CodenameOneActivity extends Activity {
         return true;
     }
     
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if(intentResultListener != null){
-            intentResultListener.onActivityResult(requestCode, resultCode, data);
+    protected void fireIntentResult() {
+        final IntentResult response = (IntentResult) intentResult.get(0);
+        if (intentResultListener != null && response != null) {
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    intentResultListener.onActivityResult(response.getRequestCode(),
+                            response.getResultCode(),
+                            response.getData());
+                }
+            });
         }
     }
 
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult response = new IntentResult(requestCode, resultCode, data);
+        intentResult.add(response);
+    }
+    
     public void setIntentResultListener(IntentResultListener l) {
         this.intentResultListener = l;
     }
@@ -529,6 +544,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
         waitingForResult = true;
+        intentResult = new Vector();
         super.startActivityForResult(intent, requestCode);
     }
 
