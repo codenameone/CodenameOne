@@ -54,7 +54,7 @@ public class CodenameOneActivity extends Activity {
     private IntentResultListener defaultResultListener;
     private boolean waitingForResult;
     private boolean background;
-    private Vector intentResult;
+    private Vector intentResult = new Vector();
     /**
      * The SharedPreferences key for recording whether we initialized the
      * database.  If false, then we perform a RestoreTransactions request
