@@ -69,6 +69,14 @@ public abstract class AbstractTest implements UnitTest {
     public void assertBool(boolean b) {
         TestUtils.assertBool(b);
     }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     * @see TestUtils
+     */
+    public void assertBool(boolean b, String errorMessage) {
+        TestUtils.assertBool(b, errorMessage);
+    }
     
 
     /**
@@ -308,7 +316,7 @@ public abstract class AbstractTest implements UnitTest {
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static void assertTitle(String title) {
+    public void assertTitle(String title) {
         TestUtils.assertTitle(title);
     }
 
@@ -316,7 +324,7 @@ public abstract class AbstractTest implements UnitTest {
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static void assertLabel(String name, String text) {
+    public void assertLabel(String name, String text) {
         TestUtils.assertLabel(name, text);
     }
 
@@ -324,7 +332,7 @@ public abstract class AbstractTest implements UnitTest {
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static void assertLabel(String text) {
+    public void assertLabel(String text) {
         TestUtils.assertLabel(text);
     }
 
@@ -332,15 +340,31 @@ public abstract class AbstractTest implements UnitTest {
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static void assertTextArea(String name, String text) {
-        TestUtils.assertLabel(name, text);
+    public void assertLabel(int[] path, String text) {
+        TestUtils.assertLabel(path, text);
+    }
+    
+    /**
+     * This method just invokes the test utils method, it is here for convenience 
+     * @see TestUtils
+     */
+    public void assertTextArea(String name, String text) {
+        TestUtils.assertTextArea(name, text);
     }
 
     /**
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static void assertTextArea(String text) {
+    public void assertTextArea(int[] path, String text) {
+        TestUtils.assertTextArea(path, text);
+    }
+    
+    /**
+     * This method just invokes the test utils method, it is here for convenience 
+     * @see TestUtils
+     */
+    public void assertTextArea(String text) {
         TestUtils.assertTextArea(text);
     }
 
@@ -348,7 +372,32 @@ public abstract class AbstractTest implements UnitTest {
      * This method just invokes the test utils method, it is here for convenience 
      * @see TestUtils
      */
-    public static TextArea findTextAreaText(String text) {
+    public TextArea findTextAreaText(String text) {
         return TestUtils.findTextAreaText(text);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience 
+     * @see TestUtils
+     */
+    public void setVerboseMode(boolean v) {
+        TestUtils.setVerboseMode(v);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience 
+     * @see TestUtils
+     */
+    public void selectInList(String listName, int offset) {
+        TestUtils.selectInList(listName, offset);
+    }
+
+    
+    /**
+     * This method just invokes the test utils method, it is here for convenience 
+     * @see TestUtils
+     */
+    public void selectInList(int[] path, int offset) {
+        TestUtils.selectInList(path, offset);
     }
 }

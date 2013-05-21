@@ -2109,6 +2109,9 @@ public class Container extends Component {
                         enableLayoutOnPaint = true;
                         thisContainer.dontRecurseContainer = false;
                         Form f = thisContainer.getComponentForm();
+                        if(f == null) {
+                            return false;
+                        }
                         f.deregisterAnimated(this);
                         if(!dontRevalidate) {
                             f.revalidate();

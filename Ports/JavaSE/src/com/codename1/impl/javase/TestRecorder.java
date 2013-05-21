@@ -22,10 +22,13 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.list.ListModel;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -152,6 +155,7 @@ public class TestRecorder extends javax.swing.JFrame {
 
     void eventKeyReleased(int k) {
         if(isRecording()) {
+            
             addWaitStatement();
             int g = Display.getInstance().getGameAction(k);
             if(g <= 0) {
@@ -173,7 +177,7 @@ public class TestRecorder extends javax.swing.JFrame {
     private com.codename1.ui.Component getCodenameOneComponentAt(int x, int y) {
         return Display.getInstance().getCurrent().getComponentAt(x, y);
     }
-    
+        
     /**
      * Creates a path object that reaches the component
      */
@@ -200,6 +204,10 @@ public class TestRecorder extends javax.swing.JFrame {
     
     private String generatePointerEventArguments(int x, int y) {
         com.codename1.ui.Component cmp = getCodenameOneComponentAt(x, y);
+        if(cmp.getParent() instanceof Form) {
+            cmp = cmp.getParent();
+        }
+        
         String componentName = cmp.getName();
         if(componentName == null) {
             componentName = getPathToComponent(cmp);
@@ -277,9 +285,45 @@ public class TestRecorder extends javax.swing.JFrame {
         });
         return cmp[0];
     }
-
+    
+    private void bindListListener(final com.codename1.ui.Component cmp, final ListModel m) {
+        if(cmp.getClientProperty("CN1$listenerBound") == null) {
+            cmp.putClientProperty("CN1$listenerBound", Boolean.TRUE);
+            m.addSelectionListener(new SelectionListener() {
+                public void selectionChanged(int oldSelected, int newSelected) {
+                    generatedCode += "        selectInList(" + getPathOrName(cmp) + ", " + newSelected + ");\n";
+                    updateTestCode();
+                }
+            });
+        }
+    }
+    
+    private boolean isListComponent(com.codename1.ui.Component cmp) {
+        if(cmp instanceof com.codename1.ui.List) {
+            if(cmp.getParent() instanceof com.codename1.ui.spinner.GenericSpinner) {
+                cmp = cmp.getParent();
+            } else {
+                bindListListener(cmp, ((com.codename1.ui.List)cmp).getModel());
+                return true;
+            }
+        }
+        if(cmp instanceof com.codename1.ui.list.ContainerList) {
+            bindListListener(cmp, ((com.codename1.ui.list.ContainerList)cmp).getModel());
+            return true;
+        }
+        if(cmp instanceof com.codename1.ui.spinner.GenericSpinner) {
+            bindListListener(cmp, ((com.codename1.ui.spinner.GenericSpinner)cmp).getModel());
+            return true;
+        }
+        return false;
+    }
+    
     void eventPointerReleased(int x, int y) {
         if(isRecording()) {
+            com.codename1.ui.Component cmp = Display.getInstance().getCurrent().getComponentAt(x, y);
+            if(isListComponent(cmp)) {
+                return;
+            }
             if(dragged) {
                 if(dragToScroll.isSelected()) {
                     com.codename1.ui.Component scrollTo;
@@ -288,7 +332,7 @@ public class TestRecorder extends javax.swing.JFrame {
                     } else {
                         scrollTo = findHighestVisibleComponent();
                     }
-                    if(scrollTo != null) {
+                    if(scrollTo != null && scrollTo != Display.getInstance().getCurrent() && scrollTo != Display.getInstance().getCurrent().getContentPane()) {
                         String name = scrollTo.getName();
                         if(name != null) {
                             generatedCode += "        ensureVisible(\"" + name + "\");\n";
@@ -303,7 +347,6 @@ public class TestRecorder extends javax.swing.JFrame {
                     updateTestCode();
                 }
             } else {
-                com.codename1.ui.Component cmp = getCodenameOneComponentAt(x, y);
                 if(cmp instanceof com.codename1.ui.Button) {
                     com.codename1.ui.Button btn = (com.codename1.ui.Button)cmp;
                     
@@ -336,13 +379,16 @@ public class TestRecorder extends javax.swing.JFrame {
         }
     }
 
-    void editTextFieldCompleted(com.codename1.ui.Component cmp, String text) {
-        String name = cmp.getName();
-        if(name == null) {
-            generatedCode += "        setText(" + getPathToComponent(cmp) + ", \"" + text + "\");\n";
-        } else {
-            generatedCode += "        setText(\"" + name + "\", \"" + text + "\");\n";
+    private String getPathOrName(com.codename1.ui.Component cmp) {
+        if(cmp.getName() == null || TestUtils.findByName(cmp.getName()) != cmp) {
+            return getPathToComponent(cmp);
         }
+        return "\"" + cmp.getName() + "\"";
+        
+    }
+    
+    void editTextFieldCompleted(com.codename1.ui.Component cmp, String text) {
+        generatedCode += "        setText(" + getPathOrName(cmp) + ", \"" + text + "\");\n";
     }
     
     private void bindForm(Form current) {
@@ -581,7 +627,7 @@ private void recordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
 
 private void assertTitleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_assertTitleActionPerformed
     Form f = Display.getInstance().getCurrent();
-    generatedCode += "        assertTitle(\"" + f.getTitle() + "\");\n";    
+    generatedCode += "        assertTitle(\"" + f.getTitle().replace("\n", "\\n") + "\");\n";    
     updateTestCode();    
 }//GEN-LAST:event_assertTitleActionPerformed
 
@@ -591,10 +637,14 @@ private void assertLabelsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         public void visit(Component c) {
             if(c instanceof com.codename1.ui.Label) {
                 com.codename1.ui.Label lbl = (com.codename1.ui.Label)c;
+                String labelText = "null";
+                if(lbl.getText() != null) {
+                    labelText = "\"" + lbl.getText().replace("\n", "\\n") + "\"";
+                }
                 if(lbl.getName() != null) {
-                    generatedCode += "        assertLabel(\"" + lbl.getName() + "\", \"" + lbl.getText() + "\");\n";                    
+                    generatedCode += "        assertLabel(" + getPathOrName(lbl) + ", " + labelText + ");\n";
                 } else {
-                    generatedCode += "        assertLabel(\"" + lbl.getText() + "\");\n";                    
+                    generatedCode += "        assertLabel(" + labelText + ");\n";                    
                 }
             }
         }
@@ -608,10 +658,14 @@ private void assertTextAreasActionPerformed(java.awt.event.ActionEvent evt) {//G
         public void visit(Component c) {
             if(c instanceof com.codename1.ui.TextArea) {
                 com.codename1.ui.TextArea lbl = (com.codename1.ui.TextArea)c;
+                String labelText = "null";
+                if(lbl.getText() != null) {
+                    labelText = "\"" + lbl.getText().replace("\n", "\\n") + "\"";
+                }
                 if(lbl.getName() != null) {
-                    generatedCode += "        assertTextArea(\"" + lbl.getName() + "\", \"" + lbl.getText() + "\");\n";                    
+                    generatedCode += "        assertTextArea(" + getPathOrName(lbl) + ", " + labelText + ");\n";
                 } else {
-                    generatedCode += "        assertTextArea(\"" + lbl.getText() + "\");\n";                    
+                    generatedCode += "        assertTextArea(" + labelText + ");\n";
                 }
             }
         }
