@@ -221,6 +221,18 @@ extern BOOL isRetina();
     stringEdit(NO, -1, editingComponent.text);
 }
 
+extern int currentlyEditingMaxLength;
+- (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
+    NSUInteger newLength = (textField.text.length - range.length) + string.length;
+    return (newLength <= currentlyEditingMaxLength);
+}
+
+-(BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text {
+    NSUInteger newLength = (textView.text.length - range.length) + text.length;
+    return (newLength <= currentlyEditingMaxLength);
+}
+
+
 - (BOOL)textFieldShouldReturn:(UITextField *)theTextField {
     if(editingComponent != nil) {
         stringEdit(YES, -2, editingComponent.text);

@@ -66,7 +66,7 @@ BOOL forceSlideUpField;
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
 int upsideDownMultiplier = -1;
-
+int currentlyEditingMaxLength;
 
 NSAutoreleasePool *globalCodenameOnePool;
 void initVMImpl() {
@@ -129,6 +129,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
  int constraint, const char* str, int len, BOOL forceSlideUp,
  int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
+    currentlyEditingMaxLength = maxSize;
     dispatch_sync(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
             [editingComponent resignFirstResponder];

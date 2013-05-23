@@ -2143,6 +2143,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             } 
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";
         }
+        if(key.equalsIgnoreCase("AppVersion")) {
+            // make app version case insensitive
+            return super.getProperty("AppVersion", "");
+        }
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
@@ -3268,7 +3272,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Image img = Image.createImage(image);
                     NativeImage ni = (NativeImage)img.getImage();
-                    long p = nativeInstance.createImageFile(ni.peer, format == FORMAT_JPEG, width, height, quality);
+                    long p = nativeInstance.createImageFile(ni.peer, format.equals(FORMAT_JPEG), width, height, quality);
                     writeNSData(p, response);
                 }
 
@@ -3290,13 +3294,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     globalGraphics.checkControl();
                     NativeImage ni = (NativeImage)img.getImage();
-                    long p = nativeInstance.createImageFile(ni.peer, format == FORMAT_JPEG, img.getWidth(), img.getHeight(), quality);
+                    long p = nativeInstance.createImageFile(ni.peer, format.equals(FORMAT_JPEG), img.getWidth(), img.getHeight(), quality);
                     writeNSData(p, response);
                 }
 
                 @Override
                 public boolean isFormatSupported(String format) {
-                    return format == FORMAT_JPEG || format == FORMAT_PNG;
+                    return format.equals(FORMAT_JPEG) || format.equals(FORMAT_PNG);
                 }
             };
         }
