@@ -193,6 +193,44 @@ public class FaceBookAccess {
         NetworkManager.getInstance().addToQueue(con);
     }
 
+    /**
+     * This method returns immediately and will call the callback when it returns with
+     * the FaceBook Object data.
+     *
+     * @param faceBookId the object id that we would like to query
+     * @param callback the callback that should be updated when the data arrives
+     * @param needToken if true authentication is being checked
+     */
+    public void getFaceBookObject(String faceBookId, final ActionListener callback, boolean needToken, boolean async) throws IOException {
+        if(needToken){
+            checkAuthentication();
+        }
+        final FacebookRESTService con = new FacebookRESTService(token, faceBookId, "", false);
+        con.addResponseListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                if (!con.isAlive()) {
+                    return;
+                }
+                if (callback != null) {
+                    callback.actionPerformed(evt);
+                }
+            }
+        });
+        if (slider != null) {
+            SliderBridge.bindProgress(con, slider);
+        }
+        for (int i = 0; i < responseCodeListeners.size(); i++) {
+            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
+        }
+        current = con;
+        if(async){
+            NetworkManager.getInstance().addToQueue(con);
+        }else{
+            NetworkManager.getInstance().addToQueueAndWait(con);        
+        }
+    }
+    
     class Listener implements ActionListener {
         private FacebookRESTService con;
         private ActionListener callback;
@@ -271,6 +309,73 @@ public class FaceBookAccess {
     }
 
     /**
+     * Gets a User from a user id
+     * This is a sync method it will block until a response it returned
+     * @param userId the user id or null to get details on the authenticated user
+     * @return the User requested
+     */ 
+    public User getUser(String userId) throws IOException {
+        String id = userId;
+        if (id == null) {
+            id = "me";
+        }
+        final User user = new User();
+        final Vector err = new Vector();
+        addResponseCodeListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                NetworkEvent ne = (NetworkEvent)evt;
+                err.addElement(ne);
+                removeResponseCodeListener(this);
+            }
+        });
+        getFaceBookObject(id, new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+                Hashtable t = (Hashtable) v.elementAt(0);
+                user.copy(t);
+            }
+        }, true, false);
+        if(err.size() > 0){
+            throw new IOException(((NetworkEvent)err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent)err.elementAt(0)).getMessage());
+        }
+        
+        return user;
+    }
+    
+    /**
+     * Gets a Page from a pageId/name
+     * This is a sync method it will block until a response it returned
+     * @param pageId the pageId
+     * @return the Page requested
+     */ 
+    public Page getPage(String pageId) throws IOException {
+        final Page page = new Page();
+        final Vector err = new Vector();
+        addResponseCodeListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                NetworkEvent ne = (NetworkEvent)evt;
+                err.addElement(ne);
+                removeResponseCodeListener(this);
+            }
+        });
+        getFaceBookObject(pageId, new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+                Hashtable t = (Hashtable) v.elementAt(0);
+                page.copy(t);
+            }
+        }, false, false);
+        if(err.size() > 0){
+            throw new IOException(((NetworkEvent)err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent)err.elementAt(0)).getMessage());
+        }
+        return page;
+    }
+    
+    /**
      * Gest a post from a post Id
      *
      * @param postId the postId
@@ -293,6 +398,40 @@ public class FaceBookAccess {
         });
     }
 
+    /**
+     * Gets a Post from a postId
+     * This is a sync method it will block until a response it returned
+     * @param postId the post id
+     * @param needAuth if this object is public needAuth can be false and no
+     * authentication will be performed
+     * @return the Post requested
+     */ 
+    public Post getPost(String postId, boolean needAuth) throws IOException {
+        final Post post = new Post();
+        final Vector err = new Vector();
+        addResponseCodeListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                NetworkEvent ne = (NetworkEvent)evt;
+                err.addElement(ne);
+                removeResponseCodeListener(this);
+            }
+        });
+        getFaceBookObject(postId, new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+                Hashtable t = (Hashtable) v.elementAt(0);
+                post.copy(t);
+                
+            }
+        }, needAuth, false);
+        if(err.size() > 0){
+            throw new IOException(((NetworkEvent)err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent)err.elementAt(0)).getMessage());
+        }
+        return post;
+    }
+    
     /**
      * Gest a photo from a photo Id
      *
@@ -317,6 +456,40 @@ public class FaceBookAccess {
     }
 
     /**
+     * Gets a Photo from a photoId
+     * This is a sync method it will block until a response it returned
+     * @param the photoId
+     * @param needAuth if this object is public needAuth can be false and no
+     * authentication will be performed
+     * @return the Photo requested
+     */ 
+    public Photo getPhoto(String photoId, boolean needAuth) throws IOException {
+        final Photo photo = new Photo();
+        final Vector err = new Vector();
+        
+        addResponseCodeListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                NetworkEvent ne = (NetworkEvent)evt;
+                err.addElement(ne);
+                removeResponseCodeListener(this);
+            }
+        });
+        getFaceBookObject(photoId, new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+                Hashtable t = (Hashtable) v.elementAt(0);
+                photo.copy(t);                
+            }
+        }, needAuth, false);
+        if(err.size() > 0){
+            throw new IOException(((NetworkEvent)err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent)err.elementAt(0)).getMessage());
+        }
+        return photo;
+    }
+    
+    /**
      * Gest an album from an albumId
      *
      * @param albumId the albumId
@@ -339,6 +512,40 @@ public class FaceBookAccess {
         });
     }
 
+    /**
+     * Gets a Album from a albumId
+     * This is a sync method it will block until a response it returned
+     * @param the albumId
+     * @param needAuth if this object is public needAuth can be false and no
+     * authentication will be performed
+     * 
+     * @return the Album requested
+     */ 
+    public Album getAlbum(String albumId, boolean needAuth) throws IOException {
+        final Album album = new Album();
+        final Vector err = new Vector();
+        addResponseCodeListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                NetworkEvent ne = (NetworkEvent)evt;
+                err.addElement(ne);
+                removeResponseCodeListener(this);
+            }
+        });
+        getFaceBookObject(albumId, new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+                Hashtable t = (Hashtable) v.elementAt(0);
+                album.copy(t);
+            }
+        }, needAuth, false);
+        if(err.size() > 0){
+            throw new IOException(((NetworkEvent)err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent)err.elementAt(0)).getMessage());
+        }
+        return album;
+    }
+    
     /**
      * Gets the user news feed, the data is being stored in the given DefaultListModel.
      * By default this method will return last 13 news entries.
