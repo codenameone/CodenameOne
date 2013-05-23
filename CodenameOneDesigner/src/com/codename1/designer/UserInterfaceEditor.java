@@ -381,6 +381,7 @@ public class UserInterfaceEditor extends BaseForm {
     private static final Integer[] TEXT_AREA_CONSTRAINT_KEY_MAP = new Integer[] {
         com.codename1.ui.TextArea.ANY,
         com.codename1.ui.TextArea.NUMERIC,
+        com.codename1.ui.TextArea.DECIMAL,
         com.codename1.ui.TextArea.PASSWORD,
         com.codename1.ui.TextArea.NUMERIC | com.codename1.ui.TextArea.PASSWORD,
         com.codename1.ui.TextArea.EMAILADDR,
@@ -395,6 +396,7 @@ public class UserInterfaceEditor extends BaseForm {
     private static final String[] TEXT_AREA_CONSTRAINT_NAME_MAP = new String[] {
         "Any",
         "Numeric",
+        "Decimal",
         "Password",
         "Numeric Password",
         "E-mail",
@@ -1289,6 +1291,17 @@ public class UserInterfaceEditor extends BaseForm {
                     }
                 }
 
+                if(rowClass == Double.class) {
+                    currentEditor = new DefaultCellEditor(new JFormattedTextField(value)) {
+                        @Override
+                        public Object getCellEditorValue() {
+                            return Double.valueOf((String)super.getCellEditorValue());
+                        }
+                    };
+                    registerListeners();
+                    return currentEditor.getTableCellEditorComponent(table, value, isSelected, row, column);
+                }
+                
                 if(rowClass == Integer.class) {
                     int id = em.getRowId(row);
                     if(id == PROPERTY_ALIGNMENT || id == PROPERTY_TEXT_POSITION || 
