@@ -510,17 +510,19 @@ public class CodenameOneActivity extends Activity {
     }
     
     protected void fireIntentResult() {
-        final IntentResult response = (IntentResult) intentResult.get(0);
-        if (intentResultListener != null && response != null) {
-            Display.getInstance().callSerially(new Runnable() {
+        if(intentResult.size() > 0){
+            final IntentResult response = (IntentResult) intentResult.get(0);
+            if (intentResultListener != null && response != null) {
+                Display.getInstance().callSerially(new Runnable() {
 
-                @Override
-                public void run() {
-                    intentResultListener.onActivityResult(response.getRequestCode(),
-                            response.getResultCode(),
-                            response.getData());
-                }
-            });
+                    @Override
+                    public void run() {
+                        intentResultListener.onActivityResult(response.getRequestCode(),
+                                response.getResultCode(),
+                                response.getData());
+                    }
+                });
+            }
         }
     }
 
