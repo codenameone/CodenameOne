@@ -34,7 +34,6 @@ public class Page extends FBObject {
     private String about;
     private String category;
     private String founded;
-    private boolean isCommunityPage;
     private int likesCount;
     private String link;
     private String username;
@@ -94,13 +93,6 @@ public class Page extends FBObject {
     /**
      * Simple Getter
      */ 
-    public boolean isIsCommunityPage() {
-        return isCommunityPage;
-    }
-
-    /**
-     * Simple Getter
-     */ 
     public int getLikesCount() {
         return likesCount;
     }
@@ -143,7 +135,6 @@ public class Page extends FBObject {
         link = (String) toCopy.get("link");
         about = (String) toCopy.get("about");
         founded = (String) toCopy.get("founded");
-        isCommunityPage = toCopy.get("is_community_page").equals("true");
         website = (String) toCopy.get("website");
         likesCount = Integer.parseInt((String) toCopy.get("likes"));
         username = (String) toCopy.get("username");
