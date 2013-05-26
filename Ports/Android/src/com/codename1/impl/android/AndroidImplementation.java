@@ -4379,6 +4379,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             sr.scanCompleted(contents, formatName, rawBytes);
                         }
                     });
+                } else if(resultCode == Activity.RESULT_CANCELED) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            sr.scanCanceled();
+                        }
+                    });
+                
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
