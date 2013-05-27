@@ -212,7 +212,8 @@ public class InPlaceEditView extends FrameLayout {
         }
 
         mLastEditText = initialText;
-        mEditText = new EditView(activity, this);
+        int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
+        mEditText = new EditView(activity, this, id);
         
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);
@@ -546,8 +547,8 @@ public class InPlaceEditView extends FrameLayout {
          * @param context
          * @param inPlaceEditView
          */
-        public EditView(Context context, InPlaceEditView inPlaceEditView) {
-            super(context);
+        public EditView(Context context, InPlaceEditView inPlaceEditView, int style) {
+            super(context, null, style);    
             mInPlaceEditView = inPlaceEditView;
 
             setBackgroundColor(Color.TRANSPARENT);
