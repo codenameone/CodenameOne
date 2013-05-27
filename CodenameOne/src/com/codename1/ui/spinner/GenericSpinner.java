@@ -66,6 +66,9 @@ public class GenericSpinner extends BaseSpinner {
         if(spin != null) {
             return spin.getModel().getItemAt(spin.getModel().getSelectedIndex());
         }
+        if(model != null) {
+            return model.getItemAt(model.getSelectedIndex());
+        }
         return value;
     }
 
@@ -77,7 +80,7 @@ public class GenericSpinner extends BaseSpinner {
         this.value = value;
         if(spin != null) {
             spin.setValue(value);
-        }
+        } 
     }
 
     Spinner createSpinner() {

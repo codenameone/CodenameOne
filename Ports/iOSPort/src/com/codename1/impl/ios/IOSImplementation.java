@@ -3168,6 +3168,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                     pushCallback.push(message);
                 }
             });
+        } else {
+            // could be a race condition against the native code... Retry in 2 seconds
+            new Thread() {
+                public void run() {
+                    try {
+                        Thread.sleep(1500);
+                    } catch (InterruptedException ex) {
+                    }
+                    // prevent infinite loop
+                    if(pushCallback != null) {
+                        pushReceived(message); 
+                    }
+                }
+            }.start();
         }
     }
     public static void pushRegistered(final String deviceKey) {

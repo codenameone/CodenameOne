@@ -1489,6 +1489,28 @@ public class Container extends Component {
     }
 
     /**
+     * @inheritDoc
+     */
+    protected void fireClicked() {
+        if(leadComponent != null) {
+            leadComponent.fireClicked();
+        } else {
+            super.fireClicked();
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected boolean isSelectableInteraction() {
+        if(leadComponent != null) {
+            return leadComponent.isSelectableInteraction();
+        } else {
+            return super.isSelectableInteraction();
+        }
+    }
+    
+    /**
      * This method will recursively set all the Container chidrens to be 
      * enabled/disabled.
      * If the Container is disabled and a child Component changed it's state to 

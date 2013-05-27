@@ -209,6 +209,7 @@ public class Dialog extends Form {
 
         super.getStyle().setBgTransparency(0);
         super.getStyle().setBgImage(null);
+        super.getStyle().setBorder(null);
         setSmoothScrolling(false);
         deregisterAnimated(this);
     }
