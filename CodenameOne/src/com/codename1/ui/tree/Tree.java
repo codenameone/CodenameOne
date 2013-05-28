@@ -341,7 +341,7 @@ public class Tree extends Container {
                 return d;
             }
         }
-        int size = model.getChildren(null).size();
+        int size = Math.max(1, model.getChildren(null).size());
         if(size < 6) {
             return new Dimension(Math.max(d.getWidth(), Display.getInstance().getDisplayWidth() / 4 * 3),
                     d.getHeight() / size * 6);
