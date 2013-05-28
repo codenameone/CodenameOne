@@ -4174,10 +4174,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public String getDatabasePath(String databaseName) {
-        if(!existsDB(databaseName)){
-            return null;
-        }
-        return activity.getDatabasePath(databaseName).getAbsolutePath();
+        File db = new File(activity.getApplicationInfo().dataDir + "/databases/" + databaseName);
+        return db.getAbsolutePath();
     }
     
     public boolean isNativeTitle() {
