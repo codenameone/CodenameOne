@@ -77,7 +77,7 @@ public abstract class Database {
     /**
      * Returns the file path of the Database if exists and if supported on 
      * the platform.
-     * @return the file path of the database or null if not exists
+     * @return the file path of the database
      */
     public static String getDatabasePath(String databaseName){
         return Display.getInstance().getDatabasePath(databaseName);    
