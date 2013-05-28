@@ -441,9 +441,6 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
     }
 
     public String getDatabasePath(String databaseName) {
-        if(!existsDB(databaseName)){
-            return null;
-        }
         return getDBDir() + databaseName;
     }
     
