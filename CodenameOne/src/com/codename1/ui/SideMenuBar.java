@@ -10,7 +10,6 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -73,13 +72,7 @@ public class SideMenuBar extends MenuBar {
         openButton.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                menu = createMenu();
-                //replace transtions to perform the Form shift
-                out = parent.getTransitionOutAnimator();
-                in = parent.getTransitionInAnimator();
-                parent.setTransitionOutAnimator(new MenuTransition(400, true));
-                parent.setTransitionInAnimator(new MenuTransition(400, false));
-                menu.show();
+                openMenu();
             }
         });
         addOpenButton();
@@ -137,8 +130,14 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    public void keyReleased(int keyCode) {
+         if (keyCode == leftSK) {
+             openMenu();
+         }
+    }
+
     /**
-     * Close the menu if it is currently open
+     * Closes the menu if it is currently open
      */
     public void closeMenu() {
         if (Display.getInstance().getCurrent() == menu) {
@@ -146,6 +145,20 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    /**
+     * Opens the menu if it is currently close
+     */
+    public void openMenu() {
+        if (Display.getInstance().getCurrent() == parent) {
+            menu = createMenu();
+            //replace transtions to perform the Form shift
+            out = parent.getTransitionOutAnimator();
+            in = parent.getTransitionInAnimator();
+            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(400, true));
+            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(400, false));
+            menu.show();
+        }
+    }
     /**
      * Returns true if the Menu is currently open
      *
@@ -232,7 +245,7 @@ public class SideMenuBar extends MenuBar {
      */
     protected Button createTouchCommandButton(final Command c) {
 
-        CommandWrapper wrapper = new CommandWrapper(c);
+        SideMenuBar.CommandWrapper wrapper = new SideMenuBar.CommandWrapper(c);
         Button b = super.createTouchCommandButton(wrapper);
         if (c.getIcon() == null) {
             b.setIcon(null);
@@ -247,8 +260,8 @@ public class SideMenuBar extends MenuBar {
         final Form m = new Form() {
 
             void actionCommandImpl(Command cmd, ActionEvent ev) {
-                if (cmd instanceof CommandWrapper) {
-                    cmd = ((CommandWrapper) cmd).cmd;
+                if (cmd instanceof SideMenuBar.CommandWrapper) {
+                    cmd = ((SideMenuBar.CommandWrapper) cmd).cmd;
                     ev = new ActionEvent(cmd);
                 }
                 final Command c = cmd;
@@ -335,6 +348,12 @@ public class SideMenuBar extends MenuBar {
 
                         }
                     });
+                }
+            }
+
+            public void keyReleased(int keyCode) {
+                if (keyCode == backSK) {
+                    closeMenu();
                 }
             }
         };
