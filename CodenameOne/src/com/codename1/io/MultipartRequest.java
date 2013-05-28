@@ -169,9 +169,9 @@ public class MultipartRequest extends ConnectionRequest {
                 length += baseTextLength;
                 length += key.length();
                 if(ignoreEncoding.contains(key)) {
-                    length += ((String)value).length() + 2; // 2 = CRLF
+                    length += ((String)value).length(); 
                 } else {
-                    length += Util.encodeBody((String)value).length() + 2; // 2 = CRLF
+                    length += Util.encodeBody((String)value).length();
                 }
             } else {
                 length += baseBinaryLength;
