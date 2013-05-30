@@ -969,6 +969,13 @@ public class Dialog extends Form {
             Display.getInstance().playDialogSound(dialogType);
         }
     }
+
+    void onShowCompletedImpl() {
+        super.onShowCompleted();
+        if(isDisposed()) {
+            disposeImpl();
+        }
+    }
     
     /**
      * @inheritDoc

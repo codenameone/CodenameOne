@@ -124,6 +124,7 @@ public class ConnectionRequest implements IOProgressListener {
     private int silentRetryCount = 0;
     private boolean failSilently;
     boolean retrying;
+    private boolean readResponseForErrors;
 
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
@@ -334,7 +335,9 @@ public class ConnectionRequest implements IOProgressListener {
                 }
 
                 handleErrorResponseCode(responseCode, impl.getResponseMessage(connection));
-                return;
+                if(!isReadResponseForErrors()) {
+                    return;
+                }
             }
             readHeaders(connection);
             contentLength = impl.getContentLength(connection);
@@ -1230,7 +1233,7 @@ public class ConnectionRequest implements IOProgressListener {
      * which is more intuitive to debug than the alternative.
      */
     protected void validate() {
-        if(!url.startsWith("http")) {
+        if(!url.toLowerCase().startsWith("http")) {
             throw new IllegalStateException("Only HTTP urls are supported!");
         }
     }
@@ -1312,5 +1315,21 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public static void setUseNativeCookieStore(boolean b) {
         Util.getImplementation().setUseNativeCookieStore(b);
+    }
+
+    /**
+     * When set to true the read response code will happen even for error codes such as 400 and 500
+     * @return the readResponseForErrors
+     */
+    public boolean isReadResponseForErrors() {
+        return readResponseForErrors;
+    }
+
+    /**
+     * When set to true the read response code will happen even for error codes such as 400 and 500
+     * @param readResponseForErrors the readResponseForErrors to set
+     */
+    public void setReadResponseForErrors(boolean readResponseForErrors) {
+        this.readResponseForErrors = readResponseForErrors;
     }
 }

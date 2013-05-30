@@ -741,11 +741,13 @@ public final class CommonTransitions extends Transition {
             }
             g.setAlpha(alpha);
             Motion m = getComponentShiftMotion(current, incoming);
-            int tval = m.getValue();
-            g.translate(tval, 0);
-            current.paintComponent(g, false);
-            g.translate(-tval, 0);
-            g.setAlpha(255);
+            if(m != null) {
+                int tval = m.getValue();
+                g.translate(tval, 0);
+                current.paintComponent(g, false);
+                g.translate(-tval, 0);
+                g.setAlpha(255);
+            }
         }
     }
 
@@ -753,6 +755,9 @@ public final class CommonTransitions extends Transition {
         Motion m = (Motion)c.getClientProperty("$shm");
         if(m == null) {
             Component dest = getDestination();
+            if(dest == null || c == null) {
+                return m;
+            }
             int travelDestination = dest.getWidth() - c.getWidth() - c.getAbsoluteX();
             if(getDestination().getWidth() - c.getWidth() < 10) {
                 // big component that takes up all the space such as a title that occupies the entire title area

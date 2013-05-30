@@ -996,7 +996,7 @@ public class TextArea extends Component {
             if(l != null) {
                 Dimension d1 = getUIManager().getLookAndFeel().getTextAreaSize(this, true);
                 Dimension d2 = l.getPreferredSize();
-                return new Dimension(d1.getWidth() + d2.getWidth(), d1.getHeight() + d2.getHeight());
+                return new Dimension(Math.max(d1.getWidth(), d2.getWidth()), Math.max(d1.getHeight(), d2.getHeight()));
             }
         }
         return getUIManager().getLookAndFeel().getTextAreaSize(this, true);

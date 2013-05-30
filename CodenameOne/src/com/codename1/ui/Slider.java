@@ -86,6 +86,14 @@ public class Slider extends Label {
         initCustomStyle(sliderFull);
         initCustomStyle(sliderFullSelected);    
     }
+    
+    /**
+     * @inheritDoc
+     */
+    protected boolean isStickyDrag() {
+        return true;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -420,10 +428,10 @@ public class Slider extends Label {
         int per = 0;
         if(vertical) {
             // turn the coordinate to a local coordinate and invert it
-            y = Math.abs(getHeight() - (y - getAbsoluteY()));
+            y = Math.max(getHeight() - (y - getAbsoluteY()), 0);
             per = (int)(Math.min(maxValue, ((float)y) / ((float)getHeight()) * maxValue));
         } else {
-            x = Math.abs(x - getAbsoluteX());
+            x = Math.max(x - getAbsoluteX(), 0);
             per = (int)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue));
         }
         if(per != getProgress()) {
