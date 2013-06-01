@@ -898,7 +898,11 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
         isShowing = show;
         Form current = Display.getInstance().getCurrent();
         if (show) {
-            TextArea txtCmp = (TextArea) current.getFocused();
+            Component foc = current.getFocused();
+            if(foc instanceof Container) {
+                foc = ((Container)foc).getLeadComponent();
+            }
+            TextArea txtCmp = (TextArea) foc;
             if (txtCmp != null) {
                 if(vkb != null && vkb.contains(txtCmp)){
                     return;
