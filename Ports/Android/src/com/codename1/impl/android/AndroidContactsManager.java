@@ -23,19 +23,22 @@
 package com.codename1.impl.android;
 
 import android.app.Activity;
-import android.content.ContentResolver;
-import android.content.ContentUris;
+import android.content.*;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.RemoteException;
+import android.provider.Contacts;
 import android.provider.ContactsContract;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
+import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -104,7 +107,7 @@ public class AndroidContactsManager {
                 }
             }
         }
-        
+
         Hashtable phones = new Hashtable();
         if (Integer.parseInt(result.getString(
                 result.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
@@ -129,7 +132,7 @@ public class AndroidContactsManager {
                 } else {
                     type = "other";
                 }
-                if(isPrimary){
+                if (isPrimary) {
                     retVal.setPrimaryPhoneNumber(phone);
                 }
                 phones.put(type, phone);
@@ -163,7 +166,7 @@ public class AndroidContactsManager {
             } else {
                 type = "other";
             }
-            if(isPrimary){
+            if (isPrimary) {
                 retVal.setPrimaryEmail(email);
             }
             emails.put(type, email);
@@ -171,7 +174,7 @@ public class AndroidContactsManager {
         retVal.setEmails(emails);
         emailCur.close();
 
-        
+
 
         String birthWhere = ContactsContract.Data.CONTACT_ID + " = ? AND "
                 + ContactsContract.Data.MIMETYPE + "= ? AND "
@@ -180,7 +183,7 @@ public class AndroidContactsManager {
         String[] birthWhereParams = new String[]{id,
             ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE
         };
-        
+
         Cursor birthCur = cr.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);
         if (birthCur.moveToFirst()) {
             String birth = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE));
@@ -199,19 +202,19 @@ public class AndroidContactsManager {
         Cursor nameCursor = cr.query(ContactsContract.Data.CONTENT_URI, null,
                 nameWhere,
                 nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
-        
+
         while (nameCursor.moveToNext()) {
-            
+
             String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));
             String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));
             String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));
             retVal.setFirstName(given);
             retVal.setFamilyName(family);
             retVal.setDisplayName(display);
-                        
+
         }
         nameCursor.close();
-        
+
         String noteWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
         String[] noteWhereParams = new String[]{id,
             ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE};
@@ -299,5 +302,95 @@ public class AndroidContactsManager {
         }
 
         return null;
+    }
+
+    public String createContact(final Activity activity, String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+        
+        String contactId = null;
+        
+        String displayName = firstName + " " + familyName;
+
+        final ArrayList<ContentProviderOperation> ops = new ArrayList<ContentProviderOperation>();
+
+        ops.add(ContentProviderOperation.newInsert(
+                ContactsContract.RawContacts.CONTENT_URI).withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null).withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null).build());
+
+        //------------------------------------------------------ Names
+        if (firstName != null) {
+            ops.add(ContentProviderOperation.newInsert(
+                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(
+                    ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+                    firstName).build());
+        }
+        if (familyName != null) {
+            ops.add(ContentProviderOperation.newInsert(
+                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(
+                    ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME,
+                    familyName).build());
+        }
+        if (displayName != null) {
+            ops.add(ContentProviderOperation.newInsert(
+                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
+                    displayName).build());
+        }
+
+        //------------------------------------------------------ Mobile Number                     
+        if (cellPhone != null) {
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, cellPhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).build());
+        }
+
+        //------------------------------------------------------ Home Numbers
+        if (homePhone != null) {
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, homePhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.TYPE_HOME).build());
+        }
+
+        //------------------------------------------------------ Work Numbers
+        if (officePhone != null) {
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, officePhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.TYPE_WORK).build());
+        }
+
+        //------------------------------------------------------ Email
+        if (email != null) {
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Email.DATA, email).withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_WORK).build());
+        }
+
+        ContentProviderResult[] res;
+        try {
+            res = activity.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
+            if (res != null && res[0] != null) {
+                contactId = res[0].uri.getPath().substring(14);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return contactId;
+    }
+    
+    public boolean deleteContact(Activity activity, String id) {
+        try {
+            final ArrayList ops = new ArrayList();
+            final ContentResolver cr = activity.getContentResolver();
+            ops.add(ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI).withSelection(
+                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID
+                    + " = ?",
+                    new String[]{id}).build());
+            cr.applyBatch(ContactsContract.AUTHORITY, ops);
+            ops.clear();
+        } catch (Exception ex) {
+            return false;
+        }
+        return true;
     }
 }

@@ -3609,6 +3609,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return AndroidContactsManager.getInstance().getContact(activity, id);
     }
 
+    public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+         return AndroidContactsManager.getInstance().createContact(activity, firstName, surname, officePhone, homePhone, cellPhone, email);
+    }
+
+    public boolean deleteContact(String id) {
+        return AndroidContactsManager.getInstance().deleteContact(activity, id);
+    }
+    
     @Override
     public boolean isNativeShareSupported() {
         return true;
