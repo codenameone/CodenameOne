@@ -26,10 +26,7 @@ import com.codename1.ui.Image;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
-import javax.microedition.pim.Contact;
-import javax.microedition.pim.PIM;
-import javax.microedition.pim.PIMException;
-import javax.microedition.pim.PIMList;
+import javax.microedition.pim.*;
 
 /**
  *
@@ -59,6 +56,7 @@ public class MIDPContactsManager {
         }
         while (contacts.hasMoreElements()) {
             Contact c = (Contact) contacts.nextElement();
+            
             if (clist.isSupportedField(Contact.UID) && c.countValues(Contact.UID) > 0) {
                 String uid = c.getString(Contact.UID, 0);
                 if (uid.equals(id)) {
@@ -79,11 +77,11 @@ public class MIDPContactsManager {
                         if (clist.isSupportedField(Contact.NAME) && c.countValues(Contact.NAME) > 0) {
                             name = "";
                             String[] newname = c.getStringArray(Contact.NAME, 0);
-                            if (newname[0] != null) {
-                                firstName = newname[0];
+                            if (newname[Contact.NAME_GIVEN] != null) {
+                                firstName = newname[Contact.NAME_GIVEN];
                             }
-                            if (newname[1] != null ) {
-                                familyName = newname[1];
+                            if (newname[Contact.NAME_FAMILY] != null ) {
+                                familyName = newname[Contact.NAME_FAMILY];
                             }
                             if(name == null){
                                 if(firstName != null){
@@ -246,5 +244,86 @@ public class MIDPContactsManager {
         }
         return ids;
 
+    }
+
+    public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+        String contactId = null;
+        try {
+            PIM pim = PIM.getInstance();
+            ContactList contacts = (ContactList) pim.openPIMList(PIM.CONTACT_LIST, PIM.READ_WRITE);
+            Contact contact = ((ContactList) contacts).createContact();
+            String[] name = new String[contacts.stringArraySize(Contact.NAME)];
+            String displayName = "";
+            if(firstName != null){
+                displayName += firstName;
+            }
+            if(familyName != null){
+                displayName += " " + familyName;
+            }
+
+            if (contacts.isSupportedField(Contact.FORMATTED_NAME)){
+                contact.addString(Contact.FORMATTED_NAME, PIMItem.ATTR_NONE, displayName);
+            }
+            if (familyName != null && contacts.isSupportedArrayElement(Contact.NAME, Contact.NAME_FAMILY)) {
+                name[Contact.NAME_FAMILY] = familyName;
+            }
+            if (firstName != null && contacts.isSupportedArrayElement(Contact.NAME, Contact.NAME_GIVEN)) {
+                name[Contact.NAME_GIVEN] = firstName;
+            }
+            contact.addStringArray(Contact.NAME, PIMItem.ATTR_NONE, name);
+            
+            if (homePhone != null && contacts.isSupportedField(Contact.TEL)) {
+                contact.addString(Contact.TEL, Contact.ATTR_HOME, homePhone);
+            }
+            if (cellPhone != null && contacts.isSupportedField(Contact.TEL)) {
+                contact.addString(Contact.TEL, Contact.ATTR_MOBILE, cellPhone);
+            }
+            if (officePhone != null && contacts.isSupportedField(Contact.TEL)) {
+                contact.addString(Contact.TEL, Contact.ATTR_WORK, officePhone);
+            }
+            
+            if (email != null && contacts.isSupportedField(Contact.EMAIL)) {
+                contact.addString(Contact.EMAIL, Contact.ATTR_HOME | Contact.ATTR_PREFERRED, email);
+            }
+            contact.commit();            
+            contactId = contact.getString(Contact.UID, 0);
+            contacts.close();
+            
+        } catch (PIMException ex) {
+            ex.printStackTrace();
+        }
+        return contactId;
+    }
+
+    boolean deleteContact(String id) {
+        ContactList clist = null;
+        try {
+            PIM pim = PIM.getInstance();
+            clist = (ContactList) pim.openPIMList(PIM.CONTACT_LIST, PIM.READ_WRITE);
+            Enumeration contacts = clist.items();
+            while (contacts.hasMoreElements()) {
+                Contact c = (Contact) contacts.nextElement();
+
+                if (clist.isSupportedField(Contact.UID) && c.countValues(Contact.UID) > 0) {
+                    String uid = c.getString(Contact.UID, 0);
+                    if(uid.equals(id)){
+                        clist.removeContact(c);
+                        return true;
+                    }
+                }
+            }
+        } catch (PIMException ex) {
+            ex.printStackTrace();            
+        }finally{
+            if(clist != null){
+                try {
+                    clist.close();
+                } catch (PIMException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
+
+        return false;
     }
 }

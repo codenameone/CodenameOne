@@ -3114,6 +3114,14 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return MIDPContactsManager.getInstance().getContactById(id);
     }
 
+    public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+         return MIDPContactsManager.getInstance().createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
+    }
+
+    public boolean deleteContact(String id) {
+        return MIDPContactsManager.getInstance().deleteContact(id);
+    }
+    
     /**
      * @inheritDoc
      */
