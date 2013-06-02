@@ -117,11 +117,7 @@ import java.net.*;
 import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Hashtable;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -169,6 +165,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/android.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
     private TestRecorder testRecorder;
+    private Hashtable contacts;
 
     /**
      * @return the showEDTWarnings
@@ -4205,122 +4202,84 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void dial(String phoneNumber) {
         System.out.println("dialing to " + phoneNumber);
     }
-
+    
+    
     @Override
     public String[] getAllContacts(boolean withNumbers) {
-        return new String[]{"1", "2", "3", "4", "5"};
+        if(contacts == null){
+            contacts = initContacts();
+        }
+        Enumeration keys = contacts.keys();
+        String [] ids = new String[contacts.size()];
+        int index = 0;
+        while(keys.hasMoreElements()){
+            ids[index++] = (String)keys.nextElement();
+        }
+        return ids;
     }
 
     @Override
     public Contact getContactById(String id) {
+        if(contacts == null){
+            contacts = initContacts();
+        }
+        return (Contact) contacts.get(id);
+    }
+    
+    public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+        if(contacts == null){
+            contacts = initContacts();
+        }
+        //get a unique id for the new contact
+        String id = "" + contacts.size();
+        while (contacts.get(id) != null) {
+            id = "" + (contacts.size() + 1);
+        }
         Contact contact = new Contact();
         contact.setId(id);
-        if (id.equals("1")) {
-            contact.setDisplayName("Chen Fishbein");
-            contact.setFirstName("Chen");
-            contact.setFamilyName("Fishbein");
 
-            Hashtable phones = new Hashtable();
-            phones.put("mobile", "+111111");
-            phones.put("home", "+222222");
-            contact.setPhoneNumbers(phones);
-            Hashtable emails = new Hashtable();
-            emails.put("work", "chen@codenameone.com");
-            contact.setEmails(emails);
-
-            Hashtable addresses = new Hashtable();
-            Address addr = new Address();
-            addr.setCountry("IL");
-            addr.setStreetAddress("Sapir 20");
-            addresses.put("home", addr);
-            contact.setAddresses(addresses);
-        } else if (id.equals("2")) {
-            contact.setDisplayName("Shai Almog");
-            contact.setFirstName("Shai");
-            contact.setFamilyName("Almog");
-
-            Hashtable phones = new Hashtable();
-            phones.put("mobile", "+111111");
-            phones.put("home", "+222222");
-            contact.setPhoneNumbers(phones);
-            Hashtable emails = new Hashtable();
-            emails.put("work", "shai@codenameone.com");
-            contact.setEmails(emails);
-
-            Hashtable addresses = new Hashtable();
-            Address addr = new Address();
-            addr.setCountry("IL");
-            addr.setStreetAddress("lev 1");
-            addresses.put("home", addr);
-            contact.setAddresses(addresses);
+        String displayName = "";
+        if (firstName != null) {
+            displayName += firstName;
         }
-        if (id.equals("3")) {
-
-            contact.setDisplayName("Eric Cartman");
-            contact.setFirstName("Eric");
-            contact.setFamilyName("Cartman");
-
-
-            Hashtable phones = new Hashtable();
-            phones.put("mobile", "+111111");
-            phones.put("home", "+222222");
-            contact.setPhoneNumbers(phones);
-            Hashtable emails = new Hashtable();
-            emails.put("work", "Eric.Cartman@codenameone.com");
-            contact.setEmails(emails);
-
-            Hashtable addresses = new Hashtable();
-            Address addr = new Address();
-            addr.setCountry("US");
-            addr.setStreetAddress("South Park");
-            addresses.put("home", addr);
-            contact.setAddresses(addresses);
+        if (familyName != null) {
+            displayName += " " + familyName;
         }
-        if (id.equals("4")) {
+        contact.setDisplayName(displayName);
+        contact.setFirstName(firstName);
+        contact.setFamilyName(familyName);
 
-            contact.setDisplayName("Kyle Broflovski");
-            contact.setFirstName("Kyle");
-            contact.setFamilyName("Broflovski");
-
-            Hashtable phones = new Hashtable();
-            phones.put("mobile", "+111111");
-            phones.put("home", "+222222");
-            contact.setPhoneNumbers(phones);
-            Hashtable emails = new Hashtable();
-            emails.put("work", "Kyle.Broflovski@codenameone.com");
-            contact.setEmails(emails);
-
-            Hashtable addresses = new Hashtable();
-            Address addr = new Address();
-            addr.setCountry("US");
-            addr.setStreetAddress("South Park");
-            addresses.put("home", addr);
-            contact.setAddresses(addresses);
-        } else if (id.equals("5")) {
-
-            contact.setDisplayName("Kenny McCormick");
-            contact.setFirstName("Kenny");
-            contact.setFamilyName("McCormick");
-
-
-            Hashtable phones = new Hashtable();
-            phones.put("mobile", "+111111");
-            phones.put("home", "+222222");
-            contact.setPhoneNumbers(phones);
-            Hashtable emails = new Hashtable();
-            emails.put("work", "Kenny.McCormick@codenameone.com");
-            contact.setEmails(emails);
-
-            Hashtable addresses = new Hashtable();
-            Address addr = new Address();
-            addr.setCountry("US");
-            addr.setStreetAddress("South Park");
-            addresses.put("home", addr);
-            contact.setAddresses(addresses);
+        Hashtable phones = new Hashtable();
+        if(cellPhone != null){
+            phones.put("mobile", cellPhone);
+            contact.setPrimaryPhoneNumber(cellPhone);
         }
-
-        return contact;
+        if(homePhone != null){
+            phones.put("home", homePhone);
+        }
+        if(officePhone != null){
+            phones.put("work", officePhone);
+        }
+        
+        contact.setPhoneNumbers(phones);
+        if(email != null){
+            Hashtable emails = new Hashtable();
+            emails.put("work", email);
+            contact.setEmails(emails);
+            contact.setPrimaryEmail(email);
+        }
+        contacts.put(id, contact);
+        return id;
     }
+
+    public boolean deleteContact(String id) {
+        if(contacts == null){
+            contacts = initContacts();
+        }
+        return contacts.remove(id) != null;
+    }
+    
+    
 
     @Override
     public boolean shouldAutoDetectAccessPoint() {
@@ -5548,5 +5507,129 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
         return skin;
+    }
+    
+    private Hashtable initContacts() {
+        Hashtable retVal = new Hashtable();
+
+        Contact contact = new Contact();
+        contact.setId("1");
+
+        contact.setDisplayName("Chen Fishbein");
+        contact.setFirstName("Chen");
+        contact.setFamilyName("Fishbein");
+
+        Hashtable phones = new Hashtable();
+        phones.put("mobile", "+111111");
+        phones.put("home", "+222222");
+        contact.setPhoneNumbers(phones);
+        Hashtable emails = new Hashtable();
+        emails.put("work", "chen@codenameone.com");
+        contact.setEmails(emails);
+
+        Hashtable addresses = new Hashtable();
+        Address addr = new Address();
+        addr.setCountry("IL");
+        addr.setStreetAddress("Sapir 20");
+        addresses.put("home", addr);
+        contact.setAddresses(addresses);
+
+        retVal.put(contact.getId(), contact);
+
+        contact = new Contact();
+        contact.setId("2");
+        contact.setDisplayName("Shai Almog");
+        contact.setFirstName("Shai");
+        contact.setFamilyName("Almog");
+
+        phones = new Hashtable();
+        phones.put("mobile", "+111111");
+        phones.put("home", "+222222");
+        contact.setPhoneNumbers(phones);
+        emails = new Hashtable();
+        emails.put("work", "shai@codenameone.com");
+        contact.setEmails(emails);
+
+        addresses = new Hashtable();
+        addr = new Address();
+        addr.setCountry("IL");
+        addr.setStreetAddress("lev 1");
+        addresses.put("home", addr);
+        contact.setAddresses(addresses);
+        retVal.put(contact.getId(), contact);
+
+        contact = new Contact();
+        contact.setId("3");
+
+        contact.setDisplayName("Eric Cartman");
+        contact.setFirstName("Eric");
+        contact.setFamilyName("Cartman");
+
+
+        phones = new Hashtable();
+        phones.put("mobile", "+111111");
+        phones.put("home", "+222222");
+        contact.setPhoneNumbers(phones);
+        emails = new Hashtable();
+        emails.put("work", "Eric.Cartman@codenameone.com");
+        contact.setEmails(emails);
+
+        addresses = new Hashtable();
+        addr = new Address();
+        addr.setCountry("US");
+        addr.setStreetAddress("South Park");
+        addresses.put("home", addr);
+        contact.setAddresses(addresses);
+
+        retVal.put(contact.getId(), contact);
+
+        contact = new Contact();
+        contact.setId("4");
+        contact.setDisplayName("Kyle Broflovski");
+        contact.setFirstName("Kyle");
+        contact.setFamilyName("Broflovski");
+
+        phones = new Hashtable();
+        phones.put("mobile", "+111111");
+        phones.put("home", "+222222");
+        contact.setPhoneNumbers(phones);
+        emails = new Hashtable();
+        emails.put("work", "Kyle.Broflovski@codenameone.com");
+        contact.setEmails(emails);
+
+        addresses = new Hashtable();
+        addr = new Address();
+        addr.setCountry("US");
+        addr.setStreetAddress("South Park");
+        addresses.put("home", addr);
+        contact.setAddresses(addresses);
+        retVal.put(contact.getId(), contact);
+
+        contact = new Contact();
+        contact.setId("5");
+
+        contact.setDisplayName("Kenny McCormick");
+        contact.setFirstName("Kenny");
+        contact.setFamilyName("McCormick");
+
+
+        phones = new Hashtable();
+        phones.put("mobile", "+111111");
+        phones.put("home", "+222222");
+        contact.setPhoneNumbers(phones);
+        emails = new Hashtable();
+        emails.put("work", "Kenny.McCormick@codenameone.com");
+        contact.setEmails(emails);
+
+        addresses = new Hashtable();
+        addr = new Address();
+        addr.setCountry("US");
+        addr.setStreetAddress("South Park");
+        addresses.put("home", addr);
+        contact.setAddresses(addresses);
+        retVal.put(contact.getId(), contact);
+
+        return retVal;
+
     }
 }
