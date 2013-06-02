@@ -1930,7 +1930,7 @@ public class Component implements Animation, StyleListener {
 
     /**
      * This method returns an image representing the dragged component, it can be overriden by subclasses to customize the look
-     * of the image, the image will be overlayed on top of the form during a drag and drop operation
+     * of the image, the image will be overlaid on top of the form during a drag and drop operation
      * 
      * @return an image
      */

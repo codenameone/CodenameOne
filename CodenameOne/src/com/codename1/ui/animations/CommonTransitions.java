@@ -820,8 +820,8 @@ public final class CommonTransitions extends Transition {
                 graphics.setAlpha(0xff);
             } else {
                 int alpha = position << 24;
-                int size = w * h;
                 int[] bufferArray = rgbBuffer.getRGB();
+                int size = bufferArray.length;
                 for (int iter = 0 ; iter < size ; iter++) {
                     bufferArray[iter] = ((bufferArray[iter] & 0xFFFFFF) | alpha);
                 }

@@ -47,6 +47,11 @@ public class BoxLayout extends Layout{
      */
     public static final int Y_AXIS = 2;
     
+    /**
+     * Horizontal layout where components are arranged from left to right but don't grow vertically beyond their preferred size
+     */
+    public static final int X_AXIS_NO_GROW = 3;
+
     private int axis;
     
     /** 
@@ -79,44 +84,72 @@ public class BoxLayout extends Layout{
             Component cmp = parent.getComponentAt(i);
             Style stl = cmp.getStyle();
             
-            if(axis == Y_AXIS){
-                int cmpBottom = height;
-                int cmpH = cmp.getPreferredH();
-                
-                y += stl.getMargin(false, Component.TOP);
-                
-                if(y >= cmpBottom && !parent.isScrollableY()){
-                    cmpH = 0;
-                }else if(y + cmpH - parent.getStyle().getPadding(false, Component.TOP) > cmpBottom){
-                    cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
-                }
-                cmp.setWidth(width - stl.getMargin(parent.isRTL(), Component.LEFT) - stl.getMargin(parent.isRTL(), Component.RIGHT));
-                cmp.setHeight(cmpH);
-                cmp.setX(x + stl.getMargin(parent.isRTL(), Component.LEFT));
-                cmp.setY(y);
-                y += cmp.getHeight() + stl.getMargin(false, Component.BOTTOM);
-            }else{
-                int cmpRight = width;
-                int cmpW = cmp.getPreferredW();
-                
-                x += stl.getMargin(false, Component.LEFT);
+            switch(axis) {
+                case Y_AXIS:
+                    int cmpBottom = height;
+                    int cmpH = cmp.getPreferredH();
 
-                if(x >= cmpRight && !parent.isScrollableX()){
-                    cmpW = 0;
-                } else {
-                    if(x + cmpW - parent.getStyle().getPadding(false, Component.LEFT) > cmpRight){
-                        cmpW = cmpRight - x - stl.getMargin(false, Component.RIGHT);
+                    y += stl.getMargin(false, Component.TOP);
+
+                    if(y >= cmpBottom && !parent.isScrollableY()){
+                        cmpH = 0;
+                    }else if(y + cmpH - parent.getStyle().getPadding(false, Component.TOP) > cmpBottom){
+                        cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
                     }
+                    cmp.setWidth(width - stl.getMargin(parent.isRTL(), Component.LEFT) - stl.getMargin(parent.isRTL(), Component.RIGHT));
+                    cmp.setHeight(cmpH);
+                    cmp.setX(x + stl.getMargin(parent.isRTL(), Component.LEFT));
+                    cmp.setY(y);
+                    y += cmp.getHeight() + stl.getMargin(false, Component.BOTTOM);
+                    break;
+                case X_AXIS_NO_GROW: {
+                    int cmpRight = width;
+                    height = Math.min(getPreferredSize(parent).getHeight(), height);
+                    int cmpW = cmp.getPreferredW();
+
+                    x += stl.getMargin(false, Component.LEFT);
+
+                    if(x >= cmpRight && !parent.isScrollableX()){
+                        cmpW = 0;
+                    } else {
+                        if(x + cmpW - parent.getStyle().getPadding(false, Component.LEFT) > cmpRight){
+                            cmpW = cmpRight - x - stl.getMargin(false, Component.RIGHT);
+                        }
+                    }
+                    cmp.setWidth(cmpW);
+                    cmp.setHeight(height- stl.getMargin(false, Component.TOP) - stl.getMargin(false, Component.BOTTOM));
+                    if(rtl) {
+                            cmp.setX(width + initX - (x - initX) - cmpW);
+                    } else {
+                            cmp.setX(x);
+                    }
+                    cmp.setY(y + stl.getMargin(false, Component.TOP));
+                    x += cmp.getWidth() + stl.getMargin(false, Component.RIGHT);
+                    break;
                 }
-                cmp.setWidth(cmpW);
-                cmp.setHeight(height- stl.getMargin(false, Component.TOP) - stl.getMargin(false, Component.BOTTOM));
-                if(rtl) {
-                	cmp.setX(width + initX - (x - initX) - cmpW);
-                } else {
-                	cmp.setX(x);
-                }
-                cmp.setY(y + stl.getMargin(false, Component.TOP));
-                x += cmp.getWidth() + stl.getMargin(false, Component.RIGHT);
+                default:
+                    int cmpRight = width;
+                    int cmpW = cmp.getPreferredW();
+
+                    x += stl.getMargin(false, Component.LEFT);
+
+                    if(x >= cmpRight && !parent.isScrollableX()){
+                        cmpW = 0;
+                    } else {
+                        if(x + cmpW - parent.getStyle().getPadding(false, Component.LEFT) > cmpRight){
+                            cmpW = cmpRight - x - stl.getMargin(false, Component.RIGHT);
+                        }
+                    }
+                    cmp.setWidth(cmpW);
+                    cmp.setHeight(height- stl.getMargin(false, Component.TOP) - stl.getMargin(false, Component.BOTTOM));
+                    if(rtl) {
+                            cmp.setX(width + initX - (x - initX) - cmpW);
+                    } else {
+                            cmp.setX(x);
+                    }
+                    cmp.setY(y + stl.getMargin(false, Component.TOP));
+                    x += cmp.getWidth() + stl.getMargin(false, Component.RIGHT);
+                    break;
             }
         }
     }

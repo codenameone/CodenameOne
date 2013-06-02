@@ -96,4 +96,44 @@ public class StringUtil {
         return tokenized;
     }
     
+
+    /**
+     * Breaks a String to multiple strings (similar to string tokenizer)
+     * 
+     * @param source the String to break
+     * @param separator the characters that can be used to search and break.
+     * @return a Vector of Strings
+     */
+    public static Vector tokenizeString(String source, String separator) {
+        if(separator.length() == 1) {
+            // slightly faster
+            return tokenizeString(source, separator.charAt(0));
+        }
+        Vector tokenized = new Vector();
+        int len = source.length();
+        boolean lastSeparator = false;
+        StringBuffer buf = new StringBuffer();
+        for(int iter = 0 ; iter < len ; iter++) {
+            char current = source.charAt(iter);
+            if(separator.indexOf(current) > -1) {
+                if(lastSeparator) {
+                    buf.append(separator);
+                    lastSeparator = false;
+                    continue;
+                }
+                lastSeparator = true;
+                if(buf.length() > 0) {
+                    tokenized.addElement(buf.toString());
+                    buf = new StringBuffer();
+                }
+            } else {
+                lastSeparator = false;
+                buf.append(current);
+            }
+        }
+        if(buf.length() > 0) {
+            tokenized.addElement(buf.toString());
+        }
+        return tokenized;
+    }
 }

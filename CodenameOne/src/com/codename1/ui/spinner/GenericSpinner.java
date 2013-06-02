@@ -23,6 +23,7 @@
 package com.codename1.ui.spinner;
 
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
@@ -35,16 +36,16 @@ import com.codename1.ui.list.ListModel;
  * @author Shai Almog
  */
 public class GenericSpinner extends BaseSpinner {
-    private Spinner spin;
-    private ListModel model = new DefaultListModel(new Object[] {"Value 1", "Value 2", "Value 3"});
-    private ListCellRenderer renderer = new DefaultListCellRenderer(false);
-    private Object value;
+    private Spinner[] spin;
+    private ListModel[] model = new ListModel[] { new DefaultListModel(new Object[] {"Value 1", "Value 2", "Value 3"}) };
+    private ListCellRenderer[] renderer = new ListCellRenderer[] { new DefaultListCellRenderer(false) };
+    private Object[] value;
     
     /**
      * Default constructor
      */
     public GenericSpinner() {
-        DefaultListCellRenderer render = (DefaultListCellRenderer) renderer;
+        DefaultListCellRenderer render = (DefaultListCellRenderer) renderer[0];
         render.setRTL(false);
         render.setShowNumbers(false);
         render.setUIID("SpinnerRenderer");
@@ -52,22 +53,79 @@ public class GenericSpinner extends BaseSpinner {
     
     void initSpinner() {
         if(spin == null) {
-            spin = createSpinner();
-            setLayout(new BorderLayout());
-            addComponent(BorderLayout.CENTER, spin);
-        }
+            if(model.length == 1) {
+                spin = new Spinner[] {createSpinner(0)};
+                setLayout(new BorderLayout());
+                addComponent(BorderLayout.CENTER, spin[0]);
+            } else {
+                setLayout(new BoxLayout(BoxLayout.X_AXIS));
+                spin = new Spinner[model.length];
+                for(int iter = 0 ; iter < spin.length ; iter++) {
+                    spin[iter] = createSpinner(iter);
+                    addComponent(spin[iter]);
+                    if(iter < spin.length - 1) {
+                        addComponent(createSeparator());
+                    }
+                }
+            }
+        } 
     }
 
+    /**
+     * Sets the column count
+     * 
+     * @return the number of columns in the spinner
+     */
+    public void setColumns(int columns) {
+        if(model.length != columns) {
+            ListModel[] lm = new ListModel[columns];
+            ListCellRenderer[] lr = new ListCellRenderer[columns];
+            Object[] values = new Object[columns];
+            if(spin != null) {
+                spin = null;
+                removeAll();
+                initSpinner();
+            }
+            for(int iter = 0 ; iter < columns ; iter++) {
+                lm[iter] = model[Math.min(iter, model.length - 1)];
+                lr[iter] = renderer[Math.min(iter, model.length - 1)];
+                if(value != null) {
+                    values[iter] = value[Math.min(iter, model.length - 1)];
+                }
+            }
+            model = lm;
+            renderer = lr;
+            value = values;
+        }
+    }
+    
+    /**
+     * Return the column count
+     * 
+     * @return the number of columns in the spinner
+     */
+    public int getColumns() {
+        return model.length;
+    }
+    
     /**
      * The value for the spinner
      * @return the value
      */
     public Object getValue() {
-        if(spin != null) {
-            return spin.getModel().getItemAt(spin.getModel().getSelectedIndex());
+        return getValue(0);
+    }
+    
+    /**
+     * The value for the spinner
+     * @return the value
+     */
+    public Object getValue(int offset) {
+        if(spin != null && spin[offset] != null) {
+            return spin[offset].getModel().getItemAt(spin[offset].getModel().getSelectedIndex());
         }
-        if(model != null) {
-            return model.getItemAt(model.getSelectedIndex());
+        if(model[offset] != null) {
+            return model[offset].getItemAt(model[offset].getSelectedIndex());
         }
         return value;
     }
@@ -77,20 +135,28 @@ public class GenericSpinner extends BaseSpinner {
      * @param value the value to set
      */
     public void setValue(Object value) {
-        this.value = value;
-        if(spin != null) {
-            spin.setValue(value);
+        setValue(0, value);
+    }
+    
+    /**
+     * The value for the spinner
+     * @param value the value to set
+     */
+    public void setValue(int offset, Object value) {
+        this.value[offset] = value;
+        if(spin != null && spin[offset] != null) {
+            spin[offset].setValue(value);
         } 
     }
 
-    Spinner createSpinner() {
-        Spinner spin = new Spinner(model, renderer);
+    Spinner createSpinner(int column) {
+        Spinner spin = new Spinner(model[column], renderer[column]);
         spin.setRenderingPrototype(null);
         spin.setShouldCalcPreferredSize(true);
         spin.setListSizeCalculationSampleCount(30);
         spin.initSpinnerRenderer();
-        if(value != null) {
-            spin.setValue(value);
+        if(value != null && value[column] != null) {
+            spin.setValue(value[column]);
         }
         return spin;
     }
@@ -100,14 +166,14 @@ public class GenericSpinner extends BaseSpinner {
      * @inheritDoc
      */
     public String[] getPropertyNames() {
-        return new String[] {"model", "renderer", "items"};
+        return new String[] {"model", "renderer", "items", "columns"};
     }
 
     /**
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
+       return new Class[] {ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};
     }
 
     /**
@@ -131,6 +197,9 @@ public class GenericSpinner extends BaseSpinner {
         if(name.equals("renderer")) {
             return getRenderer();
         }
+        if(name.equals("columns")) {
+            return new Integer(getColumns());
+        }
         return null;
     }
 
@@ -150,6 +219,10 @@ public class GenericSpinner extends BaseSpinner {
             setRenderer((ListCellRenderer)value);
             return null;
         }
+        if(name.equals("columns")) {
+            setColumns(((Integer)value).intValue());
+            return null;
+        }
         return super.setPropertyValue(name, value);
     }
 
@@ -157,16 +230,47 @@ public class GenericSpinner extends BaseSpinner {
      * @return the model
      */
     public ListModel getModel() {
-        return model;
+        return model[0];
+    }
+
+    /**
+     * @return the model
+     */
+    public ListModel getModel(int offset) {
+        return model[offset];
     }
 
     /**
      * @param model the model to set
      */
     public void setModel(ListModel model) {
-        this.model = model;
-        if(spin != null) {
-            spin.setModel(model);
+        setModel(0, model);
+    }
+
+    /**
+     * @param model the model to set
+     */
+    public void setModel(int offset, ListModel model) {
+        this.model[offset] = model;
+        if(spin != null && spin[offset] != null) {
+            spin[offset].setModel(model);
+        }
+    }
+
+    /**
+     * @return the renderer
+     */
+    public ListCellRenderer getRenderer(int offset) {
+        return renderer[offset];
+    }
+
+    /**
+     * @param renderer the renderer to set
+     */
+    public void setRenderer(int offset, ListCellRenderer renderer) {
+        this.renderer[offset] = renderer;
+        if(spin[offset] != null) {
+            spin[offset].setRenderer(renderer);
         }
     }
 
@@ -174,16 +278,13 @@ public class GenericSpinner extends BaseSpinner {
      * @return the renderer
      */
     public ListCellRenderer getRenderer() {
-        return renderer;
+        return getRenderer(0);
     }
 
     /**
      * @param renderer the renderer to set
      */
     public void setRenderer(ListCellRenderer renderer) {
-        this.renderer = renderer;
-        if(spin != null) {
-            spin.setRenderer(renderer);
-        }
+        setRenderer(0, renderer);
     }
 }
