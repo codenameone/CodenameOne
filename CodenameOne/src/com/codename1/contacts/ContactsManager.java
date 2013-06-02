@@ -57,4 +57,32 @@ public class ContactsManager {
     public static Contact getContactById(String id){
         return Display.getInstance().getContactById(id);
     }
+    
+    /**
+     * Create a contact to the device contacts book
+     * 
+     * @param firstName the Contact firstName
+     * @param familyName the Contact familyName
+     * @param workPhone the Contact work phone or null
+     * @param homePhone the Contact home phone or null
+     * @param mobilePhone the Contact mobile phone or null
+     * @param email the Contact email or null
+     * 
+     * @return the contact id if creation succeeded or null  if failed
+     */ 
+    public static String createContact(String firstName, String familyName, 
+            String workPhone, String homePhone, String mobilePhone, 
+            String email){
+        return Display.getInstance().createContact(firstName, familyName, 
+            workPhone, homePhone, mobilePhone, email);
+    }
+    
+    /**
+     * removed a contact from the device contacts book
+     * @param id the contact id to remove
+     * @return true if deletion succeeded false otherwise
+     */ 
+    public static boolean deleteContact(String id){
+        return Display.getInstance().deleteContact(id);
+    }
 }

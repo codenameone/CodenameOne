@@ -2769,6 +2769,31 @@ public final class Display {
     }
     
     /**
+     * Create a contact to the device contacts book
+     * 
+     * @param firstName the Contact firstName
+     * @param familyName the Contact familyName
+     * @param workPhone the Contact work phone or null
+     * @param homePhone the Contact home phone or null
+     * @param mobilePhone the Contact mobile phone or null
+     * @param email the Contact email or null
+     * 
+     * @return the contact id if creation succeeded or null  if failed
+     */ 
+    public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+         return impl.createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);
+    }
+
+    /**
+     * removed a contact from the device contacts book
+     * @param id the contact id to remove
+     * @return true if deletion succeeded false otherwise
+     */ 
+    public boolean deleteContact(String id) {
+        return impl.deleteContact(id);
+    }
+    
+    /**
      * Indicates if the native video player includes its own play/pause etc. controls so the movie player
      * component doesn't need to include them
      * 
@@ -3070,4 +3095,5 @@ public final class Display {
     public boolean hasCamera() {
         return impl.hasCamera();
     }
+
 }

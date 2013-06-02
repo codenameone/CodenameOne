@@ -4201,6 +4201,31 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Create a contact to the device contacts book
+     * 
+     * @param firstName the Contact firstName
+     * @param familyName the Contact familyName
+     * @param workPhone the Contact work phone or null
+     * @param homePhone the Contact home phone or null
+     * @param mobilePhone the Contact mobile phone or null
+     * @param email the Contact email or null
+     * 
+     * @return the contact id if creation succeeded or null  if failed
+     */ 
+    public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+         return null;
+    }
+
+    /**
+     * removed a contact from the device contacts book
+     * @param id the contact id to remove
+     * @return true if deletion succeeded false otherwise
+     */ 
+    public boolean deleteContact(String id) {
+        return false;
+    }
+    
+    /**
      * Indicates if the underlying platform supports sharing capabilities
      * @return true if the underlying platform handles share.
      */
@@ -4698,4 +4723,5 @@ public abstract class CodenameOneImplementation {
         return true;
     }
     
+
 }
