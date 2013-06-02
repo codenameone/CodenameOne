@@ -2947,6 +2947,14 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         return RIMContactsManager.getInstance().getContactById(id);
     }
     
+    public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+         return RIMContactsManager.getInstance().createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);
+    }
+
+    public boolean deleteContact(String id) {
+        return RIMContactsManager.getInstance().deleteContact(id);
+    }
+    
     /**
      * @inheritDoc 
      */
