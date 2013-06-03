@@ -458,7 +458,7 @@ public class CodenameOneActivity extends Activity {
                 } else if (androidShowAsAction.equalsIgnoreCase("never")) {
                     item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
                 } else if (androidShowAsAction.equalsIgnoreCase("withText")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
                 } else if (androidShowAsAction.equalsIgnoreCase("always")) {
                     item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
                 } else if (android.os.Build.VERSION.SDK_INT >= 14 && androidShowAsAction.equalsIgnoreCase("collapseActionView")) {
