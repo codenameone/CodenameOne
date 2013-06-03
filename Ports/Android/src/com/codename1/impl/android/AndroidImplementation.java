@@ -3071,8 +3071,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            FileOutputStream fc = new FileOutputStream((String) connection);
-            BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
+            String con = (String)connection;
+            if (con.startsWith("file://")) {
+                con = con.substring(7);
+            }
+
+            FileOutputStream fc = new FileOutputStream((String) con);
+            BufferedOutputStream o = new BufferedOutputStream(fc, (String) con);
             return o;
         }
         return new BufferedOutputStream(((URLConnection) connection).getOutputStream(), connection.toString());
@@ -3082,10 +3087,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
-        RandomAccessFile rf = new RandomAccessFile((String) connection, "rw");
+        String con = (String) connection;
+        if (con.startsWith("file://")) {
+            con = con.substring(7);
+        }
+        RandomAccessFile rf = new RandomAccessFile(con, "rw");
         rf.seek(offset);
         FileOutputStream fc = new FileOutputStream(rf.getFD());
-        BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
+        BufferedOutputStream o = new BufferedOutputStream(fc, con);
         o.setConnection(rf);
         return o;
     }
@@ -3111,8 +3120,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public InputStream openInputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            FileInputStream fc = new FileInputStream((String) connection);
-            BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
+            String con = (String) connection;
+            if (con.startsWith("file://")) {
+                con = con.substring(7);
+            }
+            FileInputStream fc = new FileInputStream(con);
+            BufferedInputStream o = new BufferedInputStream(fc, con);
             return o;
         }
         return new BufferedInputStream(((URLConnection) connection).getInputStream(), connection.toString());
@@ -3412,6 +3425,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean exists(String file) {
+        if (file.startsWith("file://")) {
+            file = file.substring(7);
+        }
         return new File(file).exists();
     }
 
@@ -3419,6 +3435,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void rename(String file, String newName) {
+        if (file.startsWith("file://")) {
+            file = file.substring(7);
+        }
         new File(file).renameTo(new File(new File(file).getParentFile(), newName));
     }
 
