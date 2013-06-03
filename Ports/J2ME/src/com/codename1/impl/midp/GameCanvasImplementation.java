@@ -3049,7 +3049,16 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean hasNativeTheme() {
-        InputStream i = getResourceAsStream(getClass(), "/nokia_touch_theme.res");
+        InputStream i = getResourceAsStream(getClass(), "/nokia_asha_theme.res");
+        try {
+            if(i != null) {
+                i.close();
+                return true;
+            }
+        } catch (IOException ex) {
+        }
+        
+        i = getResourceAsStream(getClass(), "/nokia_touch_theme.res");
         try {
             if(i != null) {
                 i.close();
@@ -3086,6 +3095,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         InputStream i = getResourceAsStream(getClass(), "/nokia_touch_theme.res");
         if(i == null){
             i = getResourceAsStream(getClass(), "/nokia_non_touch.res");
+        }
+        if(i == null){
+            i = getResourceAsStream(getClass(), "/nokia_asha_theme.res");
         }
         if(i == null){
             i = getResourceAsStream(getClass(), "/nativeJ2METheme.res");
