@@ -1075,6 +1075,9 @@
               </Events>
             </MenuItem>
             <Menu class="javax.swing.JMenu" name="jMenu3">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Android"/>
+              </Properties>
               <SubComponents>
                 <MenuItem class="javax.swing.JRadioButtonMenuItem" name="android2NativeTheme">
                   <Properties>
@@ -1088,13 +1091,16 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="android2NativeThemeActionPerformed"/>
                   </Events>
                 </MenuItem>
-                <MenuItem class="javax.swing.JMenuItem" name="icsNativeTheme">
+                <MenuItem class="javax.swing.JRadioButtonMenuItem" name="jRadioButtonMenuItem4">
                   <Properties>
+                    <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+                      <ComponentRef name="nativeThemeButtonGroup"/>
+                    </Property>
                     <Property name="text" type="java.lang.String" value="ICS (3.x or newer/Tablets)"/>
-                    <Property name="name" type="java.lang.String" value="icsNativeTheme" noResource="true"/>
+                    <Property name="name" type="java.lang.String" value="jRadioButtonMenuItem4" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="icsNativeThemeActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jRadioButtonMenuItem4ActionPerformed"/>
                   </Events>
                 </MenuItem>
               </SubComponents>
@@ -1125,10 +1131,21 @@
             </MenuItem>
             <Menu class="javax.swing.JMenu" name="jMenu9">
               <Properties>
-                <Property name="text" type="java.lang.String" value="J2ME"/>
-                <Property name="name" type="java.lang.String" value="jMenu9" noResource="true"/>
+                <Property name="text" type="java.lang.String" value="J2ME - Nokia"/>
               </Properties>
               <SubComponents>
+                <MenuItem class="javax.swing.JRadioButtonMenuItem" name="jRadioButtonMenuItem3">
+                  <Properties>
+                    <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+                      <ComponentRef name="nativeThemeButtonGroup"/>
+                    </Property>
+                    <Property name="text" type="java.lang.String" value="Nokia Asha"/>
+                    <Property name="name" type="java.lang.String" value="jRadioButtonMenuItem3" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jRadioButtonMenuItem3ActionPerformed"/>
+                  </Events>
+                </MenuItem>
                 <MenuItem class="javax.swing.JRadioButtonMenuItem" name="jRadioButtonMenuItem2">
                   <Properties>
                     <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">

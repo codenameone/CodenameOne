@@ -798,10 +798,11 @@ public class ResourceEditorView extends FrameView {
         iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu3 = new javax.swing.JMenu();
         android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
-        icsNativeTheme = new javax.swing.JMenuItem();
+        jRadioButtonMenuItem4 = new javax.swing.JRadioButtonMenuItem();
         blackberryNativeTheme = new javax.swing.JRadioButtonMenuItem();
         winNativeTheme = new javax.swing.JRadioButtonMenuItem();
         jMenu9 = new javax.swing.JMenu();
+        jRadioButtonMenuItem3 = new javax.swing.JRadioButtonMenuItem();
         jRadioButtonMenuItem2 = new javax.swing.JRadioButtonMenuItem();
         jRadioButtonMenuItem1 = new javax.swing.JRadioButtonMenuItem();
         customNativeTheme = new javax.swing.JRadioButtonMenuItem();
@@ -1391,7 +1392,6 @@ public class ResourceEditorView extends FrameView {
         jMenu1.add(iosNativeTheme);
 
         jMenu3.setText("Android");
-        jMenu3.setName("jMenu3"); // NOI18N
 
         nativeThemeButtonGroup.add(android2NativeTheme);
         android2NativeTheme.setText("Gingerbread (2.3.x)");
@@ -1399,10 +1399,11 @@ public class ResourceEditorView extends FrameView {
         android2NativeTheme.addActionListener(formListener);
         jMenu3.add(android2NativeTheme);
 
-        icsNativeTheme.setText("ICS (3.x or newer/Tablets)");
-        icsNativeTheme.setName("icsNativeTheme"); // NOI18N
-        icsNativeTheme.addActionListener(formListener);
-        jMenu3.add(icsNativeTheme);
+        nativeThemeButtonGroup.add(jRadioButtonMenuItem4);
+        jRadioButtonMenuItem4.setText("ICS (3.x or newer/Tablets)");
+        jRadioButtonMenuItem4.setName("jRadioButtonMenuItem4"); // NOI18N
+        jRadioButtonMenuItem4.addActionListener(formListener);
+        jMenu3.add(jRadioButtonMenuItem4);
 
         jMenu1.add(jMenu3);
 
@@ -1418,8 +1419,13 @@ public class ResourceEditorView extends FrameView {
         winNativeTheme.addActionListener(formListener);
         jMenu1.add(winNativeTheme);
 
-        jMenu9.setText("J2ME");
-        jMenu9.setName("jMenu9"); // NOI18N
+        jMenu9.setText("J2ME - Nokia");
+
+        nativeThemeButtonGroup.add(jRadioButtonMenuItem3);
+        jRadioButtonMenuItem3.setText("Nokia Asha");
+        jRadioButtonMenuItem3.setName("jRadioButtonMenuItem3"); // NOI18N
+        jRadioButtonMenuItem3.addActionListener(formListener);
+        jMenu9.add(jRadioButtonMenuItem3);
 
         nativeThemeButtonGroup.add(jRadioButtonMenuItem2);
         jRadioButtonMenuItem2.setText("Nokia Touch");
@@ -1652,9 +1658,6 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == android2NativeTheme) {
                 ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
             }
-            else if (evt.getSource() == icsNativeTheme) {
-                ResourceEditorView.this.icsNativeThemeActionPerformed(evt);
-            }
             else if (evt.getSource() == blackberryNativeTheme) {
                 ResourceEditorView.this.blackberryNativeThemeActionPerformed(evt);
             }
@@ -1723,6 +1726,12 @@ public class ResourceEditorView extends FrameView {
             }
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
+            }
+            else if (evt.getSource() == jRadioButtonMenuItem3) {
+                ResourceEditorView.this.jRadioButtonMenuItem3ActionPerformed(evt);
+            }
+            else if (evt.getSource() == jRadioButtonMenuItem4) {
+                ResourceEditorView.this.jRadioButtonMenuItem4ActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -3238,10 +3247,6 @@ private void import9PatchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     }
 }//GEN-LAST:event_import9PatchActionPerformed
 
-private void icsNativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_icsNativeThemeActionPerformed
-        setNativeTheme("/android_holo_light.res", true);
-}//GEN-LAST:event_icsNativeThemeActionPerformed
-
 private void livePreviewUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_livePreviewUIActionPerformed
     LivePreview.setLivePreviewEnabled(livePreviewUI.isSelected(), mainPanel, this);
     Preferences.userNodeForPackage(getClass()).putBoolean("LivePreview", livePreviewUI.isSelected());
@@ -3286,6 +3291,14 @@ private void jRadioButtonMenuItem2ActionPerformed(java.awt.event.ActionEvent evt
 private void jRadioButtonMenuItem1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonMenuItem1ActionPerformed
     setNativeTheme("/nokia_non_touch_theme.res", true);
 }//GEN-LAST:event_jRadioButtonMenuItem1ActionPerformed
+
+private void jRadioButtonMenuItem3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonMenuItem3ActionPerformed
+    setNativeTheme("/nokia_asha_theme.res", true);
+}//GEN-LAST:event_jRadioButtonMenuItem3ActionPerformed
+
+private void jRadioButtonMenuItem4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonMenuItem4ActionPerformed
+    setNativeTheme("/android_holo_light.res", true);
+}//GEN-LAST:event_jRadioButtonMenuItem4ActionPerformed
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
@@ -4842,7 +4855,6 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem findMultiImages;
     private javax.swing.JScrollPane fontsScroll;
     private javax.swing.JMenu helpMenu;
-    private javax.swing.JMenuItem icsNativeTheme;
     private javax.swing.JMenuItem imageBorderWizardMenuItem;
     private javax.swing.JScrollPane imageScroll;
     private javax.swing.JMenuItem imageSizes;
@@ -4869,6 +4881,8 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JPanel jPanel9;
     private javax.swing.JRadioButtonMenuItem jRadioButtonMenuItem1;
     private javax.swing.JRadioButtonMenuItem jRadioButtonMenuItem2;
+    private javax.swing.JRadioButtonMenuItem jRadioButtonMenuItem3;
+    private javax.swing.JRadioButtonMenuItem jRadioButtonMenuItem4;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator2;
