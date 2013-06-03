@@ -143,6 +143,9 @@ public class GenericSpinner extends BaseSpinner {
      * @param value the value to set
      */
     public void setValue(int offset, Object value) {
+        if(this.value == null) {
+            this.value = new Object[model.length];
+        }
         this.value[offset] = value;
         if(spin != null && spin[offset] != null) {
             spin[offset].setValue(value);
