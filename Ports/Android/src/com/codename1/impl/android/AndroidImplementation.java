@@ -392,6 +392,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.startActivity(i);
     }
 
+    @Override
+    public boolean isNativeInputImmediate() {
+        return true;
+    }
+    
     public void editString(final Component cmp, int maxSize, final int constraint, String text, int keyCode) {
         if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
             text += (char) keyCode;
