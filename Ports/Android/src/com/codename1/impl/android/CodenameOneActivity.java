@@ -494,6 +494,8 @@ public class CodenameOneActivity extends Activity {
         final Command command = cmd;
         final ActionEvent actionEvent = new ActionEvent(command);
 
+        //stop edit if the keybaord is open
+        AndroidImplementation.stopEditing();
         // Protect ourselves from commands that misbehave. A crash here will crash the entire application
         Display.getInstance().callSerially(new Runnable() {
             @Override

@@ -410,8 +410,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return InPlaceEditView.isEditing();
     }
 
-    @Override
-    public void saveTextEditingState() {
+    public static void stopEditing(){
         final boolean[] flag = new boolean[]{false};
 
         // InPlaceEditView.endEdit must be called from the UI thread.
@@ -439,7 +438,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 } catch (InterruptedException e) {
                 }
             }
-        }
+        }        
+    }
+    
+    @Override
+    public void saveTextEditingState() {
+        stopEditing();
     }
 
     protected void setLastSizeChangedWH(int w, int h) {
