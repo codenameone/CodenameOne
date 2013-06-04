@@ -134,6 +134,7 @@ public class SideMenuBar extends MenuBar {
          if (keyCode == leftSK) {
              openMenu();
          }
+         super.keyReleased(keyCode);
     }
 
     /**
@@ -352,9 +353,10 @@ public class SideMenuBar extends MenuBar {
             }
 
             public void keyReleased(int keyCode) {
-                if (keyCode == backSK) {
+                if (keyCode == leftSK) {
                     closeMenu();
                 }
+                super.keyReleased(keyCode);
             }
         };
 

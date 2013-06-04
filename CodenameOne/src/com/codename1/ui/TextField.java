@@ -1577,6 +1577,7 @@ public class TextField extends TextArea {
         int line = (y - getAbsoluteY())/lineHeight;
         cursorY = line;
         cursorY = Math.min(cursorY, getLines() - 1);
+        cursorY = Math.max(cursorY, 0);
         String text = getTextAt(cursorY);
         int textLength = text.length();
         int position = 0;
