@@ -2475,6 +2475,9 @@ public class UIBuilder {
         while(c.getParent() != null && !(c.getParent() instanceof EmbeddedContainer)) {
             c = c.getParent();
         }
+        if(!(c instanceof Container)) {
+            return null;
+        }
         return (Container)c;
     }
 

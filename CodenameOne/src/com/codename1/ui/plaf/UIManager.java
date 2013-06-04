@@ -349,6 +349,10 @@ public class UIManager {
         }
         themeProps.put("ComboBox.sel#derive", "ComboBox");
 
+        if(installedTheme == null || !installedTheme.containsKey("MenuButton.derive")) {
+            themeProps.put("MenuButton.transparency", "0");
+        }
+        
         if(installedTheme == null || !installedTheme.containsKey("ComboBoxItem.derive")) {
             themeProps.put("ComboBoxItem.margin", "0,0,0,0");
             themeProps.put("ComboBoxItem.transparency", "0");

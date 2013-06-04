@@ -273,8 +273,10 @@ public class TableLayout extends Layout {
             int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom; 
 
             int currentX = left;
+            int availableReminder = pWidth;
             for(int iter = 0 ; iter < columnSizes.length ; iter++) {
-                columnSizes[iter] = getColumnWidthPixels(iter, pWidth, pWidth);
+                columnSizes[iter] = getColumnWidthPixels(iter, pWidth, availableReminder);
+                availableReminder -= columnSizes[iter];
             }
 
             // try to recalculate the columns for none horizontally scrollable tables
@@ -469,7 +471,7 @@ public class TableLayout extends Layout {
         for(int iter = 0 ; iter < rows ; iter++) {
             Constraint c = tablePositions[iter * columns + column];
 
-            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT) {
+            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanHorizontal > 1) {
                 continue;
             }
 
@@ -480,8 +482,10 @@ public class TableLayout extends Layout {
             } else {
                 // special case, width -2 gives the column the rest of the available space
                 if(c.width == -2) {
-                    availableSpaceColumn = iter;
-                    continue;
+                    if(available < 0) {
+                        return Display.getInstance().getDisplayWidth();
+                    }
+                    return available;
                 }
                 Style s = c.parent.getStyle();
                 current = Math.max(current, c.parent.getPreferredW()  + s.getMargin(false, Component.LEFT) + s.getMargin(false, Component.RIGHT));
