@@ -4218,6 +4218,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
 
+    public void refreshNativeTitle(){
+        Form f = getCurrentForm();
+        if (isNativeTitle() &&  !(f instanceof Dialog)) {
+            activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
+        }
+    }
+    
     public void setCurrentForm(final Form f) {
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
