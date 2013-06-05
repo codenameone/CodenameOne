@@ -2999,6 +2999,14 @@ public final class Display {
     public boolean isNativeTitle() {
         return impl.isNativeTitle();
     }
+    
+    /**
+     * if the title is native(e.g the android action bar), notify the native title
+     * that is needs to be refreshed
+     */
+    public void refreshNativeTitle(){
+        impl.refreshNativeTitle();
+    }
 
     /**
      * The crash reporter gets invoked when an uncaught exception is intercepted

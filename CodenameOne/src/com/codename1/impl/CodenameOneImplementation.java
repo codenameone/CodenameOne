@@ -4566,6 +4566,13 @@ public abstract class CodenameOneImplementation {
     public boolean isNativeTitle() {
         return false;
     }
+    
+    /**
+     * if the title is native(e.g the android action bar), notify the native title
+     * that is needs to be refreshed
+     */
+    public void refreshNativeTitle(){
+    }
 
     /**
      * Indicates the way commands should be added to a form as one of the ocmmand constants defined

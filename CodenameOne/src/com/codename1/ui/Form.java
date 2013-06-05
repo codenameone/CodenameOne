@@ -757,6 +757,10 @@ public class Form extends Container {
             if(super.contains(titleArea)){
                 removeComponentFromForm(titleArea);
             }
+            //if the Form is already displayed refresh the title
+            if(Display.getInstance().getCurrent() == this){
+                Display.getInstance().refreshNativeTitle();
+            }
         }
     }
 
