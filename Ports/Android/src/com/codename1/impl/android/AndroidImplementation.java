@@ -240,7 +240,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
          * devices are extemely sensitive so dragging should start a little
          * later than suggested by default implementation.
          */
-        this.setDragStartPercentage(5);
+        this.setDragStartPercentage(1);
         VirtualKeyboardInterface vkb = new AndroidKeyboard(this);
         Display.getInstance().registerVirtualKeyboard(vkb);
         Display.getInstance().setDefaultVirtualKeyboard(vkb);
