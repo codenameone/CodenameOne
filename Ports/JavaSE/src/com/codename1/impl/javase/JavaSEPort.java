@@ -4821,6 +4821,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    protected int getDragAutoActivationThreshold() {
+        return 10000;
+    }
+    
+    @Override
     public void registerPush(Hashtable meta, boolean noFallback) {
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         String user = p.get("user", null);

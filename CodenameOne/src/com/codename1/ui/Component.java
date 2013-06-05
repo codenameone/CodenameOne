@@ -158,6 +158,7 @@ public class Component implements Animation, StyleListener {
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
     private EventDispatcher dropListener;
+    private EventDispatcher dragOverListener;
 
     /**
      * Indicates the decrement units for the scroll opacity
@@ -2073,6 +2074,13 @@ public class Component implements Animation, StyleListener {
                 draggedy = getAbsoluteY();
             }
             Component dropTo = findDropTarget(this, x, y);
+            if(dropTo != null && dragOverListener != null) {
+                ActionEvent ev = new ActionEvent(this, dropTo, x, y);
+                dragOverListener.fireActionEvent(ev);
+                if(ev.isConsumed()) {
+                    return;
+                }
+            }
             if(dropTargetComponent != dropTo) {
                 if(dropTargetComponent != null) {
                     dropTargetComponent.dragExit(this);
@@ -2332,6 +2340,31 @@ public class Component implements Animation, StyleListener {
         }
     }
     
+    /**
+     * Broadcasts an event when dragging over a component
+     * @param l the listener
+     */
+    public void addDragOverListener(ActionListener l) {
+        if(dragOverListener == null) {
+            dragOverListener = new EventDispatcher();
+        }
+        dragOverListener.addListener(l);
+    }
+    
+    /**
+     * Removes an action listener to drag over events 
+     * @param l the callback
+     */
+    public void removeDragOverListener(ActionListener l) {
+        if(dragOverListener == null) {
+            return;
+        }
+        dragOverListener.removeListener(l);
+        if(!dragOverListener.hasListeners()) {
+            dragOverListener = null;
+        }
+    }
+
     void dragFinished(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();

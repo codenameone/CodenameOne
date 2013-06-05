@@ -89,7 +89,7 @@ public abstract class CodenameOneImplementation {
     private int dragActivationCounter = 0;
     private int dragActivationX = 0;
     private int dragActivationY = 0;
-    private int dragStartPercentage = 3;
+    private int dragStartPercentage = 1;
     private Form currentForm;
     private static Object displayLock;
     private Animation[] paintQueue = new Animation[100];

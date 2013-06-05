@@ -1181,6 +1181,57 @@ public class Container extends Component {
 
         return true;
     }
+
+    private int distanceToComponent(Component c, int x, int y) {
+        int cx = c.getX();
+        if(x > cx) {
+            cx += c.getWidth();
+            if(cx > x) {
+                cx = x;
+            }
+        }
+        int cy = c.getY();
+        if(y > cy) {
+            cy += c.getHeight();
+            if(cy > y) {
+                cy = y;
+            }
+        }
+        x = Math.abs(cx - x);
+        y = Math.abs(cy - y);
+        return (int)Math.sqrt(x*x+y*y);
+    }
+    
+    /**
+     * Very useful for touch events or drop events that need approximation more than accuracy
+     * @param x location in container relative coordinates
+     * @param y location in container relative coordinates
+     * @return the closest component in the container or null if no component is in the container
+     */
+    public Component getClosestComponentTo(int x, int y) {
+        int count = getComponentCount();
+        if(count == 0) {
+            return null;
+        }
+        Component closest = getComponentAt(0);
+        if(closest.contains(x, y)) {
+            return closest;
+        }
+        int distance = distanceToComponent(closest, x, y);
+        for(int iter = 1 ; iter < count ; iter++) {
+            Component current = getComponentAt(iter);
+            if(current.contains(x, y)) {
+                return current;
+            }
+            int cd = distanceToComponent(current, x, y);
+            if(cd < distance) {
+                closest = current;
+                distance = cd;
+            }
+        }
+        return closest;
+    }
+    
     /**
      * Returns a Component that exists in the given x, y coordinates by traversing
      * component objects and invoking contains
