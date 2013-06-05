@@ -40,6 +40,7 @@ public class GenericSpinner extends BaseSpinner {
     private ListModel[] model = new ListModel[] { new DefaultListModel(new Object[] {"Value 1", "Value 2", "Value 3"}) };
     private ListCellRenderer[] renderer = new ListCellRenderer[] { new DefaultListCellRenderer(false) };
     private Object[] value;
+    private String[] renderingPrototype;
     
     /**
      * Default constructor
@@ -55,6 +56,9 @@ public class GenericSpinner extends BaseSpinner {
         if(spin == null) {
             if(model.length == 1) {
                 spin = new Spinner[] {createSpinner(0)};
+                if(renderingPrototype != null) {
+                    spin[0].setRenderingPrototype(renderingPrototype[0]);
+                }
                 setLayout(new BorderLayout());
                 addComponent(BorderLayout.CENTER, spin[0]);
             } else {
@@ -65,6 +69,9 @@ public class GenericSpinner extends BaseSpinner {
                     addComponent(spin[iter]);
                     if(iter < spin.length - 1) {
                         addComponent(createSeparator());
+                    }
+                    if(renderingPrototype != null) {
+                        spin[iter].setRenderingPrototype(renderingPrototype[iter]);
                     }
                 }
             }
@@ -81,6 +88,7 @@ public class GenericSpinner extends BaseSpinner {
             ListModel[] lm = new ListModel[columns];
             ListCellRenderer[] lr = new ListCellRenderer[columns];
             Object[] values = new Object[columns];
+            String[] rp = new String[columns];
             if(spin != null) {
                 spin = null;
                 removeAll();
@@ -92,13 +100,56 @@ public class GenericSpinner extends BaseSpinner {
                 if(value != null) {
                     values[iter] = value[Math.min(iter, model.length - 1)];
                 }
+                if(renderingPrototype != null) {
+                    rp[iter] = renderingPrototype[Math.min(iter, model.length - 1)];
+                }
             }
             model = lm;
             renderer = lr;
             value = values;
+            renderingPrototype = rp;
         }
     }
     
+    /**
+     * Returns the rendering prototype
+     * @return the prototype
+     */
+    public String getRenderingPrototype() {
+        return getRenderingPrototype(0);
+    }
+    
+    /**
+     * Returns the rendering prototype
+     * @return the prototype
+     */
+    public String getRenderingPrototype(int column) {
+        if(renderingPrototype == null) {
+            return null;
+        }
+        return renderingPrototype[column];
+    }
+
+    /**
+     * The rendering prototype
+     * @param pr the prototype
+     */
+    public void setRenderingPrototype(String pr) {
+        setRenderingPrototype(0, pr);
+    }
+    
+    /**
+     * The rendering prototype
+     * @param column the column
+     * @param pr the prototype
+     */
+    public void setRenderingPrototype(int column, String pr) {
+        if(renderingPrototype == null) {
+            renderingPrototype = new String[model.length];
+        }
+        renderingPrototype[column] = pr;
+    }
+
     /**
      * Return the column count
      * 

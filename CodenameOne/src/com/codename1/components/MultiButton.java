@@ -576,7 +576,14 @@ public class MultiButton extends Container {
      * @param s position either North/South/East/West
      */
     public void setIconPosition(String t) {
-        removeComponent(icon.getParent());
+        String ip = getEmblemPosition();
+        if(ip != null && ip.equals(t)) {
+            String ep = getIconPosition();
+            removeComponent(icon.getParent());
+            setEmblemPosition(ep);
+        } else {
+            removeComponent(icon.getParent());
+        }
         addComponent(t, icon.getParent());
         revalidate();
     }
@@ -597,7 +604,14 @@ public class MultiButton extends Container {
      * @param s position either North/South/East/West
      */
     public void setEmblemPosition(String t) {
-        removeComponent(emblem.getParent());
+        String ip = getIconPosition();
+        if(ip != null && ip.equals(t)) {
+            String ep = getEmblemPosition();
+            removeComponent(emblem.getParent());
+            setIconPosition(ep);
+        } else {
+            removeComponent(emblem.getParent());
+        }
         addComponent(t, emblem.getParent());
         revalidate();
     }

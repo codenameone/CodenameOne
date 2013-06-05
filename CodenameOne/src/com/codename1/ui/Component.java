@@ -2392,6 +2392,10 @@ public class Component implements Animation, StyleListener {
                     dropTargetComponent.drop(this, x, y);
                 }
             } else {
+                if(dragOverListener != null) {
+                    ActionEvent ev = new ActionEvent(this, null, x, y);
+                    dragOverListener.fireActionEvent(ev);
+                }
                 p.repaint();
             }
             setVisible(true);

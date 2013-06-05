@@ -38,6 +38,7 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class TableLayout extends Layout {
+
     /**
      * Represents the layout constraint for an entry within the table indicating
      * the desired position/behavior of the component.
@@ -204,6 +205,7 @@ public class TableLayout extends Layout {
     private boolean verticalSpanningExists;
 
     private int rows, columns;
+    private boolean growHorizontally;
     
     /**
      * A table must declare the amount of rows and columns in advance
@@ -481,7 +483,7 @@ public class TableLayout extends Layout {
                 modifableColumnSize[column] = false;
             } else {
                 // special case, width -2 gives the column the rest of the available space
-                if(c.width == -2) {
+                if(c.width == -2 || (growHorizontally && column == columns - 1)) {
                     if(available < 0) {
                         return Display.getInstance().getDisplayWidth();
                     }
@@ -899,4 +901,20 @@ public class TableLayout extends Layout {
     public boolean isConstraintTracking() {
         return true;
     }    
+
+    /**
+     * Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+     * @return the growHorizontally
+     */
+    public boolean isGrowHorizontally() {
+        return growHorizontally;
+    }
+
+    /**
+     * Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+     * @param growHorizontally the growHorizontally to set
+     */
+    public void setGrowHorizontally(boolean growHorizontally) {
+        this.growHorizontally = growHorizontally;
+    }
 }
