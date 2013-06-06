@@ -1269,11 +1269,13 @@ public class List extends Component {
             }
             calculateComponentPosition(i, width, pos, rendererSize, getElementSize(true, true), i <= getCurrentSelected());
 
-            Object value = model.getItemAt(i);
-            Component cmp = renderer.getListCellRendererComponent(this, value, i, false);
-            cmp.setCellRenderer(true);
-            Dimension sizeC = pos.getSize();
-            renderComponent(g, cmp, pos.getX(), pos.getY(), sizeC.getWidth(), sizeC.getHeight());
+            if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {
+                Object value = model.getItemAt(i);
+                Component cmp = renderer.getListCellRendererComponent(this, value, i, false);
+                cmp.setCellRenderer(true);
+                Dimension sizeC = pos.getSize();
+                renderComponent(g, cmp, pos.getX(), pos.getY(), sizeC.getWidth(), sizeC.getHeight());
+            }
         }
         //if the animation has finished draw the selected element
         if (shouldRendererSelectedEntry) {
