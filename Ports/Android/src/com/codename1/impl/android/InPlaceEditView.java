@@ -274,18 +274,19 @@ public class InPlaceEditView extends FrameLayout {
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
+            if((type & InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) == InputType.TYPE_TEXT_FLAG_CAP_SENTENCES){
+                type = type ^ InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+            }
             //turn off suggestions for passwords
-            mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+            mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
-            //move the cursor to the end
-            mEditText.setSelection(mEditText.getText().length());
         }
         
         int maxLength = mTextArea.getMaxSize();
         InputFilter[] FilterArray = new InputFilter[1];
         FilterArray[0] = new InputFilter.LengthFilter(maxLength);
         mEditText.setFilters(FilterArray);
-        
+        mEditText.setSelection(mEditText.getText().length());
         showVirtualKeyboard(true);
     }
 
