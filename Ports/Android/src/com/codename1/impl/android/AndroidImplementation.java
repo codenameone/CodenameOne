@@ -1,6 +1,6 @@
 package com.codename1.impl.android;
 
-import android.app.ActionBar;
+import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.view.MotionEvent;
 import com.codename1.codescan.ScanResult;
@@ -9,11 +9,6 @@ import com.codename1.ui.geom.Dimension;
 
 
 import android.webkit.CookieSyncManager;
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.*;
 import android.content.pm.*;
 import android.content.res.Configuration;
@@ -99,6 +94,7 @@ import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
 import com.codename1.ui.*;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -193,6 +189,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));            
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
+                activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
@@ -2701,6 +2698,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         protected AndroidBrowserComponentCallback jsCallback;
         private boolean lightweightMode = false;
         
+        private ProgressDialog progressBar;
+        
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
             doSetVisibility(false);
@@ -2753,18 +2752,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void onPageStarted(WebView view, String url, Bitmap favicon) {
                     parent.fireWebEvent("onStart", new ActionEvent(url));
                     super.onPageStarted(view, url, favicon);
+                    if(progressBar != null && progressBar.isShowing()){
+                        progressBar.dismiss();
+                    }
+                    //show the progress only if there is no ActionBar
+                    if(!isNativeTitle()){
+                        progressBar = ProgressDialog.show(activity, null, "Loading...");
+                    }
                 }
 
                 public void onPageFinished(WebView view, String url) {
                     parent.fireWebEvent("onLoad", new ActionEvent(url));
                     super.onPageFinished(view, url);
                     setShouldCalcPreferredSize(true);
+                    if(progressBar != null && progressBar.isShowing()){
+                        progressBar.dismiss();
+                    }
                 }
 
                 public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
                     parent.fireWebEvent("onError", new ActionEvent(description, errorCode));
                     super.onReceivedError(view, errorCode, description, failingUrl);
                     super.shouldOverrideKeyEvent(view, null);
+                    if(progressBar != null && progressBar.isShowing()){
+                        progressBar.dismiss();
+                    }
                 }
 
                 public boolean shouldOverrideKeyEvent(WebView view, KeyEvent event) {
@@ -2788,11 +2800,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
             
             web.setWebChromeClient(new WebChromeClient(){
-
+                private boolean clearTitle = false;
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
                     return true;
+                }
+
+                @Override
+                public void onProgressChanged(WebView view, int newProgress) {
+                    if(isNativeTitle()){
+                        Form current = getCurrentForm();
+                        if(current.getTitle().length() == 0){
+                            current.setTitle("Loading...");
+                            clearTitle = true;
+                        }
+                        activity.setProgress(newProgress * 100);
+                        if(newProgress == 100){
+                            if(clearTitle){
+                                current.setTitle("");
+                            }
+                        }
+                    }
                 }
                 
             });
