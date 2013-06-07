@@ -2687,12 +2687,13 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
 
                 boolean recording = false;
                 OutputStream out = null;
-                String videoPath = null;
+                String audioPath = null;
+                RecordControl record;
                 
                 public void actionPerformed(ActionEvent evt) {
-                    RecordControl record = (RecordControl) player.nativePlayer.getControl("RecordControl");
                     
                     if(!recording){
+                        record = (RecordControl) player.nativePlayer.getControl("RecordControl");
                         recording = true;
                         String type = record.getContentType();
                         String prefix = "";
@@ -2704,9 +2705,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                             prefix = ".3gp";
                         }
                         
-                        videoPath = getOutputMediaFile() + prefix;
+                        audioPath = getOutputMediaFile() + prefix;
                         try {
-                            out = FileSystemStorage.getInstance().openOutputStream(videoPath);
+                            out = FileSystemStorage.getInstance().openOutputStream(audioPath);
                             record.setRecordStream(out);
                             record.startRecord();
                             
@@ -2725,8 +2726,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                                     return false;                                   
                                 }
 
-                                public void paint(Graphics g) {
-                                    
+                                public void paint(Graphics g) {                                    
                                     String txt = sec/60 + ":" + sec%60 ;
                                     time.setText(txt);
                                 }
@@ -2734,7 +2734,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                             
                         } catch (IOException ex) {
                             ex.printStackTrace();
-                            System.out.println("failed to store video to " + videoPath );
+                            System.out.println("failed to store audio to " + audioPath );
                         }finally{
                         }                        
 
@@ -2744,14 +2744,12 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                                 record.stopRecord();
                                 record.commit();
                                 out.close();
-                                player.pause();
                                 player.cleanup();
-                            } catch (IOException ex) {
+                            } catch (Exception ex) {
                                 ex.printStackTrace();
                             }
-                        }
-                        
-                        captureResponse.actionPerformed(new ActionEvent(videoPath));
+                        }                        
+                        captureResponse.actionPerformed(new ActionEvent(audioPath));
                         current.showBack();                    
                     }
                     
@@ -2895,12 +2893,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                 boolean recording = false;
                 OutputStream out = null;
                 String videoPath = null;
-                
+                RecordControl record;
                 public void actionPerformed(ActionEvent evt) {
                     
-                    RecordControl record = (RecordControl) player.nativePlayer.getControl("RecordControl");
-                    
                     if(!recording){
+                        record = (RecordControl) player.nativePlayer.getControl("RecordControl");
                         recording = true;
                         String type = record.getContentType();
                         String prefix = "";
@@ -2935,8 +2932,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                                     return false;                                   
                                 }
 
-                                public void paint(Graphics g) {
-                                    
+                                public void paint(Graphics g) {                                    
                                     String txt = sec/60 + ":" + sec%60 ;
                                     time.setText(txt);
                                 }
@@ -2951,11 +2947,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                     }else{
                         if(out != null){
                             try {
+                                record.stopRecord();
                                 record.commit();
                                 out.close();
-                                player.pause();
                                 player.cleanup();
-                            } catch (IOException ex) {
+                            } catch (Exception ex) {
                                 ex.printStackTrace();
                             }
                         }
@@ -2963,8 +2959,6 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                         captureResponse.actionPerformed(new ActionEvent(videoPath));
                         current.showBack();                    
                     }
-                    
-                    
                 }
             };
             cam.addGameKeyListener(Display.GAME_FIRE, l);
