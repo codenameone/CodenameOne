@@ -103,7 +103,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private Lifecycle life;
     private static CodeScannerImpl scannerInstance;
     private static boolean minimized;
-    
+
     public void initEDT() {
         while(!initialized) {
             try {
@@ -154,6 +154,11 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public boolean isNativeInputImmediate() {
         return true;
+    }
+    
+    @Override
+    protected int getDragAutoActivationThreshold() {
+        return 1000000;
     }
 
     public boolean isNativeInputSupported() {
@@ -2257,6 +2262,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(),  
                 att, msg.getAttachmentMimeType(), msg.getMimeType().equals(Message.MIME_HTML));
     }
+
+    @Override
+    public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        return nativeInstance.createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
+    }
+
+    @Override
+    public boolean deleteContact(String id) {
+        return nativeInstance.deleteContact(Integer.parseInt(id));
+    }
+    
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {

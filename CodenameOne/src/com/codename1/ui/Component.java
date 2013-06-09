@@ -4100,6 +4100,38 @@ public class Component implements Animation, StyleListener {
                                 g.drawImage(s.getBgImage(), x, y);
                             }
                             return;
+                        case Style.BACKGROUND_IMAGE_SCALED_FILL:
+                            float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+                            width = (int)(((float)width) * r);
+                            height = (int)(((float)height) * r);
+                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
+                                g.drawImage(bgImage, x, y, width, height);
+                            } else {
+                                if (iW != width || iH != height) {
+                                    bgImage = bgImage.scaled(width, height);
+                                    s.setBgImage(bgImage, true);
+                                }
+                                g.drawImage(s.getBgImage(), x, y);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_SCALED_FIT:
+                            if(s.getBgTransparency() != 0) {
+                                g.setColor(s.getBgColor());
+                                g.fillRect(x, y, width, height, s.getBgTransparency());
+                            }
+                            float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+                            width = (int)(((float)width) * r2);
+                            height = (int)(((float)height) * r2);
+                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
+                                g.drawImage(bgImage, x, y, width, height);
+                            } else {
+                                if (iW != width || iH != height) {
+                                    bgImage = bgImage.scaled(width, height);
+                                    s.setBgImage(bgImage, true);
+                                }
+                                g.drawImage(s.getBgImage(), x, y);
+                            }
+                            return;
                         case Style.BACKGROUND_IMAGE_TILE_BOTH:
                             g.tileImage(bgImage, x, y, width, height);
                             return;

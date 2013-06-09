@@ -296,6 +296,8 @@ final class IOSNative {
     native String getPersonEmail(long id);
     native String getPersonAddress(long id);
     native long createPersonPhotoImage(long id);
+    native String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email);
+    native boolean deleteContact(int id);
     
     native void dial(String phone);
     native void sendSMS(String phone, String text);

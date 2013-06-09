@@ -165,7 +165,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         originalTheme.putAll(themeHash);
         initComponents();
         
-        trueTypeFontSizeValue.setModel(new SpinnerNumberModel(12.0, 5, 200, 0.5));
+        trueTypeFontSizeValue.setModel(new SpinnerNumberModel(12.0, 2, 200, 0.5));
         if(ResourceEditorView.getLoadedFile() != null) {
             String[] fontFiles = ResourceEditorView.getLoadedFile().getParentFile().list(new FilenameFilter() {
                 @Override

@@ -2299,7 +2299,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 for(File ovr : ovrFiles) {
                     try {
                         EditableResources er = EditableResources.open(new FileInputStream(ovr));
-                        for(String currentResourceName : loadedResources.getUIResourceNames()) {
+                        for(String currentResourceName : er.getUIResourceNames()) {
                             UIBuilder b = new UIBuilder() {
                                 protected com.codename1.ui.Component createComponentInstance(String componentType, Class cls) {
                                     if(cls.getName().startsWith("com.codename1.ui.")) {

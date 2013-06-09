@@ -253,6 +253,18 @@ public class Style {
     public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT = (byte)32;
 
     /**
+     * Indicates the background for the style would use a scaled image that fills all available space while 
+     * maintaining aspect ratio
+     */
+    public static final byte BACKGROUND_IMAGE_SCALED_FILL = (byte)33;
+    
+    /**
+     * Indicates the background for the style would use a scaled image that fits to available space while 
+     * maintaining aspect ratio
+     */
+    public static final byte BACKGROUND_IMAGE_SCALED_FIT = (byte)34;
+
+    /**
      * Indicates the background for the style would use a linear gradient
      */
     public static final byte BACKGROUND_GRADIENT_LINEAR_VERTICAL = (byte)6;
