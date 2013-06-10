@@ -1870,7 +1870,11 @@ public class List extends Component {
         }
         
         if (!isHover && pointerSelect(x, y) > -1) {
-            if ((fireOnClick && fixedSelection < FIXED_NONE_BOUNDRY) || fireOnRelease) {
+            if(fixedSelection > FIXED_NONE_BOUNDRY){
+                int index = pointerSelect(x, y);
+                updateAnimationPosition(index - getSelectedIndex());
+                setSelectedIndex(index);
+            }else if ((fireOnClick && fixedSelection < FIXED_NONE_BOUNDRY) || fireOnRelease) {
                 // fire the action event into the selected component
                 Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);
 
