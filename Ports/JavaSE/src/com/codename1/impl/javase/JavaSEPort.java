@@ -4185,12 +4185,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
-        try {
-            Desktop.getDesktop().mail(new URI("mailto:"+ recieptents[0]));
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        if(recieptents != null){
+            try {
+                Desktop.getDesktop().mail(new URI("mailto:"+ recieptents[0]));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            System.out.println("sending message to " + recieptents[0]);
         }
-        System.out.println("sending message to " + recieptents[0]);
     }
 
     @Override
@@ -4496,15 +4498,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public int getTime() {
-            return (int) player.getCurrentTime().toSeconds();
+            return (int) player.getCurrentTime().toMillis();
         }
 
         public void setTime(int time) {
-            player.seek(new Duration(time * 1000));
+            player.seek(new Duration(time));
         }
 
         public int getDuration() {
-            return (int) player.getStopTime().toSeconds();
+            return (int) player.getStopTime().toMillis();
         }
 
         public void setVolume(int vol) {
