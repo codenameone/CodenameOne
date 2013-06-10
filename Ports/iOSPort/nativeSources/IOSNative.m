@@ -1283,8 +1283,12 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(JAV
 
 void repaintUI() {
     com_codename1_ui_Display* d = (com_codename1_ui_Display*) com_codename1_ui_Display_getInstance__();
-    com_codename1_ui_Form* f = (com_codename1_ui_Form*)com_codename1_ui_Display_getCurrent__(d);
-    com_codename1_ui_Component_repaint__(f);
+    if(d != nil) {
+        com_codename1_ui_Form* f = (com_codename1_ui_Form*)com_codename1_ui_Display_getCurrent__(d);
+        if(f != nil) {
+            com_codename1_ui_Component_repaint__(f);
+        }
+    }
 }
 
 void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -2022,6 +2026,56 @@ ABAddressBookRef getAddressBook() {
         }
     }
     return globalAddressBook;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT firstName, JAVA_OBJECT surname, JAVA_OBJECT officePhone, JAVA_OBJECT homePhone, JAVA_OBJECT cellPhone, JAVA_OBJECT email) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    
+    ABAddressBookRef addressBook = getAddressBook();
+    CFErrorRef  error = NULL;
+    
+    ABRecordRef person = ABPersonCreate();
+    if(firstName != nil) {
+        ABRecordSetValue(person, kABPersonFirstNameProperty, toNSString(firstName), NULL);
+    }
+    if(surname != nil) {
+        ABRecordSetValue(person, kABPersonLastNameProperty, toNSString(surname), NULL);
+    }
+    
+    if(email != nil) {
+        ABMutableMultiValueRef emailVal = ABMultiValueCreateMutable(kABMultiStringPropertyType);
+        ABMultiValueAddValueAndLabel(emailVal, toNSString(email), CFSTR("email"), NULL);
+        ABRecordSetValue(person, kABPersonEmailProperty, emailVal, &error);
+    }
+
+    if(officePhone != nil || homePhone != nil || cellPhone != nil) {
+        ABMutableMultiValueRef phoneVal = ABMultiValueCreateMutable(kABPersonPhoneProperty);
+        if(officePhone != nil) {
+            ABMultiValueAddValueAndLabel(phoneVal, toNSString(officePhone), kABWorkLabel, NULL);
+        }
+        if(homePhone != nil) {
+            ABMultiValueAddValueAndLabel(phoneVal, toNSString(homePhone), kABHomeLabel, NULL);
+        }
+        if(cellPhone != nil) {
+            ABMultiValueAddValueAndLabel(phoneVal, toNSString(cellPhone), kABPersonPhoneMobileLabel, NULL);
+        }
+        ABRecordSetValue(person, kABPersonPhoneProperty, phoneVal, &error);
+    }
+    ABAddressBookSave(addressBook, nil);
+    JAVA_OBJECT o = fromNSString([NSString stringWithFormat:@"%i", ABRecordGetRecordID(person)]);
+    [pool release];
+    return o;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_deleteContact___int(JAVA_OBJECT instanceObject, JAVA_INT i) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    ABAddressBookRef addressBook = getAddressBook();
+    ABRecordRef ref = ABAddressBookGetPersonWithRecordID(addressBook, i);
+    if(ref != nil) {
+        ABAddressBookRemoveRecord(addressBook, ref, nil);
+    }
+    [pool release];
+    return ref != nil;
 }
 
 
