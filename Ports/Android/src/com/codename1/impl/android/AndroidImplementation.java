@@ -2752,9 +2752,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void onPageStarted(WebView view, String url, Bitmap favicon) {
                     parent.fireWebEvent("onStart", new ActionEvent(url));
                     super.onPageStarted(view, url, favicon);
-                    if(progressBar != null && progressBar.isShowing()){
-                        progressBar.dismiss();
-                    }
+                    dismissProgress();
                     //show the progress only if there is no ActionBar
                     if(!isNativeTitle()){
                         progressBar = ProgressDialog.show(activity, null, "Loading...");
@@ -2765,8 +2763,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     parent.fireWebEvent("onLoad", new ActionEvent(url));
                     super.onPageFinished(view, url);
                     setShouldCalcPreferredSize(true);
-                    if(progressBar != null && progressBar.isShowing()){
+                    dismissProgress();
+                }
+                
+                private void dismissProgress() {
+                    if (progressBar != null && progressBar.isShowing()) {
                         progressBar.dismiss();
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            public void run() {
+                                setVisible(true);
+                                repaint();
+                            }
+                        });
                     }
                 }
 
@@ -2774,9 +2783,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     parent.fireWebEvent("onError", new ActionEvent(description, errorCode));
                     super.onReceivedError(view, errorCode, description, failingUrl);
                     super.shouldOverrideKeyEvent(view, null);
-                    if(progressBar != null && progressBar.isShowing()){
-                        progressBar.dismiss();
-                    }
+                    dismissProgress();
                 }
 
                 public boolean shouldOverrideKeyEvent(WebView view, KeyEvent event) {
@@ -2810,16 +2817,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void onProgressChanged(WebView view, int newProgress) {
                     if(isNativeTitle()){
-                        Form current = getCurrentForm();
-                        if(current.getTitle().length() == 0){
-                            current.setTitle("Loading...");
-                            clearTitle = true;
-                        }
+                        Display.getInstance().callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                Form current = getCurrentForm();
+                                if(current.getTitle().length() == 0){
+                                    current.setTitle("Loading...");
+                                    clearTitle = true;
+                                }
+                            }
+                        });
                         activity.setProgress(newProgress * 100);
                         if(newProgress == 100){
                             if(clearTitle){
-                                current.setTitle("");
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        Form current = getCurrentForm();
+                                        current.setTitle("");
+                                    }
+                                });
                             }
+                            clearTitle = false;
                         }
                     }
                 }
