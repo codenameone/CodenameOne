@@ -68,7 +68,7 @@ public class AndroidContactsManager {
             selection = ContactsContract.Contacts.HAS_PHONE_NUMBER + "=1";
         }
 
-        Cursor cursor = context.getContentResolver().query(ContactsContract.Contacts.CONTENT_URI, null, selection, null, null);
+        Cursor cursor = context.getContentResolver().query(ContactsContract.Contacts.CONTENT_URI, null, selection, null, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC");
         while (cursor.moveToNext()) {
             String contactId = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
             ids.add(contactId);
