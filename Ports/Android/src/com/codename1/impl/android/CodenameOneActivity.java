@@ -37,6 +37,7 @@ import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.Window;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
@@ -306,6 +307,11 @@ public class CodenameOneActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        if (android.os.Build.VERSION.SDK_INT >= 11) {
+            getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
+            getActionBar().hide();
+        }
+        
         try {
             if(isBillingEnabled()) {
                 Handler mHandler = new Handler();
