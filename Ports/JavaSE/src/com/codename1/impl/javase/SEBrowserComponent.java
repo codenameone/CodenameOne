@@ -22,10 +22,7 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.Display;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.PeerComponent;
+import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
 import java.awt.Graphics2D;
@@ -173,25 +170,18 @@ public class SEBrowserComponent extends PeerComponent {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                //panel.removeAll();
-                //cnt.remove(panel);
                 frm.remove(cnt);
                 frm.repaint();
                 init = false;
             }
         });
     }
-
-    protected void setLightweightMode(final boolean l) {
-        if(lightweightModeSet && lightweightMode == l) {
-            return;
-        }
-        lightweightModeSet = true;
-        lightweightMode = l;
+    
+    private void init() {
         SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
 
-                if (!l) {
+            public void run() {
+                if (!lightweightMode) {
                     if (!init) {
                         init = true;
                         cnt.setVisible(true);
@@ -209,6 +199,15 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
 
+    }
+    
+    protected void setLightweightMode(final boolean l) {
+        if(lightweightModeSet && lightweightMode == l) {
+            return;
+        }
+        lightweightModeSet = true;
+        lightweightMode = l;
+        init();
     }
 
     protected com.codename1.ui.Image generatePeerImage() {
@@ -255,9 +254,17 @@ public class SEBrowserComponent extends PeerComponent {
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
         return new com.codename1.ui.geom.Dimension((int) web.getWidth(), (int) web.getHeight());
     }
-
+   
+    
     @Override
     protected void onPositionSizeChange() {
+        Form f = getComponentForm();
+        if(cnt.getParent() == null && 
+                f != null && 
+                Display.getInstance().getCurrent() == f){
+            init();
+        }
+        
         if(SwingUtilities.isEventDispatchThread()) {
             final int x = getAbsoluteX();
             final int y = getAbsoluteY();
