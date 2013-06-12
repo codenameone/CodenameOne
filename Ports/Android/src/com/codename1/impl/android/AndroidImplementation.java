@@ -2110,9 +2110,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void onPositionSizeChange() {
+            
+            Form f = getComponentForm();
+            if (v.getVisibility() == View.INVISIBLE
+                    && f != null
+                    && Display.getInstance().getCurrent() == f) {
+                doSetVisibility(true);
+                return;
+            }
 
             // called by Codename One EDT to position the native component.
-
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     if (layoutWrapper != null) {
