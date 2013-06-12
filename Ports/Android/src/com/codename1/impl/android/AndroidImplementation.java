@@ -2827,6 +2827,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 }
                             }
                         });
+                        activity.setProgressBarVisibility(true);
                         activity.setProgress(newProgress * 100);
                         if(newProgress == 100){
                             if(clearTitle){
@@ -2840,6 +2841,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 });
                             }
                             clearTitle = false;
+                            activity.setProgressBarVisibility(false);
                         }
                     }
                 }
