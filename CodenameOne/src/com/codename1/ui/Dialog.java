@@ -841,7 +841,7 @@ public class Dialog extends Form {
      * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is 0 infinite time is used
      * @param transition the transition installed when the dialog enters/leaves
      * @return the command pressed by the user
      */

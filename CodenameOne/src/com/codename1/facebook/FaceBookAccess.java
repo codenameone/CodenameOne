@@ -666,7 +666,7 @@ public class FaceBookAccess {
      * @param toScale the scale of the image to put in the List or null
      * @param tempStorage if true place the image in a temp storage
      */
-    public void getPicture(String id, final List targetList, final int targetOffset, final String targetKey,
+    public void getPicture(String id, final Component targetList, final int targetOffset, final String targetKey,
             Dimension toScale, boolean tempStorage) throws IOException {
         checkAuthentication();
 
@@ -684,7 +684,7 @@ public class FaceBookAccess {
             cacheKey = TEMP_STORAGE + id;
         }
 
-        ImageDownloadService.createImageToStorage(fb.requestURL(), targetList, targetOffset, targetKey, cacheKey, toScale);
+        ImageDownloadService.createImageToStorage(fb.requestURL(), targetList, targetOffset, targetKey, cacheKey, toScale, ConnectionRequest.PRIORITY_LOW);
     }
 
     /**
@@ -1164,5 +1164,26 @@ public class FaceBookAccess {
         req.setUrl("https://www.facebook.com/logout.php?access_token="+token+"&confirm=1&next="+redirectURI);
         NetworkManager.getInstance().addToQueueAndWait(req);
         token = null;
+    }
+
+
+    /**
+     * Some simple queries for public data can work just fine with anonymous login without requiring the whole
+     * OAuth process, they still need a facebook application though
+     * @param appid the id of the application
+     * @param clientSecret the client secret for the application
+     */
+    public static void anonymousLogin(String appid, String clientSecret) {
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setUrl("https://graph.facebook.com/oauth/access_token");
+        req.addArgument("client_id", appid);
+        req.addArgument("client_secret", clientSecret);
+        req.addArgument("grant_type", "client_credentials");
+        NetworkManager.getInstance().addToQueueAndWait(req);
+        if(req.getResponseData() != null) {
+            token = new String(req.getResponseData());
+            token = token.substring(token.indexOf('=') + 1);
+        }
     }
 }
