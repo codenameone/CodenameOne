@@ -795,7 +795,9 @@ public class ResourceEditorView extends FrameView {
         jMenu6 = new javax.swing.JMenu();
         resetNetbeansSettings = new javax.swing.JMenuItem();
         jMenu1 = new javax.swing.JMenu();
+        jMenu10 = new javax.swing.JMenu();
         iosNativeTheme = new javax.swing.JRadioButtonMenuItem();
+        ios7NativeTheme = new javax.swing.JCheckBoxMenuItem();
         jMenu3 = new javax.swing.JMenu();
         android2NativeTheme = new javax.swing.JRadioButtonMenuItem();
         jRadioButtonMenuItem4 = new javax.swing.JRadioButtonMenuItem();
@@ -870,17 +872,17 @@ public class ResourceEditorView extends FrameView {
         themePanel.setLayout(themePanelLayout);
         themePanelLayout.setHorizontalGroup(
             themePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(themeScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(themeScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
             .add(themePanelLayout.createSequentialGroup()
                 .add(addTheme)
-                .addContainerGap(74, Short.MAX_VALUE))
+                .addContainerGap(20, Short.MAX_VALUE))
         );
         themePanelLayout.setVerticalGroup(
             themePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(themePanelLayout.createSequentialGroup()
                 .add(addTheme)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(themeScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(themeScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Themes", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/theme.png")), themePanel, "Themes"); // NOI18N
@@ -900,9 +902,9 @@ public class ResourceEditorView extends FrameView {
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(userInterfaceScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(userInterfaceScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 202, Short.MAX_VALUE)
             .add(jPanel1Layout.createSequentialGroup()
-                .add(addUserInterface, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 185, Short.MAX_VALUE)
+                .add(addUserInterface, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 185, Short.MAX_VALUE)
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -910,7 +912,7 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel1Layout.createSequentialGroup()
                 .add(addUserInterface)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(userInterfaceScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(userInterfaceScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("GUI Builder", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/GUIBuilder.png")), jPanel1, "GUI Builder"); // NOI18N
@@ -931,15 +933,15 @@ public class ResourceEditorView extends FrameView {
             jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel7Layout.createSequentialGroup()
                 .add(addImageMain)
-                .addContainerGap(106, Short.MAX_VALUE))
-            .add(mainImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+                .addContainerGap(61, Short.MAX_VALUE))
+            .add(mainImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel7Layout.createSequentialGroup()
                 .add(addImageMain)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(mainImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(mainImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Main Images", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/images.png")), jPanel7); // NOI18N
@@ -962,15 +964,15 @@ public class ResourceEditorView extends FrameView {
             jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel3Layout.createSequentialGroup()
                 .add(addImageAll)
-                .addContainerGap(106, Short.MAX_VALUE))
-            .add(imageScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+                .addContainerGap(61, Short.MAX_VALUE))
+            .add(imageScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel3Layout.createSequentialGroup()
                 .add(addImageAll)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(imageScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(imageScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("All Images", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/images.png")), jPanel3); // NOI18N
@@ -992,14 +994,14 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel11Layout.createSequentialGroup()
                 .add(addImageMulti)
                 .addContainerGap())
-            .add(multiImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(multiImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
         );
         jPanel11Layout.setVerticalGroup(
             jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel11Layout.createSequentialGroup()
                 .add(addImageMulti)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(multiImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(multiImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Multi-Images", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/images.png")), jPanel11); // NOI18N
@@ -1021,14 +1023,14 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel9Layout.createSequentialGroup()
                 .add(addImageSVG)
                 .addContainerGap())
-            .add(svgImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(svgImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
         );
         jPanel9Layout.setVerticalGroup(
             jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel9Layout.createSequentialGroup()
                 .add(addImageSVG)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(svgImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(svgImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("SVG Images", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/images.png")), jPanel9); // NOI18N
@@ -1057,7 +1059,7 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel10Layout.createSequentialGroup()
                 .add(addNewTimeline, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
-            .add(timelineImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(timelineImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
         );
 
         jPanel10Layout.linkSize(new java.awt.Component[] {addImageTimeline, addNewTimeline}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -1069,7 +1071,7 @@ public class ResourceEditorView extends FrameView {
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                 .add(addNewTimeline, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(timelineImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 272, Short.MAX_VALUE))
+                .add(timelineImages, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 321, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Timeline Images", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/images.png")), jPanel10); // NOI18N
@@ -1091,7 +1093,7 @@ public class ResourceEditorView extends FrameView {
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
             jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(fontsScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(fontsScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
             .add(jPanel4Layout.createSequentialGroup()
                 .add(addFont)
                 .addContainerGap())
@@ -1101,7 +1103,7 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel4Layout.createSequentialGroup()
                 .add(addFont)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(fontsScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(fontsScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Fonts", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/font.png")), jPanel4, "Fonts"); // NOI18N
@@ -1123,7 +1125,7 @@ public class ResourceEditorView extends FrameView {
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(localizationScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(localizationScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 193, Short.MAX_VALUE)
             .add(jPanel5Layout.createSequentialGroup()
                 .add(addL10N)
                 .addContainerGap())
@@ -1133,7 +1135,7 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel5Layout.createSequentialGroup()
                 .add(addL10N)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(localizationScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(localizationScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Localization", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/localization.png")), jPanel5, "Localization"); // NOI18N
@@ -1155,7 +1157,7 @@ public class ResourceEditorView extends FrameView {
         jPanel6.setLayout(jPanel6Layout);
         jPanel6Layout.setHorizontalGroup(
             jPanel6Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(dataScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 195, Short.MAX_VALUE)
+            .add(dataScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 179, Short.MAX_VALUE)
             .add(jPanel6Layout.createSequentialGroup()
                 .add(addData)
                 .addContainerGap())
@@ -1165,7 +1167,7 @@ public class ResourceEditorView extends FrameView {
             .add(jPanel6Layout.createSequentialGroup()
                 .add(addData)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(dataScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE))
+                .add(dataScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Data", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/database.png")), jPanel6, "Data"); // NOI18N
@@ -1178,7 +1180,7 @@ public class ResourceEditorView extends FrameView {
         );
         treeAreaLayout.setVerticalGroup(
             treeAreaLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jTabbedPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 437, Short.MAX_VALUE)
+            .add(jTabbedPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 434, Short.MAX_VALUE)
         );
 
         jTabbedPane1.getAccessibleContext().setAccessibleName("Resources");
@@ -1384,12 +1386,22 @@ public class ResourceEditorView extends FrameView {
         jMenu1.setText("Native Theme");
         jMenu1.setName("jMenu1"); // NOI18N
 
+        jMenu10.setText("iOS");
+        jMenu10.setName("jMenu10"); // NOI18N
+
         nativeThemeButtonGroup.add(iosNativeTheme);
         iosNativeTheme.setSelected(true);
-        iosNativeTheme.setText("iOS Theme");
+        iosNativeTheme.setText("iOS 6");
         iosNativeTheme.setName("iosNativeTheme"); // NOI18N
         iosNativeTheme.addActionListener(formListener);
-        jMenu1.add(iosNativeTheme);
+        jMenu10.add(iosNativeTheme);
+
+        ios7NativeTheme.setText("iOS 7");
+        ios7NativeTheme.setName("ios7NativeTheme"); // NOI18N
+        ios7NativeTheme.addActionListener(formListener);
+        jMenu10.add(ios7NativeTheme);
+
+        jMenu1.add(jMenu10);
 
         jMenu3.setText("Android");
 
@@ -1658,11 +1670,17 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == android2NativeTheme) {
                 ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
             }
+            else if (evt.getSource() == jRadioButtonMenuItem4) {
+                ResourceEditorView.this.jRadioButtonMenuItem4ActionPerformed(evt);
+            }
             else if (evt.getSource() == blackberryNativeTheme) {
                 ResourceEditorView.this.blackberryNativeThemeActionPerformed(evt);
             }
             else if (evt.getSource() == winNativeTheme) {
                 ResourceEditorView.this.winNativeThemeActionPerformed(evt);
+            }
+            else if (evt.getSource() == jRadioButtonMenuItem3) {
+                ResourceEditorView.this.jRadioButtonMenuItem3ActionPerformed(evt);
             }
             else if (evt.getSource() == jRadioButtonMenuItem2) {
                 ResourceEditorView.this.jRadioButtonMenuItem2ActionPerformed(evt);
@@ -1727,11 +1745,8 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
             }
-            else if (evt.getSource() == jRadioButtonMenuItem3) {
-                ResourceEditorView.this.jRadioButtonMenuItem3ActionPerformed(evt);
-            }
-            else if (evt.getSource() == jRadioButtonMenuItem4) {
-                ResourceEditorView.this.jRadioButtonMenuItem4ActionPerformed(evt);
+            else if (evt.getSource() == ios7NativeTheme) {
+                ResourceEditorView.this.ios7NativeThemeActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -3194,6 +3209,10 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
                 iosNativeTheme.setSelected(true);
                 return;
             } 
+            if(t.equals("/iOS7Theme.res")) {
+                ios7NativeTheme.setSelected(true);
+                return;
+            } 
             if(t.equals("/androidTheme.res")) {
                 android2NativeTheme.setSelected(true);
                 return;
@@ -3299,6 +3318,10 @@ private void jRadioButtonMenuItem3ActionPerformed(java.awt.event.ActionEvent evt
 private void jRadioButtonMenuItem4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonMenuItem4ActionPerformed
     setNativeTheme("/android_holo_light.res", true);
 }//GEN-LAST:event_jRadioButtonMenuItem4ActionPerformed
+
+private void ios7NativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ios7NativeThemeActionPerformed
+    setNativeTheme("/iOS7Theme.res", true);
+}//GEN-LAST:event_ios7NativeThemeActionPerformed
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
@@ -4860,8 +4883,10 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem imageSizes;
     private javax.swing.JMenuItem import9Patch;
     private javax.swing.JMenuItem importRes;
+    private javax.swing.JCheckBoxMenuItem ios7NativeTheme;
     private javax.swing.JRadioButtonMenuItem iosNativeTheme;
     private javax.swing.JMenu jMenu1;
+    private javax.swing.JMenu jMenu10;
     private javax.swing.JMenu jMenu2;
     private javax.swing.JMenu jMenu3;
     private javax.swing.JMenu jMenu4;

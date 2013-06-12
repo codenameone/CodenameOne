@@ -77,6 +77,7 @@
         <copy file="../Themes/blackberry_theme.res" todir="src" />
         <copy file="../Themes/winTheme.res" todir="src" />
         <copy file="../Themes/iPhoneTheme.res" todir="src" />
+        <copy file="../Themes/iOS7Theme.res" todir="src" />
         <copy file="../Themes/android_holo_light.res" todir="src" />
     </target>
     <property name="one-jar.dist.dir" value="one-jar-ant-task-0.98"/>

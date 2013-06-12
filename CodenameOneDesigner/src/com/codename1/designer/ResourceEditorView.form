@@ -48,7 +48,7 @@
                 </DimensionLayout>
                 <DimensionLayout dim="1">
                   <Group type="103" groupAlignment="0" attributes="0">
-                      <Component id="jTabbedPane1" alignment="0" pref="437" max="32767" attributes="0"/>
+                      <Component id="jTabbedPane1" alignment="0" pref="434" max="32767" attributes="0"/>
                   </Group>
                 </DimensionLayout>
               </Layout>
@@ -87,10 +87,10 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="themeScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="themeScroll" alignment="0" pref="179" max="32767" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addTheme" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace pref="74" max="32767" attributes="0"/>
+                                  <EmptySpace pref="20" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -99,7 +99,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addTheme" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="themeScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="themeScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -151,7 +151,7 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="userInterfaceScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="userInterfaceScroll" alignment="0" pref="202" max="32767" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addUserInterface" pref="185" max="32767" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -163,7 +163,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addUserInterface" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="userInterfaceScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="userInterfaceScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -213,9 +213,9 @@
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Group type="102" attributes="0">
                                   <Component id="addImageMain" min="-2" max="-2" attributes="1"/>
-                                  <EmptySpace pref="106" max="32767" attributes="0"/>
+                                  <EmptySpace pref="61" max="32767" attributes="0"/>
                               </Group>
-                              <Component id="mainImages" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="mainImages" alignment="0" pref="179" max="32767" attributes="0"/>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
@@ -223,7 +223,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addImageMain" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="mainImages" pref="306" max="32767" attributes="0"/>
+                                  <Component id="mainImages" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -269,9 +269,9 @@
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Group type="102" attributes="0">
                                   <Component id="addImageAll" min="-2" max="-2" attributes="1"/>
-                                  <EmptySpace pref="106" max="32767" attributes="0"/>
+                                  <EmptySpace pref="61" max="32767" attributes="0"/>
                               </Group>
-                              <Component id="imageScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="imageScroll" alignment="0" pref="179" max="32767" attributes="0"/>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
@@ -279,7 +279,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addImageAll" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="imageScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="imageScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -333,7 +333,7 @@
                                   <Component id="addImageMulti" min="-2" max="-2" attributes="1"/>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
-                              <Component id="multiImages" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="multiImages" alignment="0" pref="179" max="32767" attributes="0"/>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
@@ -341,7 +341,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addImageMulti" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="multiImages" pref="306" max="32767" attributes="0"/>
+                                  <Component id="multiImages" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -389,7 +389,7 @@
                                   <Component id="addImageSVG" min="-2" max="-2" attributes="1"/>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
-                              <Component id="svgImages" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="svgImages" alignment="0" pref="179" max="32767" attributes="0"/>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
@@ -397,7 +397,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addImageSVG" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="svgImages" pref="306" max="32767" attributes="0"/>
+                                  <Component id="svgImages" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -449,7 +449,7 @@
                                   <Component id="addNewTimeline" linkSize="1" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
-                              <Component id="timelineImages" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="timelineImages" alignment="0" pref="179" max="32767" attributes="0"/>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
@@ -459,7 +459,7 @@
                                   <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                   <Component id="addNewTimeline" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="timelineImages" pref="272" max="32767" attributes="0"/>
+                                  <Component id="timelineImages" pref="321" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -514,7 +514,7 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="fontsScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="fontsScroll" alignment="0" pref="179" max="32767" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addFont" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -526,7 +526,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addFont" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="fontsScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="fontsScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -578,7 +578,7 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="localizationScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="localizationScroll" alignment="0" pref="193" max="32767" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addL10N" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -590,7 +590,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addL10N" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="localizationScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="localizationScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -642,7 +642,7 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="dataScroll" alignment="0" pref="195" max="32767" attributes="0"/>
+                              <Component id="dataScroll" alignment="0" pref="179" max="32767" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addData" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -654,7 +654,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="addData" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="dataScroll" pref="306" max="32767" attributes="0"/>
+                                  <Component id="dataScroll" pref="350" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -1061,19 +1061,36 @@
             <Property name="name" type="java.lang.String" value="jMenu1" noResource="true"/>
           </Properties>
           <SubComponents>
-            <MenuItem class="javax.swing.JRadioButtonMenuItem" name="iosNativeTheme">
+            <Menu class="javax.swing.JMenu" name="jMenu10">
               <Properties>
-                <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
-                  <ComponentRef name="nativeThemeButtonGroup"/>
-                </Property>
-                <Property name="selected" type="boolean" value="true"/>
-                <Property name="text" type="java.lang.String" value="iOS Theme"/>
-                <Property name="name" type="java.lang.String" value="iosNativeTheme" noResource="true"/>
+                <Property name="text" type="java.lang.String" value="iOS"/>
+                <Property name="name" type="java.lang.String" value="jMenu10" noResource="true"/>
               </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="iosNativeThemeActionPerformed"/>
-              </Events>
-            </MenuItem>
+              <SubComponents>
+                <MenuItem class="javax.swing.JRadioButtonMenuItem" name="iosNativeTheme">
+                  <Properties>
+                    <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+                      <ComponentRef name="nativeThemeButtonGroup"/>
+                    </Property>
+                    <Property name="selected" type="boolean" value="true"/>
+                    <Property name="text" type="java.lang.String" value="iOS 6"/>
+                    <Property name="name" type="java.lang.String" value="iosNativeTheme" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="iosNativeThemeActionPerformed"/>
+                  </Events>
+                </MenuItem>
+                <MenuItem class="javax.swing.JCheckBoxMenuItem" name="ios7NativeTheme">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="iOS 7"/>
+                    <Property name="name" type="java.lang.String" value="ios7NativeTheme" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="ios7NativeThemeActionPerformed"/>
+                  </Events>
+                </MenuItem>
+              </SubComponents>
+            </Menu>
             <Menu class="javax.swing.JMenu" name="jMenu3">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Android"/>
