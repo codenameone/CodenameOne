@@ -287,6 +287,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
         if(editNext) {
             editNext = false;
+            if(instance.currentEditing != null && instance.currentEditing instanceof TextField) {
+                ((TextField)instance.currentEditing).fireDoneEvent();
+            }
             TextEditUtil.editNextTextArea();
         }
     }
