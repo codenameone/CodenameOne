@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
@@ -97,6 +98,7 @@ public class TextField extends TextArea {
     private boolean replaceMenu = replaceMenuDefault;
     private Command[] originalCommands;
     private EventDispatcher listeners = new EventDispatcher();
+    private ActionListener doneListener;
     private boolean overwriteMode;
     private boolean enableInputScroll = true;
 
@@ -1619,6 +1621,43 @@ public class TextField extends TextArea {
      */
     public void setUseSoftkeys(boolean useSoftkeys) {
         this.useSoftkeys = useSoftkeys;
+    }
+    
+    /**
+     * Sets a Done listener on the TextField - notice this listener will be called
+     * only on supported platforms that supports done action on the keyboard
+     * 
+     * @param l the listener
+     */
+    public void setDoneListener(ActionListener l) {
+        doneListener = l;
+    }
+
+    /**
+     * Gets the done listener of this TextField.
+     * 
+     * @return the done listener or null if not exists
+     */ 
+    public ActionListener getDoneListener() {
+        return doneListener;
+    }
+    
+    /**
+     * Fire the done event to done listener
+     */ 
+    public void fireDoneEvent() {
+        if (doneListener != null) {
+            if (!Display.getInstance().isEdt()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    
+                    public void run() {
+                        fireDoneEvent();
+                    }
+                });
+                return;
+            }
+            doneListener.actionPerformed(new ActionEvent(this));
+        }
     }
     
     /**

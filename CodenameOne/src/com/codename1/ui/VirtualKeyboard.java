@@ -641,6 +641,10 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
         }
         if(okPressed){
             field.fireActionEvent();
+            if(field instanceof TextField){
+                ((TextField)field).fireDoneEvent();
+            }
+            
         }
     }
     /**
