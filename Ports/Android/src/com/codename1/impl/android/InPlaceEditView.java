@@ -235,9 +235,11 @@ public class InPlaceEditView extends FrameLayout {
         Component nextDown = mTextArea.getNextFocusDown();
         if(nextDown == null){
             nextDown = textArea.getComponentForm().findNextFocusVertical(true);
-        }
+        } 
         if (mTextArea.isSingleLineTextArea()) {
-            if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
+            if(mTextArea instanceof TextField && ((TextField)mTextArea).getDoneListener() != null){
+                mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);            
+            } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
             } else {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -326,6 +328,12 @@ public class InPlaceEditView extends FrameLayout {
         if (!leaveKeyboardShowing) {
             showVirtualKeyboard(false);
         }
+        if(reason == REASON_IME_ACTION &&
+                mEditText.getImeOptions() == EditorInfo.IME_ACTION_DONE && 
+                mTextArea instanceof TextField ){
+            ((TextField)mTextArea).fireDoneEvent();
+        }
+        
         mIsEditing = false;
         mLastEditText = mEditText.getText().toString();
         removeView(mEditText);
