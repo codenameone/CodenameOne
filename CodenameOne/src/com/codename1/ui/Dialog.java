@@ -870,6 +870,10 @@ public class Dialog extends Form {
         String uiid = getUIManager().getThemeConstant("dlgButtonCommandUIID", null);
         addButtonBar(buttonArea);
         if(cmds.length > 0) {
+            String lineColor = getUIManager().getThemeConstant("dlgInvisibleButtons", null);
+            if(cmds.length > 3) {
+                lineColor = null;
+            }
             int largest = Integer.parseInt(getUIManager().getThemeConstant("dlgCommandButtonSizeInt", "0"));
             for(int iter = 0 ; iter < cmds.length ; iter++) {
                 Button b = new Button(cmds[iter]);
@@ -877,7 +881,20 @@ public class Dialog extends Form {
                     b.setUIID(uiid);
                 }
                 largest = Math.max(b.getPreferredW(), largest);
+                if(lineColor != null) {
+                    int color = Integer.parseInt(lineColor, 16);
+                    Border brd = null;
+                    if(iter < cmds.length - 1) {
+                        brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, Border.createLineBorder(1, color));
+                    } else {
+                        brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, null);
+                    }
+                    b.getUnselectedStyle().setBorder(brd);
+                    b.getSelectedStyle().setBorder(brd);
+                    b.getPressedStyle().setBorder(brd);
+                }
                 buttonArea.addComponent(b);
+                
             }
             for(int iter = 0 ; iter < cmds.length ; iter++) {
                 buttonArea.getComponentAt(iter).setPreferredW(largest);

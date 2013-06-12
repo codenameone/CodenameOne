@@ -58,6 +58,7 @@ public class Container extends Component {
     private int scrollIncrement = 20;
     private boolean blockFocus = false;
     private boolean dontRecurseContainer;
+    private UIManager uiManager;
 
     /**
      * Constructs a new Container with a new layout manager.
@@ -99,6 +100,24 @@ public class Container extends Component {
 
     }
 
+    /**
+     * @inheritDoc
+     */
+    public UIManager getUIManager() {
+        if(uiManager != null) {
+            return uiManager;
+        }
+        return super.getUIManager();
+    }
+    
+    /**
+     * Allows replacing the UIManager in a component hierarchy to update the look and feel
+     * only to a specific hierarchy
+     * @param uiManager UIManager instance
+     */
+    public void setUIManager(UIManager uiManager) {
+        this.uiManager = uiManager;
+    }
     
     /**
      * Sets the lead component for this container, a lead component takes over the entire
