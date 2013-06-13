@@ -438,6 +438,9 @@ public class BufferedInputStream extends InputStream {
 
         int n = 0;
         for (;;) {
+            if(stopped){
+                return -1;
+            }
             lastActivityTime = System.currentTimeMillis();
             int nread = read1(b, off + n, len - n);
             if (nread <= 0) {
