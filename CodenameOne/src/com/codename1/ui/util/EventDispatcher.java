@@ -134,12 +134,14 @@ public class EventDispatcher {
      * @param listener a dispatcher listener to add
      */
     public synchronized void addListener(Object listener) {
-        if(listeners == null) {
-            listeners = new Vector();
+        if(listener != null) {
+            if(listeners == null) {
+                listeners = new Vector();
+            }
+            if(!listeners.contains(listener)){
+                listeners.addElement(listener);
+            }        
         }
-        if(!listeners.contains(listener)){
-            listeners.addElement(listener);
-        }        
     }
     
     /**

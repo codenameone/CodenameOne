@@ -111,23 +111,15 @@ public class StringUtil {
         }
         Vector tokenized = new Vector();
         int len = source.length();
-        boolean lastSeparator = false;
         StringBuffer buf = new StringBuffer();
         for(int iter = 0 ; iter < len ; iter++) {
             char current = source.charAt(iter);
             if(separator.indexOf(current) > -1) {
-                if(lastSeparator) {
-                    buf.append(separator);
-                    lastSeparator = false;
-                    continue;
-                }
-                lastSeparator = true;
                 if(buf.length() > 0) {
                     tokenized.addElement(buf.toString());
                     buf = new StringBuffer();
                 }
             } else {
-                lastSeparator = false;
                 buf.append(current);
             }
         }

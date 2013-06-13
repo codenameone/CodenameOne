@@ -33,6 +33,7 @@ import com.codename1.io.Storage;
 import com.codename1.io.services.ImageDownloadService;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.Slider;
@@ -652,6 +653,29 @@ public class FaceBookAccess {
         ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);
     }
 
+    /**
+     * Gets the picture of the given facebook object id
+     *
+     * @param id the object id to query
+     * @param toScale picture dimension or null
+     * @return the picture
+     */
+    public EncodedImage getPictureAndWait(String id, Dimension toScale) throws IOException {
+        checkAuthentication();
+
+        FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
+        if(toScale != null){
+            fb.addArgument("width", "" + toScale.getWidth());
+            fb.addArgument("height", "" + toScale.getHeight());
+        }else{
+            fb.addArgument("type", "small");
+        }
+        String cacheKey = id;
+        ImageDownloadService im = new ImageDownloadService(fb.requestURL(), (ActionListener)null);
+        NetworkManager.getInstance().addToQueueAndWait(im);
+        return im.getResult();
+    }
+    
     /**
      * Gets the picture of the given facebook object id and stores it in the given List in the offset index
      * 

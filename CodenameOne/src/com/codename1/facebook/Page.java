@@ -40,7 +40,7 @@ public class Page extends FBObject {
     private String website;
     private String coverId;
     private String coverLink;
-
+    
     /**
      * Empty Contructor
      */

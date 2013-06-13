@@ -1397,14 +1397,14 @@ public class Container extends Component {
      * @inheritDoc
      */
     public boolean isScrollableX() {
-        return scrollableX && (getScrollDimension().getWidth() > getWidth());
+        return scrollableX && (getScrollDimension().getWidth() + getStyle().getPadding(RIGHT) + getStyle().getPadding(LEFT) > getWidth());
     }
 
     /**
      * @inheritDoc
      */
     public boolean isScrollableY() {
-        return scrollableY && (getScrollDimension().getHeight() > getHeight() || isAlwaysTensile());
+        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() || isAlwaysTensile());
     }
 
     /**
