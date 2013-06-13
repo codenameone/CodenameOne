@@ -40,7 +40,7 @@ public class BufferedInputStream extends InputStream {
     private IOProgressListener progressListener;
     private boolean disableBuffering;
     private boolean closed;
-    
+    private boolean stopped;
 
     /**
      * The index one greater than the index of the last valid byte in 
@@ -59,6 +59,7 @@ public class BufferedInputStream extends InputStream {
     private String name;
     private int yield = -1;
     private long elapsedSinceLastYield;
+    
 
     /**
      * Indicates the name of the stream for debugging purposes
@@ -287,6 +288,9 @@ public class BufferedInputStream extends InputStream {
      *				or an I/O error occurs. 
      */
     public synchronized int read() throws IOException {
+        if(stopped){
+            return -1;
+        }
         lastActivityTime = System.currentTimeMillis();
         if(disableBuffering) {
             int v = getInIfOpen().read();
@@ -746,4 +750,12 @@ public class BufferedInputStream extends InputStream {
     public void setYield(int yield) {
         this.yield = yield;
     }
+/**
+     * Stop reading from the stream, invoking this will cause the read() to 
+     * return -1
+     */
+    public void stop(){
+        stopped = true;
+    }
+
 }

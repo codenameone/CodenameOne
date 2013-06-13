@@ -710,6 +710,11 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void kill() {
         killed = true;
+        //if the connection is in the midle of a reading, stop it to release the 
+        //resources
+        if(input != null && input instanceof BufferedInputStream) {
+            ((BufferedInputStream)input).stop();
+        }
     }
 
     /**
