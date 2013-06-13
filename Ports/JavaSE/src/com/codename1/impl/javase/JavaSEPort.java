@@ -5306,156 +5306,31 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private File pickImage() {
-        if (IS_MAC) {
-            FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
-            fd.setFilenameFilter(new FilenameFilter() {
+        FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
+        fd.setFilenameFilter(new FilenameFilter() {
 
-                public boolean accept(File dir, String name) {
-                    name = name.toLowerCase();
-                    return name.endsWith("png")
-                            || name.endsWith("jpg")
-                            || name.endsWith("jpeg");
+            public boolean accept(File dir, String name) {
+                name = name.toLowerCase();
+                return name.endsWith("png")
+                        || name.endsWith("jpg")
+                        || name.endsWith("jpeg");
 
-                }
-            });
-            fd.pack();
-            fd.setLocationByPlatform(true);
-            fd.setVisible(true);
-            if (fd.getFile() != null) {
-                return new File(fd.getDirectory(), fd.getFile());
             }
-            return null;
-        } else {
-            JFileChooser fc = createImagesFileChooser();
+        });
+        fd.setFile("*.png;*.jpg;*.jpeg");
+        fd.pack();
+        fd.setLocationByPlatform(true);
+        fd.setVisible(true);
 
-            if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                File selected = fc.getSelectedFile();
-                return selected;
+        if (fd.getFile() != null) {
+            if (fd.getFile().endsWith("png") || fd.getFile().endsWith("jpg")
+                    || fd.getFile().endsWith("jpeg")) {
+                return new File(fd.getDirectory(), fd.getFile());
+            } else {
+                System.out.println("Please choose an image");
             }
         }
         return null;
-    }
-
-    private static JFileChooser createImagesFileChooser() {
-        JFileChooser fc = new JFileChooser();
-        fc.setDialogTitle("Camera simulation - pick an image");
-        fc.addChoosableFileFilter(new ImageFilter());
-        fc.setAcceptAllFileFilterUsed(false);
-        fc.setAccessory(new ImagePreview(fc));
-        return fc;
-    }
-
-    public static class ImageFilter extends FileFilter {
-
-        public boolean accept(File f) {
-            if (f.isDirectory()) {
-                return true;
-            }
-            String extension = getExtension(f);
-            if (extension != null) {
-                if (extension.equals("png")
-                        || extension.equals("jpg")
-                        || extension.equals("jpeg")) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-
-            return false;
-        }
-
-        public String getDescription() {
-            return "Images";
-        }
-
-        private String getExtension(File f) {
-            String ext = null;
-            String s = f.getName();
-            int i = s.lastIndexOf('.');
-
-            if (i > 0 && i < s.length() - 1) {
-                ext = s.substring(i + 1).toLowerCase();
-            }
-            return ext;
-        }
-    }
-
-    public static class ImagePreview extends JComponent
-            implements PropertyChangeListener {
-
-        ImageIcon thumbnail = null;
-        File file = null;
-
-        public ImagePreview(JFileChooser fc) {
-            setPreferredSize(new Dimension(100, 50));
-            fc.addPropertyChangeListener(this);
-        }
-
-        public void loadImage() {
-            if (file == null) {
-                thumbnail = null;
-                return;
-            }
-
-            //Don't use createImageIcon (which is a wrapper for getResource)
-            //because the image we're trying to load is probably not one
-            //of this program's own resources.
-            ImageIcon tmpIcon = new ImageIcon(file.getPath());
-            if (tmpIcon != null) {
-                if (tmpIcon.getIconWidth() > 90) {
-                    thumbnail = new ImageIcon(tmpIcon.getImage().
-                            getScaledInstance(90, -1,
-                            java.awt.Image.SCALE_DEFAULT));
-                } else { //no need to miniaturize
-                    thumbnail = tmpIcon;
-                }
-            }
-        }
-
-        public void propertyChange(PropertyChangeEvent e) {
-            boolean update = false;
-            String prop = e.getPropertyName();
-
-            //If the directory changed, don't show an image.
-            if (JFileChooser.DIRECTORY_CHANGED_PROPERTY.equals(prop)) {
-                file = null;
-                update = true;
-
-                //If a file became selected, find out which one.
-            } else if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
-                file = (File) e.getNewValue();
-                update = true;
-            }
-
-            //Update the preview accordingly.
-            if (update) {
-                thumbnail = null;
-                if (isShowing()) {
-                    loadImage();
-                    repaint();
-                }
-            }
-        }
-
-        protected void paintComponent(java.awt.Graphics g) {
-            if (thumbnail == null) {
-                loadImage();
-            }
-            if (thumbnail != null) {
-                int x = getWidth() / 2 - thumbnail.getIconWidth() / 2;
-                int y = getHeight() / 2 - thumbnail.getIconHeight() / 2;
-
-                if (y < 0) {
-                    y = 0;
-                }
-
-                if (x < 5) {
-                    x = 5;
-                }
-                thumbnail.paintIcon(this, g, x, y);
-            }
-        }
     }
 
     public String getAppHomePath() {
