@@ -410,6 +410,9 @@ public class BufferedInputStream extends InputStream {
      */
     public synchronized int read(byte b[], int off, int len)
             throws IOException {
+        if(stopped){
+            return -1;
+        }
         if(yield > -1 && !Display.getInstance().isEdt()) {
             yieldTime();
         }
