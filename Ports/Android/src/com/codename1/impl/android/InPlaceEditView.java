@@ -54,9 +54,8 @@ public class InPlaceEditView extends FrameLayout {
     public static final int REASON_SYSTEM_KEY = 3;
     // The native Android edit-box to place over Codename One's edit-component
     private EditView mEditText = null;
-    private String mLastEditText = "";
+    private EditView mLastEditText = null;
     // The Codename One edit-component we're editing
-    private TextArea mTextArea = null;
     // The EditText's layout parameters
     private FrameLayout.LayoutParams mEditLayoutParams;
     // Reference to the system's input method manager
@@ -135,8 +134,8 @@ public class InPlaceEditView extends FrameLayout {
     public boolean onTouchEvent(MotionEvent event) {
         boolean leaveVKBOpen = false;
 
-        if (mTextArea != null && mTextArea.getComponentForm() != null) {
-            Component c = mTextArea.getComponentForm().getComponentAt((int) event.getX(), (int) event.getY());
+        if (mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.getComponentForm() != null) {
+            Component c = mEditText.mTextArea.getComponentForm().getComponentAt((int) event.getX(), (int) event.getY());
             if (c != null && c instanceof TextArea && ((TextArea) c).isEditable() && ((TextArea) c).isEnabled()) {
                 leaveVKBOpen = true;
             }
@@ -184,7 +183,7 @@ public class InPlaceEditView extends FrameLayout {
      */
     private synchronized void startEditing(Activity activity, TextArea textArea, String initialText, int codenameOneInputType) {
         if (mEditText != null) {
-            throw new IllegalArgumentException("Cannot edit - already in edit mode");
+            endEdit();
         }
         final Style taStyle = textArea.getStyle();
         Font font = taStyle.getFont();
@@ -210,10 +209,8 @@ public class InPlaceEditView extends FrameLayout {
         } else {
             paddingTop = taStyle.getPadding(false, Component.TOP);
         }
-
-        mLastEditText = initialText;
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
-        mEditText = new EditView(activity, this, id);
+        mEditText = new EditView(activity, textArea, this, id);
         
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);
@@ -231,13 +228,12 @@ public class InPlaceEditView extends FrameLayout {
         mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         addView(mEditText, mEditLayoutParams);
 
-        mTextArea = textArea;
-        Component nextDown = mTextArea.getNextFocusDown();
+        Component nextDown = textArea.getNextFocusDown();
         if(nextDown == null){
             nextDown = textArea.getComponentForm().findNextFocusVertical(true);
         } 
-        if (mTextArea.isSingleLineTextArea()) {
-            if(mTextArea instanceof TextField && ((TextField)mTextArea).getDoneListener() != null){
+        if (textArea.isSingleLineTextArea()) {
+            if(textArea instanceof TextField && ((TextField)textArea).getDoneListener() != null){
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);            
             } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
@@ -271,7 +267,7 @@ public class InPlaceEditView extends FrameLayout {
             password = true;
         }
         
-        if (mTextArea.isSingleLineTextArea()) {
+        if (textArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
         }
         if (password) {
@@ -284,7 +280,7 @@ public class InPlaceEditView extends FrameLayout {
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
         }
         
-        int maxLength = mTextArea.getMaxSize();
+        int maxLength = textArea.getMaxSize();
         InputFilter[] FilterArray = new InputFilter[1];
         FilterArray[0] = new InputFilter.LengthFilter(maxLength);
         mEditText.setFilters(FilterArray);
@@ -330,15 +326,14 @@ public class InPlaceEditView extends FrameLayout {
         }
         if(reason == REASON_IME_ACTION &&
                 mEditText.getImeOptions() == EditorInfo.IME_ACTION_DONE && 
-                mTextArea instanceof TextField ){
-            ((TextField)mTextArea).fireDoneEvent();
+                mEditText.mTextArea instanceof TextField ){
+            ((TextField)mEditText.mTextArea).fireDoneEvent();
         }
         
         mIsEditing = false;
-        mLastEditText = mEditText.getText().toString();
+        mLastEditText = mEditText;
         removeView(mEditText);
         mEditText = null;
-        mTextArea = null;
     }
 
     /**
@@ -349,17 +344,15 @@ public class InPlaceEditView extends FrameLayout {
         Display.getInstance().invokeAndBlock(new Runnable() {
 
             public void run() {
-                while (mIsEditing);
+                while (mIsEditing){
+                    try {
+                        Thread.sleep(50);                        
+                    } catch (Throwable e) {
+                    }
+                };
             }
         });
         Log.d(TAG, "waitForEditCompletion - Waiting for lock");
-    }
-
-    /**
-     * Returns the current text in the internal edit-area
-     */
-    private String getText() {
-        return mLastEditText;
     }
 
     /**
@@ -368,10 +361,11 @@ public class InPlaceEditView extends FrameLayout {
      * @param actionCode
      */
     void onEditorAction(int actionCode) {
-        if (actionCode == EditorInfo.IME_ACTION_NEXT && mTextArea != null) {
-            Component next = mTextArea.getNextFocusDown();
+        if (actionCode == EditorInfo.IME_ACTION_NEXT && mEditText != null && 
+                mEditText.mTextArea != null) {
+            Component next = mEditText.mTextArea.getNextFocusDown();
             if (next == null) {
-                next = mTextArea.getComponentForm().findNextFocusVertical(true);
+                next = mEditText.mTextArea.getComponentForm().findNextFocusVertical(true);
             }
 
             if (next != null && next instanceof TextArea && ((TextArea)next).isEditable() && ((TextArea)next).isEnabled()) {
@@ -404,9 +398,9 @@ public class InPlaceEditView extends FrameLayout {
     }
 
     public static void reLayoutEdit() {
-        if (sInstance != null) {
+        if (sInstance != null && sInstance.mEditText != null) {
 
-            TextArea txt = sInstance.mTextArea;
+            TextArea txt = sInstance.mEditText.mTextArea;
             if (txt != null) {
                 int txty = txt.getAbsoluteY();
                 int txtx = txt.getAbsoluteX();
@@ -469,6 +463,7 @@ public class InPlaceEditView extends FrameLayout {
 
         // Make this call synchronous
         waitForEditCompletion();
+        
         if (textArea instanceof TextField) {
             ((TextField) textArea).setEditable(true);
         }
@@ -489,10 +484,12 @@ public class InPlaceEditView extends FrameLayout {
             });
         }
 
-        if (sInstance != null) {
-            return sInstance.getText();
-        } else {
-            return "";
+        if(sInstance != null && sInstance.mLastEditText != null && sInstance.mLastEditText.mTextArea == textArea){
+            String retVal = sInstance.mLastEditText.getText().toString();
+            sInstance.mLastEditText = null;
+            return retVal;
+        }else{
+            return initialText;
         }
     }
 
@@ -519,6 +516,7 @@ public class InPlaceEditView extends FrameLayout {
     private class EditView extends AutoCompleteTextView {
 
         private InPlaceEditView mInPlaceEditView;
+        private TextArea mTextArea = null;
         private TextWatcher mTextWatcher = new TextWatcher() {
 
             @Override
@@ -531,11 +529,9 @@ public class InPlaceEditView extends FrameLayout {
 
             @Override
             public void afterTextChanged(Editable s) {
-                if (mInPlaceEditView.mIsEditing && mInPlaceEditView.mTextArea != null) {
+                if (mInPlaceEditView.mIsEditing && mTextArea != null) {
                     try {
-                        mInPlaceEditView.mTextArea.setText(s.toString());
-                        //mInPlaceEditView.mTextArea.setText("");
-                        //mInPlaceEditView.mTextArea.commitChange();
+                        mTextArea.setText(s.toString());
                     } catch (Exception e) {
                         Log.e(TAG, e.toString() + " " + Log.getStackTraceString(e));
                     }
@@ -556,10 +552,10 @@ public class InPlaceEditView extends FrameLayout {
          * @param context
          * @param inPlaceEditView
          */
-        public EditView(Context context, InPlaceEditView inPlaceEditView, int style) {
+        public EditView(Context context, TextArea textArea, InPlaceEditView inPlaceEditView, int style) {
             super(context, null, style);    
             mInPlaceEditView = inPlaceEditView;
-
+            mTextArea = textArea;
             setBackgroundColor(Color.TRANSPARENT);
         }
 
