@@ -24,6 +24,7 @@
 
 package com.codename1.io.services;
 
+import com.codename1.io.CharArrayReader;
 import com.codename1.ui.Dialog;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
@@ -31,7 +32,6 @@ import com.codename1.ui.Image;
 import com.codename1.xml.Element;
 import com.codename1.xml.ParserCallback;
 import com.codename1.xml.XMLParser;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -176,9 +176,8 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 String s = (String)h.get("description");
                 if(s != null && !h.containsKey("details")) {
                     XMLParser x = new XMLParser();
-                    ByteArrayInputStream bi = new ByteArrayInputStream(("<html>" + s + "</html>").getBytes("UTF-8"));
-                    Element e = x.parse(new InputStreamReader(bi));
-                    Vector results = e.getTextChildren(null, true);
+                    Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
+                    Vector results = e.getTextDescendants(null, false);
                     StringBuffer endResult = new StringBuffer();
                     for(int i = 0 ; i < results.size() ; i++) {
                         endResult.append(((Element)results.elementAt(i)).getText());
