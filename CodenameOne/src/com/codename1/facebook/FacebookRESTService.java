@@ -28,6 +28,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParseCallback;
 import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkEvent;
+import com.codename1.io.services.ImageDownloadService;
 import com.codename1.ui.list.DefaultListModel;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,6 +67,8 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String NOTES = "notes";      
     
     private DefaultListModel responseDestination;
+    private int responseOffset = -1;
+    private String imageKey;
 
     public static final String GRAPH_URL = "https://graph.facebook.com/";
     
@@ -142,7 +145,14 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
                 public synchronized void addElement(Object obj) {
                     if (responseDestination != null) {
-                        responseDestination.addItem(obj);
+                        if(responseOffset == -1) {
+                            responseDestination.addItem(obj);
+                        } else {
+                            Hashtable h = (Hashtable)responseDestination.getItemAt(responseOffset);
+                            h.putAll((Hashtable)obj);
+                            responseDestination.setItem(responseOffset, h);
+                            responseOffset++;
+                        }
                     } else {
                         super.addElement(obj);
                     }
@@ -258,6 +268,34 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     protected int getYield() {
         return -1;
+    }
+
+    /**
+     * @return the responseOffset
+     */
+    public int getResponseOffset() {
+        return responseOffset;
+    }
+
+    /**
+     * @param responseOffset the responseOffset to set
+     */
+    public void setResponseOffset(int responseOffset) {
+        this.responseOffset = responseOffset;
+    }
+
+    /**
+     * @return the imageKey
+     */
+    public String getImageKey() {
+        return imageKey;
+    }
+
+    /**
+     * @param imageKey the imageKey to set
+     */
+    public void setImageKey(String imageKey) {
+        this.imageKey = imageKey;
     }
 
 }

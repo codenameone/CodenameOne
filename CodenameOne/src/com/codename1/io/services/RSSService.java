@@ -60,6 +60,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     public RSSService(String url) {
         setUrl(url);
         setPost(false);
+        setDuplicateSupported(true);
     }
 
     /**
@@ -71,6 +72,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     public RSSService(String url, int limit) {
         this(url);
         this.limit = limit;
+        setDuplicateSupported(true);
     }
 
     /**
@@ -84,6 +86,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     public RSSService(String url, int limit, int startOffset) {
         this(url, limit);
         this.startOffset = startOffset;
+        setDuplicateSupported(true);
     }
 
     /**

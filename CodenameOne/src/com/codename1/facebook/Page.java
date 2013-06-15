@@ -136,7 +136,12 @@ public class Page extends FBObject {
         about = (String) toCopy.get("about");
         founded = (String) toCopy.get("founded");
         website = (String) toCopy.get("website");
-        likesCount = Integer.parseInt((String) toCopy.get("likes"));
+        String l = (String) toCopy.get("likes");
+        if(l != null) {
+            likesCount = Integer.parseInt(l);
+        } else {
+            likesCount = -1;
+        }
         username = (String) toCopy.get("username");
 
         Hashtable cover = (Hashtable) toCopy.get("cover");

@@ -34,6 +34,7 @@ import com.codename1.io.services.ImageDownloadService;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.Slider;
@@ -41,6 +42,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListModel;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -600,6 +602,32 @@ public class FaceBookAccess {
     }
     
     /**
+     * Gets the user wall feed, the data is being stored in the given DefaultListModel.
+     * By default this method will return last 13 news entries.
+     *
+     * @param userId the userid we would like to query
+     * @param feed the response fo fill
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallPosts(String userId, DefaultListModel feed, final ActionListener callback) throws IOException {
+        getWallPosts(userId, feed, 13, callback);
+    }
+
+    /**
+     * Gets the user wall posts, the data is being stored in the given DefaultListModel.
+     *
+     * @param userId the userid we would like to query
+     * @param feed the response to fill
+     * @param limit the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallPosts(String userId, DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+        Hashtable params = new Hashtable();
+        params.put("limit", "" + limit);
+        getFaceBookObjectItems(userId, FacebookRESTService.POSTS, feed, params, callback);
+    }
+
+    /**
      * Gets the picture of the given facebook object id
      *
      * @param id the object id to query
@@ -660,20 +688,33 @@ public class FaceBookAccess {
      * @param toScale picture dimension or null
      * @return the picture
      */
-    public EncodedImage getPictureAndWait(String id, Dimension toScale) throws IOException {
-        checkAuthentication();
-
-        FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
-        if(toScale != null){
-            fb.addArgument("width", "" + toScale.getWidth());
-            fb.addArgument("height", "" + toScale.getHeight());
-        }else{
-            fb.addArgument("type", "small");
-        }
-        String cacheKey = id;
-        ImageDownloadService im = new ImageDownloadService(fb.requestURL(), (ActionListener)null);
+    public EncodedImage getPictureAndWait(String id, Dimension toScale) {
+        ImageDownloadService im = new ImageDownloadService(getImageURL(id, toScale), (ActionListener)null);
         NetworkManager.getInstance().addToQueueAndWait(im);
         return im.getResult();
+    }
+    
+    /**
+     * Returns the URL for a given image
+     * @param id the id of the image
+     * @param toScale the resolution we want
+     * @return a link that should fetch that image
+     */
+    public String getImageURL(String id, Dimension toScale) {
+        try {
+            checkAuthentication();
+
+            FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);
+            if(toScale != null){
+                fb.addArgument("width", "" + toScale.getWidth());
+                fb.addArgument("height", "" + toScale.getHeight());
+            }else{
+                fb.addArgument("type", "thumbnail");
+            }
+            return fb.requestURL();
+        } catch(IOException err) {
+            return null;
+        }
     }
     
     /**
@@ -795,6 +836,73 @@ public class FaceBookAccess {
         getFaceBookObjectItems(albumId, FacebookRESTService.PHOTOS, photos, params, callback);
     }
 
+    /**
+     * This method returns a list model of photos that automatically fetches additional images as necessary
+     * @param targetList required for the image download code
+     * @param albumId the id of the album
+     * @param photoCount the number of photos within the album 
+     * @param placeholder a placeholder image that will determine the size of the images requested
+     * @return the list of the images
+     */
+    private ListModel getAlbumPhotos(final Component targetList, final String albumId, final int photoCount, final Image placeholder) {
+        if(!isAuthenticated()) {
+            return null;
+        }
+        Hashtable[] h = new Hashtable[photoCount];
+        for(int iter = 0 ; iter < h.length ; iter++) {
+            h[iter] = new Hashtable();
+            h[iter].put("photo", placeholder);
+            if(iter < 30) {
+                h[iter].put("fetching", Boolean.TRUE);
+            }
+        }
+        DefaultListModel dl = new DefaultListModel(h) {
+            public Object getItem(int offset) {
+                Hashtable hash = (Hashtable)super.getItemAt(offset);
+                if(!hash.containsKey("fetching")) {
+                    int limit = Math.min(30, photoCount - offset);
+                    for(int iter = 0 ; iter < limit ; iter++) {
+                        Hashtable current = (Hashtable)super.getItemAt(iter + offset);
+                        if(current.containsKey("fetching")) {
+                            break;
+                        }
+                        current.put("fetching", Boolean.TRUE);
+                    }
+                    FacebookRESTService con = new FacebookRESTService(token, albumId, FacebookRESTService.PHOTOS, false);
+                    con.setResponseDestination(this);
+                    con.setResponseOffset(0);
+                    con.addArgument("limit", "" + limit);
+                    con.addArgument("offset", "" + offset);
+                    for (int i = 0; i < responseCodeListeners.size(); i++) {
+                        con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
+                    }
+                    NetworkManager.getInstance().addToQueueAndWait(con);
+                    for(int iter = 0 ; iter < limit ; iter++) {
+                        Hashtable current = (Hashtable)getItemAt(iter + offset);
+                        ImageDownloadService.createImageToStorage((String)current.get("photo"), targetList, iter + offset, "photo", ((String)current.get("id")) + placeholder.getHeight(), placeholder, ConnectionRequest.PRIORITY_NORMAL);
+                    }
+                }
+                return hash;
+            }
+        };
+        
+        FacebookRESTService con = new FacebookRESTService(token, albumId, FacebookRESTService.PHOTOS, false);
+        con.setResponseDestination(dl);
+        con.setResponseOffset(0);
+        con.addArgument("limit", "30");
+        con.addArgument("offset", "0");
+        for (int i = 0; i < responseCodeListeners.size(); i++) {
+            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
+        }
+        NetworkManager.getInstance().addToQueueAndWait(con);
+        for(int iter = 0 ; iter < Math.min(30, photoCount) ; iter++) {
+            Hashtable hash = (Hashtable)dl.getItemAt(iter);
+            ImageDownloadService.createImageToStorage((String)hash.get("photo"), targetList, iter, "photo", ((String)hash.get("id")) + placeholder.getHeight(), placeholder, ConnectionRequest.PRIORITY_NORMAL);
+        }
+
+        return dl;
+    }
+    
     /**
      *  Gets the post comments
      *
