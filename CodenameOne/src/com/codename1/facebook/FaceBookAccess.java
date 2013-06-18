@@ -993,6 +993,50 @@ public class FaceBookAccess {
     }
 
     /**
+     * Post a message on the users wall
+     *
+     * @param userId the userId
+     * @param message the message to post
+     * @param name 
+     * @param link
+     * @param description 
+     * @param picture 
+     * @param caption 
+     */
+    public void postOnWall(String userId, String message, String name, String link, 
+            String description, String picture, String caption, ActionListener callback) throws IOException {
+        checkAuthentication();
+
+        FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);
+        if (message != null) {
+            con.addArgument("message", message);
+        }
+        if (name != null) {
+            con.addArgument("name", name);
+        }
+        if (link != null) {
+            con.addArgument("link", link);
+        }
+        if (description != null) {
+            con.addArgument("description", description);
+        }
+        if (picture != null) {
+            con.addArgument("picture", picture);
+        }
+        if (caption != null) {
+            con.addArgument("caption", caption);
+        }
+        con.addResponseListener(new Listener(con, callback));
+        if (slider != null) {
+            SliderBridge.bindProgress(con, slider);
+        }
+        for (int i = 0; i < responseCodeListeners.size(); i++) {
+            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
+        }
+        current = con;
+        NetworkManager.getInstance().addToQueueAndWait(con);
+    }
+    /**
      * Post like on a given post
      *
      * @param postId the post Id
