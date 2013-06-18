@@ -1761,6 +1761,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         while ((len = stream.read(buf, 0, buf.length)) > -1) {
             out.write(buf, 0, len);
         }
+        out.close();
         stream.close();
         
         final Runnable finish = new Runnable() {
