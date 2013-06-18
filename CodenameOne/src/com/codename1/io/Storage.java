@@ -198,6 +198,7 @@ public class Storage {
             }
             d = new DataInputStream(createInputStream(name));
             o = Util.readObject(d);
+            d.close();
             cache.put(name, o);
             return o;
         } catch(Exception err) {
