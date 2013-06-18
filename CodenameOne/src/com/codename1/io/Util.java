@@ -28,6 +28,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.util.CStringBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -634,7 +635,7 @@ public class Util {
             enc = "UTF-8";
         }
         int numChars = s.length();
-        StringBuffer sb = new StringBuffer(numChars > 500 ? numChars / 2 : numChars);
+        CStringBuilder sb = new CStringBuilder(numChars > 500 ? numChars / 2 : numChars);
         int i = 0;
 
         char c;
@@ -699,7 +700,7 @@ public class Util {
     }
    
     private static String encode(char[] buf, String spaceChar) {
-        final StringBuffer sbuf = new StringBuffer(buf.length * 3);
+        final CStringBuilder sbuf = new CStringBuilder(buf.length * 3);
         for (int i = 0; i < buf.length; i++) {
             final char ch = buf[i];
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
@@ -775,7 +776,7 @@ public class Util {
         return encode(b, "+");
     }
 
-    private static void appendHex(StringBuffer sbuf, char ch) {
+    private static void appendHex(CStringBuilder sbuf, char ch) {
         int firstLiteral = ch / 256;
         int secLiteral = ch % 256;
         if(firstLiteral == 0 && secLiteral < 127) {

@@ -26,6 +26,7 @@ import com.codename1.ui.geom.Point;
 import com.codename1.maps.Projection;
 import com.codename1.maps.ProxyHttpTile;
 import com.codename1.maps.Tile;
+import com.codename1.util.CStringBuilder;
 
 /**
  * This is a tiled map provider
@@ -60,7 +61,7 @@ public abstract class TiledProvider extends MapProvider {
      * @return the image url of the tile
      */
     protected String url(int zoomLevel, int xTile, int yTile) {
-        StringBuffer sb = new StringBuffer(_url);
+        CStringBuilder sb = new CStringBuilder(_url);
         sb.append("/");
         sb.append(zoomLevel);
         sb.append("/");

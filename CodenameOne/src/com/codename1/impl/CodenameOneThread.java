@@ -26,6 +26,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.Display;
+import com.codename1.util.CStringBuilder;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -126,7 +127,7 @@ public class CodenameOneThread extends Thread {
      */
     public String getStack(Throwable t) {
         try {
-            StringBuffer b = new StringBuffer();
+            CStringBuilder b = new CStringBuilder();
             int size;
             int[] s = (int[])exceptionStack.get(t);
             if(s == null) {

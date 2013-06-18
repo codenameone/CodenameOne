@@ -364,8 +364,12 @@ public class TextArea extends Component {
      * @inheritDoc
      */
     public void setWidth(int width) {
+        if(width != getWidth()) {
+            rowStrings = null;
+        }
         super.setWidth(width);
-        getRowStrings();
+        //getRowStrings();
+        
     }
 
     

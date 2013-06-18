@@ -23,6 +23,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.util.CStringBuilder;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Hashtable;
@@ -68,7 +69,7 @@ public class JSONParser implements JSONParseCallback {
      */
     public static void parse(Reader i, JSONParseCallback callback) throws IOException {
         boolean quoteMode = false;
-        StringBuffer currentToken = new StringBuffer();
+        CStringBuilder currentToken = new CStringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;

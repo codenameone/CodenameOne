@@ -29,6 +29,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Image;
+import com.codename1.util.CStringBuilder;
 import com.codename1.xml.Element;
 import com.codename1.xml.ParserCallback;
 import com.codename1.xml.XMLParser;
@@ -178,7 +179,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                     XMLParser x = new XMLParser();
                     Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
                     Vector results = e.getTextDescendants(null, false);
-                    StringBuffer endResult = new StringBuffer();
+                    CStringBuilder endResult = new CStringBuilder();
                     for(int i = 0 ; i < results.size() ; i++) {
                         endResult.append(((Element)results.elementAt(i)).getText());
                     }

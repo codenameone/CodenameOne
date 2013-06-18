@@ -22,6 +22,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.util.CStringBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -103,7 +104,7 @@ public class CSVParser {
      */
     public String[][] parse(Reader r) throws IOException {
         currentReader = r;
-        StringBuffer stringBuf = new StringBuffer();
+        CStringBuilder stringBuf = new CStringBuilder();
         boolean isQuoteMode = false;
         Vector returnValue = new Vector();
         Vector currentVector = new Vector();

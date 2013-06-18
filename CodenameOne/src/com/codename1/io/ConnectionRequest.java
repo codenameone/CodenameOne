@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.CStringBuilder;
 import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
@@ -250,7 +251,7 @@ public class ConnectionRequest implements IOProgressListener {
             if(v != null) {
                 int c = v.size();
                 if(c > 0) {
-                    StringBuffer cookieStr = new StringBuffer();
+                    CStringBuilder cookieStr = new CStringBuilder();
                     Cookie first = (Cookie)v.elementAt(0);
                     cookieStr.append(first.getName());
                     cookieStr.append("=");
@@ -656,7 +657,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected String createRequestURL() {
         if(!post && requestArguments != null) {
-            StringBuffer b = new StringBuffer(url);
+            CStringBuilder b = new CStringBuilder(url);
             Enumeration e = requestArguments.keys();
             if(e.hasMoreElements()) {
                 b.append("?");
@@ -684,7 +685,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void buildRequestBody(OutputStream os) throws IOException {
         if(post && requestArguments != null) {
-            StringBuffer val = new StringBuffer();
+            CStringBuilder val = new CStringBuilder();
             Enumeration e = requestArguments.keys();
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();

@@ -1145,9 +1145,27 @@ public abstract class CodenameOneImplementation {
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
         int iW = getImageWidth(img);
         int iH = getImageHeight(img);
+        int clipX = getClipX(graphics);
+        int clipW = getClipWidth(graphics);
+        int clipY = getClipY(graphics);
+        int clipH = getClipHeight(graphics);
         for (int xPos = 0; xPos <= w; xPos += iW) {
             for (int yPos = 0; yPos < h; yPos += iH) {
-                drawImage(graphics, img, x + xPos, y + yPos);
+                int actualX = xPos + x;
+                int actualY = yPos + y;
+                if(actualX > clipX + clipW) {
+                    continue;
+                }
+                if(actualX + iW < clipX) {
+                    continue;
+                }
+                if(actualY > clipY + clipH) {
+                    continue;
+                }
+                if(actualY + iH < clipY) {
+                    continue;
+                }
+                drawImage(graphics, img, actualX, actualY);
             }
         }
         

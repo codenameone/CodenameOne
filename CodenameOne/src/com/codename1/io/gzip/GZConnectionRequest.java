@@ -23,6 +23,7 @@
 package com.codename1.io.gzip;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -39,8 +40,12 @@ public class GZConnectionRequest extends ConnectionRequest {
      */
     protected void readHeaders(Object connection) throws IOException {
         super.readHeaders(connection);
-        String c = getHeader(connection, "Content-Encoding");
-        isGzipped = c != null && c.equalsIgnoreCase("gzip");
+        
+        // ios does gzip seamlessly so this class will just break
+        if(!Display.getInstance().getProperty("os.gzip", "false").equals("true")) {
+            String c = getHeader(connection, "Content-Encoding");
+            isGzipped = c != null && c.equalsIgnoreCase("gzip");
+        }
     }
 
     /**

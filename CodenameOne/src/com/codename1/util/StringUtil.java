@@ -41,7 +41,7 @@ public class StringUtil {
      * @return 
      */
     public static String replaceAll(String source, String pattern, String replace) {
-        StringBuffer sb = new StringBuffer();
+        CStringBuilder sb = new CStringBuilder();
         int idx = 0;
         String workingSource = source;
         idx = workingSource.indexOf(pattern);
@@ -71,7 +71,7 @@ public class StringUtil {
         Vector tokenized = new Vector();
         int len = source.length();
         boolean lastSeparator = false;
-        StringBuffer buf = new StringBuffer();
+        CStringBuilder buf = new CStringBuilder();
         for(int iter = 0 ; iter < len ; iter++) {
             char current = source.charAt(iter);
             if(current == separator) {
@@ -83,7 +83,7 @@ public class StringUtil {
                 lastSeparator = true;
                 if(buf.length() > 0) {
                     tokenized.addElement(buf.toString());
-                    buf = new StringBuffer();
+                    buf = new CStringBuilder();
                 }
             } else {
                 lastSeparator = false;
@@ -111,13 +111,13 @@ public class StringUtil {
         }
         Vector tokenized = new Vector();
         int len = source.length();
-        StringBuffer buf = new StringBuffer();
+        CStringBuilder buf = new CStringBuilder();
         for(int iter = 0 ; iter < len ; iter++) {
             char current = source.charAt(iter);
             if(separator.indexOf(current) > -1) {
                 if(buf.length() > 0) {
                     tokenized.addElement(buf.toString());
-                    buf = new StringBuffer();
+                    buf = new CStringBuilder();
                 }
             } else {
                 buf.append(current);
