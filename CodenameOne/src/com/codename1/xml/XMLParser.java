@@ -35,6 +35,10 @@ import java.util.Hashtable;
  * @author Ofir Leitner
  */
 public class XMLParser {
+    private static char[] buffer;
+    private static int buffOffset;
+    private static int buffSize = -1;
+
     private static final Element END_TAG = new Element();
     private boolean eventParser;
     ParserCallback parserCallback;
@@ -76,6 +80,25 @@ public class XMLParser {
     * CDATA nodes will be converted to text nodes
     */
    private static final String CDATA_STR = "DATA[";
+
+    private static int read(Reader is) throws IOException {
+        int c = -1;
+        if(buffer == null) {
+            buffer = new char[8192];
+        }
+        
+        if(buffSize < 0 || buffOffset >= buffSize) {
+            buffSize = is.read(buffer, 0, buffer.length);
+            if(buffSize < 0) {
+                return -1;
+            }
+            buffOffset = 0;
+        }
+        c = buffer[buffOffset];
+        buffOffset ++;
+        
+        return c;
+    }
 
 
    /**
@@ -236,6 +259,8 @@ public class XMLParser {
      * @return an Element object describing the parsed document (Basically its DOM)
      */
     public Element parse(Reader is) {
+        buffOffset = 0;
+        buffSize = -1;
         eventParser = false;
         Element rootElement=createNewElement("ROOT"); // ROOT is a "dummy" element that all other document elements are added to
         try {
@@ -372,7 +397,7 @@ public class XMLParser {
     protected void parseTagContent(Element element,Reader is) throws IOException {
         CStringBuilder text=null;
         boolean leadingSpace=false;
-        char c=(char)is.read();
+        char c=(char)read(is);
         CStringBuilder charEntity = null;
 
         while((byte)c!=-1) {
@@ -408,10 +433,10 @@ public class XMLParser {
                 if (childElement==END_TAG) { 
                     //was actually an ending tag
                     CStringBuilder closingTag = new CStringBuilder();
-                    c=(char)is.read();
+                    c=(char)read(is);
                     while ((c!='>')) {
                         closingTag.append(c);
-                        c=(char)is.read();
+                        c=(char)read(is);
                     }
 					String ct = closingTag.toString();
                     if(eventParser) {
@@ -463,7 +488,7 @@ public class XMLParser {
             } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
                 leadingSpace=true;
             }
-            c=(char)is.read();
+            c=(char)read(is);
         }
     }
 
@@ -493,21 +518,21 @@ public class XMLParser {
         CStringBuilder curValue = new CStringBuilder();
         //boolean procInst=false; // Support for the styleshhet processing instruction was removed, as it is not supported in most browsers, and it causes problems by adding tags before the HTML element (Makign the document with multiple roots)
 
-        char c=(char)is.read();
+        char c=(char)read(is);
         if (c=='/') {
             return END_TAG; //end tag
         } else if (c=='!') {
-            c=(char)is.read();
-            char c2=(char)is.read();
+            c=(char)read(is);
+            char c2=(char)read(is);
             if ((c=='-') && (c2=='-')) { //comment
                 return parseCommentOrXMLDeclaration(is,"-->");
             } else if ((c=='[') && (c2=='C')) { // CDATA?
-                c=(char)is.read();
+                c=(char)read(is);
                 int idx=0;
                 while ((idx<CDATA_STR.length()) && (c==CDATA_STR.charAt(idx))) {
                     idx++;
                     if (idx<CDATA_STR.length()) {
-                        c=(char)is.read();
+                        c=(char)read(is);
                     }
                 }
                 if (idx==CDATA_STR.length()) { //found CDATA
@@ -521,13 +546,13 @@ public class XMLParser {
             }
         } else if (c=='?') {
             //procInst=true;
-            //c=(char)is.read();
+            //c=(char)read(is);
             return parseCommentOrXMLDeclaration(is,">"); //parse XML declaration i.e. <?xml version="1.0" encoding="ISO-8859-1"?> as comments as well - i.e. ignore them
         }
 
          //read and ignore any whitespaces before tag name
         while (isWhiteSpace(c)) {
-            c=(char)is.read();
+            c=(char)read(is);
         }
 
         //collect tag name
@@ -536,12 +561,12 @@ public class XMLParser {
         		c = Character.toLowerCase(c);
         	}
         	tagName.append(c);
-            c=(char)is.read();
+            c=(char)read(is);
         }
 
          //read and ignore any whitespaces after tag name
         while (isWhiteSpace(c)) {
-            c=(char)is.read();
+            c=(char)read(is);
         }
 
         boolean processTag = true;
@@ -554,9 +579,9 @@ public class XMLParser {
             if (tagName.equals("xml-stylesheet")) { // The XML processing instruction <?xml-stylesheet ... ?> has the same parameters as <link .. > and behaves the same way
                 tagName="link";
             } else { // Processing instruction not supported - read till its end
-                c=(char)is.read();
+                c=(char)read(is);
                 while (c!='>') {
-                    c=(char)is.read();
+                    c=(char)read(is);
                 }
                 Element procInstElem=createNewElement("unsupported");
                 procInstElem.isComment=true;
@@ -576,13 +601,13 @@ public class XMLParser {
                 char lastChar=c;
                 while (c!='>') { // Read till the end of the tag
                     lastChar=c;
-                    c=(char)is.read();
+                    c=(char)read(is);
                 }
                 if (lastChar!='/') { // If this is an empty tag, no need to search for its closing tag as there's none...
                     String endTag = new CStringBuilder().append('<').append('/').append(tagName).append('>').toString();
                     int index=0;
                     while(index<endTag.length()) {
-                        c=(char)is.read();
+                        c=(char)read(is);
 
                         if ((c>='A') && (c<='Z')) {
                             c=(char)(c-'A'+'a');
@@ -605,7 +630,7 @@ public class XMLParser {
             }
             return element;
         } else if (c=='/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
-            c=(char)is.read();
+            c=(char)read(is);
             if (c=='>') {
                 if(eventParser) {
                     endTag(tn);
@@ -619,13 +644,13 @@ public class XMLParser {
 
         while(true) {
 			curAttribute.delete(0, curAttribute.length()).append(c);
-            c=(char)is.read();
+            c=(char)read(is);
             while ((!isWhiteSpace(c)) && (c!='=') && (c!='>')) {
             	if (eventParser == false) {
             		c = Character.toLowerCase(c);
             	}
                 curAttribute.append(c);
-                c=(char)is.read();
+                c=(char)read(is);
             }
 
             if (c=='>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
@@ -638,7 +663,7 @@ public class XMLParser {
 
              //read and ignore any whitespaces after attribute name
             while (isWhiteSpace(c)) {
-                c=(char)is.read();
+                c=(char)read(is);
             }
 
             if (c!='=') {
@@ -654,10 +679,10 @@ public class XMLParser {
                 continue; //if attribute is not followed by = then process the next attribute
             }
 
-            c=(char)is.read();
+            c=(char)read(is);
              //read and ignore any whitespaces before attribute value
             while (isWhiteSpace(c)) {
-                c=(char)is.read();
+                c=(char)read(is);
             }
 
             char quote=' ';
@@ -672,10 +697,10 @@ public class XMLParser {
             CStringBuilder charEntity = null;
             boolean ended=false;
             while (!ended) {
-                c=(char)is.read();
+                c=(char)read(is);
                 if (c==quote) {
                     ended=true;
-                    c=(char)is.read();
+                    c=(char)read(is);
                 } else if ((quote==' ') && ((c=='/') || (c=='>') || (isWhiteSpace(c)))) {
                     ended=true;
                 } else if (c=='&') {
@@ -720,7 +745,7 @@ public class XMLParser {
 
              //read and ignore any whitespaces after attribute/value pair
             while (isWhiteSpace(c)) {
-                c=(char)is.read();
+                c=(char)read(is);
             }
 
             if (c=='>') { //tag declartion ended, process content
@@ -729,7 +754,7 @@ public class XMLParser {
                 }
                 return element;
             } else if (c=='/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
-                c=(char)is.read();
+                c=(char)read(is);
                 if (c=='>') {
                     return element;
                 } else {
@@ -757,7 +782,7 @@ public class XMLParser {
         CStringBuilder text = new CStringBuilder();
         boolean ended=false;
         while (!ended) {
-            int in = is.read();
+            int in = read(is);
             if(in == -1) {
                 // input stream ended abruptly
                 break;

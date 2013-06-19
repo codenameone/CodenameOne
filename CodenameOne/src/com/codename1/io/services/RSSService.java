@@ -156,16 +156,38 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             }
         };
         p.setParserCallback(this);
-        input.mark(3);
+        input.mark(10);
 
         // Skip the bom marking UTF-8 in some streams
         while(input.read() != '<') {
-            input.mark(3);
+            //input.mark(4);
         }
-        input.reset();
+        int question = input.read();
+        String cType = "UTF-8";
+        if(question == '?') {
+            // we are in an XML header, check if the encoding section exists 
+            CStringBuilder cs = new CStringBuilder();
+            question = input.read();
+            while(question != '>') {
+                cs.append((char)question);
+                question = input.read();
+            }
+            String str = cs.toString();
+            int index = str.indexOf("encoding=\"") + 10;
+            if(index > -1) {
+                cType = str.substring(index, Math.max(str.indexOf("\"", index), str.indexOf("'", index)));
+            }
+        } else {
+            // oops, continue as usual
+            input.reset();
+        }
 
+        String resultType = getResponseContentType();
+        if(resultType != null && resultType.indexOf("charset=") > -1) {
+            cType = resultType.substring(resultType.indexOf("charset=") + 8);
+        }
         try {
-            p.eventParser(new InputStreamReader(input, "UTF-8"));
+            p.eventParser(new InputStreamReader(input, cType));
         } catch(FinishParsing ignor) {
             hasMore = true;
         }

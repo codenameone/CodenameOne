@@ -34,20 +34,10 @@ abstract class AbstractStringBuilder {
 
     private int count;
 
-    private boolean shared;
-
     /*
      * Returns the character array.
      */
     final char[] getValue() {
-        return value;
-    }
-
-    /*
-     * Returns the underlying buffer and sets the shared flag.
-     */
-    final char[] shareValue() {
-        shared = true;
         return value;
     }
 
@@ -62,7 +52,6 @@ abstract class AbstractStringBuilder {
             throw new RuntimeException();
         }
 
-        shared = false;
         value = val;
         count = len;
     }
@@ -80,7 +69,6 @@ abstract class AbstractStringBuilder {
 
     AbstractStringBuilder(String string) {
         count = string.length();
-        shared = false;
         value = new char[count + INITIAL_CAPACITY];
         string.getChars(0, count, value, 0);
     }
@@ -90,7 +78,6 @@ abstract class AbstractStringBuilder {
         char[] newData = new char[min > newSize ? min : newSize];
         System.arraycopy(value, 0, newData, 0, count);
         value = newData;
-        shared = false;
     }
 
     final void appendNull() {
@@ -192,15 +179,7 @@ abstract class AbstractStringBuilder {
             if (end > start) {
                 int length = count - end;
                 if (length >= 0) {
-                    if (!shared) {
-                        System.arraycopy(value, end, value, start, length);
-                    } else {
-                        char[] newData = new char[value.length];
-                        System.arraycopy(value, 0, newData, 0, start);
-                        System.arraycopy(value, end, newData, start, length);
-                        value = newData;
-                        shared = false;
-                    }
+                    System.arraycopy(value, end, value, start, length);
                 }
                 count -= end - start;
                 return;
@@ -215,17 +194,7 @@ abstract class AbstractStringBuilder {
         }
         int length = count - location - 1;
         if (length > 0) {
-            if (!shared) {
-                System.arraycopy(value, location + 1, value, location, length);
-            } else {
-                char[] newData = new char[value.length];
-                System.arraycopy(value, 0, newData, 0, location);
-                System
-                        .arraycopy(value, location + 1, newData, location,
-                                length);
-                value = newData;
-                shared = false;
-            }
+            System.arraycopy(value, location + 1, value, location, length);
         }
         count--;
     }
@@ -342,12 +311,9 @@ abstract class AbstractStringBuilder {
     private void move(int size, int index) {
         int newSize;
         if (value.length - count >= size) {
-            if (!shared) {
-                System.arraycopy(value, index, value, index + size, count
-                        - index); // index == count case is no-op
-                return;
-            }
-            newSize = value.length;
+            System.arraycopy(value, index, value, index + size, count
+                    - index); // index == count case is no-op
+            return;
         } else {
             int a = count + size, b = (value.length << 1) + 2;
             newSize = a > b ? a : b;
@@ -358,7 +324,6 @@ abstract class AbstractStringBuilder {
         // index == count case is no-op
         System.arraycopy(value, index, newData, index + size, count - index);
         value = newData;
-        shared = false;
     }
 
     final void replace0(int start, int end, String string) {
@@ -370,26 +335,13 @@ abstract class AbstractStringBuilder {
                 int stringLength = string.length();
                 int diff = end - start - stringLength;
                 if (diff > 0) { // replacing with fewer characters
-                    if (!shared) {
-                        // index == count case is no-op
-                        System.arraycopy(value, end, value, start
-                                + stringLength, count - end);
-                    } else {
-                        char[] newData = new char[value.length];
-                        System.arraycopy(value, 0, newData, 0, start);
-                        // index == count case is no-op
-                        System.arraycopy(value, end, newData, start
-                                + stringLength, count - end);
-                        value = newData;
-                        shared = false;
-                    }
+                    // index == count case is no-op
+                    System.arraycopy(value, end, value, start
+                            + stringLength, count - end);
                 } else if (diff < 0) {
                     // replacing with more characters...need some room
                     move(-diff, end);
-                } else if (shared) {
-                    //value = value.clone();
-                    shared = false;
-                }
+                } 
                 string.getChars(0, stringLength, value, start);
                 count -= diff;
                 return;
@@ -409,76 +361,59 @@ abstract class AbstractStringBuilder {
         if (count < 2) {
             return;
         }
-        if (!shared) {
-            int end = count - 1;
-            char frontHigh = value[0];
-            char endLow = value[end];
-            boolean allowFrontSur = true, allowEndSur = true;
-            for (int i = 0, mid = count / 2; i < mid; i++, --end) {
-                char frontLow = value[i + 1];
-                char endHigh = value[end - 1];
-                boolean surAtFront = allowFrontSur && frontLow >= 0xdc00
-                        && frontLow <= 0xdfff && frontHigh >= 0xd800
-                        && frontHigh <= 0xdbff;
-                if (surAtFront && (count < 3)) {
-                    return;
-                }
-                boolean surAtEnd = allowEndSur && endHigh >= 0xd800
-                        && endHigh <= 0xdbff && endLow >= 0xdc00
-                        && endLow <= 0xdfff;
-                allowFrontSur = allowEndSur = true;
-                if (surAtFront == surAtEnd) {
-                    if (surAtFront) {
-                        // both surrogates
-                        value[end] = frontLow;
-                        value[end - 1] = frontHigh;
-                        value[i] = endHigh;
-                        value[i + 1] = endLow;
-                        frontHigh = value[i + 2];
-                        endLow = value[end - 2];
-                        i++;
-                        end--;
-                    } else {
-                        // neither surrogates
-                        value[end] = frontHigh;
-                        value[i] = endLow;
-                        frontHigh = frontLow;
-                        endLow = endHigh;
-                    }
+        int end = count - 1;
+        char frontHigh = value[0];
+        char endLow = value[end];
+        boolean allowFrontSur = true, allowEndSur = true;
+        for (int i = 0, mid = count / 2; i < mid; i++, --end) {
+            char frontLow = value[i + 1];
+            char endHigh = value[end - 1];
+            boolean surAtFront = allowFrontSur && frontLow >= 0xdc00
+                    && frontLow <= 0xdfff && frontHigh >= 0xd800
+                    && frontHigh <= 0xdbff;
+            if (surAtFront && (count < 3)) {
+                return;
+            }
+            boolean surAtEnd = allowEndSur && endHigh >= 0xd800
+                    && endHigh <= 0xdbff && endLow >= 0xdc00
+                    && endLow <= 0xdfff;
+            allowFrontSur = allowEndSur = true;
+            if (surAtFront == surAtEnd) {
+                if (surAtFront) {
+                    // both surrogates
+                    value[end] = frontLow;
+                    value[end - 1] = frontHigh;
+                    value[i] = endHigh;
+                    value[i + 1] = endLow;
+                    frontHigh = value[i + 2];
+                    endLow = value[end - 2];
+                    i++;
+                    end--;
                 } else {
-                    if (surAtFront) {
-                        // surrogate only at the front
-                        value[end] = frontLow;
-                        value[i] = endLow;
-                        endLow = endHigh;
-                        allowFrontSur = false;
-                    } else {
-                        // surrogate only at the end
-                        value[end] = frontHigh;
-                        value[i] = endHigh;
-                        frontHigh = frontLow;
-                        allowEndSur = false;
-                    }
+                    // neither surrogates
+                    value[end] = frontHigh;
+                    value[i] = endLow;
+                    frontHigh = frontLow;
+                    endLow = endHigh;
+                }
+            } else {
+                if (surAtFront) {
+                    // surrogate only at the front
+                    value[end] = frontLow;
+                    value[i] = endLow;
+                    endLow = endHigh;
+                    allowFrontSur = false;
+                } else {
+                    // surrogate only at the end
+                    value[end] = frontHigh;
+                    value[i] = endHigh;
+                    frontHigh = frontLow;
+                    allowEndSur = false;
                 }
             }
-            if ((count & 1) == 1 && (!allowFrontSur || !allowEndSur)) {
-                value[end] = allowFrontSur ? endLow : frontHigh;
-            }
-        } else {
-            char[] newData = new char[value.length];
-            for (int i = 0, end = count; i < count; i++) {
-                char high = value[i];
-                if ((i + 1) < count && high >= 0xd800 && high <= 0xdbff) {
-                    char low = value[i + 1];
-                    if (low >= 0xdc00 && low <= 0xdfff) {
-                        newData[--end] = low;
-                        i++;
-                    }
-                }
-                newData[--end] = high;
-            }
-            value = newData;
-            shared = false;
+        }
+        if ((count & 1) == 1 && (!allowFrontSur || !allowEndSur)) {
+            value[end] = allowFrontSur ? endLow : frontHigh;
         }
     }
 
@@ -496,10 +431,6 @@ abstract class AbstractStringBuilder {
     public void setCharAt(int index, char ch) {
         if (0 > index || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
-        }
-        if (shared) {
-            //value = value.clone();
-            shared = false;
         }
         value[index] = ch;
     }
@@ -522,16 +453,9 @@ abstract class AbstractStringBuilder {
         if (length > value.length) {
             enlargeBuffer(length);
         } else {
-            if (shared) {
-                char[] newData = new char[value.length];
-                System.arraycopy(value, 0, newData, 0, count);
-                value = newData;
-                shared = false;
-            } else {
-                if (count < length) {
-                    for(int iter = count ; iter < count + length ; iter++) {
-                        value[iter] = (char)0;
-                    }
+            if (count < length) {
+                for(int iter = count ; iter < count + length ; iter++) {
+                    value[iter] = (char)0;
                 }
             }
         }
@@ -594,15 +518,8 @@ abstract class AbstractStringBuilder {
     @Override
     public String toString() {
         if (count == 0) {
-            return ""; //$NON-NLS-1$
+            return ""; 
         }
-        // Optimize String sharing for more performance
-        int wasted = value.length - count;
-        if (wasted >= 256
-                || (wasted >= INITIAL_CAPACITY && wasted >= (count >> 1))) {
-            return new String(value, 0, count);
-        }
-        shared = true;
         return new String(value, 0, count);
     }
 
@@ -751,7 +668,6 @@ abstract class AbstractStringBuilder {
             char[] newValue = new char[count];
             System.arraycopy(value, 0, newValue, 0, count);
             value = newValue;
-            shared = false;
         }
     }
 

@@ -25,6 +25,7 @@ package com.codename1.io;
 
 import com.codename1.util.CStringBuilder;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -37,6 +38,9 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class JSONParser implements JSONParseCallback {
+    private static char[] buffer;
+    private static int buffOffset;
+    private static int buffSize = -1;
 
     private Hashtable state;
     private Vector parseStack;
@@ -59,6 +63,25 @@ public class JSONParser implements JSONParseCallback {
 			return key;
 		}
 	};
+    
+    private static int read(Reader is) throws IOException {
+        int c = -1;
+        if(buffer == null) {
+            buffer = new char[8192];
+        }
+        
+        if(buffSize < 0 || buffOffset >= buffSize) {
+            buffSize = is.read(buffer, 0, buffer.length);
+            if(buffSize < 0) {
+                return -1;
+            }
+            buffOffset = 0;
+        }
+        c = buffer[buffOffset];
+        buffOffset ++;
+        
+        return c;
+    }
 
     /**
      * Static method! Parses the given input stream and fires the data into the given callback.
@@ -69,13 +92,15 @@ public class JSONParser implements JSONParseCallback {
      */
     public static void parse(Reader i, JSONParseCallback callback) throws IOException {
         boolean quoteMode = false;
+        buffOffset = 0;
+        buffSize = -1;
         CStringBuilder currentToken = new CStringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;
         try {
             while (callback.isAlive()) {
-                int currentChar = i.read();
+                int currentChar = read(i);
                 if (currentChar < 0) {
                     return;
                 }
@@ -96,9 +121,9 @@ public class JSONParser implements JSONParseCallback {
                             quoteMode = false;
                             continue;
                         case '\\':
-                            c = (char) i.read();
+                            c = (char) read(i);
                             if (c == 'u') {
-                                String unicode = "" + ((char) i.read()) + ((char) i.read()) + ((char) i.read()) + ((char) i.read());
+                                String unicode = "" + ((char) read(i)) + ((char) read(i)) + ((char) read(i)) + ((char) read(i));
                                 try {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
@@ -115,9 +140,9 @@ public class JSONParser implements JSONParseCallback {
                     switch (c) {
                         case 'n':
                             // check for null
-                            char u = (char) i.read();
-                            char l = (char) i.read();
-                            char l2 = (char) i.read();
+                            char u = (char) read(i);
+                            char l = (char) read(i);
+                            char l2 = (char) read(i);
                             if (u == 'u' && l == 'l' && l2 == 'l') {
                                 // this is null
                                 callback.stringToken(null);
@@ -133,9 +158,9 @@ public class JSONParser implements JSONParseCallback {
                             continue;
                         case 't':
                             // check for true
-                            char a1 = (char) i.read();
-                            char a2 = (char) i.read();
-                            char a3 = (char) i.read();
+                            char a1 = (char) read(i);
+                            char a2 = (char) read(i);
+                            char a3 = (char) read(i);
                             if (a1 == 'r' && a2 == 'u' && a3 == 'e') {
                                 callback.stringToken("true");
                                 if (lastKey != null) {
@@ -156,10 +181,10 @@ public class JSONParser implements JSONParseCallback {
                                 continue;
                             }
                             // check for false
-                            char b1 = (char) i.read();
-                            char b2 = (char) i.read();
-                            char b3 = (char) i.read();
-                            char b4 = (char) i.read();
+                            char b1 = (char) read(i);
+                            char b2 = (char) read(i);
+                            char b3 = (char) read(i);
+                            char b4 = (char) read(i);
                             if (b1 == 'a' && b2 == 'l' && b3 == 's' && b4 == 'e') {
                                 callback.stringToken("false");
                                 if (lastKey != null) {

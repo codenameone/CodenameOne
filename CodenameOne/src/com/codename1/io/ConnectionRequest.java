@@ -126,7 +126,8 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean failSilently;
     boolean retrying;
     private boolean readResponseForErrors;
-
+    private String responseContentType;
+    
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
             silentRetryCount = 1;
@@ -340,6 +341,7 @@ public class ConnectionRequest implements IOProgressListener {
                     return;
                 }
             }
+            responseContentType = getHeader(connection, "Content-Type");
             readHeaders(connection);
             contentLength = impl.getContentLength(connection);
             timeSinceLastUpdate = System.currentTimeMillis();
@@ -1337,5 +1339,13 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void setReadResponseForErrors(boolean readResponseForErrors) {
         this.readResponseForErrors = readResponseForErrors;
+    }
+    
+    /**
+     * Returns the content type from the response headers
+     * @return the content type
+     */
+    public String getResponseContentType() {
+        return responseContentType;
     }
 }

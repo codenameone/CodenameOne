@@ -733,7 +733,14 @@ public class TextArea extends Component {
         return f.charsWidth(chrs, off, length) < width;
     }
 
-    private synchronized void initRowString() {
+    private void initRowString() {
+        if(!Display.getInstance().isEdt()) {
+            if(rowStrings == null) {
+                rowStrings = new Vector();
+                rowStrings.addElement(getText());
+                return;
+            }
+        }
         Style style = getUnselectedStyle();
         rowStrings= new Vector();
         widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
