@@ -476,7 +476,7 @@ public final class Display {
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
                 INSTANCE.edt = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
-                INSTANCE.impl.setThreadPriority(INSTANCE.edt, Thread.NORM_PRIORITY + 1);
+                INSTANCE.impl.setThreadPriority(INSTANCE.edt, INSTANCE.impl.getEDTThreadPriority());
                 INSTANCE.edt.start();
             }
             INSTANCE.impl.postInit();

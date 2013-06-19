@@ -4748,5 +4748,11 @@ public abstract class CodenameOneImplementation {
         return true;
     }
     
+    /**
+     * Returns the platform EDT thread priority
+     */
+    public int getEDTThreadPriority(){
+        return Thread.NORM_PRIORITY + 1;
+    }
 
 }
