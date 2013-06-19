@@ -279,11 +279,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 activity.getResources().getDisplayMetrics());
     }
 
-    @Override
-    public void setThreadPriority(Thread t, int p) {
-        super.setThreadPriority(t, Thread.NORM_PRIORITY);
+    /**
+     * Returns the platform EDT thread priority
+     */
+    public int getEDTThreadPriority(){
+        return Thread.NORM_PRIORITY;
     }
-
     
     @Override
     public int getDeviceDensity() {
