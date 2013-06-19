@@ -280,6 +280,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void setThreadPriority(Thread t, int p) {
+        super.setThreadPriority(t, Thread.NORM_PRIORITY);
+    }
+
+    
+    @Override
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
         activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
