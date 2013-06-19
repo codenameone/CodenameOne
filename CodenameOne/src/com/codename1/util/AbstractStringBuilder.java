@@ -387,7 +387,7 @@ abstract class AbstractStringBuilder {
                     // replacing with more characters...need some room
                     move(-diff, end);
                 } else if (shared) {
-                    value = value.clone();
+                    //value = value.clone();
                     shared = false;
                 }
                 string.getChars(0, stringLength, value, start);
@@ -498,7 +498,7 @@ abstract class AbstractStringBuilder {
             throw new StringIndexOutOfBoundsException(index);
         }
         if (shared) {
-            value = value.clone();
+            //value = value.clone();
             shared = false;
         }
         value[index] = ch;
