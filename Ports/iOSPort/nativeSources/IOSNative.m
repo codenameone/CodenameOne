@@ -2888,6 +2888,9 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
     NSHTTPCookieStorage *cstore = [NSHTTPCookieStorage sharedHTTPCookieStorage];
 
     NSString* nsStr = toNSString(urlStr);
+    
+    // workaround for exception where the | character is concidered to be illegal by apple but is required by facebook
+    nsStr = [nsStr stringByReplacingOccurrencesOfString:@"|" withString:@"%7C"];
     NSURL *url = [NSURL URLWithString:nsStr];
     if(url == nil) {
         NSLog(@"Invalid URL! You need to escape the characters of the URL in order for it work properly! %@", nsStr);

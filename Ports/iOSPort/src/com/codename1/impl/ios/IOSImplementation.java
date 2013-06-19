@@ -865,7 +865,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public int charWidth(Object nativeFont, char ch) {
-        return charWidthNative(f(nativeFont).peer, ch);
+        return f(nativeFont).charWidth(ch);
     }
 
     private int charWidthNative(long peer, char ch) {
@@ -1671,8 +1671,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         String name;
         int weight;
         float height;
+        private Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
         
         public NativeFont() {
+        }
+        
+        public int charWidth(char c) {
+            Character chr = new Character(c);
+            Integer w = widthCache.get(chr);
+            if(w != null) {
+                return w.intValue();
+            }
+            int v = charWidthNative(peer, c);
+            widthCache.put(chr, v);
+            return v;
         }
         
         public boolean equals(Object o) {
@@ -2141,6 +2153,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("Platform")) {
             return "iOS";
+        }
+        if(key.equalsIgnoreCase("os.gzip")) {
+            return "true";
         }
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";

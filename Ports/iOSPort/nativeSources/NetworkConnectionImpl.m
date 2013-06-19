@@ -43,6 +43,9 @@ int connections = 0;
     [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
     connections++;
     float time = ((float)timeout) / 1000.0;
+    
+    // workaround for exception where the | character is concidered to be illegal by apple but is required by facebook
+    url = [url stringByReplacingOccurrencesOfString:@"|" withString:@"%7C"];
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];

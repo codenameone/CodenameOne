@@ -79,14 +79,10 @@ static NSMutableArray* pendingDeleteStrings = nil;
     if(object == self) {
         return YES;
     }
-    if(!object || ![object isKindOfClass:[self class]]) {
-        return NO;
-    }
     DrawStringTextureCache* o = (DrawStringTextureCache*)object;
-    return [str isEqualToString:o->str] && 
-    [font isEqual:o->font] &&
-    color == o->color &&
-    alpha == o->alpha;
+    return color == o->color &&
+    alpha == o->alpha && [str isEqualToString:o->str] &&
+    [font isEqual:o->font];
 }
 
 +(GLuint)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a {
