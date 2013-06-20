@@ -712,6 +712,9 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void setLayout(Layout layout) {
+        if(layout instanceof BorderLayout) {
+            setScrollable(false);
+        }
         contentPane.setLayout(layout);
     }
 
