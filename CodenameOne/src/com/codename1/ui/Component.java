@@ -4102,8 +4102,8 @@ public class Component implements Animation, StyleListener {
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED_FILL:
                             float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            width = (int)(((float)width) * r);
-                            height = (int)(((float)height) * r);
+                            width = (int)(((float)iW) * r);
+                            height = (int)(((float)iH) * r);
                             if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
                                 g.drawImage(bgImage, x, y, width, height);
                             } else {
@@ -4120,16 +4120,16 @@ public class Component implements Animation, StyleListener {
                                 g.fillRect(x, y, width, height, s.getBgTransparency());
                             }
                             float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            width = (int)(((float)width) * r2);
-                            height = (int)(((float)height) * r2);
+                            int awidth = (int)(((float)iW) * r2);
+                            int aheight = (int)(((float)iH) * r2);
                             if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x, y, width, height);
+                                g.drawImage(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
                             } else {
-                                if (iW != width || iH != height) {
-                                    bgImage = bgImage.scaled(width, height);
+                                if (iW != awidth || iH != aheight) {
+                                    bgImage = bgImage.scaled(awidth, aheight);
                                     s.setBgImage(bgImage, true);
                                 }
-                                g.drawImage(s.getBgImage(), x, y);
+                                g.drawImage(s.getBgImage(), x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_BOTH:

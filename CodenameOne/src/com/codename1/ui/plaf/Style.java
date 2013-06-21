@@ -1168,10 +1168,10 @@ public class Style {
     /**
      * Sets the Style Margin
      *  
-     * @param top number of margin pixels
-     * @param bottom number of margin pixels
-     * @param left number of margin pixels
-     * @param right number of margin pixels
+     * @param top number of margin using the current unit
+     * @param bottom number of margin using the current unit
+     * @param left number of margin using the current unit
+     * @param right number of margin using the current unit
      */
     public void setMargin(int top, int bottom, int left, int right) {
         if (top < 0 || left < 0 || right < 0 || bottom < 0) {
@@ -1195,7 +1195,7 @@ public class Style {
      * Sets the Style Margin
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of margin pixels
+     * @param gap number of margin using the current unit
      */
     public void setMargin(int orientation, int gap) {
         setMargin(orientation, gap, false);
@@ -1227,7 +1227,7 @@ public class Style {
     }
 
     /**
-     * Returns the Padding in pixels
+     * Returns the Padding in using the current unit
      *
      * @param rtl flag indicating whether the padding is for an RTL bidi component
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
@@ -1274,7 +1274,7 @@ public class Style {
      * Returns the Margin
      *
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin pixels in the given orientation
+     * @return number of margin using the current unit in the given orientation
      */
     public int getMargin(int orientation) {
         return getMargin(UIManager.getInstance().getLookAndFeel().isRTL(), orientation);
@@ -1285,7 +1285,7 @@ public class Style {
      *
      * @param rtl flag indicating whether the padding is for an RTL bidi component
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin pixels in the given orientation
+     * @return number of margin using the current unit in the given orientation
      */
     public int getMargin(boolean rtl, int orientation) {
         int v = getMarginValue(rtl, orientation);
@@ -1297,7 +1297,7 @@ public class Style {
      * 
      * @param rtl flag indicating whether the padding is for an RTL bidi component
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin pixels in the given orientation
+     * @return number of margin using the current unit in the given orientation
      */
     public int getMarginValue(boolean rtl, int orientation) {
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
@@ -1590,7 +1590,7 @@ public class Style {
      * Sets the Style Margin
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of margin pixels
+     * @param gap number of margin using the current unit
      * @param override If set to true allows the look and feel/theme to override 
      * the value in this attribute when changing a theme/look and feel
      */

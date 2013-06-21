@@ -309,6 +309,47 @@ public class Element {
 
     }
 
+    private void getDescendantsByTagNameAndAttributeInternal(Vector v,String name,String attribute, int depth) {
+        if (children!=null) {
+            int i=0;
+            while (i<children.size()) {
+                Element child=(Element)children.elementAt(i);
+                if (depth>1) {
+                    child.getDescendantsByTagNameAndAttributeInternal(v, name, attribute, depth-1);
+                }
+                if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {
+                    String a = child.getAttribute(attribute);
+                    if(a != null && a.length() > 0) {
+                        v.addElement(child);
+                    }
+                }
+                i++;
+            }
+        }
+
+    }
+
+    /**
+     *  Returns all descendants with the specified tag name and the none empty attribute
+     * 
+     * @param name The tag name to look for
+     * @param attributeName the attribute that must exist on the tag
+     * @param depth The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+     *
+     * @return A vector containing descendants with the specified tag name
+     */
+    public Vector getDescendantsByTagNameAndAttribute(String name, String attributeName, int depth) {
+        if (depth<1) {
+            throw new IllegalArgumentException("Depth must be 1 or higher");
+        }
+        if (children==null) {
+            return null;
+        }
+        Vector v=new Vector();
+        getDescendantsByTagNameAndAttributeInternal(v, name, attributeName, depth);
+        return v;
+    }
+    
     /**
      *  Returns all descendants with the specified tag name
      * 
@@ -657,4 +698,23 @@ public class Element {
         return str;
    }
 
+    /**
+     * Determines whether or not this Element has any text children.
+     * @return true if any of this Elements children are text Elements.
+     */
+    public boolean hasTextChild() {
+        for (Object child : children) {
+                if (child instanceof Element && ((Element)child).isTextElement())
+                        return true;
+        }
+        return false;
+    }
+   
+    /**
+     * Determines whether or not this Element has no children.
+     * @return true if this Element has no children.
+     */
+    public boolean isEmpty() {
+        return children.isEmpty();
+    }
 }
