@@ -95,7 +95,9 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public void play() {
-        player.start();
+        if (player != null) {
+            player.start();
+        }
     }
 
     @Override
@@ -146,14 +148,20 @@ class Audio implements Runnable, com.codename1.media.Media {
         if (player == null) {
             return lastDuration;
         }
-        lastDuration = player.getDuration();
+        int d = player.getDuration();
+        if(d == 0){
+            return -1;
+        }
+        lastDuration = d;
         return lastDuration;
     }
 
     @Override
     public void setVolume(int vol) {
         float v = ((float) vol) / 100.0F;
-        player.setVolume(v, v);
+        if (player != null) {
+            player.setVolume(v, v);
+        }
     }
 
     @Override
@@ -192,7 +200,7 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public boolean isPlaying() {
-        return player.isPlaying();
+        return player != null && player.isPlaying();
     }
     
 }
