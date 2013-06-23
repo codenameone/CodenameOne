@@ -4400,8 +4400,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame frm;
         private boolean playing = false;
         
-        private int currentTime = -1;
-        
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             if (onCompletion != null) {
                 this.onCompletion = new Runnable() {
@@ -4486,29 +4484,20 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void cleanup() {
             playing = false;
-            currentTime = -1;
         }
 
         public void play() {
-            if(currentTime > 0){
-                setTime(currentTime);
-            }
             player.play();
             playing = true;
         }
 
         public void pause() {
-            currentTime = getTime();
-            player.stop();
+            player.pause();
             playing = false;
         }
 
         public int getTime() {
-            if(playing){
-                return (int) player.getCurrentTime().toMillis();
-            }else{
-                return currentTime;
-            }
+            return (int) player.getCurrentTime().toMillis();
         }
 
         public void setTime(int time) {
