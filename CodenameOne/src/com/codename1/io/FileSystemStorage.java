@@ -222,6 +222,16 @@ public class FileSystemStorage {
     }
 
     /**
+     * Returns the time that the file denoted by this abstract pathname was 
+     * last modified.
+     * @return A long value representing the time the file was last modified, 
+     * measured in milliseconds
+     */ 
+    public long getLastModified(String file) {
+        return Util.getImplementation().getFileLastModified(file);
+    }
+    
+    /**
      * Indicates whether the given file is a directory
      *
      * @param file file

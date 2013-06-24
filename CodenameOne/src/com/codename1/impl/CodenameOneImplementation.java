@@ -3744,6 +3744,16 @@ public abstract class CodenameOneImplementation {
     public abstract long getFileLength(String file);
 
     /**
+     * Returns the time that the file denoted by this abstract pathname was 
+     * last modified.
+     * @return A long value representing the time the file was last modified, 
+     * measured in milliseconds
+     */ 
+    public long getFileLastModified(String file) {
+        return -1;
+    }
+    
+    /**
      * Indicates whether the given file is a directory
      *
      * @param file file
@@ -4754,5 +4764,6 @@ public abstract class CodenameOneImplementation {
     public int getEDTThreadPriority(){
         return Thread.NORM_PRIORITY + 1;
     }
+
 
 }
