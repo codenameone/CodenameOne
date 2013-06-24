@@ -4111,6 +4111,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public long getFileLastModified(String file) {
+        return new File(file).lastModified();
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public boolean isDirectory(String file) {
         return new File(unfile(file)).isDirectory();
     }
