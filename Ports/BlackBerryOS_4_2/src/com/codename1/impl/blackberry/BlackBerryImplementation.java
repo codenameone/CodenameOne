@@ -2671,6 +2671,22 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public long getFileLastModified(String file) {
+        FileConnection fc = null;
+        try {
+            fc = (FileConnection) Connector.open(file, Connector.READ);
+            return fc.lastModified();
+        } catch (IOException err) {
+            err.printStackTrace();
+            return -1;
+        } finally {
+            cleanup(fc);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public boolean isDirectory(String file) {
         FileConnection fc = null;
         try {
