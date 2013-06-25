@@ -99,8 +99,7 @@ public class SideMenuBar extends MenuBar {
             getCommands().insertElementAt(getBackCommand(), 0);
         }
     }
-    
-    
+
     /**
      * @inheritDoc
      */
@@ -131,17 +130,17 @@ public class SideMenuBar extends MenuBar {
     }
 
     public void keyReleased(int keyCode) {
-         if (keyCode == leftSK) {
-             openMenu();
-         }
-         super.keyReleased(keyCode);
+        if (keyCode == leftSK) {
+            openMenu();
+        }
+        super.keyReleased(keyCode);
     }
 
     /**
      * Closes the menu if it is currently open
      */
     public void closeMenu() {
-        if (Display.getInstance().getCurrent() == menu) {
+        if (Display.getInstance().getCurrent()  == menu) {
             parent.showBack();
         }
     }
@@ -160,6 +159,7 @@ public class SideMenuBar extends MenuBar {
             menu.show();
         }
     }
+
     /**
      * Returns true if the Menu is currently open
      *
@@ -267,23 +267,22 @@ public class SideMenuBar extends MenuBar {
                 }
                 final Command c = cmd;
                 final ActionEvent e = ev;
-                
+
                 Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                     public void run() {
                         Display.getInstance().invokeAndBlock(new Runnable() {
 
                             public void run() {
-                                while (Display.getInstance().getCurrent() != parent){
+                                while (Display.getInstance().getCurrent() != parent) {
                                     try {
                                         Thread.sleep(40);
                                     } catch (Exception ex) {
-
                                     }
                                 }
                             }
                         });
-                        
+
                         Display.getInstance().callSerially(new Runnable() {
 
                             public void run() {
@@ -316,7 +315,7 @@ public class SideMenuBar extends MenuBar {
                 }
                 super.pointerDragged(x, y);
             }
-            
+
             public void pointerReleased(int x, int y) {
                 super.pointerReleased(x, y);
                 if (dragActivated || rightPanel.contains(x, y)) {
@@ -355,6 +354,7 @@ public class SideMenuBar extends MenuBar {
             public void keyReleased(int keyCode) {
                 if (keyCode == leftSK) {
                     closeMenu();
+                    return;
                 }
                 super.keyReleased(keyCode);
             }
@@ -437,7 +437,7 @@ public class SideMenuBar extends MenuBar {
         }
 
         public boolean animate() {
-            if(motion != null){
+            if (motion != null) {
                 position = motion.getValue();
                 return !motion.isFinished();
             }
@@ -486,7 +486,6 @@ public class SideMenuBar extends MenuBar {
                                 try {
                                     Thread.sleep(40);
                                 } catch (Exception ex) {
-                                    
                                 }
                             }
                         }
