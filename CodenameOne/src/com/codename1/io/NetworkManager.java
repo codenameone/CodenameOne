@@ -257,7 +257,7 @@ public class NetworkManager {
                         if(progressListeners != null) {
                             progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                         }
-                        if(currentRequest.getDisposeOnCompletion() != null) {
+                        if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
                             // there may be a race condition where the dialog hasn't yet appeared but the
                             // network request completed
                             while(Display.getInstance().getCurrent() != currentRequest.getDisposeOnCompletion()) {

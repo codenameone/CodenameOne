@@ -127,6 +127,7 @@ public class ConnectionRequest implements IOProgressListener {
     boolean retrying;
     private boolean readResponseForErrors;
     private String responseContentType;
+    private boolean redirecting;
     
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
@@ -234,6 +235,7 @@ public class ConnectionRequest implements IOProgressListener {
         Object connection = null;
         input = null;
         output = null;
+        redirecting = false;
         try {
             String actualUrl = createRequestURL();
             if(timeout > 0) {
@@ -331,6 +333,7 @@ public class ConnectionRequest implements IOProgressListener {
                     connection = null;
                     output = null;
                     if(!onRedirect(url)){
+                        redirecting = true;
                         retry();
                     }
                     return;
@@ -1347,5 +1350,13 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public String getResponseContentType() {
         return responseContentType;
+    }
+    
+    /**
+     * Returns true if this request is been redirected to a different url
+     * @return true if redirecting
+     */ 
+    public boolean isRedirecting(){
+        return redirecting;
     }
 }
