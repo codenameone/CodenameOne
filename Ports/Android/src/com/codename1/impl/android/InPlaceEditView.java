@@ -455,7 +455,7 @@ public class InPlaceEditView extends FrameLayout {
             public void run() {
                 if (sInstance == null) {
                     sInstance = new InPlaceEditView(impl);
-                    impl.activity.addContentView(sInstance, new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
+                    impl.relativeLayout.addView(sInstance);
                 }
                 sInstance.startEditing(impl.activity, textArea, initialText, inputType);
             }

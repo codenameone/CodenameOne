@@ -75,13 +75,12 @@ import android.provider.Settings;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
+import android.view.*;
 import android.view.View.MeasureSpec;
-import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
-import android.widget.MediaController;
-import android.widget.VideoView;
+import android.widget.*;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -95,6 +94,7 @@ import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
 import com.codename1.ui.*;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -341,14 +341,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 RelativeLayout.LayoutParams.FILL_PARENT));
         relativeLayout.setFocusable(false);
 
-        //FrameLayout v = new FrameLayout(activity);
-
         myView = new AndroidView(activity, AndroidImplementation.this);
         myView.setVisibility(View.VISIBLE);
 
         relativeLayout.addView(myView);
         myView.setVisibility(View.VISIBLE);
-        activity.setContentView(relativeLayout);
+        
+        int id = activity.getResources().getIdentifier("main", "layout", activity.getApplicationInfo().packageName);
+        LinearLayout root = (LinearLayout) LayoutInflater.from(activity).inflate(id, null);
+        root.addView(relativeLayout);
+        activity.setContentView(root);
         myView.requestFocus();
     }
 
