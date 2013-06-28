@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -708,6 +709,23 @@ public class MenuBar extends Container implements ActionListener {
         return soft;
     }
 
+    private void updateBackBorderToRTL(Style s) {
+        Border b = s.getBorder();
+        b = b.mirrorBorder();
+        s.setBorder(b);
+    }
+    
+    private void verifyBackCommandRTL(Button bg) {
+        if(getCommandBehavior() == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && isRTL()) {
+            if(bg.getClientProperty("$cn1BackRTL") == null) {
+                bg.putClientProperty("$cn1BackRTL", Boolean.TRUE);
+                updateBackBorderToRTL(bg.getUnselectedStyle());
+                updateBackBorderToRTL(bg.getSelectedStyle());
+                updateBackBorderToRTL(bg.getPressedStyle());
+            }
+        }
+    }
+    
     private void addTwoTitleButtons(Container leftContainer, Container rightContainer) {
         ensureCommandsInContainer(getCommand(0), null, rightContainer, "TitleCommand", null);
         if (parent.getBackCommand() != null) {
@@ -766,13 +784,19 @@ public class MenuBar extends Container implements ActionListener {
             if (leftContainer.getComponentCount() == 0) {
                 Button back = createBackCommandButton();
                 leftContainer.addComponent(back);
-                back.setUIID("BackCommand");
+                if(!back.getUIID().equals("BackCommand")) {
+                    back.setUIID("BackCommand");
+                }
                 hideEmptyCommand(back);
+                verifyBackCommandRTL(back);
             } else {
                 Button b = (Button) leftContainer.getComponentAt(0);
                 if (b.getCommand() != parent.getBackCommand()) {
                     b.setCommand(parent.getBackCommand());
-                    b.setUIID("BackCommand");
+                    if(!b.getUIID().equals("BackCommand")) {
+                        b.setUIID("BackCommand");
+                    }
+                    verifyBackCommandRTL(b);
                     hideEmptyCommand(b);
                 }
             }
@@ -858,11 +882,15 @@ public class MenuBar extends Container implements ActionListener {
     private void ensureCommandsInContainer(Command a, Command b, Container c, String styleA, String styleB) {
         if (c.getComponentCount() == 0) {
             Button btn = new Button(a);
-            btn.setUIID(styleA);
+            if(!btn.getUIID().equals(styleA)) {
+                btn.setUIID(styleA);
+            }
             c.addComponent(btn);
             if (b != null) {
                 btn = new Button(b);
-                btn.setUIID(styleB);
+                if(!btn.getUIID().equals(styleB)) {
+                    btn.setUIID(styleB);
+                }
                 c.addComponent(btn);
             }
             hideEmptyCommand(btn);
@@ -870,13 +898,17 @@ public class MenuBar extends Container implements ActionListener {
         }
         if (c.getComponentCount() == 1) {
             Button btn = (Button) c.getComponentAt(0);
-            btn.setUIID(styleA);
+            if(!btn.getUIID().equals(styleA)) {
+                btn.setUIID(styleA);
+            }
             if (btn.getCommand() != a) {
                 btn.setCommand(a);
             }
             if (b != null) {
                 btn = new Button(b);
-                btn.setUIID(styleB);
+                if(!btn.getUIID().equals(styleB)) {
+                    btn.setUIID(styleB);
+                }
                 c.addComponent(btn);
             }
             hideEmptyCommand(btn);
@@ -884,14 +916,18 @@ public class MenuBar extends Container implements ActionListener {
         }
         if (c.getComponentCount() == 2) {
             Button btn = (Button) c.getComponentAt(0);
-            btn.setUIID(styleA);
+            if(!btn.getUIID().equals(styleA)) {
+                btn.setUIID(styleA);
+            }
             if (btn.getCommand() != a) {
                 btn.setCommand(a);
             }
             hideEmptyCommand(btn);
             if (b != null) {
                 btn = (Button) c.getComponentAt(1);
-                btn.setUIID(styleB);
+                if(!btn.getUIID().equals(styleB)) {
+                    btn.setUIID(styleB);
+                }
                 if (btn.getCommand() != b) {
                     btn.setCommand(b);
                 }

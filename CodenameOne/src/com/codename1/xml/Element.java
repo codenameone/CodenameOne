@@ -703,9 +703,13 @@ public class Element {
      * @return true if any of this Elements children are text Elements.
      */
     public boolean hasTextChild() {
-        for (Object child : children) {
-                if (child instanceof Element && ((Element)child).isTextElement())
-                        return true;
+        if(children != null) {
+            for (int iter = 0 ; iter < children.size() ; iter++) {
+                Object child = children.elementAt(iter);
+                if (child instanceof Element && ((Element)child).isTextElement()) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -715,6 +719,6 @@ public class Element {
      * @return true if this Element has no children.
      */
     public boolean isEmpty() {
-        return children.isEmpty();
+        return children == null || children.isEmpty();
     }
 }

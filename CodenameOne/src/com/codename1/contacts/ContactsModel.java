@@ -67,16 +67,20 @@ public class ContactsModel extends DefaultListModel {
         final String id = (String) super.getItemAt(index);
         Hashtable contact = (Hashtable) contactsCache.get(id);
         if (contact == null) {
+            Hashtable cnt = getContactAsHashtable(null);
+            contactsCache.put(id, cnt);
             Display.getInstance().scheduleBackgroundTask(new Runnable() {                
                 public void run() {
                     Contact c = ContactsManager.getContactById(id);
                     Hashtable contact = getContactAsHashtable(c);
                     contactsCache.put(id, contact);
-                    setItem(index, id);
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            setItem(index, id);
+                        }
+                    });
                 }
             });
-            Hashtable cnt = getContactAsHashtable(null);
-            contactsCache.put(id, cnt);
             return cnt;
         }
         return contact;

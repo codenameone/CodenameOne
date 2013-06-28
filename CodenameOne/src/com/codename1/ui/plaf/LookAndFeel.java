@@ -1036,6 +1036,13 @@ public abstract class LookAndFeel {
                 return CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
+        if(val.equalsIgnoreCase("uncover")) {
+            if(slideDir.equalsIgnoreCase("horizontal")) {
+                return CommonTransitions.createUncover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
+            } else {
+                return CommonTransitions.createUncover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
+            }
+        }
         if(val.equalsIgnoreCase("fslide")) {
             if(slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);

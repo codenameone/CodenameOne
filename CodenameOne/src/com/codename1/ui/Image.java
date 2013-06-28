@@ -298,6 +298,27 @@ public class Image {
     }
     
     /**
+     * Creates a mirror image for the given image which is useful for some RTL scenarios. Notice that this
+     * method isn't the most efficient way to perform this task and is designed for portability over efficiency.
+     * @return a mirrored image
+     */
+    public Image mirror() {
+        int width = getWidth();
+        int height = getHeight();
+        int[] tmp = getRGB();
+        int[] arr = new int[width * height];
+        for(int x = 0 ; x < width ; x++) {
+            for(int y = 0 ; y < height ; y++) {
+                arr[x + y * width] = tmp[width - x - 1 + y * width];
+            }
+        }
+        Image i = new Image(Display.getInstance().getImplementation().createImage(arr, width, height));
+        i.opaque = opaque;
+        i.opaqueTested = opaqueTested;
+        return i;
+    }
+    
+    /**
      * Returns an instance of this image rotated by the given number of degrees. By default 90 degree
      * angle divisions are supported, anything else is implementation dependent. This method assumes 
      * a square image. Notice that it is inefficient in the current implementation to rotate to

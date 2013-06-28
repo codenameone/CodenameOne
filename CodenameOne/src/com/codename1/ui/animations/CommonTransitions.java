@@ -57,6 +57,7 @@ public final class CommonTransitions extends Transition {
     private static final int TYPE_SLIDE_AND_FADE = 5;
     private static final int TYPE_PULSATE_DIALOG = 6;
     private static final int TYPE_COVER = 7;
+    private static final int TYPE_UNCOVER = 8;
     
     /**
      * Slide the transition horizontally
@@ -261,6 +262,26 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
+    /**
+     * Creates a uncover transition with the given duration and direction
+     * 
+     * @param type type can be either vertically or horizontally, which means 
+     * the movement direction of the transition
+     * @param forward forward is a boolean value, represent the directions of 
+     * switching forms, for example for a horizontally type, true means 
+     * horizontally movement to right.
+     * @param duration represent the time the transition should take in millisecond
+     * @return a transition object
+     */
+    public static CommonTransitions createUncover(int type, boolean forward, int duration) {
+        CommonTransitions t = new CommonTransitions(TYPE_UNCOVER);
+        t.slideType = type;
+        t.forward = forward;
+        t.speed = duration;
+        t.position = 0;
+        return t;
+    }
+
 
     /**
      * Creates a slide transition with the given duration and direction, this differs from the
@@ -447,7 +468,7 @@ public final class CommonTransitions extends Transition {
             return;
         }
 
-        if (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE || transitionType == TYPE_COVER) {
+        if (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE || transitionType == TYPE_COVER || transitionType == TYPE_UNCOVER) {
             int dest;
             int startOffset = 0;
             boolean direction = forward;
@@ -972,17 +993,26 @@ public final class CommonTransitions extends Transition {
             paint(g, dest, -slideX - w, -slideY - h);
             return;
         } 
-        
-        if(source.getParent() != null || buffer == null) {
-            source.paintBackgrounds(g);
-            paint(g, source, 0 , 0 );
-        } else {
-            g.drawImage(buffer, 0, 0);        
-        }
-        paint(g, dest, slideX + w, slideY + h);
-        
-    }
 
+        if(transitionType == TYPE_UNCOVER) {
+            paint(g, dest, 0, 0);
+            if(source.getParent() != null || buffer == null) {
+                source.paintBackgrounds(g);
+                paint(g, source, slideX + w, slideY + h);
+            } else {
+                g.drawImage(buffer, slideX + w, slideY + h);        
+            }
+        } else {
+            if(source.getParent() != null || buffer == null) {
+                source.paintBackgrounds(g);
+                paint(g, source, 0 , 0 );
+            } else {
+                g.drawImage(buffer, 0, 0);        
+            }
+            paint(g, dest, slideX + w, slideY + h);
+        }
+    }
+    
     private void paintFastSlideAtPosition(Graphics g, int slideX, int slideY) {
         if(secondaryBuffer != null) {
             Component source = getSource();
@@ -1155,6 +1185,16 @@ public final class CommonTransitions extends Transition {
                     retVal = CommonTransitions.createCover(slideType, !fwd, speed);
                 } else {
                     retVal = CommonTransitions.createCover(slideType, fwd, speed);
+                }
+                break;
+            }
+            case TYPE_UNCOVER: {
+                boolean fwd=forward;
+
+                if(reverse) {
+                    retVal = CommonTransitions.createUncover(slideType, !fwd, speed);
+                } else {
+                    retVal = CommonTransitions.createUncover(slideType, fwd, speed);
                 }
                 break;
             }

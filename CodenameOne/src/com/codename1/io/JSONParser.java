@@ -131,6 +131,11 @@ public class JSONParser implements JSONParseCallback {
                                     err.printStackTrace();
                                     System.out.println("Error in parsing \\u" + unicode);
                                 }
+                            } else {
+                                if(c == 'n') {
+                                    currentToken.append('\n');
+                                    continue;
+                                }
                             }
                             currentToken.append(c);
                             continue;

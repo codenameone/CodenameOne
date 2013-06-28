@@ -119,6 +119,10 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 if(current != null) {
                     if("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
                         current.put("thumb", value);
+                    } else {
+                        if("media:player".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
+                            current.put("player", value);
+                        }
                     }
                 }
             }
@@ -187,6 +191,10 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             cType = resultType.substring(resultType.indexOf("charset=") + 8);
         }
         try {
+            int pos2 = cType.indexOf(';');
+            if(pos2 > 0) {
+                cType = cType.substring(0, pos2);
+            }
             p.eventParser(new InputStreamReader(input, cType));
         } catch(FinishParsing ignor) {
             hasMore = true;

@@ -108,6 +108,18 @@ public class Border {
      */
     protected Border() {
     }
+    
+    /**
+     * If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
+     * 
+     * @return the current border or a mirrored instance
+     */
+    public Border mirrorBorder() {
+        if(type == TYPE_IMAGE_HORIZONTAL) {
+            return createHorizonalImageBorder(images[1].mirror(), images[0].mirror(), images[2].mirror());
+        }
+        return this;
+    }
 
     /**
      * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border

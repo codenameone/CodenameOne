@@ -96,6 +96,20 @@ public class ImageDownloadService extends ConnectionRequest {
     public static void setAlwaysRevalidate(boolean aAlwaysRevalidate) {
         alwaysRevalidate = aAlwaysRevalidate;
     }
+
+    /**
+     * @return the defaultMaintainAspectRatio
+     */
+    public static boolean isDefaultMaintainAspectRatio() {
+        return defaultMaintainAspectRatio;
+    }
+
+    /**
+     * @param aDefaultMaintainAspectRatio the defaultMaintainAspectRatio to set
+     */
+    public static void setDefaultMaintainAspectRatio(boolean aDefaultMaintainAspectRatio) {
+        defaultMaintainAspectRatio = aDefaultMaintainAspectRatio;
+    }
      
     private boolean downloadToStyles;
     private Label parentLabel;
@@ -112,6 +126,8 @@ public class ImageDownloadService extends ConnectionRequest {
     
     private static boolean fastScale = true;
     private Image placeholder;
+    private static boolean defaultMaintainAspectRatio;
+    private boolean maintainAspectRatio = defaultMaintainAspectRatio;
     
     /**
      * This method is invoked when an image finished downloading and should be set to an offset in the list
@@ -134,12 +150,24 @@ public class ImageDownloadService extends ConnectionRequest {
         }
         h = (Hashtable)model.getItemAt(targetOffset);
         if(!fastScale && toScale != null){
-            img = img.scaled(toScale.getWidth(), toScale.getHeight());
+            img = scaleImage(img, toScale, maintainAspectRatio);
         }
         h.put(targetKey, img);
         if(model instanceof DefaultListModel) {
              ((DefaultListModel)model).setItem(targetOffset, h);
         }
+    }
+
+    private static Image scaleImage(Image img, Dimension toScale, boolean maintainAspectRatio) {
+        if(maintainAspectRatio) {
+            float r2 = Math.min(((float)toScale.getWidth()) / ((float)img.getWidth()), ((float)toScale.getHeight()) / ((float)img.getHeight()));
+            int awidth = (int)(((float)img.getWidth()) * r2);
+            int aheight = (int)(((float)img.getHeight()) * r2);
+            img = img.scaled(awidth, aheight);
+        } else {
+            img = img.scaled(toScale.getWidth(), toScale.getHeight());
+        }
+        return img;
     }
     
     /**
@@ -237,7 +265,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
             String targetKey, String destFile, Dimension toScale, byte priority) {
-        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, toScale, priority, null);
+        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, toScale, priority, null, defaultMaintainAspectRatio);
     }
 
     /**
@@ -255,7 +283,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
             String targetKey, String destFile, Image placeholder, byte priority) {
-        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, null, priority, placeholder);
+        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, null, priority, placeholder, defaultMaintainAspectRatio);
     }
 
     /**
@@ -274,7 +302,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, Component targetList, ListModel model, int targetOffset, 
             String targetKey, String destFile, Image placeholder, byte priority) {
-        createImageToFileSystem(url, targetList, model, targetOffset, targetKey, destFile, null, priority, placeholder);
+        createImageToFileSystem(url, targetList, model, targetOffset, targetKey, destFile, null, priority, placeholder, defaultMaintainAspectRatio);
     }
 
     /**
@@ -291,13 +319,14 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param destFile local file to store the data into the given path
      */
     private static void createImageToFileSystem(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
-            final String targetKey, final String destFile, final Dimension toScale, final byte priority, final Image placeholderImage) {
+            final String targetKey, final String destFile, final Dimension toScale, final byte priority, final Image placeholderImage, 
+            final boolean maintainAspectRatio) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
                     createImageToFileSystem(url, targetList, targetModel, targetOffset,
-                            targetKey, destFile, toScale, priority, placeholderImage);
+                            targetKey, destFile, toScale, priority, placeholderImage, maintainAspectRatio);
                 }
             });
             return;
@@ -307,7 +336,8 @@ public class ImageDownloadService extends ConnectionRequest {
         //image not found on cache go and download from the url
         ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
         i.targetModel = targetModel;
-        Image im = cacheImage(null, false, destFile, toScale, placeholderImage);
+        i.maintainAspectRatio = maintainAspectRatio;
+        Image im = cacheImage(null, false, destFile, toScale, placeholderImage, maintainAspectRatio);
         if (im != null) {
             i.setEntryInListModel(targetOffset, im);
             targetList.repaint();
@@ -357,7 +387,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Dimension scale, byte priority) {
-        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, scale, priority, null);
+        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, scale, priority, null, defaultMaintainAspectRatio);
     }
 
     /**
@@ -376,7 +406,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, int targetOffset, 
             String targetKey, String cacheId, Image placeholderImage, byte priority) {
-        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
+        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage, defaultMaintainAspectRatio);
     }
 
     /**
@@ -396,7 +426,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Component targetList, ListModel model, int targetOffset, 
             String targetKey, String cacheId, Image placeholderImage, byte priority) {
-        createImageToStorage(url, targetList, model, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage);
+        createImageToStorage(url, targetList, model, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage, defaultMaintainAspectRatio);
     }
     
     /**
@@ -416,20 +446,22 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param scale the scale of the image to put in the List or null
      */
     private static void createImageToStorage(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
-            final String targetKey, final String cacheId, final boolean keep, final Dimension scale, final byte priority, final Image placeholderImage) {
+            final String targetKey, final String cacheId, final boolean keep, final Dimension scale, final byte priority, final Image placeholderImage,
+            final boolean maintainAspectRatio) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
                     createImageToStorage(url, targetList, targetModel, targetOffset,
-                            targetKey, cacheId, keep, scale, priority, placeholderImage);
+                            targetKey, cacheId, keep, scale, priority, placeholderImage, maintainAspectRatio);
                 }
             });
             return;
         }
-        Image im = cacheImage(cacheId, keep, null, scale, placeholderImage);
+        Image im = cacheImage(cacheId, keep, null, scale, placeholderImage, maintainAspectRatio);
         ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);
         i.targetModel = targetModel;
+        i.maintainAspectRatio = maintainAspectRatio;
         if (im != null) {
             i.setEntryInListModel(targetOffset, im);
             targetList.repaint();            
@@ -474,7 +506,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale,
             byte priority) {
-        createImageToStorage(url, l, cacheId, false, toScale, priority, null);
+        createImageToStorage(url, l, cacheId, false, toScale, priority, null, defaultMaintainAspectRatio);
     }
 
     /**
@@ -490,7 +522,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, Label l, String cacheId, Image placeholder,
             byte priority) {
-        createImageToStorage(url, l, cacheId, false, null, priority, placeholder);
+        createImageToStorage(url, l, cacheId, false, null, priority, placeholder, defaultMaintainAspectRatio);
     }
     
     /**
@@ -505,28 +537,29 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param priority the priority for the task
      */
     private static void createImageToStorage(final String url, final Label l, final String cacheId, final boolean keep, final Dimension toScale,
-            final byte priority, final Image placeholder) {
+            final byte priority, final Image placeholder, final boolean maintainAspectRatio) {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
                     createImageToStorage(url, l, cacheId, keep, toScale,
-                            priority, placeholder);
+                            priority, placeholder, maintainAspectRatio);
                 }
             });
             return;
         }
         
-        Image im = cacheImage(cacheId, keep, null, toScale, placeholder);
+        Image im = cacheImage(cacheId, keep, null, toScale, placeholder, maintainAspectRatio);
         if (im != null) {
             if (!fastScale && toScale != null) {
-                im = im.scaled(toScale.getWidth(), toScale.getHeight());
+                im = scaleImage(im, toScale, defaultMaintainAspectRatio);
             }
             l.setIcon(im);
             return;
         }
         //image not found on cache go and download from the url
         ImageDownloadService i = new ImageDownloadService(url, l);
+        i.maintainAspectRatio = maintainAspectRatio;
         i.setDuplicateSupported(true);
         i.cacheImages = true;
         i.toScale = toScale;
@@ -548,7 +581,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToFileSystem(String url, ActionListener callback, String destFile) {
 
-        Image im = cacheImage(null, false, destFile, null, null);
+        Image im = cacheImage(null, false, destFile, null, null, defaultMaintainAspectRatio);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -575,7 +608,7 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     public static void createImageToStorage(String url, ActionListener callback, String cacheId, boolean keep) {
 
-        Image im = cacheImage(cacheId, keep, null, null, null);
+        Image im = cacheImage(cacheId, keep, null, null, null, defaultMaintainAspectRatio);
         if (im != null) {
             callback.actionPerformed(new NetworkEvent(null, im));
             return;
@@ -588,8 +621,7 @@ public class ImageDownloadService extends ConnectionRequest {
         NetworkManager.getInstance().addToQueue(i);
     }
 
-    private static Image cacheImage(String cacheKey, boolean keep, String destFile, Dimension scale, Image placeholderImage) {
-        
+    private static Image cacheImage(String cacheKey, boolean keep, String destFile, Dimension scale, Image placeholderImage, boolean maintainAspectRatio) {
         if (destFile != null) {
             if (FileSystemStorage.getInstance().exists(destFile)) {
                 Image f;
@@ -597,7 +629,17 @@ public class ImageDownloadService extends ConnectionRequest {
                     f = FileEncodedImageAsync.create(destFile, placeholderImage);
                 } else {
                     if(fastScale && scale != null) {
-                        f = FileEncodedImage.create(destFile, scale.getWidth(), scale.getHeight());
+                        int w = scale.getWidth();
+                        int h = scale.getHeight();
+                        if(maintainAspectRatio) {
+                            f = FileEncodedImage.create(destFile, -1, -1);
+                            float actualW = f.getWidth();
+                            float actualH = f.getHeight();
+                            float r2 = Math.min(((float)w) / actualW, ((float)h) / actualH);
+                            w = (int)(actualW * r2);
+                            h = (int)(actualH * r2);
+                        }
+                        f = FileEncodedImage.create(destFile, w, h);
                     } else {
                         f = FileEncodedImage.create(destFile, -1, -1);
                     }
@@ -611,7 +653,17 @@ public class ImageDownloadService extends ConnectionRequest {
                     s = StorageImageAsync.create(cacheKey, placeholderImage);
                 } else {
                     if(fastScale && scale != null) {
-                        s = StorageImage.create(cacheKey, scale.getWidth(), scale.getHeight(), keep);
+                        int w = scale.getWidth();
+                        int h = scale.getHeight();
+                        if(maintainAspectRatio) {
+                            s = StorageImage.create(cacheKey, -1, -1);
+                            float actualW = s.getWidth();
+                            float actualH = s.getHeight();
+                            float r2 = Math.min(((float)w) / actualW, ((float)h) / actualH);
+                            w = (int)(actualW * r2);
+                            h = (int)(actualH * r2);
+                        }
+                        s = StorageImage.create(cacheKey, w, h, keep);
                     } else {
                         s = StorageImage.create(cacheKey, -1, -1, keep);
                     }
@@ -637,7 +689,7 @@ public class ImageDownloadService extends ConnectionRequest {
         Image image = result;
 
         if (toScale != null && toScale.getWidth() != image.getWidth() && toScale.getHeight() != image.getHeight()) {
-            image = image.scaled(toScale.getWidth(), toScale.getHeight());
+            image = scaleImage(image, toScale, maintainAspectRatio);
         }
 
         if(parentLabel != null) {
@@ -714,6 +766,13 @@ public class ImageDownloadService extends ConnectionRequest {
                 result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);
             } else {
                 EncodedImage e = EncodedImage.create(input);
+                if(maintainAspectRatio) {
+                    float actualW = e.getWidth();
+                    float actualH = e.getHeight();
+                    float r2 = Math.min(((float)imageScaleWidth) / actualW, ((float)imageScaleHeight) / actualH);
+                    imageScaleWidth = (int)(actualW * r2);
+                    imageScaleHeight = (int)(actualH * r2);
+                }
                 result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);
                 //if the storage has failed create the image from the stream
                 if(result == null){
@@ -760,5 +819,19 @@ public class ImageDownloadService extends ConnectionRequest {
     public boolean equals(Object o) {
         return (o instanceof ImageDownloadService) && ((ImageDownloadService)o).cacheId != null && 
                 ((ImageDownloadService)o).cacheId.equals(cacheId);
+    }
+
+    /**
+     * @return the maintainAspectRatio
+     */
+    public boolean isMaintainAspectRatio() {
+        return maintainAspectRatio;
+    }
+
+    /**
+     * @param maintainAspectRatio the maintainAspectRatio to set
+     */
+    public void setMaintainAspectRatio(boolean maintainAspectRatio) {
+        this.maintainAspectRatio = maintainAspectRatio;
     }
 }
