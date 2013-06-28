@@ -77,9 +77,7 @@ import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
 import android.view.*;
 import android.view.View.MeasureSpec;
-import android.webkit.ConsoleMessage;
-import android.webkit.CookieManager;
-import android.webkit.WebChromeClient;
+import android.webkit.*;
 import android.widget.*;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
@@ -1624,26 +1622,52 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    private String getMimeType(String url){
+        String type = null;
+        String extension = MimeTypeMap.getFileExtensionFromUrl(url);
+        if (extension != null) {
+            MimeTypeMap mime = MimeTypeMap.getSingleton();
+            type = mime.getMimeTypeFromExtension(extension);
+        }
+        return type;
+    }
+    
     public void execute(String url, ActionListener response) {
         if (response != null) {
             callback = new EventDispatcher();
             callback.addListener(response);
         }
 
-        int flags = Intent.URI_INTENT_SCHEME;
         Intent intent;
+        Uri uri;
         try {
-            intent = Intent.parseUri(url, flags);
-            activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME);
+            if (url.startsWith("intent")) {
+                intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+            } else {
+                intent = new Intent();
+                intent.setAction(Intent.ACTION_VIEW);
+                if (url.startsWith("/")) {
+                    uri = Uri.fromFile(new File(url));
+                }else{
+                    uri = Uri.parse(url);
+                }
+                String mimeType = getMimeType(url);
+                if(mimeType != null){
+                    intent.setDataAndType(uri, mimeType);            
+                }else{
+                    intent.setData(uri);
+                }
+            }
+            if(response != null){
+                activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME);
+            }else{
+                activity.startActivity(intent);
+            }
             return;
-        } catch (URISyntaxException ex) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
 
-        try {
-            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 
