@@ -4728,13 +4728,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.getResourceAsStream(cls, resource);
     }
 
-    public void beforeComponentPaint(Component c) {
+    @Override
+    public void beforeComponentPaint(Component c, Graphics g) {
         if (perfMonitor != null) {
             perfMonitor.beforeComponentPaint(c);
         }
     }
 
-    public void afterComponentPaint(Component c) {
+    @Override
+    public void afterComponentPaint(Component c, Graphics g) {
         if (perfMonitor != null) {
             perfMonitor.afterComponentPaint(c);
         }
