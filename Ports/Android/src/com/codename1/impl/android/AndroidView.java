@@ -537,15 +537,16 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
                     editorInfo.imeOptions |= EditorInfo.IME_ACTION_NONE;
                 }
                 int inputType = 0;
-                switch (txt.getConstraint()) {
+                int constraint = txt.getConstraint();
+                if ((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
+                    constraint = constraint ^ TextArea.PASSWORD;
+                }
+                switch (constraint) {
                     case TextArea.NUMERIC:
                         inputType = EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_FLAG_SIGNED;
                         break;
                     case TextArea.DECIMAL:
                         inputType = EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_FLAG_DECIMAL;
-                        break;
-                    case TextArea.PASSWORD:
-                        inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_PASSWORD;
                         break;
                     case TextArea.PHONENUMBER:
                         inputType = EditorInfo.TYPE_CLASS_PHONE;
@@ -563,7 +564,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
                 }
 
                 editorInfo.inputType = inputType;
-
             }
         return super.onCreateInputConnection(editorInfo);
     }
