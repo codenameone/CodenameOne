@@ -50,7 +50,7 @@ public class Container extends Component {
     private static boolean enableLayoutOnPaint = true;
     private Component leadComponent;
     private Layout layout;
-    private java.util.Vector components = new java.util.Vector();
+    private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
     private boolean shouldLayout = true;
     boolean scrollableX;
     boolean scrollableY;
@@ -263,9 +263,7 @@ public class Container extends Component {
             shouldLayout = layout;
             shouldCalcPreferredSize = layout;
             shouldCalcScrollSize = layout;
-            int size = components.size();
-            for(int iter = 0 ; iter < size ; iter++) {
-                Component cmp = (Component) components.elementAt(iter);
+            for(Component cmp : components) {
                 if(cmp instanceof Container){
                     cmp.setShouldCalcPreferredSize(shouldCalcPreferredSize);
                 }
@@ -290,9 +288,7 @@ public class Container extends Component {
         super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
         shouldLayout = shouldCalcPreferredSize;
         if (shouldLayout) {
-            int size = components.size();
-            for(int iter = 0 ; iter < size ; iter++) {
-                Component cmp = (Component) components.elementAt(iter);
+            for(Component cmp : components) {
                 if (cmp instanceof Container) {
                     ((Container) cmp).setShouldCalcPreferredSize(shouldCalcPreferredSize);
                 }
@@ -441,7 +437,7 @@ public class Container extends Component {
                 }
             });
         }
-        components.insertElementAt(cmp, index);
+        components.add(index, cmp);
         setShouldCalcPreferredSize(true);
         if (isInitialized()) {
             cmp.initComponentImpl();
@@ -675,9 +671,8 @@ public class Container extends Component {
         if (!isInitialized()) {
             super.initComponentImpl();
         }
-        int size = components.size();
-        for(int iter = 0 ; iter < size ; iter++) {
-            ((Component) components.elementAt(iter)).initComponentImpl();
+        for(Component cmp : components) {
+            cmp.initComponentImpl();
         }
         if(leadComponent != null) {
             initLead();
@@ -714,7 +709,7 @@ public class Container extends Component {
         Form parentForm = cmp.getComponentForm();
         layout.removeLayoutComponent(cmp);
         cmp.deinitializeImpl();
-        components.removeElement(cmp);
+        components.remove(cmp);
         cmp.setParent(null);
         if (parentForm != null) {
             if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) {
@@ -749,9 +744,8 @@ public class Container extends Component {
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
-        int size = components.size();
-        for (int iter = 0; iter < size; iter++) {
-            ((Component) components.elementAt(iter)).deinitializeImpl();
+        for(Component cmp : components) {
+            cmp.deinitializeImpl();
         }
         flushReplace();
     }
@@ -784,11 +778,13 @@ public class Container extends Component {
                 parentForm.setFocused(null);
             }
         }
-        Object[] arr = new Object[components.size()];
-        components.copyInto(arr);
+        
+        // prevents concurrent modification exception
+        Component[] arr = new Component[components.size()];
+        components.toArray(arr);
 
-        for (int i = 0; i < arr.length; i++) {
-            removeComponent((Component) arr[i]);
+        for(Component cmp : arr) {
+            removeComponent(cmp);
         }
     }
 
@@ -863,8 +859,7 @@ public class Container extends Component {
         int size = components.size();
         CodenameOneImplementation impl = Display.getInstance().getImplementation();
         if(dontRecurseContainer) {
-            for (int i = 0; i < size; i++) {
-                Component cmp = (Component)components.elementAt(i);
+            for(Component cmp : components) {
                 if(cmp.getClass() == Container.class) {
                     paintContainerChildrenForAnimation((Container)cmp, g);
                 } else {
@@ -872,8 +867,7 @@ public class Container extends Component {
                 }
             }
         } else {
-            for (int i = 0; i < size; i++) {
-                Component cmp = (Component)components.elementAt(i);
+            for(Component cmp : components) {
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
         }
@@ -911,8 +905,7 @@ public class Container extends Component {
                 endIndex = indexOfComponent;
             }
 
-            for (int i = startIndex; i < endIndex; i++) {
-                Component cmp2 = (Component) components.elementAt(i);
+            for(Component cmp2 : components) {
                 if(Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),
@@ -971,7 +964,7 @@ public class Container extends Component {
      */
     public Component getComponentAt(
             int index) {
-        return (Component) components.elementAt(index);
+        return components.get(index);
     }
 
     /**
@@ -1369,9 +1362,8 @@ public class Container extends Component {
      */
     private String getComponentsNames() {
         String ret = "[";
-        int size = components.size();
-        for(int iter = 0 ; iter < size ; iter++) {
-            String className = components.elementAt(iter).getClass().getName();
+        for(Component cmp : components) {
+            String className = cmp.getClass().getName();
             ret += className.substring(className.lastIndexOf('.') + 1) + ", ";
         }
         if (ret.length() > 1) {
@@ -1386,9 +1378,7 @@ public class Container extends Component {
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        int size = components.size();
-        for(int iter = 0 ; iter < size ; iter++) {
-            Component cmp = (Component) components.elementAt(iter);
+        for(Component cmp : components) {
             cmp.refreshTheme(merge);
         }
     }
