@@ -4102,16 +4102,16 @@ public class Component implements Animation, StyleListener {
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED_FILL:
                             float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            width = (int)(((float)iW) * r);
-                            height = (int)(((float)iH) * r);
+                            int bwidth = (int)(((float)iW) * r);
+                            int bheight = (int)(((float)iH) * r);
                             if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x, y, width, height);
+                                g.drawImage(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
                             } else {
-                                if (iW != width || iH != height) {
-                                    bgImage = bgImage.scaled(width, height);
+                                if (iW != bwidth || iH != bheight) {
+                                    bgImage = bgImage.scaled(bwidth, bheight);
                                     s.setBgImage(bgImage, true);
                                 }
-                                g.drawImage(s.getBgImage(), x, y);
+                                g.drawImage(s.getBgImage(), x + (width - bwidth) / 2, y + (height - bheight) / 2);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED_FIT:

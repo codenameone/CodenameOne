@@ -26,6 +26,8 @@ package com.codename1.ui.list;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -33,9 +35,9 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
-public class DefaultListModel implements ListModel{
+public class DefaultListModel implements ListModel {
     
-    private Vector items;
+    private java.util.List items;
 
     private EventDispatcher dataListener = new EventDispatcher();
     private EventDispatcher selectionListener = new EventDispatcher();
@@ -46,7 +48,7 @@ public class DefaultListModel implements ListModel{
      * Creates a new instance of DefaultListModel 
      */
     public DefaultListModel() {
-        this.items = new Vector();
+        this.items = new ArrayList();
     }
 
     /** 
@@ -55,7 +57,16 @@ public class DefaultListModel implements ListModel{
      * @param items the items in the model
      */
     public DefaultListModel(Vector items) {
-        this.items = items;
+        this.items = new ArrayList(items);
+    }
+
+    /** 
+     * Creates a new instance of DefaultListModel 
+     * 
+     * @param items the items in the model
+     */
+    public DefaultListModel(Collection items) {
+        this.items = new ArrayList(items);
     }
 
     /** 
@@ -64,16 +75,16 @@ public class DefaultListModel implements ListModel{
      * @param items the items in the model
      */
     public DefaultListModel(Object[] items) {
-        this.items = createVector(items);
+        this.items = createList(items);
     }
 
-    private static Vector createVector(Object[] items) {
+    private static java.util.List createList(Object[] items) {
         if (items == null) {
             items = new Object[] {};
         }
-        Vector vec = new Vector(items.length);
+        java.util.List vec = new ArrayList(items.length);
         for(int iter = 0 ; iter < items.length ; iter++) {
-            vec.addElement(items[iter]);
+            vec.add(items[iter]);
         }
         return vec;
     }
@@ -83,7 +94,7 @@ public class DefaultListModel implements ListModel{
      */
     public Object getItemAt(int index) {
         if(index < getSize() && index >= 0){
-            return items.elementAt(index);
+            return items.get(index);
         }
         return null;
     }
@@ -106,7 +117,7 @@ public class DefaultListModel implements ListModel{
      * @inheritDoc
      */
     public void addItem(Object item){
-        items.addElement(item);
+        items.add(item);
         fireDataChangedEvent(DataChangedListener.ADDED, items.size());
     }
     
@@ -117,7 +128,7 @@ public class DefaultListModel implements ListModel{
      * @param item the value to set
      */
     public void setItem(int index, Object item){
-        items.setElementAt(item, index);
+        items.set(index, item);
         fireDataChangedEvent(DataChangedListener.CHANGED, index);
     }
 
@@ -128,7 +139,7 @@ public class DefaultListModel implements ListModel{
      */
     public void addItemAtIndex(Object item, int index){
         if (index <= items.size()) {
-            items.insertElementAt(item, index);
+            items.add(index, item);
             fireDataChangedEvent(DataChangedListener.ADDED, index);
         }
     }
@@ -138,7 +149,7 @@ public class DefaultListModel implements ListModel{
      */
     public void removeItem(int index){
         if(index < getSize() && index >= 0){
-            items.removeElementAt(index);
+            items.remove(index);
             if(index != 0){
                 setSelectedIndex(index - 1);
             }

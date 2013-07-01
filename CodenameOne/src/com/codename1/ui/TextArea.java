@@ -32,7 +32,7 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
-import java.util.Vector;
+import java.util.ArrayList;
 
 /**
  * An optionally multi-line editable region that can display text and allow a user to edit it.
@@ -180,7 +180,7 @@ public class TextArea extends Component {
     
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     
-    private Vector rowStrings;
+    private ArrayList rowStrings;
     private int widthForRowCalculations = -1;
 
     private int rowsGap = 2;
@@ -386,7 +386,7 @@ public class TextArea extends Component {
         }
         
         synchronized(this) {
-            //zero the vector inorder to initialize it on the next paint
+            //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
         }
         repaint();
@@ -659,7 +659,7 @@ public class TextArea extends Component {
         super.initComponentImpl();
     }
     
-    private Vector getRowStrings() {
+    private ArrayList getRowStrings() {
         if(rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getPadding(false, RIGHT) - getUnselectedStyle().getPadding(false, LEFT)){
             initRowString();
             setShouldCalcPreferredSize(true);
@@ -675,7 +675,7 @@ public class TextArea extends Component {
      */
     public int getLines(){
         int retVal;
-        Vector v = getRowStrings();
+        ArrayList v = getRowStrings();
         retVal = v.size();
         return retVal;
     }
@@ -687,15 +687,15 @@ public class TextArea extends Component {
      * @return the text of the line
      */
     public String getTextAt(int line){
-        Vector rowsV = getRowStrings();
+        ArrayList rowsV = getRowStrings();
         int size = rowsV.size();
         if(size == 0){
             return "";
         }
         if(line >= size){
-            return (String)rowsV.elementAt(size-1);        
+            return (String)rowsV.get(size-1);        
         }            
-        return (String)rowsV.elementAt(line);
+        return (String)rowsV.get(line);
     }
     
     private int indexOf(char[] t, char c, int offset, int length) {
@@ -736,22 +736,22 @@ public class TextArea extends Component {
     private void initRowString() {
         if(!Display.getInstance().isEdt()) {
             if(rowStrings == null) {
-                rowStrings = new Vector();
-                rowStrings.addElement(getText());
+                rowStrings = new ArrayList();
+                rowStrings.add(getText());
                 return;
             }
         }
         Style style = getUnselectedStyle();
-        rowStrings= new Vector();
+        rowStrings= new ArrayList();
         widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
         // single line text area is essentially a text field, we call the method
         // to allow subclasses to override it
         if (isSingleLineTextArea()) {
-            rowStrings.addElement(getText());
+            rowStrings.add(getText());
             return;
         }
         if (widthForRowCalculations <= 0) {
-            rowStrings.addElement(getText());
+            rowStrings.add(getText());
             setShouldCalcPreferredSize(true);
             return;
         }
@@ -786,12 +786,12 @@ public class TextArea extends Component {
         }*/
         if(textAreaWidth <= charWidth) {
             if(!isInitialized()) {
-                rowStrings.addElement(getText());
+                rowStrings.add(getText());
             } else {
                 // special case for the edge case of "no room".
                 // Its important since sometimes this case occurs in the GUI builder by accident
                 for(int iter = 0 ; iter < text.length ; iter++) {
-                    rowStrings.addElement("" + text[iter]);
+                    rowStrings.add("" + text[iter]);
                 }
             }
             return;
@@ -937,25 +937,25 @@ public class TextArea extends Component {
                 // This happens due to a race condition or something, no idea why???
                 if(textAreaWidth <= charWidth) {
                     if(!isInitialized()) {
-                        rowStrings.addElement(getText());
+                        rowStrings.add(getText());
                     } else {
                         // special case for the edge case of "no room".
                         // Its important since sometimes this case occurs in the GUI builder by accident
                         for(int iter = 0 ; iter < text.length ; iter++) {
-                            rowStrings.addElement("" + text[iter]);
+                            rowStrings.add("" + text[iter]);
                         }
                     }
                     return;
                 }
             }
-            rowStrings.addElement(rowText);
+            rowStrings.add(rowText);
             //adding minCharactersInRow doesn't work if what is left is less
             //then minCharactersInRow
             to=from;//+minCharactersInRow;
             rowIndex++;
         }
         if(text[text.length -1 ] == '\n'){
-            rowStrings.addElement("");
+            rowStrings.add("");
         }
     }
     

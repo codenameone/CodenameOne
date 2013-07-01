@@ -34,6 +34,7 @@ package com.codename1.util;
  * @see StringBuffer
  * @see String
  * 
+ * @deprecated we will be moving to the proper string builder very soon
  * @since 1.5
  */
 public final class CStringBuilder extends AbstractStringBuilder {

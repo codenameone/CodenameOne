@@ -1334,7 +1334,14 @@ public final class Display {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        cmp.getComponentForm().scrollComponentToVisible(cmp);
+        Form f = cmp.getComponentForm();
+        
+        // this can happen in the spinner in the simulator where the key press should in theory start native 
+        // edit 
+        if(f == null) {
+            return;
+        }
+        f.scrollComponentToVisible(cmp);
         editingText = cmp;
         keyRepeatCharged = false;
         longPressCharged = false;

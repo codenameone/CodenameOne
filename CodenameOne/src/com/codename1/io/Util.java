@@ -37,9 +37,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -203,6 +207,17 @@ public class Util {
             return;
         }
 
+        if(o instanceof Collection) {
+            Collection v = (Collection)o;
+            out.writeUTF("java.util.Collection");
+            int size = v.size();
+            out.writeInt(size);
+            for(Object cur : v) {
+                writeObject(cur, out);
+            }
+            return;
+        }
+
         if(o instanceof Hashtable) {
             Hashtable v = (Hashtable)o;
             out.writeUTF("java.util.Hashtable");
@@ -210,6 +225,16 @@ public class Util {
             Enumeration k = v.keys();
             while(k.hasMoreElements()) {
                 Object key = k.nextElement();
+                writeObject(key, out);
+                writeObject(v.get(key), out);
+            }
+            return;
+        }
+        if(o instanceof Map) {
+            Map v = (Map)o;
+            out.writeUTF("java.util.Map");
+            out.writeInt(v.size());
+            for(Object key : v.keySet()) {
                 writeObject(key, out);
                 writeObject(v.get(key), out);
             }
@@ -549,6 +574,22 @@ public class Util {
             }
             if ("java.util.Hashtable".equals(type)) {
                 Hashtable v = new Hashtable();
+                int size = input.readInt();
+                for(int iter = 0 ; iter < size ; iter++) {
+                    v.put(readObject(input), readObject(input));
+                }
+                return v;
+            }
+            if ("java.util.Collection".equals(type)) {
+                Collection v = new ArrayList();
+                int size = input.readInt();
+                for (int iter = 0; iter < size; iter++) {
+                    v.add(readObject(input));
+                }
+                return v;
+            }
+            if ("java.util.Map".equals(type)) {
+                Map v = new HashMap();
                 int size = input.readInt();
                 for(int iter = 0 ; iter < size ; iter++) {
                     v.put(readObject(input), readObject(input));
