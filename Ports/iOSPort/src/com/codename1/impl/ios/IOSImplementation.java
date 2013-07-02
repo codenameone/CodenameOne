@@ -129,6 +129,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void init(Object m) {
         instance = this;
+        setUseNativeCookieStore(false);
         Display.getInstance().setTransitionYield(10);
         Display.getInstance().setDefaultVirtualKeyboard(null);
         callback = (Runnable)m;
@@ -287,9 +288,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
         if(editNext) {
             editNext = false;
-            if(instance.currentEditing != null && instance.currentEditing instanceof TextField) {
-                ((TextField)instance.currentEditing).fireDoneEvent();
-            }
             TextEditUtil.editNextTextArea();
         }
     }
@@ -302,6 +300,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 synchronized(EDITING_LOCK) {
                     instance.currentEditing.setText(s);
                     Display.getInstance().onEditingComplete(instance.currentEditing, s);
+                    if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
+                        ((TextField)instance.currentEditing).fireDoneEvent();
+                    }
                     instance.currentEditing = null;
                     EDITING_LOCK.notify();
                 }
@@ -767,7 +768,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.checkControl();
         ng.applyClip();
         NativeFont fnt = ng.getFont();
-        ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, str, x, y);
+        int l = str.length();
+        int max = fnt.getMaxStringLength();
+        if(l > max) {
+            // really long string split it and draw multiple strings to avoid texture overload
+            int one = 1;
+            if(l % max == 0) {
+                one = 0;
+            }
+            int stringCount = l / max + one;
+            for(int iter = 0 ; iter < stringCount ; iter++) {
+                int pos = iter * max;
+                String s = str.substring(pos, Math.min(pos + max, str.length()));
+                ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, s, x, y);
+                x += stringWidth(fnt, s);
+            }
+        } else {
+            ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, str, x, y);
+        }
     }
 
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
@@ -1671,9 +1689,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         String name;
         int weight;
         float height;
+        int maxStringLength = -1;
         private Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
         
         public NativeFont() {
+        }
+        
+        public int getMaxStringLength() {
+            if(maxStringLength == -1) {
+                int w = charWidth('X');
+                maxStringLength = Math.max(getDisplayWidth(), getDisplayHeight()) * 2 / w;
+            }
+            return maxStringLength;
         }
         
         public int charWidth(char c) {
@@ -3096,6 +3123,10 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public long getFileLength(String file) {
         return nativeInstance.getFileSize(file);
+    }
+
+    public long getFileLastModified(String file) {
+        return nativeInstance.getFileLastModified(file);
     }
 
     /**

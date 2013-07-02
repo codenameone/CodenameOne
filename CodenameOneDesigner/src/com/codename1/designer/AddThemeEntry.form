@@ -260,28 +260,30 @@
             <Component class="javax.swing.JComboBox" name="backgroundType">
               <Properties>
                 <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-                  <StringArray count="21">
+                  <StringArray count="23">
                     <StringItem index="0" value="IMAGE_SCALED"/>
-                    <StringItem index="1" value="IMAGE_TILE_BOTH"/>
-                    <StringItem index="2" value="IMAGE_TILE_VERTICAL_ALIGN_LEFT"/>
-                    <StringItem index="3" value="IMAGE_TILE_VERTICAL_ALIGN_CENTER"/>
-                    <StringItem index="4" value="IMAGE_TILE_VERTICAL_ALIGN_RIGHT"/>
-                    <StringItem index="5" value="IMAGE_TILE_HORIZONTAL_ALIGN_TOP"/>
-                    <StringItem index="6" value="IMAGE_TILE_HORIZONTAL_ALIGN_CENTER"/>
-                    <StringItem index="7" value="IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM"/>
-                    <StringItem index="8" value="IMAGE_ALIGNED_TOP"/>
-                    <StringItem index="9" value="IMAGE_ALIGNED_BOTTOM"/>
-                    <StringItem index="10" value="IMAGE_ALIGNED_LEFT"/>
-                    <StringItem index="11" value="IMAGE_ALIGNED_RIGHT"/>
-                    <StringItem index="12" value="IMAGE_ALIGNED_TOP_LEFT"/>
-                    <StringItem index="13" value="IMAGE_ALIGNED_TOP_RIGHT"/>
-                    <StringItem index="14" value="IMAGE_ALIGNED_BOTTOM_LEFT"/>
-                    <StringItem index="15" value="IMAGE_ALIGNED_BOTTOM_RIGHT"/>
-                    <StringItem index="16" value="IMAGE_ALIGNED_CENTER"/>
-                    <StringItem index="17" value="GRADIENT_LINEAR_HORIZONTAL"/>
-                    <StringItem index="18" value="GRADIENT_LINEAR_VERTICAL"/>
-                    <StringItem index="19" value="GRADIENT_RADIAL"/>
-                    <StringItem index="20" value="NONE"/>
+                    <StringItem index="1" value="IMAGE_SCALED_FILL"/>
+                    <StringItem index="2" value="IMAGE_SCALED_FIT"/>
+                    <StringItem index="3" value="IMAGE_TILE_BOTH"/>
+                    <StringItem index="4" value="IMAGE_TILE_VERTICAL_ALIGN_LEFT"/>
+                    <StringItem index="5" value="IMAGE_TILE_VERTICAL_ALIGN_CENTER"/>
+                    <StringItem index="6" value="IMAGE_TILE_VERTICAL_ALIGN_RIGHT"/>
+                    <StringItem index="7" value="IMAGE_TILE_HORIZONTAL_ALIGN_TOP"/>
+                    <StringItem index="8" value="IMAGE_TILE_HORIZONTAL_ALIGN_CENTER"/>
+                    <StringItem index="9" value="IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM"/>
+                    <StringItem index="10" value="IMAGE_ALIGNED_TOP"/>
+                    <StringItem index="11" value="IMAGE_ALIGNED_BOTTOM"/>
+                    <StringItem index="12" value="IMAGE_ALIGNED_LEFT"/>
+                    <StringItem index="13" value="IMAGE_ALIGNED_RIGHT"/>
+                    <StringItem index="14" value="IMAGE_ALIGNED_TOP_LEFT"/>
+                    <StringItem index="15" value="IMAGE_ALIGNED_TOP_RIGHT"/>
+                    <StringItem index="16" value="IMAGE_ALIGNED_BOTTOM_LEFT"/>
+                    <StringItem index="17" value="IMAGE_ALIGNED_BOTTOM_RIGHT"/>
+                    <StringItem index="18" value="IMAGE_ALIGNED_CENTER"/>
+                    <StringItem index="19" value="GRADIENT_LINEAR_HORIZONTAL"/>
+                    <StringItem index="20" value="GRADIENT_LINEAR_VERTICAL"/>
+                    <StringItem index="21" value="GRADIENT_RADIAL"/>
+                    <StringItem index="22" value="NONE"/>
                   </StringArray>
                 </Property>
                 <Property name="enabled" type="boolean" value="false"/>

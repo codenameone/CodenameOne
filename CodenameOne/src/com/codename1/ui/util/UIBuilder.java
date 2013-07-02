@@ -332,7 +332,7 @@ public class UIBuilder {
      * and add support for additional 3rd party components to the GUI builder. Components
      * must be registered using their UIID name, by default all the content of com.codename1.ui is
      * registered however subpackages and 3rd party components are not.
-     * Registeration is essential for obfuscation to work properly!
+     * Registration is essential for obfuscation to work properly!
      *
      * @param name the name of the component (UIID)
      * @param cmp the class for the given component

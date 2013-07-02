@@ -222,6 +222,7 @@ final class IOSNative {
     native int writeToFile(byte[] data, String path);
     native int appendToFile(byte[] data, String path);
     native int getFileSize(String path);
+    native long getFileLastModified(String path);
     native void readFile(String path, byte[] bytes);
 
     native String getDocumentsDir();

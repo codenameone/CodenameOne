@@ -41,7 +41,7 @@ import java.util.Date;
  *
  * @author Shai Almog
  */
-public class PushInbox {
+class PushInbox {
     private java.util.List<CloudObject> cache;
     private static PushInbox instance;
     private boolean sync;

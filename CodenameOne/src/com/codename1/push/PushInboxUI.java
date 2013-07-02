@@ -51,7 +51,7 @@ import java.util.Date;
  *
  * @author Shai Almog
  */
-public class PushInboxUI extends Container {
+class PushInboxUI extends Container {
     private String replyEmail;
     
     //private static String defaultFrom = "";

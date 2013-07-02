@@ -49,6 +49,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -255,7 +256,7 @@ public final class Display {
     /**
      * Contains the call serially pending elements
      */
-    private Vector pendingSerialCalls = new Vector();
+    private ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
 
     /**
      * This is the instance of the EDT used internally to indicate whether
@@ -268,7 +269,7 @@ public final class Display {
      * may be processed. This is useful for transitions/intro's etc... that animate without
      * user interaction.
      */
-    private Vector animationQueue;
+    private ArrayList<Animation> animationQueue;
 
     /**
      * Indicates whether the 3rd softbutton should be supported on this device
@@ -310,7 +311,7 @@ public final class Display {
     /**
      * Events to broadcast on the EDT
      */
-    private Vector inputEvents = new Vector();
+    private ArrayList inputEvents = new ArrayList();
 
     private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
@@ -409,17 +410,13 @@ public final class Display {
 
     private boolean dropEvents;
     
-    private Vector backgroundTasks;
+    private ArrayList<Runnable> backgroundTasks;
     private Thread backgroundThread;
     
     /**
      * Private constructor to prevent instanciation
      */
     private Display() {
-    }
-
-    Vector getAnimationQueue() {
-        return animationQueue;
     }
 
     /**
@@ -642,7 +639,7 @@ public final class Display {
      */
     public void callSerially(Runnable r){
         synchronized(lock) {
-            pendingSerialCalls.addElement(r);
+            pendingSerialCalls.add(r);
             lock.notifyAll();
         }
     }
@@ -656,9 +653,9 @@ public final class Display {
     public void scheduleBackgroundTask(Runnable r) {
         synchronized(lock) {
             if(backgroundTasks == null) {
-                backgroundTasks = new Vector();
+                backgroundTasks = new ArrayList<Runnable>();
             }
-            backgroundTasks.addElement(r);
+            backgroundTasks.add(r);
             if(backgroundThread == null) {
                 backgroundThread = new CodenameOneThread(new Runnable() {
                     public void run() {
@@ -667,12 +664,12 @@ public final class Display {
                             Runnable nextTask = null;
                             synchronized(lock) {
                                 if(backgroundTasks.size() > 0) {
-                                    nextTask = (Runnable)backgroundTasks.elementAt(0);
+                                    nextTask = (Runnable)backgroundTasks.get(0);
                                 } else {
                                     backgroundThread = null;
                                     return;
                                 }
-                                backgroundTasks.removeElementAt(0);
+                                backgroundTasks.remove(0);
                             }
                             nextTask.run();
                             try {
@@ -764,15 +761,15 @@ public final class Display {
 
 
     private void paintTransitionAnimation() {
-        Animation ani = (Animation) animationQueue.elementAt(0);
+        Animation ani = (Animation) animationQueue.get(0);
         if (!ani.animate()) {
-            animationQueue.removeElementAt(0);
+            animationQueue.remove(0);
             if (ani instanceof Transition) {
                 Form source = (Form) ((Transition)ani).getSource();
                 restoreMenu(source);
 
                 if (animationQueue.size() > 0) {
-                    ani = (Animation) animationQueue.elementAt(0);
+                    ani = (Animation) animationQueue.get(0);
                     if (ani instanceof Transition) {
                         ((Transition) ani).initTransition();
                     }
@@ -911,8 +908,8 @@ public final class Display {
         long currentTime = System.currentTimeMillis();
 
         while(inputEvents.size() > 0) {
-            int[] i = (int[])inputEvents.elementAt(0);
-            inputEvents.removeElementAt(0);
+            int[] i = (int[])inputEvents.get(0);
+            inputEvents.remove(0);
             handleEvent(i);
         }
 
@@ -980,15 +977,15 @@ public final class Display {
 
                 // copy all elements to an array and remove them otherwise invokeAndBlock from
                 // within a callSerially() can cause an infinite loop...
-                pendingSerialCalls.copyInto(array);
+                pendingSerialCalls.toArray(array);
 
                 if(size == pendingSerialCalls.size()) {
                     // this is faster
-                    pendingSerialCalls.removeAllElements();
+                    pendingSerialCalls.clear();
                 } else {
                     // this can occur if an element was added during the loop
                     for(int iter = 0 ; iter < size ; iter++) {
-                        pendingSerialCalls.removeElementAt(0);
+                        pendingSerialCalls.remove(0);
                     }
                 }
             }
@@ -1177,7 +1174,7 @@ public final class Display {
 
         boolean transitionExists = false;
         if(animationQueue != null && animationQueue.size() > 0) {
-            Object o = animationQueue.lastElement();
+            Object o = animationQueue.get(animationQueue.size() - 1);
             if(o instanceof Transition) {
                 current = (Form)((Transition)o).getDestination();
                 impl.setCurrentForm(current);
@@ -1203,7 +1200,7 @@ public final class Display {
             if(newForm != current) {
                 if((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
                     if(animationQueue == null) {
-                        animationQueue = new Vector();
+                        animationQueue = new ArrayList<Animation>();
                     }
                     // prevent form transitions from breaking our dialog based
                     // transitions which are a bit sensitive
@@ -1254,7 +1251,7 @@ public final class Display {
             
             // if a native transition implementation exists then substitute it into place
             transition = impl.getNativeTransition(transition);
-            animationQueue.addElement(transition);
+            animationQueue.add(transition);
 
             if (animationQueue.size() == 1) {
                 transition.initTransition();
@@ -1262,7 +1259,7 @@ public final class Display {
         } catch (Throwable e) {
             e.printStackTrace();
             transition.cleanup();
-            animationQueue.removeElement(transition);
+            animationQueue.remove(transition);
             return false;
         }
         return true;
@@ -1388,7 +1385,7 @@ public final class Display {
                     || ev[0] == POINTER_DRAGGED || ev[0] == POINTER_HOVER)) {
                 return;
             }
-            inputEvents.addElement(ev);
+            inputEvents.add(ev);
             lock.notify();
         }
     }
@@ -1793,9 +1790,7 @@ public final class Display {
 
         // we are in the middle of a transition so we should extract the next form
         if(animationQueue != null) {
-            int size = animationQueue.size();
-            for(int iter = 0 ; iter < size ; iter++) {
-                Object o = animationQueue.elementAt(iter);
+            for(Animation o : animationQueue) {
                 if(o instanceof Transition) {
                     upcoming = (Form)((Transition)o).getDestination();
                 }
@@ -1835,9 +1830,7 @@ public final class Display {
 
                 // we are in the middle of a transition so we should extract the next form
                 if(animationQueue != null) {
-                    int size = animationQueue.size();
-                    for(int iter = 0 ; iter < size ; iter++) {
-                        Object o = animationQueue.elementAt(iter);
+                    for(Animation o : animationQueue) {
                         if(o instanceof Transition) {
                             return (Form)((Transition)o).getDestination();
                         }
@@ -2714,7 +2707,7 @@ public final class Display {
         return impl.getPlatformOverrides();
     }
 
-      /**
+    /**
      * Send an email using the platform mail client
      * @param recieptents array of e-mail addresses
      * @param subject e-mail subject

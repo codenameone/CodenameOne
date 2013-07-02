@@ -22,6 +22,8 @@
  */
 package com.codename1.messaging;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.Display;
 
 /**
@@ -125,4 +127,54 @@ public class Message {
         Display.getInstance().sendMessage(recieptents, subject, msg);
     }
     
+
+    /**
+     * Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts
+     * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
+     * @param recipient the email for the recipient
+     * @param recipientName the display name for the recipient
+     * @param subject e-mail subject
+     * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
+     * this is redundant if the email is a plain text message to begin with
+     */
+    public void sendMessageViaCloud(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
+        NetworkManager.getInstance().addToQueue(createMessage(sender, recipient, recipientName, subject, plainTextBody));
+    }
+
+    /**
+     * Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts
+     * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
+     * @param recipient the email for the recipient
+     * @param recipientName the display name for the recipient
+     * @param subject e-mail subject
+     * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
+     * this is redundant if the email is a plain text message to begin with
+     * @return true if sending succeeded
+     */
+    public boolean sendMessageViaCloudSync(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
+        ConnectionRequest r = createMessage(sender, recipient, recipientName, subject, plainTextBody);
+        NetworkManager.getInstance().addToQueueAndWait(r);
+        return r.getResposeCode() == 200;
+    }
+    
+    private ConnectionRequest createMessage(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setUrl("https://codename-one.appspot.com/sendEmailServlet");
+        cr.setPost(true);
+        cr.addArgument("d", Display.getInstance().getProperty("built_by_user", ""));
+        cr.addArgument("from", sender);
+        cr.addArgument("to", recipient);
+        cr.addArgument("re", recipientName);
+        cr.addArgument("subject", subject);
+        if(mimeType.equals(MIME_TEXT)) {
+            cr.addArgument("body", content);
+        } else {
+            cr.addArgument("body", plainTextBody);
+            cr.addArgument("html", content);
+        }
+        
+        return cr;
+    }
 }
