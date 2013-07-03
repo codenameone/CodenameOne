@@ -2848,7 +2848,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
             
             web.setWebChromeClient(new WebChromeClient(){
-                private boolean clearTitle = false;
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
@@ -2857,31 +2856,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public void onProgressChanged(WebView view, int newProgress) {
-                    if(isNativeTitle()){
-                        Display.getInstance().callSerially(new Runnable() {
-                            @Override
-                            public void run() {
-                                Form current = getCurrentForm();
-                                if(current.getTitle().length() == 0){
-                                    current.setTitle("Loading...");
-                                    clearTitle = true;
-                                }
-                            }
-                        });
+                    if(isNativeTitle() && getCurrentForm().getTitle().length() > 0 ){
                         activity.setProgressBarVisibility(true);
                         activity.setProgress(newProgress * 100);
                         if(newProgress == 100){
-                            if(clearTitle){
-                                Display.getInstance().callSerially(new Runnable() {
-
-                                    @Override
-                                    public void run() {
-                                        Form current = getCurrentForm();
-                                        current.setTitle("");
-                                    }
-                                });
-                            }
-                            clearTitle = false;
                             activity.setProgressBarVisibility(false);
                         }
                     }
