@@ -1664,10 +1664,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 activity.startActivity(intent);
             }
             return;
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (Exception ex) {           
         }
-
+        
+        try {
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 
