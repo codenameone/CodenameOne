@@ -486,13 +486,14 @@ public class CodenameOneActivity extends Activity {
             return false;
         }
         Command cmd = null;
-        ActionEvent evt = null;
+        final boolean [] tmpProp = new boolean[1];
         if(item.getItemId() == android.R.id.home){
             cmd = currentForm.getBackCommand();
             if(cmd == null){
                 return false;
             }
-            evt = new ActionEvent("home");
+            cmd.putClientProperty("source", "ActionBar");
+            tmpProp[0] = true;
         }
         
         int commandIndex = item.getItemId();
@@ -500,10 +501,7 @@ public class CodenameOneActivity extends Activity {
             cmd = currentForm.getCommand(commandIndex);
         }
         final Command command = cmd;
-        if(evt == null){
-            evt = new ActionEvent(command);
-        }
-        final ActionEvent actionEvent = evt;
+        final ActionEvent actionEvent = new ActionEvent(command);
 
         //stop edit if the keybaord is open
         AndroidImplementation.stopEditing();
@@ -513,6 +511,10 @@ public class CodenameOneActivity extends Activity {
             public void run() {
                 try {
                     currentForm.dispatchCommand(command, actionEvent);
+                    //remove the temp source property
+                    if(tmpProp[0]){
+                        command.putClientProperty("source", null);
+                    }
                 } catch (Throwable e) {
                     Log.e("CodenameOneActivity.onOptionsItemSelected", e.toString() + Log.getStackTraceString(e));
                 }
