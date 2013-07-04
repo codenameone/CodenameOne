@@ -2741,9 +2741,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private BrowserComponent parent;
         private boolean scrollingEnabled = true;
         protected AndroidBrowserComponentCallback jsCallback;
-        private boolean lightweightMode = false;
-        
+        private boolean lightweightMode = false;        
         private ProgressDialog progressBar;
+        private boolean hideProgress;
+        
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
@@ -2754,6 +2755,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
             this.act = act;
             jsCallback = new AndroidBrowserComponentCallback();
+            hideProgress = Display.getInstance().getProperty("WebLoadingHidden", "false").equals("true");
+            
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
 
             web.setWebViewClient(new WebViewClient() {
@@ -2799,7 +2802,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     super.onPageStarted(view, url, favicon);
                     dismissProgress();
                     //show the progress only if there is no ActionBar
-                    if(!isNativeTitle()){
+                    if(!hideProgress && !isNativeTitle()){
                         progressBar = ProgressDialog.show(activity, null, "Loading...");
                     }
                 }
@@ -2860,7 +2863,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public void onProgressChanged(WebView view, int newProgress) {
-                    if(isNativeTitle() && getCurrentForm().getTitle().length() > 0 ){
+                    if(!hideProgress && isNativeTitle() && getCurrentForm().getTitle().length() > 0 ){
                         activity.setProgressBarVisibility(true);
                         activity.setProgress(newProgress * 100);
                         if(newProgress == 100){
