@@ -486,11 +486,13 @@ public class CodenameOneActivity extends Activity {
             return false;
         }
         Command cmd = null;
+        ActionEvent evt = null;
         if(item.getItemId() == android.R.id.home){
             cmd = currentForm.getBackCommand();
             if(cmd == null){
                 return false;
             }
+            evt = new ActionEvent("home");
         }
         
         int commandIndex = item.getItemId();
@@ -498,7 +500,10 @@ public class CodenameOneActivity extends Activity {
             cmd = currentForm.getCommand(commandIndex);
         }
         final Command command = cmd;
-        final ActionEvent actionEvent = new ActionEvent(command);
+        if(evt == null){
+            evt = new ActionEvent(command);
+        }
+        final ActionEvent actionEvent = evt;
 
         //stop edit if the keybaord is open
         AndroidImplementation.stopEditing();
