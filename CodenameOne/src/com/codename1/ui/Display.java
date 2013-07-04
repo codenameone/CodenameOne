@@ -1338,7 +1338,9 @@ public final class Display {
         if(f == null) {
             return;
         }
+        Component.setDisableSmoothScrolling(true);
         f.scrollComponentToVisible(cmp);
+        Component.setDisableSmoothScrolling(false);
         editingText = cmp;
         keyRepeatCharged = false;
         longPressCharged = false;
