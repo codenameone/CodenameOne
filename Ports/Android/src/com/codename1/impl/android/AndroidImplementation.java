@@ -2848,6 +2848,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         setURL(url);
                         return true;
                     }
+                    
+                    // this will fail if dial permission isn't declared
+                    if(url.startsWith("tel:")) {
+                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                            try {
+                                Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse(url));
+                                activity.startActivity(dialer);
+                            } catch(Throwable t) {}
+                        }
+                        return false;
+                    }
                     return !parent.getBrowserNavigationCallback().shouldNavigate(url); 
                 }
                 
@@ -4137,8 +4148,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((CodenameOneActivity) activity).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);
+            registerPushOnServer(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
         }
-        registerPushOnServer(id, getApplicationKey(), (byte)1, getProperty("UDID", ""), getPackageName());
     }
 
     public static void stopPollingLoop() {
