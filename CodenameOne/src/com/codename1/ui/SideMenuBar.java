@@ -215,10 +215,29 @@ public class SideMenuBar extends MenuBar {
             m.setGlassPane(new Painter() {
 
                 public void paint(Graphics g, Rectangle rect) {
-                    if (isRTL) {
-                        g.drawImage(i, Math.max(draggedX, rightPanel.getWidth()) - i.getWidth(), 0);
+                    if(i == null) {
+                        // will happen for areMutableImagesFast returning false on iOS and Windows Phone
+                        Component c = (Component)rightPanel.getClientProperty("$parent");
+                        boolean b = c.isVisible();
+                        c.setVisible(true);
+                        if (isRTL) {
+                            int x = Math.max(draggedX, rightPanel.getWidth()) - c.getWidth();
+                            g.translate(x, 0);
+                            c.paintComponent(g, true);
+                            g.translate(-x, 0);
+                        } else {
+                            int x = Math.min(draggedX, rightPanel.getX());
+                            g.translate(x, 0);
+                            c.paintComponent(g, true);
+                            g.translate(-x, 0);
+                        }
+                        c.setVisible(b);
                     } else {
-                        g.drawImage(i, Math.min(draggedX, rightPanel.getX()), 0);
+                        if (isRTL) {
+                            g.drawImage(i, Math.max(draggedX, rightPanel.getWidth()) - i.getWidth(), 0);
+                        } else {
+                            g.drawImage(i, Math.min(draggedX, rightPanel.getX()), 0);
+                        }
                     }
                 }
             });
@@ -390,7 +409,24 @@ public class SideMenuBar extends MenuBar {
             }
         });
         m.setLayout(new BorderLayout());
-        rightPanel = new Container(new BorderLayout());
+        if(Display.getInstance().areMutableImagesFast()) {
+            rightPanel = new Container(new BorderLayout());
+        } else {
+            rightPanel = new Container(new BorderLayout()) {
+                public void paintBackground(Graphics g) {}
+                public void paintBackgrounds(Graphics g) {}
+                public void paint(Graphics g) {
+                    Component c = (Component)rightPanel.getClientProperty("$parent");
+                    boolean b = c.isVisible();
+                    c.setVisible(true);
+                    int x = getAbsoluteX();
+                    g.translate(x, 0);
+                    c.paintComponent(g, true);
+                    g.translate(-x, 0);
+                    c.setVisible(b);
+                }
+            };
+        }
 
 
         if (Display.getInstance().isPortrait()) {
@@ -433,23 +469,33 @@ public class SideMenuBar extends MenuBar {
 
         public void initTransition() {
             super.initTransition();
-            buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
-            boolean isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
-            if (fwd) {
-                Graphics g = buffer.getGraphics();
-                getSource().paintComponent(g);
-                motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);
+            if(Display.getInstance().areMutableImagesFast()) {
+                buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+                boolean isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
+                if (fwd) {
+                    Graphics g = buffer.getGraphics();
+                    getSource().paintComponent(g);
+                    motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);
+                } else {
+                    Graphics g = buffer.getGraphics();
+                    getDestination().paintComponent(g);
+                    motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);
+                }
+                if (isRTL) {
+                    rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT);
+                } else {
+                    rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
+                }
+                rightPanel.getStyle().setBgImage(buffer);
             } else {
-                Graphics g = buffer.getGraphics();
-                getDestination().paintComponent(g);
-                motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);
+                if (fwd) {
+                    motion = Motion.createEaseInOutMotion(0, Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), speed);
+                    rightPanel.putClientProperty("$parent", getSource());
+                } else {
+                    motion = Motion.createEaseInOutMotion(Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), 0, speed);
+                    rightPanel.putClientProperty("$parent", getDestination());
+                }
             }
-            if (isRTL) {
-                rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT);
-            } else {
-                rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);
-            }
-            rightPanel.getStyle().setBgImage(buffer);
 
             motion.start();
         }
@@ -472,12 +518,26 @@ public class SideMenuBar extends MenuBar {
             if (src.isRTL()) {
                 position = position * -1;
             }
-            if (fwd) {
-                dest.paintComponent(g, true);
-                g.drawImage(buffer, position, 0);
+            if(Display.getInstance().areMutableImagesFast()) {
+                if (fwd) {
+                    dest.paintComponent(g, true);
+                    g.drawImage(buffer, position, 0);
+                } else {
+                    src.paintComponent(g, true);
+                    g.drawImage(buffer, position, 0);
+                }
             } else {
-                src.paintComponent(g, true);
-                g.drawImage(buffer, position, 0);
+                if (fwd) {
+                    dest.paintComponent(g, true);
+                    g.translate(position, 0);
+                    src.paintComponent(g, true);
+                    g.translate(-position, 0);
+                } else {
+                    src.paintComponent(g, true);
+                    g.translate(position, 0);
+                    dest.paintComponent(g, true);
+                    g.translate(-position, 0);
+                }
             }
         }
     }
