@@ -3225,7 +3225,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             BufferedInputStream o = new BufferedInputStream(fc, con);
             return o;
         }
-        return new BufferedInputStream(((URLConnection) connection).getInputStream(), connection.toString());
+        if(connection instanceof HttpURLConnection) {
+            HttpURLConnection ht = (HttpURLConnection)connection;
+            if(ht.getResponseCode() < 400) {
+                return new BufferedInputStream(ht.getInputStream());
+            }
+            return new BufferedInputStream(ht.getErrorStream());
+        } else {
+            return new BufferedInputStream(((URLConnection) connection).getInputStream());
+        }        
     }
 
     /**

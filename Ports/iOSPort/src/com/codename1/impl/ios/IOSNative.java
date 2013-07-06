@@ -285,6 +285,7 @@ final class IOSNative {
 
     native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType, boolean htmlMail);
 
+    native boolean isContactsPermissionGranted();
     native int getContactCount(boolean withNumbers);
     native void getContactRefIds(int[] refs, boolean withNumbers);
     native long getPersonWithRecordID(int id);

@@ -4245,6 +4245,15 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
+     * 
+     * @return true if contacts access is allowed or globally available, false otherwise
+     */
+    public boolean isContactsPermissionGranted() {
+        return true;
+    }
+    
+    /**
      * removed a contact from the device contacts book
      * @param id the contact id to remove
      * @return true if deletion succeeded false otherwise

@@ -859,7 +859,8 @@ public class Container extends Component {
         int size = components.size();
         CodenameOneImplementation impl = Display.getInstance().getImplementation();
         if(dontRecurseContainer) {
-            for(Component cmp : components) {
+            for(int iter = 0 ; iter < size ; iter++) {
+                Component cmp = components.get(iter);
                 if(cmp.getClass() == Container.class) {
                     paintContainerChildrenForAnimation((Container)cmp, g);
                 } else {
@@ -867,7 +868,8 @@ public class Container extends Component {
                 }
             }
         } else {
-            for(Component cmp : components) {
+            for(int iter = 0 ; iter < size ; iter++) {
+                Component cmp = components.get(iter);
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
         }
@@ -905,7 +907,9 @@ public class Container extends Component {
                 endIndex = indexOfComponent;
             }
 
-            for(Component cmp2 : components) {
+            int size = components.size();
+            for(int iter = 0 ; iter < size ; iter++) {
+                Component cmp2 = components.get(iter);
                 if(Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),

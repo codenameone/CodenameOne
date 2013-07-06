@@ -2309,6 +2309,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isContactsPermissionGranted() {
+        final boolean[] f = new boolean[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+
+            @Override
+            public void run() {
+                f[0] = nativeInstance.isContactsPermissionGranted();
+            }
+        });
+        return f[0];
+    }
+
+    @Override
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
         return nativeInstance.createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
     }

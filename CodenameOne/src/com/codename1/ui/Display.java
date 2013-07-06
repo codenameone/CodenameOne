@@ -2769,6 +2769,15 @@ public final class Display {
     public Contact getContactById(String id) {
         return impl.getContactById(id);
     }
+
+    /**
+     * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
+     * 
+     * @return true if contacts access is allowed or globally available, false otherwise
+     */
+    public boolean isContactsPermissionGranted() {
+        return impl.isContactsPermissionGranted();
+    }
     
     /**
      * Create a contact to the device contacts book

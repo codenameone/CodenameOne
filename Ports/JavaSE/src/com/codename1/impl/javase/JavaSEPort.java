@@ -3884,7 +3884,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return i;
             }
         }
-        return new BufferedInputStream(((URLConnection) connection).getInputStream());
+        if(connection instanceof HttpURLConnection) {
+            HttpURLConnection ht = (HttpURLConnection)connection;
+            if(ht.getResponseCode() < 400) {
+                return new BufferedInputStream(ht.getInputStream());
+            }
+            return new BufferedInputStream(ht.getErrorStream());
+        } else {
+            return new BufferedInputStream(((URLConnection) connection).getInputStream());
+        }        
     }
 
     /**
