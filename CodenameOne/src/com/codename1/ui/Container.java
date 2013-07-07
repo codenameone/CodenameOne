@@ -908,8 +908,8 @@ public class Container extends Component {
             }
 
             int size = components.size();
-            for(int iter = 0 ; iter < size ; iter++) {
-                Component cmp2 = components.get(iter);
+            for (int i = startIndex; i < endIndex; i++) {
+                Component cmp2 = (Component) components.get(i);
                 if(Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),
