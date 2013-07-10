@@ -208,6 +208,9 @@ public class FileSystemStorage {
      * @param newName relative new name
      */
     public void rename(String file, String newName) {
+        if(newName.indexOf('/') > -1) {
+            throw new RuntimeException("Rename accepts only relative file names not full paths: " + newName);
+        }
         Util.getImplementation().rename(file, newName);        
     }
 

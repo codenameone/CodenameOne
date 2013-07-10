@@ -663,6 +663,7 @@ public final class CommonTransitions extends Transition {
                         paintFastSlideAtPosition(g, 0, position);
                     }
                     return;
+                case TYPE_UNCOVER:
                 case TYPE_COVER:
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintCoverAtPosition(g, position, 0);

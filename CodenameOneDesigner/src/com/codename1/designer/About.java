@@ -75,7 +75,7 @@ public class About extends javax.swing.JDialog {
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("About");
 
-        jLabel1.setText("Codename One Designer Version 0.1");
+        jLabel1.setText("Codename One Designer Version 1.1");
         jLabel1.setName("jLabel1"); // NOI18N
 
         jPanel1.setName("jPanel1"); // NOI18N

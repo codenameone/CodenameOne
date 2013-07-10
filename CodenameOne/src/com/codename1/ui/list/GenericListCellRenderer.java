@@ -114,6 +114,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
         unselectedEntries = initRenderer(unselected);
         firstCharacterRTL = selected.getUIManager().isThemeConstant("firstCharRTLBool", false);
         addSelectedEntriesListener(selectedEntries);
+        addSelectedEntriesListener(unselectedEntries);
     }
 
     

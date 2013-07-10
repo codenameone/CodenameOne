@@ -432,6 +432,20 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Returns the HTTP header field for the given connection, this method is only guaranteed to work
+     * when invoked from the readHeaders method. Unlike the getHeader method this version works when
+     * the same header name is declared multiple times.
+     *
+     * @param connection the connection to the network
+     * @param header the name of the header
+     * @return the value of the header
+     * @throws java.io.IOException thrown on failure
+     */
+    protected String[] getHeaders(Object connection, String header) throws IOException {
+        return Util.getImplementation().getHeaderFields(header, connection);
+    }
+
+    /**
      * Returns the HTTP header field names for the given connection, this method is only guaranteed to work
      * when invoked from the readHeaders method.
      *
