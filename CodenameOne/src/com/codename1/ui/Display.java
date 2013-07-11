@@ -1170,6 +1170,9 @@ public final class Display {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
+        } else {
+            // if shouldLayout is true
+            newForm.layoutContainer();
         }
 
         boolean transitionExists = false;

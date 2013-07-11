@@ -87,6 +87,7 @@ public class BoxLayout extends Layout{
             switch(axis) {
                 case Y_AXIS:
                     int cmpBottom = height;
+                    cmp.setWidth(width - stl.getMargin(parent.isRTL(), Component.LEFT) - stl.getMargin(parent.isRTL(), Component.RIGHT));
                     int cmpH = cmp.getPreferredH();
 
                     y += stl.getMargin(false, Component.TOP);
@@ -96,7 +97,6 @@ public class BoxLayout extends Layout{
                     }else if(y + cmpH - parent.getStyle().getPadding(false, Component.TOP) > cmpBottom){
                         cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
                     }
-                    cmp.setWidth(width - stl.getMargin(parent.isRTL(), Component.LEFT) - stl.getMargin(parent.isRTL(), Component.RIGHT));
                     cmp.setHeight(cmpH);
                     cmp.setX(x + stl.getMargin(parent.isRTL(), Component.LEFT));
                     cmp.setY(y);

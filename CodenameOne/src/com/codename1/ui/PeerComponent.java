@@ -203,7 +203,10 @@ public class PeerComponent extends Component {
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
         if(shouldRenderPeerImage() && getWidth() > 0 && getHeight() > 0) {
-            g.drawImage(getPeerImage(), getX(), getY(), getWidth(), getHeight());
+            Image img = getPeerImage();
+            if(img != null) {
+                g.drawImage(img, getX(), getY(), getWidth(), getHeight());
+            }
         } else {
             super.paint(g);
         }

@@ -366,6 +366,9 @@ public class TextArea extends Component {
     public void setWidth(int width) {
         if(width != getWidth()) {
             rowStrings = null;
+            if(growByContent) {
+                setShouldCalcPreferredSize(true);
+            }
         }
         super.setWidth(width);
         //getRowStrings();
