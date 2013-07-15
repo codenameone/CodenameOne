@@ -69,6 +69,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("dlgCommandButtonSizeInt", "Valid values: positive ints. Indicates the minimum size width for a button command in a dialog");
         helpMap.put("formTransitionIn", "Valid values: slide, fade. Indicates the default transition when entering a form");
         helpMap.put("formTransitionOut", "Valid values: slide, fade. Indicates the default transition when leaving a form");
+        helpMap.put("hideBackCommandBool", "Valid values: true/false. Indicates that back command is hidden from the commands and is only mapped to the hard key back button.");
         helpMap.put("hideEmptyTitleBool", "Valid values: true/false. Indicates that titles without text should be hidden from view in a dialog, this is useful for some elaborate dialog designs.");
         helpMap.put("menuHeightPercent", "Valid values: 1-99. Percentage of the screen that should be occupied by the menu dialog when the softbutton Menu option is opened");
         helpMap.put("menuTransitionIn", "Valid values: slide, fade. Indicates the default transition when opening a menu");
@@ -90,6 +91,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("alwaysTensileBool", "Enables tensile drag even when there is no scrolling in the container (only for scrollable containers though)");
         helpMap.put("ComponentGroupBool", "Enables component group which allows components to be logically grouped together so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. Its disabled by default thus leaving its usage up to the designer.");
         helpMap.put("dlgCommandGridBool", "Places the dialog commands in a grid for uniform sizes");
+        helpMap.put("tensileDragBool", "Indicates if tensile drag is enabled");
         helpMap.put("textFieldCursorColorInt", "The color of the cursor as an integer (not hex)");
         helpMap.put("textCmpVAlignInt", "The vertical alignment of the text component: TOP = 0, CENTER = 4, BOTTOM = 2");
         helpMap.put("PackTouchMenuBool", "Enables preferred sized packing of the touch menu (true by default), when set to false this allows manually determining the touch menu size using percentages");
