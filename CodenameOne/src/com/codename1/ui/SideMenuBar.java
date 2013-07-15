@@ -201,8 +201,12 @@ public class SideMenuBar extends MenuBar {
     }
 
     private void clean() {
-        parent.setTransitionOutAnimator(out);
-        parent.setTransitionInAnimator(in);
+        if(out != null){
+            parent.setTransitionOutAnimator(out);
+        }
+        if(in != null){
+            parent.setTransitionInAnimator(in);
+        }
         out = null;
         in = null;
     }
@@ -381,6 +385,12 @@ public class SideMenuBar extends MenuBar {
                                 parent.setTransitionInAnimator(CommonTransitions.createEmpty());
                                 parent.show();
                                 deregisterAnimated(this);
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    public void run() {
+                                        clean();
+                                    }
+                                });
                             }
 
                         }
