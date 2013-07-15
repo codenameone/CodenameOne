@@ -41,14 +41,14 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * The generic list cell renderer can display containers or arbitrary Codename One components
- * as items in a list. It generally relies on the source data being either a hashtable a CloudObject or
- * a list of Strings. It extracts values from the hashtable using the component name as
- * an indication to the hashtable key lookup.
+ * as items in a list. It generally relies on the source data being either a Map a CloudObject or
+ * a list of Strings. It extracts values from the Map using the component name as
+ * an indication to the Map key lookup.
  * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.
  * Please notice that you must use at least two distinguished instances of the component
  * to render, reusing the same instance WILL NOT WORK.
@@ -59,10 +59,10 @@ import java.util.Vector;
  */
 public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     private Button lastClickedComponent;
-    private Vector pendingAnimations;
+    private ArrayList<Image> pendingAnimations;
 
     /**
-     * If this flag exists in a hashtable of data the renderer will enable/disable
+     * If this flag exists in a Map of data the renderer will enable/disable
      * the entries, the flag assumes either Boolean.TRUE or Boolean.FALSE. 
      * Notice that just setting it to false when necessary will not work, when its
      * used it must be applied to all entries otherwise the reuse of the renderer
@@ -71,7 +71,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     public static final String ENABLED = "$$ENABLED$$";
 
     /**
-     * Put this flag as a hashtable key to indicate that a checkbox entry rendered by
+     * Put this flag as a Map key to indicate that a checkbox entry rendered by
      * this renderer should act as a "select all" entry and toggle all other entries.
      * The value for this entry is ignored
      */
@@ -129,7 +129,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     private Component[] initRenderer(Component r) {
         r.setCellRenderer(true);
         if(r instanceof Container) {
-            Vector selectedVector = new Vector();
+            ArrayList selectedVector = new ArrayList();
             findComponentsOfInterest(r, selectedVector);
             return vectorToComponentArray(selectedVector);
         } else {
@@ -168,17 +168,18 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
         selectedEntriesEven = initRenderer(even);
         unselectedEntriesEven = initRenderer(evenUnselected);
         addSelectedEntriesListener(selectedEntriesEven);
+        addSelectedEntriesListener(unselectedEntriesEven);
     }
 
-    private Component[] vectorToComponentArray(Vector v) {
+    private Component[] vectorToComponentArray(ArrayList v) {
         Component[] result = new Component[v.size()];
         for(int iter = 0 ; iter < result.length ; iter++) {
-            result[iter] = (Component)v.elementAt(iter);
+            result[iter] = (Component)v.get(iter);
         }
         return result;
     }
 
-    private void findComponentsOfInterest(Component cmp, Vector dest) {
+    private void findComponentsOfInterest(Component cmp, ArrayList dest) {
         if(cmp instanceof Container) {
             Container c = (Container)cmp;
             int count = c.getComponentCount();
@@ -188,7 +189,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
             return;
         }
         if((cmp instanceof Label || cmp instanceof TextArea) && cmp.getName() != null) {
-            dest.addElement(cmp);
+            dest.add(cmp);
             return;
         }
     }
@@ -219,8 +220,8 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
             if(cmp instanceof Container) {
                 lead = ((Container)cmp).getLeadComponent() != null;
             }
-            if(value instanceof Hashtable) {
-                Hashtable h = (Hashtable)value;
+            if(value instanceof Map) {
+                Map h = (Map)value;
                 Boolean enabled = (Boolean)h.get(ENABLED);
                 if(enabled != null) {
                     cmp.setEnabled(enabled.booleanValue());
@@ -285,8 +286,8 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                 }
             }
             cmp.setFocus(false);
-            if(value instanceof Hashtable) {
-                Hashtable h = (Hashtable)value;
+            if(value instanceof Map) {
+                Map h = (Map)value;
                 Boolean enabled = (Boolean)h.get(ENABLED);
                 if(enabled != null) {
                     cmp.setEnabled(enabled.booleanValue());
@@ -383,10 +384,10 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                 Image i = (Image)value;
                 if(i.isAnimation()) {
                     if(pendingAnimations == null) {
-                        pendingAnimations = new Vector();
+                        pendingAnimations = new ArrayList<Image>();
                     }
                     if(!pendingAnimations.contains(i)) {
-                        pendingAnimations.addElement(i);
+                        pendingAnimations.add(i);
                         if(parentList == null) {
                             parentList = parent;
                         }
@@ -551,11 +552,11 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                     int s = pendingAnimations.size();
                     hasAnimations = true;
                     for(int iter = 0 ; iter < s ; iter++) {
-                        Image i = (Image)pendingAnimations.elementAt(iter);
+                        Image i = (Image)pendingAnimations.get(iter);
                         repaint = i.animate() || repaint;
                     }
                     if(repaint) {
-                        pendingAnimations.removeAllElements();
+                        pendingAnimations.clear();
                     } else {
                         // flush the queue if we have too many animations
                         if(pendingAnimations.size() > 20) {
@@ -620,8 +621,8 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                 // prevent list from losing focus on action
                 parentList.setHandlesInput(true);
                 Object selection = ((List)parentList).getSelectedItem();
-                if(selection instanceof Hashtable) {
-                    Hashtable h = (Hashtable)selection;
+                if(selection instanceof Map) {
+                    Map h = (Map)selection;
                     Command cmd = (Command)h.get("$navigation");
                     if(cmd != null) {
                         parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd));
@@ -640,14 +641,14 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
                                 String selectionVal = "" + sel;
                                 for(int x = 0 ; x < count ; x++) {
                                     Object o = ((List)parentList).getModel().getItemAt(x);
-                                    if(o instanceof Hashtable) {
-                                        ((Hashtable)o).put(selectedEntries[iter].getName(), selectionVal);
+                                    if(o instanceof Map) {
+                                        ((Map)o).put(selectedEntries[iter].getName(), selectionVal);
                                     }
                                 }
                             } else {
                                 if(selectAllChecked) {
                                     selectAllChecked = false;
-                                    Hashtable selAll = (Hashtable)((List)parentList).getModel().getItemAt(selectAllOffset);
+                                    Map selAll = (Map)((List)parentList).getModel().getItemAt(selectAllOffset);
                                     selAll.put(selectedEntries[iter].getName(), "false");
                                 }
                                 h.put(selectedEntries[iter].getName(), "" + sel);

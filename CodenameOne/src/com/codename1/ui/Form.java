@@ -37,6 +37,7 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -72,7 +73,8 @@ public class Form extends Container {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
-    Vector buttonsAwatingRelease;
+    ArrayList<Component> buttonsAwatingRelease;
+    
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -1888,7 +1890,10 @@ public class Form extends Container {
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
-            Component pendingButton = (Component)buttonsAwatingRelease.elementAt(0);
+            if(atXY instanceof Container) {
+                atXY = atXY.getLeadComponent();
+            }
+            Component pendingButton = buttonsAwatingRelease.get(0);
             if(atXY != pendingButton) {
                 if(pendingButton instanceof Button) {
                     Button b = (Button)pendingButton;
@@ -2065,7 +2070,7 @@ public class Form extends Container {
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
-            Component pendingButton = (Component)buttonsAwatingRelease.elementAt(0);
+            Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
                 pointerReleased(x, y);
@@ -2144,7 +2149,7 @@ public class Form extends Container {
         stickyDrag = null;
         if (buttonsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
             for (int iter = 0; iter < buttonsAwatingRelease.size(); iter++) {
-                Button b = (Button) buttonsAwatingRelease.elementAt(iter);
+                Button b = (Button) buttonsAwatingRelease.get(iter);
                 b.setState(Button.STATE_DEFAULT);
                 b.repaint();
             }

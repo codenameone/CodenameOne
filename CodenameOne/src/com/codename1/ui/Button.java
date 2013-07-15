@@ -31,6 +31,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import java.util.ArrayList;
 import java.util.Vector;
 
 
@@ -471,9 +472,9 @@ public class Button extends Label {
         // might happen when programmatically triggering press
         if(f != null) {
             if(f.buttonsAwatingRelease == null) {
-                f.buttonsAwatingRelease = new Vector();
+                f.buttonsAwatingRelease = new ArrayList<Component>();
             }
-            f.buttonsAwatingRelease.addElement(this);
+            f.buttonsAwatingRelease.add(this);
         }
     }
     
@@ -485,7 +486,7 @@ public class Button extends Label {
         // might happen when programmatically triggering press
         if(f != null) {
             if(f.buttonsAwatingRelease != null) {
-                f.buttonsAwatingRelease.removeElement(this);
+                f.buttonsAwatingRelease.remove(this);
             }
         }
 
