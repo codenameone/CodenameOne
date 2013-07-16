@@ -126,6 +126,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
+import java.net.CookieHandler;
 import java.util.*;
 //import android.webkit.JavascriptInterface;
 
@@ -251,7 +252,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         HttpURLConnection.setFollowRedirects(false);
-        
+        CookieHandler.setDefault(null);
     }
     
     private static class InvalidateOptionsMenuImpl implements Runnable {
@@ -508,7 +509,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    //@Override
+    @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
         try {
             if (resource.startsWith("/")) {
@@ -516,7 +517,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             return activity.getAssets().open(resource);
         } catch (IOException ex) {
-            Log.i("Codename One", "Failed to load resource: " + resource);
+            Log.i("Codename One", "Resource not found: " + resource);
             return null;
         }
     }
@@ -3134,6 +3135,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
+        CookieHandler.setDefault(null);
         URLConnection con = u.openConnection();
         if (con instanceof HttpURLConnection) {
             HttpURLConnection c = (HttpURLConnection) con;
@@ -3302,7 +3304,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
-        List r = new ArrayList();
         List<String> headers = c.getHeaderFields().get(name);
         if (headers != null && headers.size() > 0) {
             Vector v = new Vector<String>();
@@ -3311,6 +3312,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             String[] s = new String[v.size()];
             v.toArray(s);
             return s;
+        }
+        // workaround for a bug in some android devices
+        String f = c.getHeaderField(name);
+        if(f != null && f.length() > 0) {
+            return new String[] {f};
         }
         return null;
 
