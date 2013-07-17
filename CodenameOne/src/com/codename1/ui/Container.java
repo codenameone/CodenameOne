@@ -1512,7 +1512,7 @@ public class Container extends Component {
                 if(current.isFocusable()){
                     return current;
                 }
-                if (current instanceof Container && !((Container)current).isBlockFocus()) {
+                if (current instanceof Container && !((Container)current).isBlockFocus() && ((Container)current).getLeadComponent() == null) {
                     Component cmp = ((Container)current).findFirstFocusable();
                     if(cmp != null){
                         return cmp;
