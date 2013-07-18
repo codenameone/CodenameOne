@@ -2605,7 +2605,8 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                 w.write("        Container rootContainerAncestor = getRootAncestor(c);\n");
                 w.write("        if(rootContainerAncestor == null) return;\n");
                 w.write("        String rootContainerName = rootContainerAncestor.getName();\n");
-                w.write("        if(c.getParent().getLeadParent() != null) {\n");
+                w.write("        Container leadParentContainer = c.getParent().getLeadParent();\n");
+                w.write("        if(leadParentContainer != null && leadParentContainer.getClass() != Container.class) {\n");
                 w.write("            c = c.getParent().getLeadParent();\n");
                 w.write("        }\n");
                 w.write("        if(rootContainerName == null) return;\n");
