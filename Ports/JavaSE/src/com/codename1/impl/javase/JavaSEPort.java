@@ -3183,7 +3183,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
-        java.awt.Font fnt = (java.awt.Font) font;
+        java.awt.Font fnt;
+        if(font instanceof int []){
+            fnt = createAWTFont((int [])font);
+        }else{
+            fnt = (java.awt.Font) font;        
+        }
         int style = java.awt.Font.PLAIN;
         if ((weight & com.codename1.ui.Font.STYLE_BOLD) == com.codename1.ui.Font.STYLE_BOLD) {
             style = java.awt.Font.BOLD;
