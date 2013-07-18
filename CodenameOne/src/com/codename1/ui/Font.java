@@ -195,7 +195,7 @@ public class Font {
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
-        if(fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf")) {
+        if(fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf"))) {
             throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
         }
         Object font = Display.getInstance().getImplementation().loadTrueTypeFont(fontName, fileName);
