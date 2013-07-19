@@ -43,6 +43,9 @@ public class GoogleMapsProvider extends TiledProvider{
     
     private int type;
     
+    private String language;
+    private boolean sensor;
+    
     /**
      * This is a regular road map
      */
@@ -75,6 +78,7 @@ public class GoogleMapsProvider extends TiledProvider{
      public void setMapType(int type){
         this.type = type;
     }
+     
     
     /**
      * @inheritDoc
@@ -106,7 +110,12 @@ public class GoogleMapsProvider extends TiledProvider{
         sb.append("&format=png");
         sb.append("&zoom="+_zoomLevel);
         sb.append("&size=256x256");
-        sb.append("&sensor=false");
+        sb.append("&sensor=");
+        sb.append(sensor);
+        if(language != null) {
+            sb.append("&language=");
+            sb.append(language);
+        }
         
         if(type == SATELLITE){
             sb.append("&maptype=satellite");        
@@ -117,6 +126,46 @@ public class GoogleMapsProvider extends TiledProvider{
         sb.append("&key="+apiKey);
         
         return new ProxyHttpTile(tileSize(), bbox, sb.toString());
+    }
+
+    /**
+     * Defines the language to use for display of labels on map tiles. 
+     * Note that this parameter is only supported for some country tiles; 
+     * if the specific language requested is not supported for the tile set, 
+     * then the default language for that tileset will be used.
+     * @return the language
+     */
+    public String getLanguage() {
+        return language;
+    }
+
+    /**
+     * Defines the language to use for display of labels on map tiles. 
+     * Note that this parameter is only supported for some country tiles; 
+     * if the specific language requested is not supported for the tile set, 
+     * then the default language for that tileset will be used.
+     * @param language the language to set
+     */
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    /**
+     * Specifies whether the application requesting the static map is using a sensor to determine the user's location. 
+     * 
+     * @return the sensor
+     */
+    public boolean isSensor() {
+        return sensor;
+    }
+
+    /**
+     * Specifies whether the application requesting the static map is using a sensor to determine the user's location. 
+     * 
+     * @param sensor the sensor to set
+     */
+    public void setSensor(boolean sensor) {
+        this.sensor = sensor;
     }
 
 }
