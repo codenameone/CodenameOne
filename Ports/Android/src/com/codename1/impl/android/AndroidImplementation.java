@@ -47,7 +47,6 @@ import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
 
 import com.codename1.ui.Component;
-import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -67,9 +66,10 @@ import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Environment;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.telephony.SmsManager;
@@ -84,8 +84,7 @@ import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.Cookie;
-import com.codename1.io.FileSystemStorage;
+import com.codename1.io.*;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -173,7 +172,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private EventDispatcher callback;
     private int timeout = -1;
     private CodeScannerImpl scannerInstance;
-
+    private HashMap apIds;
+    
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
@@ -4559,5 +4559,123 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         int numCameras = Camera.getNumberOfCameras();
         return numCameras > 0;
     }
-    
+
+    public String getCurrentAccessPoint() {
+
+        ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (info == null) {
+            return null;
+        }
+        String apName = info.getTypeName() + "_" + info.getSubtypeName();
+        if (info.getExtraInfo() != null) {
+            apName += "_" + info.getExtraInfo();
+        }
+        return apName;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getAPIds() {
+        if (apIds == null) {
+            apIds = new HashMap();
+            NetworkInfo[] aps = ((ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE)).getAllNetworkInfo();
+            for (int i = 0; i < aps.length; i++) {
+                String apName = aps[i].getTypeName() + "_" + aps[i].getSubtypeName();
+                if (aps[i].getExtraInfo() != null) {
+                    apName += "_" + aps[i].getExtraInfo();
+                }
+                apIds.put(apName, aps[i]);
+            }
+        }
+        if (apIds.isEmpty()) {
+            return null;
+        }
+        String[] ret = new String[apIds.size()];
+        Iterator iter = apIds.keySet().iterator();
+        for (int i = 0; iter.hasNext(); i++) {
+            ret[i] = iter.next().toString();
+        }
+        return ret;
+
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int getAPType(String id) {
+        if (apIds == null) {
+            getAPIds();
+        }
+        NetworkInfo info = (NetworkInfo) apIds.get(id);
+        if (info == null) {
+            return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
+        }
+        int type = info.getType();
+        int subType = info.getSubtype();
+        if (type == ConnectivityManager.TYPE_WIFI) {
+            return NetworkManager.ACCESS_POINT_TYPE_WLAN;
+        } else if (type == ConnectivityManager.TYPE_MOBILE) {
+            switch (subType) {
+                case TelephonyManager.NETWORK_TYPE_1xRTT:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G; // ~ 50-100 kbps
+                case TelephonyManager.NETWORK_TYPE_CDMA:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G; // ~ 14-64 kbps
+                case TelephonyManager.NETWORK_TYPE_EDGE:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G; // ~ 50-100 kbps
+                case TelephonyManager.NETWORK_TYPE_EVDO_0:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 400-1000 kbps
+                case TelephonyManager.NETWORK_TYPE_EVDO_A:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 600-1400 kbps
+                case TelephonyManager.NETWORK_TYPE_GPRS:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G; // ~ 100 kbps
+                case TelephonyManager.NETWORK_TYPE_HSDPA:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 2-14 Mbps
+                case TelephonyManager.NETWORK_TYPE_HSPA:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 700-1700 kbps
+                case TelephonyManager.NETWORK_TYPE_HSUPA:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 1-23 Mbps
+                case TelephonyManager.NETWORK_TYPE_UMTS:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 400-7000 kbps
+            /*
+                 * Above API level 7, make sure to set android:targetSdkVersion
+                 * to appropriate level to use these
+                 */
+                case TelephonyManager.NETWORK_TYPE_EHRPD: // API level 11
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 1-2 Mbps
+                case TelephonyManager.NETWORK_TYPE_EVDO_B: // API level 9
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 5 Mbps
+                case TelephonyManager.NETWORK_TYPE_HSPAP: // API level 13
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 10-20 Mbps
+                case TelephonyManager.NETWORK_TYPE_IDEN: // API level 8
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G; // ~25 kbps
+                case TelephonyManager.NETWORK_TYPE_LTE: // API level 11
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 10+ Mbps
+                // Unknown
+                case TelephonyManager.NETWORK_TYPE_UNKNOWN:
+                default:
+                    return NetworkManager.ACCESS_POINT_TYPE_NETWORK2G;
+            }
+        } else {
+            return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
+        }
+    }
+   
+    /**
+     * @inheritDoc
+     */
+    public void setCurrentAccessPoint(String id) {
+
+        if (apIds == null) {
+            getAPIds();
+        }
+        NetworkInfo info = (NetworkInfo) apIds.get(id);
+        if (info == null || info.isConnectedOrConnecting()) {
+            return;
+
+        }
+        ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        cm.setNetworkPreference(info.getType());
+    }
 }
