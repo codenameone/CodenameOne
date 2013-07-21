@@ -1874,7 +1874,11 @@ public class List extends Component {
                 int index = pointerSelect(x, y);
                 updateAnimationPosition(index - getSelectedIndex());
                 setSelectedIndex(index);
-            }else if ((fireOnClick && fixedSelection < FIXED_NONE_BOUNDRY) || fireOnRelease) {
+                fireActionEvent(new ActionEvent(eventSource));
+                return;
+            } 
+            
+            if ((fireOnClick && fixedSelection < FIXED_NONE_BOUNDRY) || fireOnRelease) {
                 // fire the action event into the selected component
                 Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);
 
