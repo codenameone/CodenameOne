@@ -528,10 +528,16 @@ public class InPlaceEditView extends FrameLayout {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {
+            public void afterTextChanged(final Editable s) {
                 if (mInPlaceEditView.mIsEditing && mTextArea != null) {
                     try {
-                        mTextArea.setText(s.toString());
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                mTextArea.setText(s.toString());
+                            }
+                        });
                     } catch (Exception e) {
                         Log.e(TAG, e.toString() + " " + Log.getStackTraceString(e));
                     }
