@@ -35,6 +35,7 @@ class CacheProviderProxy extends MapProvider {
     private int _time;
     private long _initialFreeMemory;
     private int _maxSize;
+    private boolean freeMemoryWorks;
 
     CacheProviderProxy(MapProvider provider) {
         super(provider.projection(), provider.tileSize());
@@ -42,7 +43,17 @@ class CacheProviderProxy extends MapProvider {
         _cache = new Hashtable();
         _time = 0;
         _maxSize = 100;
-        _initialFreeMemory = Runtime.getRuntime().freeMemory();
+        _initialFreeMemory = freeMemory();
+    }
+    
+    private long freeMemory() {
+        try {
+            freeMemoryWorks = true;
+            return Runtime.getRuntime().freeMemory();
+        } catch(Throwable t) {
+            freeMemoryWorks = false;
+            return 1000000;
+        }
     }
 
     public int maxZoomLevel() {
@@ -85,10 +96,12 @@ class CacheProviderProxy extends MapProvider {
     }
 
     protected void put(BoundingBox bbox, Tile tile) {
-        long freeMemory = Runtime.getRuntime().freeMemory();
-        if (_cache.size() > _maxSize || (freeMemory * 2 < _initialFreeMemory && (freeMemory < 262144 || freeMemory < _initialFreeMemory / 10))) {
-            removeOld();
-        }
+        if(freeMemoryWorks) {
+            long freeMemory = freeMemory();
+            if (_cache.size() > _maxSize || (freeMemory * 2 < _initialFreeMemory && (freeMemory < 262144 || freeMemory < _initialFreeMemory / 10))) {
+                removeOld();
+            }
+        } 
         _cache.put(bbox, new AgeableTile(tile, _time));
     }
 
@@ -96,8 +109,10 @@ class CacheProviderProxy extends MapProvider {
         //#mdebug
         System.out.println("= Cleaning cache");
         System.out.println("Initial: " + _initialFreeMemory);
-        System.out.println("Available: " + Runtime.getRuntime().freeMemory());
-        System.out.println("Total: " + Runtime.getRuntime().totalMemory());
+        if(freeMemoryWorks) {
+            System.out.println("Available: " + Runtime.getRuntime().freeMemory());
+            System.out.println("Total: " + Runtime.getRuntime().totalMemory());
+        } 
         //#enddebug
         int leave = Math.min(_cache.size() / 10, _maxSize / 2);
         Enumeration keys = _cache.keys();
