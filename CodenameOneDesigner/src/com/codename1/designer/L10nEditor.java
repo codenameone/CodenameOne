@@ -37,7 +37,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EventObject;
 import java.util.HashMap;
@@ -64,6 +67,7 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableModel;
 
 /**
  * Editor for resource localization data
@@ -721,6 +725,11 @@ private void removePropertyActionPerformed(java.awt.event.ActionEvent evt) {//GE
 }//GEN-LAST:event_removePropertyActionPerformed
 
 private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exportResourceActionPerformed
+        Object[] options = new Object[] {"Properties", "CSV With ;", "CSV With ,"};
+        int result = JOptionPane.showOptionDialog(this, "Export file type", "File Type", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        if(result == JOptionPane.CLOSED_OPTION) {
+            return;
+        }
         File[] file = ResourceEditorView.showSaveFileChooser();
         if(file != null) {
             FileOutputStream out = null;
@@ -734,16 +743,58 @@ private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                     }
                 } else {
                     if(f.getName().indexOf('.') < 0) {
-                        f = new File(f.getAbsolutePath() + ".properties");
+                        if(result == 0) {
+                            f = new File(f.getAbsolutePath() + ".properties");
+                        } else {
+                            f = new File(f.getAbsolutePath() + ".csv");
+                        }
                     }
                 }
-                Properties prop = new Properties();
-                String locale = (String) locales.getSelectedItem();
-                Hashtable h = res.getL10N(localeName, locale);
-                prop.putAll(h);
-                out = new FileOutputStream(f);
-                prop.store(out, "Export locale from the Codename One Designer");
-                out.close();
+                if(result == 0) {
+                    Properties prop = new Properties();
+                    String locale = (String) locales.getSelectedItem();
+                    Hashtable h = res.getL10N(localeName, locale);
+                    prop.putAll(h);
+                    out = new FileOutputStream(f);
+                    prop.store(out, "Export locale from the Codename One Designer");
+                    out.close();
+                } else {
+                    char separator = ';';
+                    if(result == 2) {
+                        separator = ',';
+                    }
+                    out = new FileOutputStream(f);
+                    
+                    // Write BOM for excel/windows apps
+                    out.write(new byte[] {(byte)0xEF, (byte)0xBB, (byte)0xBF});
+                    out.flush();
+                    Writer w = new OutputStreamWriter(out, "UTF-8");
+                    
+                    
+                    TableModel m = bundleTable.getModel();
+                    
+                    int rowCount = m.getRowCount();
+                    int columnCount = m.getColumnCount();
+                    for(int col = 0 ; col < columnCount ; col++) {
+                        w.append(m.getColumnName(col));
+                        w.append(separator);
+                    }
+                    w.append('\n');
+
+                    for(int row = 0 ; row < rowCount ; row++) {
+                        for(int col = 0 ; col < columnCount ; col++) {
+                            String c = (String)m.getValueAt(row, col);
+                            c = c.replaceAll("\"", "\"\"");
+                            w.append('"');
+                            w.append(c);
+                            w.append('"');
+                            w.append(separator);
+                        }
+                        w.append('\n');
+                    }
+                    
+                    w.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Error: " + ex, "IO Error Occured", JOptionPane.ERROR_MESSAGE);
