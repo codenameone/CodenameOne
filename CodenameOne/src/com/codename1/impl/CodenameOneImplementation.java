@@ -4229,6 +4229,24 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * This method returns a Contact by the contact id and fills it's data
+     * according to the given flags
+     * 
+     * @param id of the Contact
+     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
+     * @param includesPicture if true try to fetch the Contact Picture if exists
+     * @param includesNumbers if true try to fetch all Contact numbers
+     * @param includesEmail if ture try to fetch all Contact Emails
+     * @param includeAddress if ture try to fetch all Contact Addresses
+     *  
+     * @return a Contact Object
+     */ 
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, 
+            boolean includesNumbers, boolean includesEmail, boolean includeAddress){
+        return null;
+    }
+    
+    /**
      * Create a contact to the device contacts book
      * 
      * @param firstName the Contact firstName

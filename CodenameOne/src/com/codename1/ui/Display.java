@@ -2774,6 +2774,26 @@ public final class Display {
     }
 
     /**
+     * This method returns a Contact by the contact id and fills it's data
+     * according to the given flags
+     * 
+     * @param id of the Contact
+     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
+     * @param includesPicture if true try to fetch the Contact Picture if exists
+     * @param includesNumbers if true try to fetch all Contact numbers
+     * @param includesEmail if ture try to fetch all Contact Emails
+     * @param includeAddress if ture try to fetch all Contact Addresses
+     *  
+     * @return a Contact Object
+     */     
+    public Contact getContactById(String id, boolean includesFullName, 
+            boolean includesPicture, boolean includesNumbers, boolean includesEmail, 
+            boolean includeAddress) {
+        return impl.getContactById(id,includesFullName, includesPicture, 
+                includesNumbers, includesEmail, includeAddress);
+    }
+    
+    /**
      * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
      * 
      * @return true if contacts access is allowed or globally available, false otherwise
@@ -3117,5 +3137,6 @@ public final class Display {
     public boolean hasCamera() {
         return impl.hasCamera();
     }
+
 
 }
