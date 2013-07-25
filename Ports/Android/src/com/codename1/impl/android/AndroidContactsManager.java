@@ -82,192 +82,9 @@ public class AndroidContactsManager {
         }
         return contacts;
     }
-
+    
     public Contact getContact(Activity activity, String id) {
-        Contact retVal = new Contact();
-        retVal.setId(id);
-
-        ContentResolver cr = activity.getContentResolver();
-
-        Cursor result = cr.query(ContactsContract.Contacts.CONTENT_URI, null,
-                ContactsContract.Contacts._ID + " = ?",
-                new String[]{id}, null);
-        if (result.moveToFirst()) {
-            String name = result.getString(result.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-            retVal.setDisplayName(name);
-            String photoID = result.getString(result.getColumnIndex(ContactsContract.Contacts.PHOTO_ID));
-            if (photoID != null) {
-                InputStream input = loadContactPhoto(cr, Long.parseLong(id), Long.parseLong(photoID));
-                if (input != null) {
-                    try {
-                        retVal.setPhoto(Image.createImage(input));
-                    } catch (IOException ex) {
-                        Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                }
-            }
-        }
-
-        Hashtable phones = new Hashtable();
-        if (Integer.parseInt(result.getString(
-                result.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
-            //String[] whereParameters = new String[]{id, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
-            Cursor pCur = cr.query(
-                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                    null,
-                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                    new String[]{id}, null);
-            while (pCur.moveToNext()) {
-                String type = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));
-                String phone = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
-                boolean isPrimary = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.IS_PRIMARY)) != 0;
-                if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME).equals(type)) {
-                    type = "home";
-                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).equals(type)) {
-                    type = "mobile";
-                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_WORK).equals(type)) {
-                    type = "work";
-                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_FAX_HOME).equals(type)) {
-                    type = "fax";
-                } else {
-                    type = "other";
-                }
-                if (isPrimary) {
-                    retVal.setPrimaryPhoneNumber(phone);
-                }
-                phones.put(type, phone);
-            }
-            retVal.setPhoneNumbers(phones);
-            pCur.close();
-        }
-
-
-        Hashtable emails = new Hashtable();
-        Cursor emailCur = cr.query(
-                ContactsContract.CommonDataKinds.Email.CONTENT_URI,
-                null,
-                ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?",
-                new String[]{id}, null);
-        while (emailCur.moveToNext()) {
-            // This would allow you get several email addresses
-            // if the email addresses were stored in an array
-            String email = emailCur.getString(
-                    emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));
-            String type = emailCur.getString(
-                    emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE));
-            boolean isPrimary = emailCur.getInt(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.IS_PRIMARY)) != 0;
-
-            if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_HOME).equals(type)) {
-                type = "home";
-            } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_MOBILE).equals(type)) {
-                type = "mobile";
-            } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_WORK).equals(type)) {
-                type = "work";
-            } else {
-                type = "other";
-            }
-            if (isPrimary) {
-                retVal.setPrimaryEmail(email);
-            }
-            emails.put(type, email);
-        }
-        retVal.setEmails(emails);
-        emailCur.close();
-
-
-
-        String birthWhere = ContactsContract.Data.CONTACT_ID + " = ? AND "
-                + ContactsContract.Data.MIMETYPE + "= ? AND "
-                + ContactsContract.CommonDataKinds.Event.TYPE + "="
-                + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY;
-        String[] birthWhereParams = new String[]{id,
-            ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE
-        };
-
-        Cursor birthCur = cr.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);
-        if (birthCur.moveToFirst()) {
-            String birth = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE));
-            Date bd = null;
-            try {
-                bd = new SimpleDateFormat("yyyy-MM-dd").parse(birth);
-                retVal.setBirthday(bd.getTime());
-            } catch (ParseException ex) {
-            }
-        }
-        birthCur.close();
-
-        String nameWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
-        String[] nameWhereParams = new String[]{id,
-            ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
-        Cursor nameCursor = cr.query(ContactsContract.Data.CONTENT_URI, null,
-                nameWhere,
-                nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
-
-        while (nameCursor.moveToNext()) {
-
-            String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));
-            String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));
-            String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));
-            retVal.setFirstName(given);
-            retVal.setFamilyName(family);
-            retVal.setDisplayName(display);
-
-        }
-        nameCursor.close();
-
-        String noteWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
-        String[] noteWhereParams = new String[]{id,
-            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE};
-        Cursor noteCur = cr.query(ContactsContract.Data.CONTENT_URI, null, noteWhere, noteWhereParams, null);
-        if (noteCur.moveToFirst()) {
-            String note = noteCur.getString(noteCur.getColumnIndex(ContactsContract.CommonDataKinds.Note.NOTE));
-            retVal.setNote(note);
-        }
-        noteCur.close();
-
-        Hashtable addresses = new Hashtable();
-        String addrWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
-        String[] addrWhereParams = new String[]{id,
-            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE};
-        Cursor addrCur = cr.query(ContactsContract.Data.CONTENT_URI,
-                null, addrWhere, addrWhereParams, null);
-        while (addrCur.moveToNext()) {
-            Address address = new Address();
-            String poBox = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POBOX));
-            String street = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.STREET));
-            String city = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY));
-            String state = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.REGION));
-            String postalCode = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE));
-            String country = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY));
-            String type = addrCur.getString(
-                    addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.TYPE));
-            address.setCountry(country);
-            address.setLocality(city);
-            address.setPostalCode(postalCode);
-            address.setRegion(state);
-            address.setStreetAddress(street);
-
-            if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME).equals(type)) {
-                type = "home";
-            } else if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK).equals(type)) {
-                type = "work";
-            } else {
-                type = "other";
-            }
-
-            addresses.put(type, address);
-        }
-        retVal.setAddresses(addresses);
-        addrCur.close();
-        result.close();
-
-        return retVal;
+        return getContact(activity, id, true, true, true, true, true);
     }
 
     public static InputStream loadContactPhoto(ContentResolver cr, long id, long photo_id) {
@@ -392,5 +209,224 @@ public class AndroidContactsManager {
             return false;
         }
         return true;
+    }
+
+    public Contact getContact(Activity activity, String id, boolean includesFullName, 
+            boolean includesPicture, boolean includesNumbers, boolean includesEmail, 
+            boolean includeAddress) {
+        Contact retVal = new Contact();
+        retVal.setId(id);
+
+        ContentResolver cr = activity.getContentResolver();
+
+        String[] projection = new String[] {ContactsContract.Contacts.DISPLAY_NAME,
+                ContactsContract.Contacts.PHOTO_ID, 
+                ContactsContract.Contacts.HAS_PHONE_NUMBER};
+        
+        Cursor result = cr.query(ContactsContract.Contacts.CONTENT_URI, projection,
+                ContactsContract.Contacts._ID + " = ?",
+                new String[]{id}, null);
+        if (result.moveToFirst()) {
+            String name = result.getString(result.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+            retVal.setDisplayName(name);
+            if(includesPicture){
+                String photoID = result.getString(result.getColumnIndex(ContactsContract.Contacts.PHOTO_ID));
+                if (photoID != null) {
+                    InputStream input = loadContactPhoto(cr, Long.parseLong(id), Long.parseLong(photoID));
+                    if (input != null) {
+                        try {
+                            retVal.setPhoto(Image.createImage(input));
+                        } catch (IOException ex) {
+                            Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if(includesNumbers){
+            Hashtable phones = new Hashtable();
+            if (Integer.parseInt(result.getString(
+                    result.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
+                //String[] whereParameters = new String[]{id, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
+                projection = new String[] {ContactsContract.CommonDataKinds.Phone.TYPE,
+                        ContactsContract.CommonDataKinds.Phone.NUMBER, 
+                        ContactsContract.CommonDataKinds.Phone.IS_PRIMARY};
+                
+                Cursor pCur = cr.query(
+                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        projection,
+                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                        new String[]{id}, null);
+                while (pCur.moveToNext()) {
+                    String type = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));
+                    String phone = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    boolean isPrimary = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.IS_PRIMARY)) != 0;
+                    if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME).equals(type)) {
+                        type = "home";
+                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).equals(type)) {
+                        type = "mobile";
+                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_WORK).equals(type)) {
+                        type = "work";
+                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_FAX_HOME).equals(type)) {
+                        type = "fax";
+                    } else {
+                        type = "other";
+                    }
+                    if (isPrimary) {
+                        retVal.setPrimaryPhoneNumber(phone);
+                    }
+                    phones.put(type, phone);
+                }
+                retVal.setPhoneNumbers(phones);
+                pCur.close();
+            }
+        }
+        
+        if(includesEmail){
+            Hashtable emails = new Hashtable();
+            projection = new String[] {ContactsContract.CommonDataKinds.Email.DATA,
+                    ContactsContract.CommonDataKinds.Email.TYPE, 
+                    ContactsContract.CommonDataKinds.Email.IS_PRIMARY};
+            
+            Cursor emailCur = cr.query(
+                    ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+                    projection,
+                    ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?",
+                    new String[]{id}, null);
+            while (emailCur.moveToNext()) {
+                // This would allow you get several email addresses
+                // if the email addresses were stored in an array
+                String email = emailCur.getString(
+                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));
+                String type = emailCur.getString(
+                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE));
+                boolean isPrimary = emailCur.getInt(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.IS_PRIMARY)) != 0;
+
+                if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_HOME).equals(type)) {
+                    type = "home";
+                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_MOBILE).equals(type)) {
+                    type = "mobile";
+                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_WORK).equals(type)) {
+                    type = "work";
+                } else {
+                    type = "other";
+                }
+                if (isPrimary) {
+                    retVal.setPrimaryEmail(email);
+                }
+                emails.put(type, email);
+            }
+            retVal.setEmails(emails);
+            emailCur.close();
+        }
+
+        if(includesFullName){
+            String birthWhere = ContactsContract.Data.CONTACT_ID + " = ? AND "
+                    + ContactsContract.Data.MIMETYPE + "= ? AND "
+                    + ContactsContract.CommonDataKinds.Event.TYPE + "="
+                    + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY;
+            String[] birthWhereParams = new String[]{id,
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE
+            };
+
+            Cursor birthCur = cr.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);
+            if (birthCur.moveToFirst()) {
+                String birth = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE));
+                Date bd = null;
+                try {
+                    bd = new SimpleDateFormat("yyyy-MM-dd").parse(birth);
+                    retVal.setBirthday(bd.getTime());
+                } catch (ParseException ex) {
+                }
+            }
+            birthCur.close();
+        
+            String nameWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
+            String[] nameWhereParams = new String[]{id,
+                ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
+            projection = new String[] {ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+                    ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME, 
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME};
+            
+            Cursor nameCursor = cr.query(ContactsContract.Data.CONTENT_URI, projection,
+                    nameWhere,
+                    nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
+
+            while (nameCursor.moveToNext()) {
+
+                String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));
+                String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));
+                String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));
+                retVal.setFirstName(given);
+                retVal.setFamilyName(family);
+                retVal.setDisplayName(display);
+
+            }
+            nameCursor.close();
+            String noteWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
+            String[] noteWhereParams = new String[]{id,
+                ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE};
+            projection = new String[] {ContactsContract.CommonDataKinds.Note.NOTE};
+            Cursor noteCur = cr.query(ContactsContract.Data.CONTENT_URI, projection, noteWhere, noteWhereParams, null);
+            if (noteCur.moveToFirst()) {
+                String note = noteCur.getString(noteCur.getColumnIndex(ContactsContract.CommonDataKinds.Note.NOTE));
+                retVal.setNote(note);
+            }
+            noteCur.close();
+        }
+        
+        if(includeAddress){
+            Hashtable addresses = new Hashtable();
+            String addrWhere = ContactsContract.Data.CONTACT_ID + " = ? AND " + ContactsContract.Data.MIMETYPE + " = ?";
+            String[] addrWhereParams = new String[]{id,
+                ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE};
+            projection = new String[] {ContactsContract.CommonDataKinds.StructuredPostal.POBOX, 
+            ContactsContract.CommonDataKinds.StructuredPostal.STREET, 
+            ContactsContract.CommonDataKinds.StructuredPostal.CITY,
+            ContactsContract.CommonDataKinds.StructuredPostal.REGION,
+            ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE,
+            ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY,
+            ContactsContract.CommonDataKinds.StructuredPostal.TYPE};
+            Cursor addrCur = cr.query(ContactsContract.Data.CONTENT_URI,
+                    projection, addrWhere, addrWhereParams, null);
+            while (addrCur.moveToNext()) {
+                Address address = new Address();
+                String poBox = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POBOX));
+                String street = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.STREET));
+                String city = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY));
+                String state = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.REGION));
+                String postalCode = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE));
+                String country = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY));
+                String type = addrCur.getString(
+                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.TYPE));
+                address.setCountry(country);
+                address.setLocality(city);
+                address.setPostalCode(postalCode);
+                address.setRegion(state);
+                address.setStreetAddress(street);
+
+                if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME).equals(type)) {
+                    type = "home";
+                } else if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK).equals(type)) {
+                    type = "work";
+                } else {
+                    type = "other";
+                }
+
+                addresses.put(type, address);
+            }
+            retVal.setAddresses(addresses);
+            addrCur.close();
+        }
+        result.close();
+
+        return retVal;
     }
 }

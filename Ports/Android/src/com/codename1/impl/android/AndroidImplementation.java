@@ -3750,6 +3750,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return AndroidContactsManager.getInstance().getContact(activity, id);
     }
 
+    @Override 
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, 
+            boolean includesNumbers, boolean includesEmail, boolean includeAddress){
+        return AndroidContactsManager.getInstance().getContact(activity, id, includesFullName, includesPicture, 
+            includesNumbers, includesEmail, includeAddress);
+    }
+    
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
          return AndroidContactsManager.getInstance().createContact(activity, firstName, surname, officePhone, homePhone, cellPhone, email);
     }
