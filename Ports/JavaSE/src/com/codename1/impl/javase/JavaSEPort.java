@@ -4255,6 +4255,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         return (Contact) contacts.get(id);
     }
     
+    @Override
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
+            boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+
+        Contact c = new Contact();
+        Contact contact = getContactById(id);
+        c.setId(contact.getId());
+        c.setDisplayName(contact.getDisplayName());
+        
+        if (includesFullName) {
+            c.setFirstName(contact.getFirstName());
+            c.setFamilyName(contact.getFamilyName());
+        }
+        if (includesNumbers) {
+            c.setPhoneNumbers(contact.getPhoneNumbers());            
+        }
+        if(includesEmail){
+            c.setEmails(contact.getEmails());
+        }
+        if(includeAddress){
+            c.setAddresses(contact.getAddresses());
+        }
+        
+        return c;
+    }
+
     public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
         if(contacts == null){
             contacts = initContacts();
@@ -5437,6 +5463,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         phones.put("mobile", "+111111");
         phones.put("home", "+222222");
         contact.setPhoneNumbers(phones);
+        
         Hashtable emails = new Hashtable();
         emails.put("work", "chen@codenameone.com");
         contact.setEmails(emails);
