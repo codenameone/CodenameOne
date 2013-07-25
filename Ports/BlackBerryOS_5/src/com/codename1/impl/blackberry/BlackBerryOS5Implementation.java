@@ -654,7 +654,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         String appId = Display.getInstance().getProperty("$CN1AppId", "");
         String bpsUrl = Display.getInstance().getProperty("$CN1BpsURL", "");
         ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
-        boolean isEnterprise = Boolean.parseBoolean(Display.getInstance().getProperty("$CN1Enterprise", "false"));
+        boolean isEnterprise = Display.getInstance().getProperty("$CN1Enterprise", "false").equals("true");
         
         // server type depends whether we get pushes through BES or BIS
         byte serverType = isEnterprise ? PushApplicationDescriptor.SERVER_TYPE_NONE : PushApplicationDescriptor.SERVER_TYPE_BPAS;
