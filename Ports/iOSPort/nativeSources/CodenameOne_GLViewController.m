@@ -879,6 +879,32 @@ static CodenameOne_GLViewController *sharedSingleton;
     return sharedSingleton->drawTextureSupported;
 }
 
+#ifdef INCLUDE_MOPUB
+@synthesize adView;
+- (void)viewDidLoad {
+    if(isIPad()) {
+        self.adView = [[[MPAdView alloc] initWithAdUnitId:MOPUB_TABLET_AD_UNIT
+                                                     size:MOPUB_TABLET_AD_SIZE] autorelease];
+    } else {
+        self.adView = [[[MPAdView alloc] initWithAdUnitId:MOPUB_AD_UNIT
+                       size:MOPUB_AD_SIZE] autorelease];
+    }
+    self.adView.delegate = self;
+    CGRect frame = self.adView.frame;
+    CGSize size = [self.adView adContentViewSize];
+    frame.origin.y = [[UIScreen mainScreen] applicationFrame].size.height - size.height;
+    self.adView.frame = frame;
+    [self.view addSubview:self.adView];
+    [self.adView loadAd];
+    [super viewDidLoad];
+}
+
+#pragma mark - <MPAdViewDelegate>
+- (UIViewController *)viewControllerForPresentingModalView {
+    return self;
+}
+#endif
+
 - (void)awakeFromNib
 {
     retinaBug = isRetinaBug();
@@ -1150,6 +1176,10 @@ int keyboardSlideOffset;
         [EAGLContext setCurrentContext:nil];
     
     [context release];
+ 
+#ifdef INCLUDE_MOPUB
+     self.adView = nil;
+#endif
     
     [super dealloc];
 }
@@ -1263,6 +1293,9 @@ bool lockDrawing;
         [upcomingTarget removeAllObjects];
     }
     [self drawFrame:CGRectMake(0, 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl())];
+#ifdef INCLUDE_MOPUB
+    [self.adView rotateToOrientation:toInterfaceOrientation];
+#endif    
 }
 
 - (BOOL)shouldAutorotate {
@@ -1331,6 +1364,12 @@ bool lockDrawing;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
     lockDrawing = NO;
     screenSizeChanged(displayWidth, displayHeight);
+#ifdef INCLUDE_MOPUB
+    CGSize size = [self.adView adContentViewSize];
+    CGFloat centeredX = (self.view.bounds.size.width - size.width) / 2;
+    CGFloat bottomAlignedY = self.view.bounds.size.height - size.height;
+    self.adView.frame = CGRectMake(centeredX, bottomAlignedY, size.width, size.height);
+#endif    
 }
 
 //static UIImage *img = nil;

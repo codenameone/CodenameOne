@@ -44,6 +44,11 @@
 #include "OpenUDID.h"
 #import "StoreKit/StoreKit.h"
 #import "ScanCodeImpl.h"
+#include "com_codename1_contacts_Contact.h"
+#include "java_util_Hashtable.h"
+#include "com_codename1_ui_Image.h"
+#include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
+
 //#import "QRCodeReaderOC.h"
 #define INCLUDE_CN1_PUSH2
 #ifdef INCLUDE_ZOOZ
@@ -845,6 +850,27 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(JAVA_OB
     return result;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    const char* chrs = stringToUTF8(path);
+    NSString* ns = [NSString stringWithUTF8String:chrs];
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    }
+    NSFileManager *man = [[NSFileManager alloc] init];
+    NSError *error = nil;
+    NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
+    if(error != nil) {  
+        NSLog(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);        
+    }
+    NSDate* modDate = [attrs objectForKey:NSFileModificationDate];
+    NSTimeZone *tzone = [NSTimeZone timeZoneWithName:@"GMT"];
+    JAVA_LONG result = [tzone secondsFromGMTForDate:modDate] * 1000;
+    [man release];
+    [pool release];
+    return result;
+}
+
 void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_OBJECT n1) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     const char* chrs = stringToUTF8(path);
@@ -1243,17 +1269,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(JAV
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
-        
-        UIGraphicsBeginImageContextWithOptions(v.bounds.size, v.opaque, 0.0);
-        [v.layer renderInContext:UIGraphicsGetCurrentContext()];
-
-        UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
-
-        UIGraphicsEndImageContext();
-        g = [[GLUIImage alloc] initWithImage:image];
-        data[0] = (JAVA_INT)v.bounds.size.width;
-        data[1] = (JAVA_INT)v.bounds.size.height;
-        
+        if(v.bounds.size.width > 0 && v.bounds.size.height > 0) {
+            UIGraphicsBeginImageContextWithOptions(v.bounds.size, v.opaque, 0.0);
+            [v.layer renderInContext:UIGraphicsGetCurrentContext()];
+            
+            UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
+            
+            UIGraphicsEndImageContext();
+            g = [[GLUIImage alloc] initWithImage:image];
+            data[0] = (JAVA_INT)v.bounds.size.width;
+            data[1] = (JAVA_INT)v.bounds.size.height;
+        }
         [pool release];    
     });
     return g;
@@ -2009,6 +2035,7 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(JAVA_OBJECT in
 }
 
 ABAddressBookRef globalAddressBook = nil;
+bool grantedPermission;
 ABAddressBookRef getAddressBook() {
     if(globalAddressBook == nil) {
         if (ABAddressBookRequestAccessWithCompletion != nil) {
@@ -2016,6 +2043,7 @@ ABAddressBookRef getAddressBook() {
             globalAddressBook = ABAddressBookCreateWithOptions(NULL,&error);
             __block bool completed = NO;
             ABAddressBookRequestAccessWithCompletion(globalAddressBook, ^(bool granted, CFErrorRef error) {
+                grantedPermission = granted;
                 completed = YES;
             });
             while(!completed) {
@@ -2028,10 +2056,21 @@ ABAddressBookRef getAddressBook() {
     return globalAddressBook;
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted__(JAVA_OBJECT instanceObject) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    getAddressBook();
+    [pool release];
+    return grantedPermission;
+}
+
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT firstName, JAVA_OBJECT surname, JAVA_OBJECT officePhone, JAVA_OBJECT homePhone, JAVA_OBJECT cellPhone, JAVA_OBJECT email) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     
     ABAddressBookRef addressBook = getAddressBook();
+    if(!grantedPermission) {
+        return JAVA_NULL;
+    }
     CFErrorRef  error = NULL;
     
     ABRecordRef person = ABPersonCreate();
@@ -2070,6 +2109,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_deleteContact___int(JAVA_OBJECT instanceObject, JAVA_INT i) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABAddressBookRef addressBook = getAddressBook();
+    if(!grantedPermission) {
+        return 0;
+    }
     ABRecordRef ref = ABAddressBookGetPersonWithRecordID(addressBook, i);
     if(ref != nil) {
         ABAddressBookRemoveRecord(addressBook, ref, nil);
@@ -2082,6 +2124,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_deleteContact___int(JAVA_OBJECT in
 JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(JAVA_OBJECT instanceObject, JAVA_BOOLEAN includeNumbers) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABAddressBookRef addressBook = getAddressBook();
+    if(!grantedPermission) {
+        return 0;
+    }
     CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
     
     if(includeNumbers) {
@@ -2110,6 +2155,9 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     int size = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     ABAddressBookRef addressBook = getAddressBook();
+    if(!grantedPermission) {
+        return;
+    }
     CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
     if(includeNumbers) {
         CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
@@ -2225,6 +2273,85 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_OB
     return g;
 }
 
+void addToHashtable(JAVA_OBJECT hash, ABMultiValueRef ref, int count) {
+    for(int iter = 0 ; iter < count ; iter++) {
+        NSString *key = (NSString *)ABMultiValueCopyLabelAtIndex(ref, iter);
+        NSString *value = (NSString *)ABMultiValueCopyValueAtIndex(ref, iter);
+        java_util_Hashtable_put___java_lang_Object_java_lang_Object(hash, fromNSString(key), fromNSString(value));
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact(JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT  cnt) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
+    ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
+    int emailCount = ABMultiValueGetCount(emails);
+    if(emailCount > 0) {
+        NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(emails, 0);
+        com_codename1_contacts_Contact_setPrimaryEmail___java_lang_String(cnt, fromNSString(k));
+        JAVA_OBJECT emailsHash = com_codename1_contacts_Contact_getEmails__(cnt);
+        addToHashtable(emailsHash, emails, emailCount);
+    }
+
+    ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
+    int numbersCount = ABMultiValueGetCount(numbers);
+    if(numbersCount > 0) {
+        NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(numbers, 0);
+        com_codename1_contacts_Contact_setPrimaryPhoneNumber___java_lang_String(cnt, fromNSString(k));
+        JAVA_OBJECT hash = com_codename1_contacts_Contact_getPhoneNumbers__(cnt);
+        addToHashtable(hash, numbers, numbersCount);
+    }
+    
+    NSString* first = (NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);
+    if(first != nil) {
+        com_codename1_contacts_Contact_setFirstName___java_lang_String(cnt, fromNSString(first));
+    }
+
+    NSString* last = (NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);
+    if(last != nil) {
+        com_codename1_contacts_Contact_setFamilyName___java_lang_String(cnt, fromNSString(last));
+    }
+
+    NSString* full = [NSString stringWithFormat:@"%@ %@", first, last];
+    if(first != nil && last != nil) {
+        com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(full));
+    } else {
+        if(first != nil) {
+            com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(first));
+        } else {
+            if(last != nil) {
+                com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(last));
+            }
+        }
+    }
+    
+    NSString* note = (NSString*)ABRecordCopyValue(i, kABPersonNoteProperty);
+    if(note != nil) {
+        com_codename1_contacts_Contact_setNote___java_lang_String(cnt, fromNSString(note));
+    }
+
+    NSDate *bDayProperty = (NSDate*)ABRecordCopyValue(i, kABPersonBirthdayProperty);
+    if(bDayProperty != nil) {
+        NSTimeInterval nst = [bDayProperty timeIntervalSince1970];
+        com_codename1_contacts_Contact_setBirthday___long(cnt, nst * 1000);
+    }
+    
+    GLUIImage* g = nil;
+    if(ABPersonHasImageData(i)){
+        UIImage* img = [UIImage imageWithData:(NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
+        g = [[GLUIImage alloc] initWithImage:img];
+        com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage();
+        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.peer_ = g;
+        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.width_ = (int)[g getImage].size.width;
+        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.height_ = (int)[g getImage].size.height;
+        
+        JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object(nativeImage);
+        com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(cnt, image);
+    }
+    
+    [pool release];
+}
+    
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(JAVA_OBJECT instanceObject, JAVA_INT recId) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
@@ -2269,14 +2396,18 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
 
 void com_codename1_impl_ios_IOSNative_registerPush__(JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
-    [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-		(UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+                    (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+    });
 #endif
 }
 
 void com_codename1_impl_ios_IOSNative_deregisterPush__(JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
-    [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+    });
 #endif
 }
 

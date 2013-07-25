@@ -41,9 +41,21 @@
 #import "ZooZ.h"
 #endif
 
+//#define INCLUDE_MOPUB
+#ifdef INCLUDE_MOPUB
+#define MOPUB_AD_UNIT
+#define MOPUB_AD_SIZE
+#define MOPUB_TABLET_AD_UNIT
+#define MOPUB_TABLET_AD_SIZE
+#import "MPAdView.h"
+#endif
+
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate 
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
+#endif
+#ifdef INCLUDE_MOPUB
+        ,MPAdViewDelegate
 #endif
 > {
 @private
@@ -62,6 +74,10 @@
     BOOL keyboardIsShown;
     BOOL modifiedViewHeight;
 }
+
+#ifdef INCLUDE_MOPUB
+@property (nonatomic, retain) MPAdView *adView;
+#endif
 
 @property (readonly, nonatomic, getter=isAnimating) BOOL animating;
 @property (nonatomic) NSInteger animationFrameInterval;
