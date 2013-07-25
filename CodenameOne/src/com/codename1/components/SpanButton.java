@@ -28,6 +28,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
 
 /**
  * A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
@@ -54,15 +55,26 @@ public class SpanButton extends Container {
         setUIID("Button");
         setLayout(new BorderLayout());
         text = new TextArea(txt);
-        text.setUIID("Label");
+        text.setUIID("Button");
         text.setEditable(false);
         text.setFocusable(false);
+        removeBackground(text.getUnselectedStyle());
+        removeBackground(text.getSelectedStyle());
+        removeBackground(text.getPressedStyle());
+        removeBackground(text.getDisabledStyle());
         actualButton = new Button();
         actualButton.setUIID("icon");
         addComponent(BorderLayout.WEST, actualButton);
         addComponent(BorderLayout.CENTER, text);
         setLeadComponent(actualButton);
     }
+    
+    private void removeBackground(Style s) {
+        s.setBackgroundType(Style.BACKGROUND_NONE);
+        s.setBgImage(null);
+        s.setBorder(null);
+        s.setBgTransparency(0);
+    } 
     
     /**
      * Set the text of the button
