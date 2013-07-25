@@ -135,7 +135,7 @@ import net.rim.device.api.system.*;
  */
 public class BlackBerryImplementation extends CodenameOneImplementation {
     public static boolean nativeBrowser = false;
-
+    protected static BlackBerryImplementation instance;
     private static CodeModuleGroup group;
     static Hashtable fieldComponentMap = new Hashtable();
     static final int INVOKE_LATER_confirmControlView = 1;
@@ -184,7 +184,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     }
     
     public void init(Object m) {
-        
+        instance = this;
         app = (CodenameOneUiApplication) m;        
 
         if(askForPermission) {

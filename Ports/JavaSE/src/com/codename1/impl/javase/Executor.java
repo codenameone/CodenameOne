@@ -115,6 +115,17 @@ public class Executor {
             } 
         }
     }
+
+    public static void destroyApp(){
+        if(c != null && app != null){
+            try {
+                Method stop = c.getDeclaredMethod("destroy", new Class[0]);
+                stop.invoke(app, new Object[0]);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } 
+        }
+    }
     
     public static void startApp(){
         if(c != null && app != null){

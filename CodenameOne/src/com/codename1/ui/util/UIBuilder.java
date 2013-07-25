@@ -24,6 +24,8 @@
 package com.codename1.ui.util;
 
 import com.codename1.analytics.AnalyticsService;
+import com.codename1.io.Externalizable;
+import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -62,6 +64,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.TableLayout;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.util.Enumeration;
@@ -77,7 +80,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-public class UIBuilder {
+public class UIBuilder { //implements Externalizable {
     /**
      * A key in the form state hashtable used in the back command navigation
      */
@@ -2480,6 +2483,77 @@ public class UIBuilder {
         }
         return (Container)c;
     }
+
+    /**
+     * @inheritDoc
+     */
+    /*public final int getVersion() {
+        return 1;
+    }*/
+
+    /**
+     * Restores state of the previously running application
+     * @return true if there is a state to restore
+     */
+    /*protected boolean restoreRunningApp() {
+        if(baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
+            Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
+            String formName = (String)h.get(FORM_STATE_KEY_NAME);
+            if(!h.containsKey(FORM_STATE_KEY_CONTAINER)) {
+                Form f = (Form)createContainer(fetchResourceFile(), formName);
+                initBackForm(f);
+                beforeShow(f);
+                f.show();
+                postShowImpl(f);
+                return true;
+            } 
+        }
+        return false;
+    }*/
+    
+    /**
+     * @inheritDoc
+     */
+    /*public final void externalize(DataOutputStream out) throws IOException {
+        Util.writeObject(baseFormNavigationStack, out);
+        Util.writeObject(backCommands, out);
+        externalizeUserState(out);
+    }*/
+
+    /**
+     * This method is called on externalization of the state machine and allows developers to persist their own data
+     * 
+     * @param out output stream
+     * @throws IOException if an error occurred
+     */
+    //protected void externalizeUserState(DataOutputStream out) throws IOException {
+    //}
+    
+    /**
+     * This method is called on loading of a state machine and allows the developers to load custom state machine data,
+     * notice that the version isn't passed into this method since the version of the UIBuilder persistence logic
+     * might differ from the version used by user code hence you should use a personal versioning system.
+     * @param in the input stream
+     * @throws IOException if an error occurred
+     */
+    //protected void internalizeUserState(DataInputStream in) throws IOException {
+    //}
+    
+    /**
+     * @inheritDoc
+     */
+    /*public final void internalize(int version, DataInputStream in) throws IOException {
+        baseFormNavigationStack = (Vector)Util.readObject(in);
+        backCommands = (Vector)Util.readObject(in);
+        internalizeUserState(in);
+    }*/
+
+    /**
+     * @inheritDoc
+     */
+    /*public String getObjectId() {
+        return "StateMachine";
+    }*/
 
     class FormListener implements ActionListener, Runnable {
         private Command currentAction;

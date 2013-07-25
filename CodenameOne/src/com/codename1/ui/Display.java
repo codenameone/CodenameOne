@@ -2831,7 +2831,7 @@ public final class Display {
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
      * @param toShare String to share.
-     * @deprecated 
+     * @deprecated use the method share that accepts an image and mime type
      */
     public void share(String toShare){
         share(toShare, null, null);

@@ -4390,12 +4390,15 @@ public abstract class CodenameOneImplementation {
      */
     public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
+        System.out.println("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey);
         if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
                 protected void readResponse(InputStream input) throws IOException  {
                     DataInputStream d = new DataInputStream(input);
-                    Preferences.set("push_id", d.readLong());
+                    long pid = d.readLong();
+                    Preferences.set("push_id", pid);
+                    System.out.println("registerPushOnServer push id received from server: " + pid);
                 }
             };
             r.setPost(false);
@@ -4410,7 +4413,7 @@ public abstract class CodenameOneImplementation {
             r.addArgument("t", "" + pushType);
             r.addArgument("ud", udid);
             r.addArgument("r", packageName);
-            NetworkManager.getInstance().addToQueue(r);
+            NetworkManager.getInstance().addToQueueAndWait(r);
         }
     }
 

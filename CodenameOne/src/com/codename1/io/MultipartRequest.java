@@ -199,10 +199,13 @@ public class MultipartRequest extends ConnectionRequest {
             String key = (String)e.nextElement();
             Object value = args.get(key);
             
-            writer.write("--" + boundary);
+            writer.write("--");
+            writer.write(boundary);
             writer.write(CRLF);
             if(value instanceof String) {
-                writer.write("Content-Disposition: form-data; name=\"" + key + "\"");
+                writer.write("Content-Disposition: form-data; name=\"");
+                writer.write(key);
+                writer.write("\"");
                 writer.write(CRLF);
                 writer.write("Content-Type: text/plain; charset=UTF-8");
                 writer.write(CRLF);

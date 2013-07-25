@@ -30,7 +30,6 @@ import com.codename1.maps.Projection;
 import com.codename1.maps.ProxyHttpTile;
 import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.util.CStringBuilder;
 
 /**
  * This is a GoogleMaps Provider https://developers.google.com/maps/documentation/staticmaps/
@@ -98,7 +97,7 @@ public class GoogleMapsProvider extends TiledProvider{
      * @inheritDoc
      */
     public Tile tileFor(BoundingBox bbox) {
-        CStringBuilder sb = new CStringBuilder(_url);
+        StringBuilder sb = new StringBuilder(_url);
         Coord ne = bbox.getNorthEast();
         Coord c = projection().toWGS84(new Coord(ne.getLatitude() - bbox.latitudeDifference()/2, 
                 ne.getLongitude() - bbox.longitudeDifference()/2, true));

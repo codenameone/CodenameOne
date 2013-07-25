@@ -62,6 +62,7 @@ import java.net.URISyntaxException;
 import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.PixelFormat;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.media.MediaPlayer;
@@ -851,6 +852,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //Decode image size
                 BitmapFactory.Options o = new BitmapFactory.Options();
                 o.inJustDecodeBounds = true;
+                o.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
                 FileInputStream fis = new FileInputStream(path);
                 BitmapFactory.decodeStream(fis, null, o);
@@ -863,6 +865,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 //Decode with inSampleSize
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
+                o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 o2.inSampleSize = scale;
                 fis = new FileInputStream(path);
                 b = BitmapFactory.decodeStream(fis, null, o2);
@@ -910,6 +913,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
         BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
         try {
             BitmapFactory.Options.class.getField("inPurgeable").set(opts, true);
         } catch (Exception e) {
@@ -4155,10 +4159,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void registerPush(Hashtable metaData, boolean noFallback) {
         boolean has = hasAndroidMarket();
         if (noFallback && !has) {
+            Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
-        String id = (String)metaData.get("googlePlay");
+        String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
         if(has) {
+            Log.d("Codename One", "Sending async push request for id: " + id);
             ((CodenameOneActivity) activity).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);

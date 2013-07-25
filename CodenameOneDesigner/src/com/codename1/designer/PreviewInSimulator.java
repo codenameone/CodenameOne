@@ -158,6 +158,7 @@ public class PreviewInSimulator {
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("LikeButton", com.codename1.facebook.ui.LikeButton.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("InfiniteProgress", com.codename1.components.InfiniteProgress.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiButton", com.codename1.components.MultiButton.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("SpanButton", com.codename1.components.SpanButton.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("Ads", com.codename1.components.Ads.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);

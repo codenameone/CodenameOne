@@ -2019,6 +2019,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
+        CookieHandler.setDefault(null);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
@@ -3379,6 +3380,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void exitApplication() {
         try {
+            Executor.stopApp();
+            Executor.destroyApp();
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+        try {
             System.exit(0);
         } catch (Throwable t) {
             System.out.println("Can't exit from applet");
@@ -3751,6 +3758,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
+        CookieHandler.setDefault(null);
 
         URLConnection con = u.openConnection();
 
@@ -3987,7 +3995,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
-        List r = new ArrayList();
         List<String> headers = c.getHeaderFields().get(name);
         if (headers != null && headers.size() > 0) {
             Vector v = new Vector<String>();

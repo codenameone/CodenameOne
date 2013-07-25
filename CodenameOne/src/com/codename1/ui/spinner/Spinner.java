@@ -214,6 +214,7 @@ class Spinner extends List {
     void initSpinnerRenderer() {
         DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());
         render.setRTL(false);
+        setRTL(false);
         render.setShowNumbers(false);
         render.setUIID("SpinnerRenderer");
         Component bgFocus = render.getListFocusComponent(this);
@@ -221,6 +222,13 @@ class Spinner extends List {
         bgFocus.getSelectedStyle().setBgTransparency(0);
         bgFocus.getUnselectedStyle().setBgTransparency(0);
         render.setAlwaysRenderSelection(true);
+    }
+    
+    void updateToDefaultRTL() {
+        boolean r = getUIManager().getLookAndFeel().isRTL();
+        DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());
+        render.setRTL(r);
+        setRTL(r);
     }
     
     /**
@@ -494,21 +502,6 @@ class Spinner extends List {
                 ignore.printStackTrace();
             } 
         }
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public boolean isRTL() {
-        // Since spinner is numeric it shouldn't be affected by RTL and should naturally be right aligned
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public void setRTL(boolean rtl) {
-        // Since spinner is numeric it shouldn't be affected by RTL and should naturally be right aligned
     }
     
     /**

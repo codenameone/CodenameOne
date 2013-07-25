@@ -47,7 +47,6 @@ public class GenericSpinner extends BaseSpinner {
      */
     public GenericSpinner() {
         DefaultListCellRenderer render = (DefaultListCellRenderer) renderer[0];
-        render.setRTL(false);
         render.setShowNumbers(false);
         render.setUIID("SpinnerRenderer");
     }
@@ -209,6 +208,7 @@ public class GenericSpinner extends BaseSpinner {
         spin.setShouldCalcPreferredSize(true);
         spin.setListSizeCalculationSampleCount(30);
         spin.initSpinnerRenderer();
+        spin.updateToDefaultRTL();
         if(value != null && value[column] != null) {
             spin.setValue(value[column]);
         }

@@ -31,6 +31,8 @@ import com.codename1.impl.blackberry.codescan.CodeScannerImpl;
 import com.codename1.impl.blackberry.codescan.MultimediaManager;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -44,12 +46,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import java.util.Hashtable;
 import javax.microedition.io.HttpConnection;
 
+import javax.microedition.io.StreamConnection;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
+import net.rim.blackberry.api.push.PushApplicationDescriptor;
+import net.rim.blackberry.api.push.PushApplicationRegistry;
+import net.rim.blackberry.api.push.PushApplicationStatus;
 import net.rim.device.api.database.DatabaseIOException;
 import net.rim.device.api.database.DatabasePathException;
+import net.rim.device.api.io.http.PushInputStream;
 import net.rim.device.api.script.ScriptEngine;
 import net.rim.device.api.system.Branding;
 import org.w3c.dom.Document;
@@ -63,6 +71,7 @@ import net.rim.device.api.io.file.FileSystemJournal;
 import net.rim.device.api.io.file.FileSystemJournalEntry;
 import net.rim.device.api.io.file.FileSystemJournalListener;
 import net.rim.device.api.script.Scriptable;
+import net.rim.device.api.system.ApplicationDescriptor;
 import net.rim.device.api.system.Bitmap;
 import net.rim.device.api.system.Characters;
 import net.rim.device.api.system.DeviceInfo;
@@ -78,6 +87,7 @@ import net.rim.device.api.ui.picker.FilePicker;
  * @author Shai Almog, Thorsten Schemm
  */
 public class BlackBerryOS5Implementation extends BlackBerryImplementation {
+    private static PushCallback pushCallback;
 
     BlackBerryCanvas createCanvas() {
         return new BlackBerryTouchSupport(this);
@@ -569,5 +579,106 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         }
         return new String[]{"audio/amr", "audio/basic", "qcelp"};
     }
-    
+
+    public static void onMessage(final PushInputStream stream, final StreamConnection sc) {
+        if(pushCallback != null) {
+            new Thread() {
+                public void run() {
+                    try {
+                        final byte[] buffer = Util.readInputStream(stream);
+                        Util.cleanup(stream);
+                        try {
+                            sc.close();
+                        } catch(Throwable t) {}
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                pushCallback.push(new String(buffer));
+                            }
+                        });
+                    } catch(IOException err) {
+                        err.printStackTrace();
+                    }
+                }
+            }.start();
+        }
+    }
+
+    public static void onStatusChange(PushApplicationStatus pushAppStatus) {
+        if(pushCallback == null) {
+            return;
+        }
+        byte bpsStatus = pushAppStatus.getStatus();
+        byte regReason = pushAppStatus.getReason();
+        String error = pushAppStatus.getError();
+
+        boolean simChanged = false;
+
+        String logStatus = "Unknown " + bpsStatus;
+
+        switch( bpsStatus ) {
+            case PushApplicationStatus.STATUS_ACTIVE:
+                logStatus = "Active";
+                instance.registerPushOnServer(Integer.toHexString(DeviceInfo.getDeviceId()), instance.getApplicationKey(), (byte)3, 
+                        Display.getInstance().getProperty("UDID", ""), Display.getInstance().getProperty("package_name", ""));
+                break;
+            case PushApplicationStatus.STATUS_FAILED:
+                pushCallback.pushRegistrationError(error, regReason);
+                logStatus = "Failed";
+                break;
+            case PushApplicationStatus.STATUS_NOT_REGISTERED:
+                logStatus = "Not Registered";
+                switch( pushAppStatus.getReason() ) {
+                    case PushApplicationStatus.REASON_SIM_CHANGE:
+                        simChanged = true;
+                        break;
+                    case PushApplicationStatus.REASON_API_CALL:
+                        // should not happen, even if called then we already unregistered
+                        break;
+                    case PushApplicationStatus.REASON_REJECTED_BY_SERVER:
+                    case PushApplicationStatus.REASON_NETWORK_ERROR:
+                    case PushApplicationStatus.REASON_INVALID_PARAMETERS:
+                        // registration failed
+                        break;
+                }
+                pushCallback.pushRegistrationError(logStatus + ": " + error, regReason);
+                break;
+            case PushApplicationStatus.STATUS_PENDING:
+                logStatus = "Pending";
+                break;
+        }
+
+    }    
+
+    public void registerPush(Hashtable metaData, boolean noFallback) {
+        int port = Integer.parseInt(Display.getInstance().getProperty("$CN1Port", "100"));
+        String appId = Display.getInstance().getProperty("$CN1AppId", "");
+        String bpsUrl = Display.getInstance().getProperty("$CN1BpsURL", "");
+        ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
+        boolean isEnterprise = Boolean.parseBoolean(Display.getInstance().getProperty("$CN1Enterprise", "false"));
+        
+        // server type depends whether we get pushes through BES or BIS
+        byte serverType = isEnterprise ? PushApplicationDescriptor.SERVER_TYPE_NONE : PushApplicationDescriptor.SERVER_TYPE_BPAS;
+        // if enterprise network then there is no server URL
+        bpsUrl = isEnterprise ? null : bpsUrl;
+
+        PushApplicationDescriptor pad = new PushApplicationDescriptor( appId, port, bpsUrl, serverType, ad );
+
+        // check whether already registered or registration pending
+        PushApplicationStatus pushApplicationStatus = PushApplicationRegistry.getStatus( pad );
+        byte pasStatus = pushApplicationStatus.getStatus();
+        if( pasStatus == PushApplicationStatus.STATUS_ACTIVE ) {
+            // we already registered, update the statuses
+            return;
+            
+        } else if( pasStatus == PushApplicationStatus.STATUS_PENDING ) {
+            // we already scheduled registration, wait for its result
+        } else {
+            // not registered yet, register
+            PushApplicationRegistry.registerApplication( pad );
+        }
+    }
+
+    public static void setPushCallback(PushCallback callback) {
+        pushCallback = callback;
+    }
 }

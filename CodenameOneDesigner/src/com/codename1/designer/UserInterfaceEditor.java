@@ -1856,6 +1856,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneLikeButton, com.codename1.facebook.ui.LikeButton.class, "LikeButton", null);
         makeDraggable(codenameOneInfiniteProgress, com.codename1.components.InfiniteProgress.class, "InfiniteProgress", null);
         makeDraggable(codenameOneMultiButton, com.codename1.components.MultiButton.class, "MultiButton", null);
+        makeDraggable(codenameOneSpanButton, com.codename1.components.SpanButton.class, "SpanButton", null);
         makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
         makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
@@ -4268,7 +4269,34 @@ public class UserInterfaceEditor extends BaseForm {
 
         arrangeLeftRight = new javax.swing.JSplitPane();
         jSplitPane2 = new javax.swing.JSplitPane();
+        jSplitPane1 = new javax.swing.JSplitPane();
+        leftSidePanel = new javax.swing.JPanel();
+        jScrollPane6 = new javax.swing.JScrollPane();
+        componentHierarchy = new org.jdesktop.swingx.JXTree();
+        jPanel2 = new javax.swing.JPanel();
+        jPanel5 = new javax.swing.JPanel();
         propertyAndEventTabs = new javax.swing.JTabbedPane();
+        jScrollPane2 = new javax.swing.JScrollPane();
+        properties = new javax.swing.JTable();
+        jPanel4 = new javax.swing.JPanel();
+        bindActionEvent = new javax.swing.JButton();
+        bindOnCreate = new javax.swing.JButton();
+        bindBeforeShow = new javax.swing.JButton();
+        bindPostShow = new javax.swing.JButton();
+        bindExitForm = new javax.swing.JButton();
+        bindListModel = new javax.swing.JButton();
+        whyAreEventsDisabled = new org.jdesktop.swingx.JXButton();
+        jPanel3 = new javax.swing.JPanel();
+        jScrollPane4 = new javax.swing.JScrollPane();
+        localizeTable = new javax.swing.JTable();
+        resourceBundle = new javax.swing.JComboBox();
+        jPanel9 = new javax.swing.JPanel();
+        jLabel3 = new javax.swing.JLabel();
+        simulateDevice = new javax.swing.JButton();
+        jLabel5 = new javax.swing.JLabel();
+        initialForm = new javax.swing.JButton();
+        jScrollPane5 = new javax.swing.JScrollPane();
+        help = new javax.swing.JTextPane();
         palettePanel = new javax.swing.JScrollPane();
         componentPalette = new javax.swing.JPanel();
         jTabbedPane1 = new JOutlookBar();
@@ -4277,6 +4305,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneLabel = new javax.swing.JButton();
         codenameOneButton = new javax.swing.JButton();
         codenameOneMultiButton = new javax.swing.JButton();
+        codenameOneSpanButton = new javax.swing.JButton();
         codenameOneCheckBox = new javax.swing.JButton();
         codenameOneRadioButton = new javax.swing.JButton();
         codenameOneComboBox = new javax.swing.JButton();
@@ -4314,32 +4343,6 @@ public class UserInterfaceEditor extends BaseForm {
         fileTree = new javax.swing.JButton();
         jPanel8 = new javax.swing.JPanel();
         userComponents = new javax.swing.JPanel();
-        jScrollPane2 = new javax.swing.JScrollPane();
-        properties = new javax.swing.JTable();
-        jPanel4 = new javax.swing.JPanel();
-        bindActionEvent = new javax.swing.JButton();
-        bindOnCreate = new javax.swing.JButton();
-        bindBeforeShow = new javax.swing.JButton();
-        bindPostShow = new javax.swing.JButton();
-        bindExitForm = new javax.swing.JButton();
-        bindListModel = new javax.swing.JButton();
-        whyAreEventsDisabled = new org.jdesktop.swingx.JXButton();
-        jPanel3 = new javax.swing.JPanel();
-        jScrollPane4 = new javax.swing.JScrollPane();
-        localizeTable = new javax.swing.JTable();
-        resourceBundle = new javax.swing.JComboBox();
-        jPanel9 = new javax.swing.JPanel();
-        jLabel3 = new javax.swing.JLabel();
-        simulateDevice = new javax.swing.JButton();
-        jLabel5 = new javax.swing.JLabel();
-        initialForm = new javax.swing.JButton();
-        jScrollPane5 = new javax.swing.JScrollPane();
-        help = new javax.swing.JTextPane();
-        leftSidePanel = new javax.swing.JPanel();
-        jScrollPane6 = new javax.swing.JScrollPane();
-        componentHierarchy = new org.jdesktop.swingx.JXTree();
-        jPanel2 = new javax.swing.JPanel();
-        jPanel5 = new javax.swing.JPanel();
         uiPreview = new javax.swing.JPanel();
 
         FormListener formListener = new FormListener();
@@ -4356,7 +4359,186 @@ public class UserInterfaceEditor extends BaseForm {
         jSplitPane2.setName("jSplitPane2"); // NOI18N
         jSplitPane2.setOneTouchExpandable(true);
 
+        jSplitPane1.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
+        jSplitPane1.setName("jSplitPane1"); // NOI18N
+        jSplitPane1.setOneTouchExpandable(true);
+
+        leftSidePanel.setName("leftSidePanel"); // NOI18N
+        leftSidePanel.setLayout(new java.awt.BorderLayout());
+
+        jScrollPane6.setName("jScrollPane6"); // NOI18N
+
+        componentHierarchy.setDragEnabled(true);
+        componentHierarchy.setName("componentHierarchy"); // NOI18N
+        jScrollPane6.setViewportView(componentHierarchy);
+
+        leftSidePanel.add(jScrollPane6, java.awt.BorderLayout.CENTER);
+
+        jPanel2.setName("jPanel2"); // NOI18N
+        jPanel2.setLayout(new java.awt.BorderLayout());
+
+        jPanel5.setName("jPanel5"); // NOI18N
+        jPanel5.setLayout(new java.awt.BorderLayout());
+        jPanel2.add(jPanel5, java.awt.BorderLayout.CENTER);
+
+        leftSidePanel.add(jPanel2, java.awt.BorderLayout.NORTH);
+
+        jSplitPane1.setBottomComponent(leftSidePanel);
+
         propertyAndEventTabs.setName("propertyAndEventTabs"); // NOI18N
+
+        jScrollPane2.setName("jScrollPane2"); // NOI18N
+
+        properties.setName("properties"); // NOI18N
+        properties.addMouseListener(formListener);
+        jScrollPane2.setViewportView(properties);
+
+        propertyAndEventTabs.addTab("Properties", jScrollPane2);
+
+        jPanel4.setName("jPanel4"); // NOI18N
+
+        bindActionEvent.setText("Action Event");
+        bindActionEvent.setName("bindActionEvent"); // NOI18N
+        bindActionEvent.addActionListener(formListener);
+
+        bindOnCreate.setText("onCreate");
+        bindOnCreate.setName("bindOnCreate"); // NOI18N
+        bindOnCreate.addActionListener(formListener);
+
+        bindBeforeShow.setText("Before Show");
+        bindBeforeShow.setName("bindBeforeShow"); // NOI18N
+        bindBeforeShow.addActionListener(formListener);
+
+        bindPostShow.setText("Post Show");
+        bindPostShow.setName("bindPostShow"); // NOI18N
+        bindPostShow.addActionListener(formListener);
+
+        bindExitForm.setText("Exit Form");
+        bindExitForm.setName("bindExitForm"); // NOI18N
+        bindExitForm.addActionListener(formListener);
+
+        bindListModel.setText("List Model");
+        bindListModel.setName("bindListModel"); // NOI18N
+        bindListModel.addActionListener(formListener);
+
+        whyAreEventsDisabled.setText("Why Are Events Disabled?");
+        whyAreEventsDisabled.setName("whyAreEventsDisabled"); // NOI18N
+        whyAreEventsDisabled.addActionListener(formListener);
+
+        org.jdesktop.layout.GroupLayout jPanel4Layout = new org.jdesktop.layout.GroupLayout(jPanel4);
+        jPanel4.setLayout(jPanel4Layout);
+        jPanel4Layout.setHorizontalGroup(
+            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
+                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        jPanel4Layout.setVerticalGroup(
+            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel4Layout.createSequentialGroup()
+                .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindActionEvent)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindOnCreate)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindBeforeShow)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindPostShow)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindExitForm)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(bindListModel)
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+
+        propertyAndEventTabs.addTab("Events", jPanel4);
+
+        jPanel3.setName("jPanel3"); // NOI18N
+        jPanel3.setLayout(new java.awt.BorderLayout());
+
+        jScrollPane4.setName("jScrollPane4"); // NOI18N
+
+        localizeTable.setName("localizeTable"); // NOI18N
+        jScrollPane4.setViewportView(localizeTable);
+
+        jPanel3.add(jScrollPane4, java.awt.BorderLayout.CENTER);
+
+        resourceBundle.setToolTipText("Resource Bundle");
+        resourceBundle.setName("resourceBundle"); // NOI18N
+        resourceBundle.addActionListener(formListener);
+        jPanel3.add(resourceBundle, java.awt.BorderLayout.PAGE_START);
+
+        propertyAndEventTabs.addTab("Localize", jPanel3);
+
+        jPanel9.setName("jPanel9"); // NOI18N
+
+        jLabel3.setText("Simulate Device");
+        jLabel3.setName("jLabel3"); // NOI18N
+
+        simulateDevice.setText("...");
+        simulateDevice.setName("simulateDevice"); // NOI18N
+        simulateDevice.addActionListener(formListener);
+
+        jLabel5.setText("Set As Main Form");
+        jLabel5.setName("jLabel5"); // NOI18N
+
+        initialForm.setText("Initial Form");
+        initialForm.setToolTipText("<html>Makes this form into the first form shown<br>when the application loads if applicable");
+        initialForm.setName("initialForm"); // NOI18N
+        initialForm.addActionListener(formListener);
+
+        org.jdesktop.layout.GroupLayout jPanel9Layout = new org.jdesktop.layout.GroupLayout(jPanel9);
+        jPanel9.setLayout(jPanel9Layout);
+        jPanel9Layout.setHorizontalGroup(
+            jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel9Layout.createSequentialGroup()
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jLabel5)
+                    .add(jLabel3))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                    .add(simulateDevice, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(initialForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .add(280, 280, 280))
+        );
+        jPanel9Layout.setVerticalGroup(
+            jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel9Layout.createSequentialGroup()
+                .addContainerGap()
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel3)
+                    .add(simulateDevice))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel5)
+                    .add(initialForm))
+                .addContainerGap(165, Short.MAX_VALUE))
+        );
+
+        propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
+
+        jScrollPane5.setName("jScrollPane5"); // NOI18N
+
+        help.setContentType("text/html");
+        help.setEditable(false);
+        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rTo use the GUI builder drag components from the component palette at the bottom to either\nthe component tree on the right or into the actual UI. Components are arranged in a hierarchy \nwithin containers, you can nest containers and components to create all forms of elaborate UI's.\nTo determine how components are arranged within a Container you need to determine the layout\nmanager of the container (click the layout field in the Properties section while a container is \nselected, there is more documentation on layouts there).\n    </p>\r\n    <p>\n      Attributes of a component can be customized when its selected in the tree or in the UI by \nediting the properties tab content. Components can be dragged and rearranged both within the\nUI preview and within the tree, a right click (meta-click) menu also exists to delete/copy/paste etc.\nthe existing components. To change the appearance of a component you need to work with\na theme, to apply a change only to a specific component you can change its UIID attribute and\nedit that UIID in the theme (read more about UIID's in the theme section).\n    </p>\n    <p>\n      Navigation between forms in the GUI builder is possible with commands, in order to view the resulting UI \nthe theme can be selected (select the UI from the Preview Options area). In order for events to be mappable\n via the GUI builder use the generate netbeans project functionality in the Application menu.\n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
+        help.setName("help"); // NOI18N
+        jScrollPane5.setViewportView(help);
+
+        propertyAndEventTabs.addTab("Help", jScrollPane5);
+
+        jSplitPane1.setTopComponent(propertyAndEventTabs);
+
+        jSplitPane2.setRightComponent(jSplitPane1);
 
         palettePanel.setMaximumSize(new java.awt.Dimension(32766, 32766));
         palettePanel.setMinimumSize(new java.awt.Dimension(50, 50));
@@ -4400,6 +4582,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMultiButton.setName("codenameOneMultiButton"); // NOI18N
         codenameOneMultiButton.addActionListener(formListener);
         coreComponents.add(codenameOneMultiButton);
+
+        codenameOneSpanButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
+        codenameOneSpanButton.setText("Span-Button");
+        codenameOneSpanButton.setToolTipText("<html><body><b>SpanButton</b><br> \n<p>\nA button that can span multiple lines<br>\nsimilarly to a text area component.</p> </body> </html>"); // NOI18N
+        codenameOneSpanButton.setBorder(null);
+        codenameOneSpanButton.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneSpanButton.setName("codenameOneSpanButton"); // NOI18N
+        codenameOneSpanButton.addActionListener(formListener);
+        coreComponents.add(codenameOneSpanButton);
 
         codenameOneCheckBox.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneCheckBox.setText("Check Box");
@@ -4715,180 +4906,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         palettePanel.setViewportView(componentPalette);
 
-        propertyAndEventTabs.addTab("Palette", palettePanel);
-
-        jScrollPane2.setName("jScrollPane2"); // NOI18N
-
-        properties.setName("properties"); // NOI18N
-        properties.addMouseListener(formListener);
-        jScrollPane2.setViewportView(properties);
-
-        propertyAndEventTabs.addTab("Properties", jScrollPane2);
-
-        jPanel4.setName("jPanel4"); // NOI18N
-
-        bindActionEvent.setText("Action Event");
-        bindActionEvent.setName("bindActionEvent"); // NOI18N
-        bindActionEvent.addActionListener(formListener);
-
-        bindOnCreate.setText("onCreate");
-        bindOnCreate.setName("bindOnCreate"); // NOI18N
-        bindOnCreate.addActionListener(formListener);
-
-        bindBeforeShow.setText("Before Show");
-        bindBeforeShow.setName("bindBeforeShow"); // NOI18N
-        bindBeforeShow.addActionListener(formListener);
-
-        bindPostShow.setText("Post Show");
-        bindPostShow.setName("bindPostShow"); // NOI18N
-        bindPostShow.addActionListener(formListener);
-
-        bindExitForm.setText("Exit Form");
-        bindExitForm.setName("bindExitForm"); // NOI18N
-        bindExitForm.addActionListener(formListener);
-
-        bindListModel.setText("List Model");
-        bindListModel.setName("bindListModel"); // NOI18N
-        bindListModel.addActionListener(formListener);
-
-        whyAreEventsDisabled.setText("Why Are Events Disabled?");
-        whyAreEventsDisabled.setName("whyAreEventsDisabled"); // NOI18N
-        whyAreEventsDisabled.addActionListener(formListener);
-
-        org.jdesktop.layout.GroupLayout jPanel4Layout = new org.jdesktop.layout.GroupLayout(jPanel4);
-        jPanel4.setLayout(jPanel4Layout);
-        jPanel4Layout.setHorizontalGroup(
-            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel4Layout.createSequentialGroup()
-                .addContainerGap()
-                .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE))
-                .addContainerGap())
-        );
-        jPanel4Layout.setVerticalGroup(
-            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel4Layout.createSequentialGroup()
-                .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindActionEvent)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindOnCreate)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindBeforeShow)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindPostShow)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindExitForm)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(bindListModel)
-                .addContainerGap(86, Short.MAX_VALUE))
-        );
-
-        propertyAndEventTabs.addTab("Events", jPanel4);
-
-        jPanel3.setName("jPanel3"); // NOI18N
-        jPanel3.setLayout(new java.awt.BorderLayout());
-
-        jScrollPane4.setName("jScrollPane4"); // NOI18N
-
-        localizeTable.setName("localizeTable"); // NOI18N
-        jScrollPane4.setViewportView(localizeTable);
-
-        jPanel3.add(jScrollPane4, java.awt.BorderLayout.CENTER);
-
-        resourceBundle.setToolTipText("Resource Bundle");
-        resourceBundle.setName("resourceBundle"); // NOI18N
-        resourceBundle.addActionListener(formListener);
-        jPanel3.add(resourceBundle, java.awt.BorderLayout.PAGE_START);
-
-        propertyAndEventTabs.addTab("Localize", jPanel3);
-
-        jPanel9.setName("jPanel9"); // NOI18N
-
-        jLabel3.setText("Simulate Device");
-        jLabel3.setName("jLabel3"); // NOI18N
-
-        simulateDevice.setText("...");
-        simulateDevice.setName("simulateDevice"); // NOI18N
-        simulateDevice.addActionListener(formListener);
-
-        jLabel5.setText("Set As Main Form");
-        jLabel5.setName("jLabel5"); // NOI18N
-
-        initialForm.setText("Initial Form");
-        initialForm.setToolTipText("<html>Makes this form into the first form shown<br>when the application loads if applicable");
-        initialForm.setName("initialForm"); // NOI18N
-        initialForm.addActionListener(formListener);
-
-        org.jdesktop.layout.GroupLayout jPanel9Layout = new org.jdesktop.layout.GroupLayout(jPanel9);
-        jPanel9.setLayout(jPanel9Layout);
-        jPanel9Layout.setHorizontalGroup(
-            jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel9Layout.createSequentialGroup()
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jLabel5)
-                    .add(jLabel3))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                    .add(simulateDevice, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(initialForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .add(187, 187, 187))
-        );
-        jPanel9Layout.setVerticalGroup(
-            jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel9Layout.createSequentialGroup()
-                .addContainerGap()
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel3)
-                    .add(simulateDevice))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel5)
-                    .add(initialForm))
-                .addContainerGap(234, Short.MAX_VALUE))
-        );
-
-        propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
-
-        jScrollPane5.setName("jScrollPane5"); // NOI18N
-
-        help.setContentType("text/html");
-        help.setEditable(false);
-        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rTo use the GUI builder drag components from the component palette at the bottom to either\nthe component tree on the right or into the actual UI. Components are arranged in a hierarchy \nwithin containers, you can nest containers and components to create all forms of elaborate UI's.\nTo determine how components are arranged within a Container you need to determine the layout\nmanager of the container (click the layout field in the Properties section while a container is \nselected, there is more documentation on layouts there).\n    </p>\r\n    <p>\n      Attributes of a component can be customized when its selected in the tree or in the UI by \nediting the properties tab content. Components can be dragged and rearranged both within the\nUI preview and within the tree, a right click (meta-click) menu also exists to delete/copy/paste etc.\nthe existing components. To change the appearance of a component you need to work with\na theme, to apply a change only to a specific component you can change its UIID attribute and\nedit that UIID in the theme (read more about UIID's in the theme section).\n    </p>\n    <p>\n      Navigation between forms in the GUI builder is possible with commands, in order to view the resulting UI \nthe theme can be selected (select the UI from the Preview Options area). In order for events to be mappable\n via the GUI builder use the generate netbeans project functionality in the Application menu.\n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
-        help.setName("help"); // NOI18N
-        jScrollPane5.setViewportView(help);
-
-        propertyAndEventTabs.addTab("Help", jScrollPane5);
-
-        jSplitPane2.setTopComponent(propertyAndEventTabs);
-
-        leftSidePanel.setName("leftSidePanel"); // NOI18N
-        leftSidePanel.setLayout(new java.awt.BorderLayout());
-
-        jScrollPane6.setName("jScrollPane6"); // NOI18N
-
-        componentHierarchy.setDragEnabled(true);
-        componentHierarchy.setName("componentHierarchy"); // NOI18N
-        jScrollPane6.setViewportView(componentHierarchy);
-
-        leftSidePanel.add(jScrollPane6, java.awt.BorderLayout.CENTER);
-
-        jPanel2.setName("jPanel2"); // NOI18N
-        jPanel2.setLayout(new java.awt.BorderLayout());
-
-        jPanel5.setName("jPanel5"); // NOI18N
-        jPanel5.setLayout(new java.awt.BorderLayout());
-        jPanel2.add(jPanel5, java.awt.BorderLayout.CENTER);
-
-        leftSidePanel.add(jPanel2, java.awt.BorderLayout.NORTH);
-
-        jSplitPane2.setBottomComponent(leftSidePanel);
+        jSplitPane2.setLeftComponent(palettePanel);
 
         arrangeLeftRight.setLeftComponent(jSplitPane2);
 
@@ -4907,7 +4925,37 @@ public class UserInterfaceEditor extends BaseForm {
     private class FormListener implements java.awt.event.ActionListener, java.awt.event.MouseListener {
         FormListener() {}
         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            if (evt.getSource() == codenameOneLabel) {
+            if (evt.getSource() == bindActionEvent) {
+                UserInterfaceEditor.this.bindActionEventActionPerformed(evt);
+            }
+            else if (evt.getSource() == bindOnCreate) {
+                UserInterfaceEditor.this.bindOnCreateActionPerformed(evt);
+            }
+            else if (evt.getSource() == bindBeforeShow) {
+                UserInterfaceEditor.this.bindBeforeShowActionPerformed(evt);
+            }
+            else if (evt.getSource() == bindPostShow) {
+                UserInterfaceEditor.this.bindPostShowActionPerformed(evt);
+            }
+            else if (evt.getSource() == bindExitForm) {
+                UserInterfaceEditor.this.bindExitFormActionPerformed(evt);
+            }
+            else if (evt.getSource() == bindListModel) {
+                UserInterfaceEditor.this.bindListModelActionPerformed(evt);
+            }
+            else if (evt.getSource() == whyAreEventsDisabled) {
+                UserInterfaceEditor.this.whyAreEventsDisabledActionPerformed(evt);
+            }
+            else if (evt.getSource() == resourceBundle) {
+                UserInterfaceEditor.this.resourceBundleActionPerformed(evt);
+            }
+            else if (evt.getSource() == simulateDevice) {
+                UserInterfaceEditor.this.simulateDeviceActionPerformed(evt);
+            }
+            else if (evt.getSource() == initialForm) {
+                UserInterfaceEditor.this.initialFormActionPerformed(evt);
+            }
+            else if (evt.getSource() == codenameOneLabel) {
                 UserInterfaceEditor.this.codenameOneLabelActionPerformed(evt);
             }
             else if (evt.getSource() == codenameOneButton) {
@@ -5009,44 +5057,17 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == bindActionEvent) {
-                UserInterfaceEditor.this.bindActionEventActionPerformed(evt);
-            }
-            else if (evt.getSource() == bindOnCreate) {
-                UserInterfaceEditor.this.bindOnCreateActionPerformed(evt);
-            }
-            else if (evt.getSource() == bindBeforeShow) {
-                UserInterfaceEditor.this.bindBeforeShowActionPerformed(evt);
-            }
-            else if (evt.getSource() == bindPostShow) {
-                UserInterfaceEditor.this.bindPostShowActionPerformed(evt);
-            }
-            else if (evt.getSource() == bindExitForm) {
-                UserInterfaceEditor.this.bindExitFormActionPerformed(evt);
-            }
-            else if (evt.getSource() == bindListModel) {
-                UserInterfaceEditor.this.bindListModelActionPerformed(evt);
-            }
-            else if (evt.getSource() == whyAreEventsDisabled) {
-                UserInterfaceEditor.this.whyAreEventsDisabledActionPerformed(evt);
-            }
-            else if (evt.getSource() == resourceBundle) {
-                UserInterfaceEditor.this.resourceBundleActionPerformed(evt);
-            }
-            else if (evt.getSource() == simulateDevice) {
-                UserInterfaceEditor.this.simulateDeviceActionPerformed(evt);
-            }
-            else if (evt.getSource() == initialForm) {
-                UserInterfaceEditor.this.initialFormActionPerformed(evt);
+            else if (evt.getSource() == codenameOneSpanButton) {
+                UserInterfaceEditor.this.codenameOneSpanButtonActionPerformed(evt);
             }
         }
 
         public void mouseClicked(java.awt.event.MouseEvent evt) {
-            if (evt.getSource() == componentPalette) {
-                UserInterfaceEditor.this.componentPaletteMouseClicked(evt);
-            }
-            else if (evt.getSource() == properties) {
+            if (evt.getSource() == properties) {
                 UserInterfaceEditor.this.propertiesMouseClicked(evt);
+            }
+            else if (evt.getSource() == componentPalette) {
+                UserInterfaceEditor.this.componentPaletteMouseClicked(evt);
             }
         }
 
@@ -5713,6 +5734,14 @@ private void codenameOneOnOffSwitchActionPerformed(java.awt.event.ActionEvent ev
         addComponentToContainer(new com.codename1.components.OnOffSwitch(), "OnOffSwitch");
 }//GEN-LAST:event_codenameOneOnOffSwitchActionPerformed
 
+private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneSpanButtonActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.SpanButton(), "SpanButton");
+}//GEN-LAST:event_codenameOneSpanButtonActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5836,6 +5865,7 @@ private void codenameOneOnOffSwitchActionPerformed(java.awt.event.ActionEvent ev
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneShare;
     private javax.swing.JButton codenameOneSlider;
+    private javax.swing.JButton codenameOneSpanButton;
     private javax.swing.JButton codenameOneTable;
     private javax.swing.JButton codenameOneTabs;
     private javax.swing.JButton codenameOneTextArea;
@@ -5864,6 +5894,7 @@ private void codenameOneOnOffSwitchActionPerformed(java.awt.event.ActionEvent ev
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
+    private javax.swing.JSplitPane jSplitPane1;
     private javax.swing.JSplitPane jSplitPane2;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JPanel leftSidePanel;

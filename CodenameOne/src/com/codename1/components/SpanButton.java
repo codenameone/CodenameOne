@@ -35,7 +35,7 @@ import com.codename1.ui.layouts.BorderLayout;
  *
  * @author Shai Almog
  */
-class SpanButton extends Container {
+public class SpanButton extends Container {
     private Button actualButton;
     private TextArea text;
     
@@ -58,7 +58,7 @@ class SpanButton extends Container {
         text.setEditable(false);
         text.setFocusable(false);
         actualButton = new Button();
-        actualButton.setUIID("Icon");
+        actualButton.setUIID("icon");
         addComponent(BorderLayout.WEST, actualButton);
         addComponent(BorderLayout.CENTER, text);
         setLeadComponent(actualButton);
@@ -111,5 +111,81 @@ class SpanButton extends Container {
      */
     public void removeActionListener(ActionListener l) {
         actualButton.removeActionListener(l);
+    }
+    
+    /**
+     * Sets the icon position based on border layout constraints
+     * 
+     * @param s position either North/South/East/West
+     */
+    public void setIconPosition(String t) {
+        removeComponent(actualButton);
+        addComponent(t, actualButton);
+        revalidate();
+    }
+    
+    /**
+     * Returns the icon position based on border layout constraints
+     * 
+     * @return position either North/South/East/West
+     */
+    public String getIconPosition() {
+        return (String)getLayout().getComponentConstraint(actualButton);
+    }
+    
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {
+            "text", "icon", "iconPosition"
+        };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {
+           String.class, // text
+           Image.class, // icon
+           String.class // iconPosition
+       };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("text")) {
+            return getText();
+        }
+        if(name.equals("icon")) {
+            return getIcon();
+        }
+        if(name.equals("iconPosition")) {
+            return getIconPosition();
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("text")) {
+            setText((String)value);
+            return null;
+        }
+        if(name.equals("icon")) {
+            setIcon((Image)value);
+            return null;
+        }
+        if(name.equals("iconPosition")) {
+            setIconPosition((String)value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
     }
 }

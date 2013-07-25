@@ -694,7 +694,11 @@ public final class CommonTransitions extends Transition {
                     g.translate(0, sourceForm.getTitleArea().getHeight());
                     Container sourcePane = ((Form)getSource()).getContentPane();
                     Container destPane = ((Form)getDestination()).getContentPane();
-                    if(forward) {
+                    boolean dir = forward;
+                    if(sourceForm != null && sourceForm.getUIManager().getLookAndFeel().isRTL()) {
+                        dir = !dir;
+                    }
+                    if(dir) {
                         g.translate(slidePos, 0);
                         paint(g, sourcePane, -sourcePane.getAbsoluteX() -sourcePane.getScrollX(), -sourcePane.getAbsoluteY() -sourcePane.getScrollY(), true);
                         g.translate(-destPane.getWidth(), 0);
@@ -785,14 +789,18 @@ public final class CommonTransitions extends Transition {
                 // big component that takes up all the space such as a title that occupies the entire title area
                 travelDestination = c.getWidth() / 2 - c.getPreferredW() / 2;
             }
+            boolean dir = forward;
+            if(c.getUIManager().getLookAndFeel().isRTL()) {
+                dir = !dir;
+            }
             if(incoming) {
-                if(forward) {
+                if(dir) {
                     m = Motion.createEaseInOutMotion(-travelDestination, 0, speed);
                 } else {
                     m = Motion.createEaseInOutMotion(travelDestination, 0, speed);
                 }
             } else {
-                if(forward) {
+                if(dir) {
                     m = Motion.createEaseInOutMotion(0, travelDestination, speed);
                 } else {
                     m = Motion.createEaseInOutMotion(0, -travelDestination, speed);
@@ -907,7 +915,11 @@ public final class CommonTransitions extends Transition {
             w = 0;
         }
 
-        if(forward) {
+        boolean dir = forward;
+        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+            dir = !dir;
+        }
+        if(dir) {
             w = -w;
             h = -h;
         } else {
@@ -965,7 +977,11 @@ public final class CommonTransitions extends Transition {
             w = 0;
         }
 
-        if(forward) {
+        boolean dir = forward;
+        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+            dir = !dir;
+        }
+        if(dir) {
             w = -w;
             h = -h;
         } else {
@@ -1034,7 +1050,11 @@ public final class CommonTransitions extends Transition {
                 w = 0;
             }
 
-            if(forward) {
+            boolean dir = forward;
+            if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+                dir = !dir;
+            }
+            if(dir) {
                 w = -w;
                 h = -h;
             } else {

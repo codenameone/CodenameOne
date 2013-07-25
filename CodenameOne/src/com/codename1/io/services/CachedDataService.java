@@ -23,14 +23,10 @@
 package com.codename1.io.services;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Externalizable;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
-import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionListener;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -66,13 +62,16 @@ public class CachedDataService extends ConnectionRequest {
         }
         d.setFetching(true);
         CachedDataService c = new CachedDataService();
+        c.setUrl(d.getUrl());
         c.setPost(false);
         if(callback != null) {
             c.addResponseListener(callback);
         }
         if(d.getModified() != null && d.getModified().length() > 0) {
             c.addRequestHeader("If-Modified-Since", d.getModified());
-            c.addRequestHeader("If-None-Match", d.getEtag());
+            if(d.getEtag() != null) {
+                c.addRequestHeader("If-None-Match", d.getEtag());
+            }
         }
         NetworkManager.getInstance().addToQueue(c);        
     }
@@ -80,7 +79,16 @@ public class CachedDataService extends ConnectionRequest {
     /**
      * @inheritDoc
      */
+    protected void handleException(Exception err) {
+        data.setFetching(false);
+        super.handleException(err);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     protected void handleErrorResponseCode(int code, String message) {
+        data.setFetching(false);
         if(code == 304) {
             // data unmodified
             return;
@@ -107,5 +115,6 @@ public class CachedDataService extends ConnectionRequest {
     protected void readResponse(InputStream input) throws IOException  {
         data.setData(Util.readInputStream(input));
         fireResponseListener(new NetworkEvent(this, data));
+        data.setFetching(false);
     }
 }

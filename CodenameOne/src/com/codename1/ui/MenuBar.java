@@ -711,8 +711,10 @@ public class MenuBar extends Container implements ActionListener {
 
     private void updateBackBorderToRTL(Style s) {
         Border b = s.getBorder();
-        b = b.mirrorBorder();
-        s.setBorder(b);
+        if(b != null) {
+            b = b.mirrorBorder();
+            s.setBorder(b);
+        }
     }
     
     private void verifyBackCommandRTL(Button bg) {

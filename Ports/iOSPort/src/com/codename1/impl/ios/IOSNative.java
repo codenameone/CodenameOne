@@ -288,6 +288,7 @@ final class IOSNative {
     native boolean isContactsPermissionGranted();
     native int getContactCount(boolean withNumbers);
     native void getContactRefIds(int[] refs, boolean withNumbers);
+    native void updatePersonWithRecordID(int id, Contact cnt);
     native long getPersonWithRecordID(int id);
     native String getPersonFirstName(long id);
     native String getPersonSurnameName(long id);

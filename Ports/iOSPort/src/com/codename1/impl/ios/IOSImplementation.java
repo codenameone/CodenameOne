@@ -2347,11 +2347,33 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Contact getContactById(String id) {
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
-        c.setId("" + id);
-        long person = nativeInstance.getPersonWithRecordID(recId);
-        c.setFirstName(nativeInstance.getPersonFirstName(person));
-        c.setFamilyName(nativeInstance.getPersonSurnameName(person));
+        c.setId(id);
+        c.setAddresses(new Hashtable());
+        c.setEmails(new Hashtable());
+        c.setPhoneNumbers(new Hashtable());
+        nativeInstance.updatePersonWithRecordID(recId, c);
+        return c;
         
+        /*c.setId("" + id);
+        long person = nativeInstance.getPersonWithRecordID(recId);
+        String fname = nativeInstance.getPersonFirstName(person);
+        c.setFirstName(fname);
+        String sname = nativeInstance.getPersonSurnameName(person);
+        c.setFamilyName(sname);
+        if(c.getFirstName() != null) {
+            StringBuilder s = new StringBuilder();
+            if(fname != null && fname.length() > 0) {
+                if(sname != null && sname.length() > 0) {
+                    c.setDisplayName(fname + " " + sname);
+                } else {
+                    c.setDisplayName(fname);
+                }
+            } else {
+                if(sname != null && sname.length() > 0) {
+                    c.setDisplayName(sname);
+                }
+            }
+        }
         c.setPrimaryEmail(nativeInstance.getPersonEmail(person));
         
         int phones = nativeInstance.getPersonPhoneCount(person);
@@ -2374,7 +2396,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         //h.put("Work", h);
         c.setAddresses(h);
         nativeInstance.releasePeer(person);
-        return c;
+        return c;*/
     }
     
     @Override
@@ -2590,6 +2612,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected Image generatePeerImage() {
             int[] wh = new int[2];
             long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
+            if(imagePeer == 0) {
+                return null;
+            }
             NativeImage ni = new NativeImage("PeerScreen");
             ni.peer = imagePeer;
             ni.width = wh[0];
@@ -3264,12 +3289,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     public static void pushRegistered(final String deviceKey) {
         System.out.println("Push handleRegistration() Sending registration to server!");
-        String clsName = callback.getClass().getName();
-        clsName = clsName.substring(0, clsName.lastIndexOf('.'));
-        CodenameOneImplementation.registerPushOnServer(deviceKey, getApplicationKey(), (byte)2, "", clsName);
+        String c = callback.getClass().getName();
+        final String clsName = c.substring(0, c.lastIndexOf('.'));
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
+                    CodenameOneImplementation.registerPushOnServer(deviceKey, getApplicationKey(), (byte)2, "", clsName);
                     pushCallback.registeredForPush(deviceKey);
                 }
             });

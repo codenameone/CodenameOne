@@ -38,8 +38,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Vector;
 
 /**
@@ -141,7 +144,7 @@ public class Resources {
      * A cache within the resource allowing us to preserve some resources in memory
      * so they can be utilized by a theme when it is loaded
      */
-    private Hashtable resources = new Hashtable();
+    private HashMap<String, Object> resources = new HashMap<String, Object>();
     
     private DataInputStream input; 
     
@@ -674,8 +677,8 @@ public class Resources {
      * @param locale name of the locale resource
      * @return Hashtable containing key value pairs for localized data
      */
-    public Hashtable getL10N(String id, String locale) {
-        return (Hashtable)((Hashtable)resources.get(id)).get(locale);
+    public Hashtable<String, String> getL10N(String id, String locale) {
+        return (Hashtable<String, String>)((Hashtable)resources.get(id)).get(locale);
     }
 
     /**
@@ -688,6 +691,16 @@ public class Resources {
         return ((Hashtable)resources.get(id)).keys();
     }
 
+    /**
+     * Returns a collection of the l10 locale names
+     * 
+     * @param id the name of the locale resource
+     * @return collection of strings containing bundle names
+     */
+    public Collection<String> l10NLocaleSet(String id) {
+        return ((Hashtable<String, String>)resources.get(id)).keySet();
+    }
+    
     /**
      * Returns the font resource from the file
      * 
@@ -1537,7 +1550,7 @@ public class Resources {
     }
         
     private Hashtable loadL10N() throws IOException {
-        Hashtable l10n = new Hashtable();
+        Hashtable<String, Hashtable<String, String>> l10n = new Hashtable<String, Hashtable<String, String>>();
 
         int keys = input.readShort();
         int languages = input.readShort();
