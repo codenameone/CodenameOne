@@ -3136,6 +3136,15 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return MIDPContactsManager.getInstance().getContactById(id);
     }
 
+    /**
+     * @inheritDoc
+     */
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, 
+            boolean includesNumbers, boolean includesEmail, boolean includeAddress){
+        return MIDPContactsManager.getInstance().getContactById(id, includesFullName, includesPicture, 
+            includesNumbers, includesEmail, includeAddress);
+    }
+    
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
          return MIDPContactsManager.getInstance().createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
     }
