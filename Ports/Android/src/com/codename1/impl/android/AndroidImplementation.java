@@ -2888,6 +2888,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 }
                 
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin,
+                        GeolocationPermissions.Callback callback) {
+                    // Always grant permission since the app itself requires location
+                    // permission and the user has therefore already granted it
+                    callback.invoke(origin, true, false);
+                }
             });
         }
         
