@@ -554,7 +554,13 @@ public class ImageDownloadService extends ConnectionRequest {
             if (!fastScale && toScale != null) {
                 im = scaleImage(im, toScale, defaultMaintainAspectRatio);
             }
-            l.setIcon(im);
+            final Image i = im;
+            Display.getInstance().callSerially(new Runnable() {
+
+                public void run() {
+                    l.setIcon(i);
+                }
+            });
             return;
         }
         //image not found on cache go and download from the url
@@ -692,32 +698,44 @@ public class ImageDownloadService extends ConnectionRequest {
             image = scaleImage(image, toScale, maintainAspectRatio);
         }
 
+        final Image i = image;
         if(parentLabel != null) {
-            Dimension pref = parentLabel.getPreferredSize();
+            final Dimension pref = parentLabel.getPreferredSize();
             if(parentLabel.getComponentForm() != null) {
-                if(isDownloadToStyles()) {
-                    parentLabel.getUnselectedStyle().setBgImage(image);
-                    parentLabel.getSelectedStyle().setBgImage(image);
-                    parentLabel.getPressedStyle().setBgImage(image);
-                } else {
-                    parentLabel.setIcon(image);
-                }
-                Dimension newPref = parentLabel.getPreferredSize();
+                Display.getInstance().callSerially(new Runnable() {
 
-                // if the preferred size changed we need to reflow the UI
-                // this might not be necessary if the label already had an identically
-                // sized image in place or has a hardcoded preferred size.
-                if(pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
-                    parentLabel.getComponentForm().revalidate();
-                }
+                    public void run() {
+                        if(isDownloadToStyles()) {
+                            parentLabel.getUnselectedStyle().setBgImage(i);
+                            parentLabel.getSelectedStyle().setBgImage(i);
+                            parentLabel.getPressedStyle().setBgImage(i);
+                        } else {
+                            parentLabel.setIcon(i);
+                        }
+                        Dimension newPref = parentLabel.getPreferredSize();
+                        // if the preferred size changed we need to reflow the UI
+                        // this might not be necessary if the label already had an identically
+                        // sized image in place or has a hardcoded preferred size.
+                        if(pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
+                            parentLabel.getComponentForm().revalidate();
+                        }
+                    }
+                });
+
             } else {
-                if(isDownloadToStyles()) {
-                    parentLabel.getUnselectedStyle().setBgImage(image);
-                    parentLabel.getSelectedStyle().setBgImage(image);
-                    parentLabel.getPressedStyle().setBgImage(image);
-                } else {
-                    parentLabel.setIcon(image);
-                }
+                Display.getInstance().callSerially(new Runnable() {
+
+                    public void run() {
+                        if(isDownloadToStyles()) {
+                            parentLabel.getUnselectedStyle().setBgImage(i);
+                            parentLabel.getSelectedStyle().setBgImage(i);
+                            parentLabel.getPressedStyle().setBgImage(i);
+                        } else {
+                            parentLabel.setIcon(i);
+                        }
+                        
+                    }
+                });
             }
             parentLabel.repaint();
             return;
