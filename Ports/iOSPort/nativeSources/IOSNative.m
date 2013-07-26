@@ -2281,25 +2281,30 @@ void addToHashtable(JAVA_OBJECT hash, ABMultiValueRef ref, int count) {
     }
 }
 
-void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact(JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT  cnt) {
+void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact_boolean_boolean_boolean_boolean_boolean(JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT cnt, 
+            JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
-    ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
-    int emailCount = ABMultiValueGetCount(emails);
-    if(emailCount > 0) {
-        NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(emails, 0);
-        com_codename1_contacts_Contact_setPrimaryEmail___java_lang_String(cnt, fromNSString(k));
-        JAVA_OBJECT emailsHash = com_codename1_contacts_Contact_getEmails__(cnt);
-        addToHashtable(emailsHash, emails, emailCount);
+    if(includesEmail) {
+        ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
+        int emailCount = ABMultiValueGetCount(emails);
+        if(emailCount > 0) {
+            NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(emails, 0);
+            com_codename1_contacts_Contact_setPrimaryEmail___java_lang_String(cnt, fromNSString(k));
+            JAVA_OBJECT emailsHash = com_codename1_contacts_Contact_getEmails__(cnt);
+            addToHashtable(emailsHash, emails, emailCount);
+        }
     }
 
-    ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
-    int numbersCount = ABMultiValueGetCount(numbers);
-    if(numbersCount > 0) {
-        NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(numbers, 0);
-        com_codename1_contacts_Contact_setPrimaryPhoneNumber___java_lang_String(cnt, fromNSString(k));
-        JAVA_OBJECT hash = com_codename1_contacts_Contact_getPhoneNumbers__(cnt);
-        addToHashtable(hash, numbers, numbersCount);
+    if(includesNumbers) {
+        ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
+        int numbersCount = ABMultiValueGetCount(numbers);
+        if(numbersCount > 0) {
+            NSString *k = (NSString *)ABMultiValueCopyValueAtIndex(numbers, 0);
+            com_codename1_contacts_Contact_setPrimaryPhoneNumber___java_lang_String(cnt, fromNSString(k));
+            JAVA_OBJECT hash = com_codename1_contacts_Contact_getPhoneNumbers__(cnt);
+            addToHashtable(hash, numbers, numbersCount);
+        }
     }
     
     NSString* first = (NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);
@@ -2312,15 +2317,17 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
         com_codename1_contacts_Contact_setFamilyName___java_lang_String(cnt, fromNSString(last));
     }
 
-    NSString* full = [NSString stringWithFormat:@"%@ %@", first, last];
-    if(first != nil && last != nil) {
-        com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(full));
-    } else {
-        if(first != nil) {
-            com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(first));
+    if(includesFullName) {
+        NSString* full = [NSString stringWithFormat:@"%@ %@", first, last];
+        if(first != nil && last != nil) {
+            com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(full));
         } else {
-            if(last != nil) {
-                com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(last));
+            if(first != nil) {
+                com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(first));
+            } else {
+                if(last != nil) {
+                    com_codename1_contacts_Contact_setDisplayName___java_lang_String(cnt, fromNSString(last));
+                }
             }
         }
     }
@@ -2336,17 +2343,19 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
         com_codename1_contacts_Contact_setBirthday___long(cnt, nst * 1000);
     }
     
-    GLUIImage* g = nil;
-    if(ABPersonHasImageData(i)){
-        UIImage* img = [UIImage imageWithData:(NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
-        g = [[GLUIImage alloc] initWithImage:img];
-        com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage();
-        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.peer_ = g;
-        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.width_ = (int)[g getImage].size.width;
-        (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.height_ = (int)[g getImage].size.height;
-        
-        JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object(nativeImage);
-        com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(cnt, image);
+    if(includesPicture) {
+        GLUIImage* g = nil;
+        if(ABPersonHasImageData(i)){
+            UIImage* img = [UIImage imageWithData:(NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
+            g = [[GLUIImage alloc] initWithImage:img];
+            com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage();
+            (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.peer_ = g;
+            (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.width_ = (int)[g getImage].size.width;
+            (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.height_ = (int)[g getImage].size.height;
+
+            JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object(nativeImage);
+            com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(cnt, image);
+        }
     }
     
     [pool release];

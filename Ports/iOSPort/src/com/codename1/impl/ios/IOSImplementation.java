@@ -2344,15 +2344,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public Contact getContactById(String id) {
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId(id);
         c.setAddresses(new Hashtable());
         c.setEmails(new Hashtable());
         c.setPhoneNumbers(new Hashtable());
-        nativeInstance.updatePersonWithRecordID(recId, c);
+        nativeInstance.updatePersonWithRecordID(recId, c, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
         return c;
+    }
+
+    @Override
+    public Contact getContactById(String id) {
+        return getContactById(id, true, true, true, true, true);
         
         /*c.setId("" + id);
         long person = nativeInstance.getPersonWithRecordID(recId);
