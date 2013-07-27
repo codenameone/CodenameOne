@@ -1438,6 +1438,7 @@ public class Form extends Container {
      */
     void disposeImpl() {
         if (previousForm != null) {
+            boolean clearPrevious = Display.getInstance().getCurrent() == this;
             previousForm.tint = false;
 
             if (previousForm instanceof Dialog) {
@@ -1449,8 +1450,10 @@ public class Form extends Container {
                 //previousForm.revalidate();
             }
 
-            // enable GC to cleanup the previous form if no longer referenced
-            previousForm = null;
+            if(clearPrevious) {
+                // enable GC to cleanup the previous form if no longer referenced
+                previousForm = null;
+            }
         }
     }
 
