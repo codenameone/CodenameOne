@@ -52,6 +52,9 @@ import javax.microedition.io.HttpConnection;
 import javax.microedition.io.StreamConnection;
 import net.rim.blackberry.api.invoke.CameraArguments;
 import net.rim.blackberry.api.invoke.Invoke;
+import net.rim.blackberry.api.messagelist.ApplicationIcon;
+import net.rim.blackberry.api.messagelist.ApplicationIndicator;
+import net.rim.blackberry.api.messagelist.ApplicationIndicatorRegistry;
 import net.rim.blackberry.api.push.PushApplicationDescriptor;
 import net.rim.blackberry.api.push.PushApplicationRegistry;
 import net.rim.blackberry.api.push.PushApplicationStatus;
@@ -88,11 +91,21 @@ import net.rim.device.api.ui.picker.FilePicker;
  */
 public class BlackBerryOS5Implementation extends BlackBerryImplementation {
     private static PushCallback pushCallback;
-
+    private static int unreadCount = 0;
+    
     BlackBerryCanvas createCanvas() {
         return new BlackBerryTouchSupport(this);
     }
 
+    public void init(Object m) {
+        super.init(m);
+        if(unreadCount > 0) {
+            unreadCount = 0;
+            updateIndicator(0);
+        }
+        unreadCount = 0;
+    }
+    
     public void nativeEdit(final Component cmp, final int maxSize, final int constraint, String text, int keyCode) {
         BlackBerryVirtualKeyboard.blockFolding = true;
         super.nativeEdit(cmp, maxSize, constraint, text, keyCode);
@@ -580,16 +593,40 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         return new String[]{"audio/amr", "audio/basic", "qcelp"};
     }
 
+    private static void updateIndicator( final int inc ) {
+        UiApplication.getApplication().invokeLater(new Runnable() {
+            public void run() {
+                ApplicationIndicatorRegistry indicatorRegistry = ApplicationIndicatorRegistry.getInstance();
+                ApplicationIndicator indicator = indicatorRegistry.getApplicationIndicator();
+                if( indicator == null ) {
+                    ApplicationIcon icon = new ApplicationIcon(net.rim.device.api.system.EncodedImage.getEncodedImageResource("push_small_size_icon.png"));
+                    indicator = indicatorRegistry.register( icon, false, true );
+                } 
+
+                unreadCount = inc;
+
+                indicator.setValue( unreadCount );
+                if( unreadCount > 0 ) {
+                    indicator.setVisible( true );
+                } else {
+                    indicator.setVisible( false );
+                }
+            }
+        });
+    }
+
     public static void onMessage(final PushInputStream stream, final StreamConnection sc) {
         if(pushCallback != null) {
             new Thread() {
                 public void run() {
                     try {
                         final byte[] buffer = Util.readInputStream(stream);
-                        Util.cleanup(stream);
                         try {
+                            stream.accept();
+                            Util.cleanup(stream);
                             sc.close();
                         } catch(Throwable t) {}
+                        updateIndicator(unreadCount + 1);
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 pushCallback.push(new String(buffer));
@@ -654,6 +691,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         String appId = Display.getInstance().getProperty("$CN1AppId", "");
         String bpsUrl = Display.getInstance().getProperty("$CN1BpsURL", "");
         ApplicationDescriptor ad = ApplicationDescriptor.currentApplicationDescriptor();
+        
         boolean isEnterprise = Display.getInstance().getProperty("$CN1Enterprise", "false").equals("true");
         
         // server type depends whether we get pushes through BES or BIS

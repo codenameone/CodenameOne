@@ -54,7 +54,7 @@ public class Push {
      */
     public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "");
+        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "");
         NetworkManager.getInstance().addToQueueAndWait(cr);
         if(cr.getResposeCode() == 200) {
             return true;
@@ -77,12 +77,13 @@ public class Push {
      * for production you will need to apply at https://cp310.pushapi.na.blackberry.com
      * @param bbApp the application id to authenticate on push for RIM devices
      * @param bbPass the application password credentials authenticate on push for RIM devices
+     * @param bbPort the port of the blackberry push
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
      */
     public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
-            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass) {
-        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass);
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         if(cr.getResposeCode() == 200) {
             return true;
@@ -105,7 +106,7 @@ public class Push {
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", ""));
+        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", ""));
     }
     
     /**
@@ -122,16 +123,17 @@ public class Push {
      * for production you will need to apply at https://cp310.pushapi.na.blackberry.com
      * @param bbApp the application id to authenticate on push for RIM devices
      * @param bbPass the application password credentials authenticate on push for RIM devices
+     * @param bbPort the port of the blackberry push
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
-            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass));
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort));
     }
 
     private static ConnectionRequest createPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
-            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass) {
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(true);
         cr.setUrl("https://codename-one.appspot.com/sendPushMessage");
@@ -148,6 +150,7 @@ public class Push {
         cr.addArgument("burl", bbUrl);
         cr.addArgument("bbAppId", bbApp);
         cr.addArgument("bbPass", bbPass);
+        cr.addArgument("bbPort", bbPort);
         if(production) {
             cr.addArgument("production", "true");
         } else {
