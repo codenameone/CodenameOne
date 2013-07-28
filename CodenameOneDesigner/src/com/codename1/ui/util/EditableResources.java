@@ -1596,7 +1596,7 @@ public class EditableResources extends Resources implements TreeModel {
                     getL10N(localeName, locale).remove(key);
                     return null;
                 } else {
-                    getL10N(localeName, locale).put(key, value);
+                    getL10N(localeName, locale).put(key, (String)value);
                     return localeName;
                 }
             }
@@ -1606,7 +1606,7 @@ public class EditableResources extends Resources implements TreeModel {
                 if(oldValue == null) {
                     getL10N(localeName, locale).remove(key);
                 } else {
-                    getL10N(localeName, locale).put(key, oldValue);
+                    getL10N(localeName, locale).put(key, (String)oldValue);
                 }
                 return localeName;
             }
