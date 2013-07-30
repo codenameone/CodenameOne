@@ -134,6 +134,8 @@ public class Resources {
         classLoader = cls;
     }
     
+    private int dpi = -1;
+    
     /**
      * Hashtable containing the mapping between element types and their names in the
      * resource hashtable
@@ -152,7 +154,8 @@ public class Resources {
     Resources() {
     }
     
-    Resources(InputStream input) throws IOException {
+    Resources(InputStream input, int dpi) throws IOException {
+        this.dpi = dpi;
         openFile(input);
     }
     
@@ -181,7 +184,7 @@ public class Resources {
     public void override(InputStream input) throws IOException { 
         openFileImpl(input);
     }
-    
+
     void openFile(InputStream input) throws IOException {
         clear();
         openFileImpl(input);
@@ -577,7 +580,43 @@ public class Resources {
      * @throws java.io.IOException if opening/reading the resource fails
      */
     public static Resources openLayered(String resource) throws IOException {
-        Resources r = open(resource + ".res");
+        return openLayered(resource, -1);
+    }
+    
+    /**
+     * Creates a resource object from the local JAR resource identifier
+     * 
+     * @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
+     * @return a resource object
+     * @throws java.io.IOException if opening/reading the resource fails
+     */
+    public static Resources open(String resource) throws IOException {
+        return open(resource, -1);
+    }
+    
+    /**
+     * Creates a resource object from the given input stream
+     * 
+     * @param resource stream from which to read the resource
+     * @return a resource object
+     * @throws java.io.IOException if opening/reading the resource fails
+     */
+    public static Resources open(InputStream resource) throws IOException {
+        return open(resource, -1);
+    }    
+    
+    /**
+     * Opens a multi-layer resource file that supports overriding features on a specific 
+     * platform. Notice that the ".res" extension MUST not be given to this method!
+     * 
+     * @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
+     * however <b>the extension MUST not be included in the name!</b> E.g. to reference /x.res use /x
+     * @param dpi the dpi used for the loaded images
+     * @return a resource object
+     * @throws java.io.IOException if opening/reading the resource fails
+     */
+    public static Resources openLayered(String resource, int dpi) throws IOException {
+        Resources r = open(resource + ".res", dpi);
         
         String[] over = Display.getInstance().getPlatformOverrides();
         for(int iter = 0 ; iter < over.length ; iter++) {
@@ -595,9 +634,10 @@ public class Resources {
      * 
      * @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
      * @return a resource object
+     * @param dpi the dpi used for the loaded images
      * @throws java.io.IOException if opening/reading the resource fails
      */
-    public static Resources open(String resource) throws IOException {
+    public static Resources open(String resource, int dpi) throws IOException {
         try {
             if(lastLoadedName != null && lastLoadedName.equals(resource)) {
                 Resources r = (Resources)Display.getInstance().extractHardRef(cachedResource);
@@ -609,7 +649,7 @@ public class Resources {
             if(is == null) {
                 throw new IOException(resource + " not found");
             }
-            Resources r = new Resources(is);
+            Resources r = new Resources(is, dpi);
             is.close();
             lastLoadedName = resource;
             cachedResource = Display.getInstance().createSoftWeakRef(r);
@@ -625,11 +665,12 @@ public class Resources {
      * Creates a resource object from the given input stream
      * 
      * @param resource stream from which to read the resource
+     * @param dpi the dpi used for the loaded images
      * @return a resource object
      * @throws java.io.IOException if opening/reading the resource fails
      */
-    public static Resources open(InputStream resource) throws IOException {
-        return new Resources(resource);
+    public static Resources open(InputStream resource, int dpi) throws IOException {
+        return new Resources(resource, dpi);
     }
 
     /**
@@ -978,7 +1019,9 @@ public class Resources {
 
     Image readMultiImage(DataInputStream input, boolean skipAll) throws IOException {
         EncodedImage resultImage = null;
-        int dpi = Display.getInstance().getDeviceDensity();
+        if(dpi == -1) {
+            dpi = Display.getInstance().getDeviceDensity();
+        }
         int dpiCount = input.readInt();
         int bestFitOffset = 0;
         int bestFitDPI = 0;

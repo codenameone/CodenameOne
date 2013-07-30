@@ -2784,7 +2784,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Indicates whether we are in the middle of a drag operation, this method allows
      * developers overriding the pointer released events to know when this is a drag
-     * operaton.
+     * operation.
      * 
      * @return true if we are in the middle of a drag; otherwise false
      */
@@ -2807,7 +2807,7 @@ public class Component implements Animation, StyleListener {
             }
         } else {
             Painter p = getStyle().getBgPainter();
-            if(p.getClass() != BGPainter.class && p instanceof Animation) {
+            if(p != null && p.getClass() != BGPainter.class && p instanceof Animation) {
                 Form pf = getComponentForm();
                 if (pf != null) {
                     pf.registerAnimated(this);

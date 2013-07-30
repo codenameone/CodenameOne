@@ -1827,7 +1827,11 @@ public class UIBuilder { //implements Externalizable {
                             continue;
                         }
                         if(cmp instanceof Tabs) {
-                            ((Tabs)cmp).setSelectedIndex(((Integer)value).intValue());
+                            int val = ((Integer)value).intValue();
+                            Tabs t = (Tabs)cmp;
+                            if(t.getTabCount() > val) {
+                                t.setSelectedIndex(val);
+                            }
                         }
                     }
                 }
