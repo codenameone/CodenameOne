@@ -799,6 +799,13 @@ public class Container extends Component {
         if (root != null) {
             root.layoutContainer();
             root.repaint();
+            
+            // for complex hierarchies 
+            if(getParent() != null) {
+                getParent().layoutContainer();
+            } else {
+                layoutContainer();
+            }
         } else {
             layoutContainer();
             repaint();

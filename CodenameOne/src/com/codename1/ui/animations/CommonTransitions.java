@@ -440,7 +440,7 @@ public final class CommonTransitions extends Transition {
                 paint(g, getDestination(), 0, 0);
                 rgbBuffer = new RGBImage(buffer.getRGBCached(), buffer.getWidth(), buffer.getHeight());
 
-                paint(g, getSource(), 0, 0);
+                paint(g, getSource(), 0, 0, true);
                 g.translate(source.getAbsoluteX(), source.getAbsoluteY());
             }
             return;

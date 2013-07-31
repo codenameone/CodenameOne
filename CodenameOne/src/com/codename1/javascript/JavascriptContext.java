@@ -31,6 +31,11 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.util.StringUtil;
 import java.util.Hashtable;
+import java.util.ArrayList; 
+import java.util.HashMap; 
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 /**
  * Represents a Javascript context of a single BrowserComponent.  This provides
@@ -127,6 +132,22 @@ public class JavascriptContext  {
      */
     static final String LOOKUP_TABLE = "ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE";
     
+    
+    /**
+     * A map of JSObjects that is used for cleanup when they are no longer needed.
+     */
+    private  Map<Integer,Object> objectMap = new HashMap<Integer,Object>();
+    
+    /**
+     * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
+     * is called.
+     */
+    private int objectMapThresholdSize = 500;
+    
+    private Random cleanupRandomizer = new Random();
+    private double cleanupProbability = 0.1;
+    
+    
     /**
      * Creates a Javascript context for the given BrowserComponent.
      * @param c 
@@ -154,6 +175,67 @@ public class JavascriptContext  {
             }
         }
     }
+    
+    /**
+     * Increments the reference count for a the javascript object wrapped by 
+     * the given JSObject.  This may also trigger a cleanup of the object map if
+     * the map grows too big, or it randomly decided to perform cleanup.
+     * @param obj 
+     */
+    void retain(JSObject obj){
+        objectMap.put(new Integer(obj.objectId), Display.getInstance().createSoftWeakRef(obj));
+        if ( objectMap.size() > objectMapThresholdSize || cleanupRandomizer.nextDouble() < cleanupProbability ){
+            cleanup();
+        }
+    }
+    
+    /**
+     * Decrements the reference count for the javascript object with the given id.
+     * This ID was assigned inside the JSObject constructor and refers to the javascript
+     * lookup table location for the javascript object.
+     * @param id The ID of the javascript object.
+     */
+    void release(int id){
+        String ID_KEY = JSObject.ID_KEY;
+        String PROP_REFCOUNT = JSObject.PROP_REFCOUNT;
+        String lt = jsLookupTable;
+        String p = lt+"["+id+"]";
+        String js = "var id = "+id+"; "+
+                "if (typeof(id) != 'undefined' && typeof("+lt+"[id]) != 'undefined' && "+lt+"[id]."+ID_KEY+"==id){"+
+                    p+"."+PROP_REFCOUNT+"--;"+
+                    "if ("+p+"."+PROP_REFCOUNT+"<=0){"+
+                        "delete "+lt+"[id];"+
+                    "}"+
+                "}";
+        exec(js);
+    }
+    
+    /**
+     * Cleans up stale references to Javascript objects.  This is triggered randomly whenever 
+     * a JSObject is constructed (with a given probability threshold).  If this is never called
+     * then the JS GC won't be able to free any objects that have ever been wrapped by JSObject
+     * because they are stored in the global lookup table.
+     */
+    public void cleanup(){
+        if ( DEBUG ){
+            Log.p("Cleaning up Javascript lookup table.");
+        }
+        List<Integer> remove = new ArrayList<Integer>();
+        for ( Map.Entry<Integer,Object> e : objectMap.entrySet()){
+            if ( Display.getInstance().extractHardRef(e.getValue()) == null ){
+                remove.add(e.getKey());
+            }
+        }
+                
+        if ( DEBUG ){
+            Log.p("Found "+remove.size()+" objects to remove from the Javascript lookup table.");
+        }
+        for ( Integer i : remove ){
+            release(i.intValue());
+            objectMap.remove(i);
+        }        
+    }
+    
     
     /**
      * Executes a Javascript string and returns the string.  It is synchronized

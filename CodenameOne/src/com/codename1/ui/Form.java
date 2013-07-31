@@ -2691,4 +2691,57 @@ public class Form extends Container {
     public void setFocusScrolling(boolean focusScrolling) {
         this.focusScrolling = focusScrolling;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] { "titleUIID", "titleAreaUIID" };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {
+           String.class,
+           String.class
+       };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("titleUIID")) {
+            if(getTitleComponent() != null) {
+                return getTitleComponent().getUIID();
+            }
+        }
+        if(name.equals("titleAreaUIID")) {
+            if(getTitleArea() != null) {
+                return getTitleArea().getUIID();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("titleUIID")) {
+            if(getTitleComponent() != null) {
+                getTitleComponent().setUIID((String)value);
+            }
+            return null;
+        }
+        if(name.equals("titleAreaUIID")) {
+            if(getTitleArea() != null) {
+                getTitleArea().setUIID((String)value);
+            }
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
 }

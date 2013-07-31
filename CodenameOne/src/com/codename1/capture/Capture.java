@@ -36,6 +36,8 @@ import java.io.OutputStream;
 /**
  * This is the main class for capturing media files from the device.
  * Use this class to invoke the native camera to capture images, audio or video
+ * Notice that files returned by this class are potentially temporary files and might be
+ * deleted by the OS in the future.
  * @author Chen
  */
 public class Capture {
