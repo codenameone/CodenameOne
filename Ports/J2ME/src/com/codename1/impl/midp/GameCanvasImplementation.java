@@ -307,6 +307,8 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      */
     static int clearSK = -8;
     static int backspaceSK = -8;
+    public static boolean disableFullScreen;
+    
     /**
      * This flag indicates if the drawRGB method is able to draw negative x and y
      * In drawRGB method, some devices such as BlackBerry throw exceptions if you
@@ -368,7 +370,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     public void init(Object m) {
         canvas = createCanvas();
         canvas.setTitle(null);
-        canvas.setFullScreenMode(!com.codename1.ui.Display.getInstance().isNativeCommands());
+        if(!disableFullScreen) {
+            canvas.setFullScreenMode(!com.codename1.ui.Display.getInstance().isNativeCommands());
+        }
 
         // disable the flashGraphics bug on Nokia phones
         String platform = System.getProperty("microedition.platform");
@@ -1334,7 +1338,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
 
         if(!minimized) {
             if (d instanceof Canvas) {
-                ((Canvas) d).setFullScreenMode(!com.codename1.ui.Display.getInstance().isNativeCommands());
+                if(!disableFullScreen) {
+                    ((Canvas) d).setFullScreenMode(!com.codename1.ui.Display.getInstance().isNativeCommands());
+                }
             }
 
             display.setCurrent(d);
