@@ -55,6 +55,7 @@ import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.MultipartRequest;
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -3009,7 +3010,12 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     }
 
     public void sendMessage(String[] recieptents, String subject, Message msg) {
-        execute("mailto:" +recieptents[0] + "?body=" + msg.getContent() + "?subject=" + subject);
+        String mailto = "mailto:" + recieptents[0];
+        for(int iter = 1 ; iter < recieptents.length ; iter++) {
+            mailto += "," + recieptents[iter];
+        }
+        mailto += "?body=" + Util.encodeUrl(msg.getContent()) + "&subject=" + Util.encodeUrl(subject);
+        execute(mailto);
     }
 
     /**
