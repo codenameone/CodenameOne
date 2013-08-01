@@ -147,7 +147,8 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
      */
     public VirtualKeyboard() {
         setLayout(new BorderLayout());
-        setDialogUIID("VKB");
+        setDialogUIID("Container");
+        getContentPane().setUIID("VKB");
         setAutoDispose(false);
         setDisposeWhenPointerOutOfBounds(true);
         setTransitionInAnimator(transitionIn);

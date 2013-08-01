@@ -632,7 +632,7 @@ public class UIManager {
 
         if(installedTheme == null || !installedTheme.containsKey("VKB.derive")) {
             themeProps.put("VKB.bgColor", "666666");
-            themeProps.put("VKB.padding", "3,6,3,3");
+            themeProps.put("VKB.padding", "1,1,1,1");
             themeProps.put("VKB.transparency", "255");            
         }
 
