@@ -62,9 +62,11 @@ import java.net.URISyntaxException;
 import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
+import android.media.ExifInterface;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.ConnectivityManager;
@@ -90,6 +92,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
+import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -174,6 +177,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int timeout = -1;
     private CodeScannerImpl scannerInstance;
     private HashMap apIds;
+
+    public static void appendNotification(String type, String body) {
+        Vector v = (Vector)Storage.getInstance().readObject("CN1$AndroidPendingNotifications");
+        if(v == null) {
+            v = new Vector();
+        }
+        v.add(new Object[] {type, body});
+        Storage.getInstance().writeObject("CN1$AndroidPendingNotifications", v);
+    }
+
+    public static void firePendingPushes(final PushCallback c) {
+        if(c != null) {
+            final Vector v = (Vector)Storage.getInstance().readObject("CN1$AndroidPendingNotifications");
+            if(v != null) {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        for(Object o : v) {
+                            Object[] arr = (Object[])o;
+                            Display.getInstance().setProperty("pushType", (String)arr[0]);
+                            c.push((String)arr[1]);
+                        }
+                        Storage.getInstance().deleteStorageFile("CN1$AndroidPendingNotifications");
+                    }
+                });
+            }
+        }
+    }
     
     @Override
     public void init(Object m) {
@@ -1548,7 +1579,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         } catch(Throwable t) {
             // will be caused by no permissions.
-            return null;
+            return defaultValue;
         }
 
         //these keys/values are from the Application Resources (strings values)
@@ -2862,7 +2893,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 activity.startActivity(dialer);
                             } catch(Throwable t) {}
                         }
-                        return false;
+                        return true;
                     }
                     return !parent.getBrowserNavigationCallback().shouldNavigate(url); 
                 }
@@ -4007,7 +4038,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (requestCode == CAPTURE_IMAGE) {
                 try {
                     String path = convertImageUriToFilePath(imageUri, activity);
-                    Bitmap picture = BitmapFactory.decodeFile(path);
+                    
+                    Bitmap picture;
+                    if(Display.getInstance().getProperty("normalizeImage", "false").equals("true")) {
+                        ExifInterface exif = new ExifInterface(path);
+                        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+                        int angle = 0;
+
+                        switch(orientation) {
+                            case ExifInterface.ORIENTATION_ROTATE_90:
+                                angle = 90;
+                                break;
+                            case ExifInterface.ORIENTATION_ROTATE_180:
+                                angle = 180;
+                                break;
+                            case ExifInterface.ORIENTATION_ROTATE_270:
+                                angle = 270;
+                                break;
+                        }
+                        
+                        if(angle == 0) {
+                            picture = BitmapFactory.decodeFile(path);
+                        } else {
+                            Matrix mat = new Matrix();
+                            mat.postRotate(angle);
+
+                            InputStream is = new FileInputStream(path);
+                            picture = BitmapFactory.decodeStream(is, null, null);
+                            Util.cleanup(is);
+                            Bitmap correctBmp = Bitmap.createBitmap(picture, 0, 0, picture.getWidth(), picture.getHeight(), mat, true);
+                            picture.recycle();
+                            picture = correctBmp;
+                        }
+                    } else {
+                        picture = BitmapFactory.decodeFile(path);
+                    }
                     File f = getOutputMediaFile(false);
                     FileOutputStream os = new FileOutputStream(f);
                     picture.compress(Bitmap.CompressFormat.JPEG, 50, os);
