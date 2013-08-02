@@ -3029,7 +3029,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void sendSMS(final String phoneNumber, final String message) throws IOException{
-        String address = "sms://" + phoneNumber + ":5000";
+        String address = "sms://" + phoneNumber;
         MessageConnection con = null;
 
         try {
