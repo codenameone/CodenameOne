@@ -4059,20 +4059,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                         
                         if(angle == 0) {
-                            picture = BitmapFactory.decodeFile(path);
+                            picture = (Bitmap) createImage(path);
                         } else {
                             Matrix mat = new Matrix();
                             mat.postRotate(angle);
 
-                            InputStream is = new FileInputStream(path);
-                            picture = BitmapFactory.decodeStream(is, null, null);
-                            Util.cleanup(is);
+                            picture = (Bitmap) createImage(path);
                             Bitmap correctBmp = Bitmap.createBitmap(picture, 0, 0, picture.getWidth(), picture.getHeight(), mat, true);
                             picture.recycle();
                             picture = correctBmp;
                         }
                     } else {
-                        picture = BitmapFactory.decodeFile(path);
+                        picture = (Bitmap) createImage(path);
                     }
                     File f = getOutputMediaFile(false);
                     FileOutputStream os = new FileOutputStream(f);
