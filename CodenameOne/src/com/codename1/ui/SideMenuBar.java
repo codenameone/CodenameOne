@@ -79,6 +79,9 @@ public class SideMenuBar extends MenuBar {
             return;
         }
         super.installMenuBar();
+        if(parent instanceof Dialog){
+            return;
+        }
         openButton = new Button();
         openButton.setUIID("MenuButton");
         Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
@@ -101,6 +104,9 @@ public class SideMenuBar extends MenuBar {
      */
     public void addCommand(Command cmd) {
         super.addCommand(cmd);
+        if(parent instanceof Dialog){
+            return;
+        }
         addOpenButton();
     }
 
@@ -109,6 +115,9 @@ public class SideMenuBar extends MenuBar {
      */
     public void setBackCommand(Command backCommand) {
         super.setBackCommand(backCommand);
+        if(parent instanceof Dialog){
+            return;
+        }
         addOpenButton();
         if (getBackCommand() != null
                 && getCommandCount() > 0
@@ -123,6 +132,9 @@ public class SideMenuBar extends MenuBar {
      */
     protected void addCommand(Command cmd, int index) {
         super.addCommand(cmd, index);
+        if(parent instanceof Dialog){
+            return;
+        }
         addOpenButton();
         if (getBackCommand() != null
                 && getCommandCount() > 0
@@ -137,6 +149,9 @@ public class SideMenuBar extends MenuBar {
      */
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
+        if(parent instanceof Dialog){
+            return;
+        }
         if (getCommandCount() == 0) {
             if (parent.getTitleComponent() != null) {
                 parent.getTitleComponent().getParent().removeAll();
