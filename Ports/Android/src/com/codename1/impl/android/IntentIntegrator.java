@@ -23,16 +23,14 @@ import java.util.List;
 import java.util.Map;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Looper;
 import android.util.Log;
+import com.codename1.ui.Dialog;
 
 /**
  * <p>A utility class which helps ease integration with Barcode Scanner via {@link Intent}s.
@@ -229,7 +227,7 @@ public class IntentIntegrator {
     /**
      * Initiates a scan for all known barcode types.
      */
-    public AlertDialog initiateScan() {
+    public boolean initiateScan() {
         return initiateScan(ALL_CODE_TYPES);
     }
 
@@ -239,10 +237,9 @@ public class IntentIntegrator {
      * class like "UPC_A". You can supply constants like {@link #PRODUCT_CODE_TYPES}
      * for example.
      *
-     * @return the {@link AlertDialog} that was shown to the user prompting them
      * to download the app if a prompt was needed, or null otherwise
      */
-    public AlertDialog initiateScan(Collection<String> desiredBarcodeFormats) {
+    public boolean initiateScan(Collection<String> desiredBarcodeFormats) {
         Intent intentScan = new Intent(BS_PACKAGE + ".SCAN");
         intentScan.addCategory(Intent.CATEGORY_DEFAULT);
 
@@ -261,18 +258,15 @@ public class IntentIntegrator {
 
         String targetAppPackage = findTargetAppPackage(intentScan);
         if (targetAppPackage == null) {
-            Looper.prepare();
-            AlertDialog d = showDownloadDialog();
-            Looper.loop();
-            return d;
-
+            showDownloadDialog();
+            return false;
         }
         intentScan.setPackage(targetAppPackage);
         intentScan.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intentScan.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
         attachMoreExtras(intentScan);
         startActivityForResult(intentScan, REQUEST_CODE);
-        return null;
+        return true;
     }
 
     /**
@@ -303,31 +297,20 @@ public class IntentIntegrator {
         return null;
     }
 
-    private AlertDialog showDownloadDialog() {
-        AlertDialog.Builder downloadDialog = new AlertDialog.Builder(activity);
-        downloadDialog.setTitle(title);
-        downloadDialog.setMessage(message);
-        downloadDialog.setPositiveButton(buttonYes, new DialogInterface.OnClickListener() {
-
-            @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-                Uri uri = Uri.parse("market://details?id=" + BS_PACKAGE);
-                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                try {
-                    activity.startActivity(intent);
-                } catch (ActivityNotFoundException anfe) {
-                    // Hmm, market is not installed
-                    Log.w(TAG, "Android Market is not installed; cannot install Barcode Scanner");
-                }
+    private void showDownloadDialog() {
+        Dialog d = new Dialog();
+        d.setTitle(title);
+        if (Dialog.show(title, message, "Yes", "No")) {
+            Uri uri = Uri.parse("market://details?id=" + BS_PACKAGE);
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            try {
+                activity.startActivity(intent);
+            } catch (ActivityNotFoundException anfe) {
+                // Hmm, market is not installed
+                Log.w(TAG, "Android Market is not installed; cannot install Barcode Scanner");
             }
-        });
-        downloadDialog.setNegativeButton(buttonNo, new DialogInterface.OnClickListener() {
+        }
 
-            @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-            }
-        });
-        return downloadDialog.show();
     }
 
     /**
@@ -335,7 +318,7 @@ public class IntentIntegrator {
      *
      * @see #shareText(CharSequence, CharSequence)
      */
-    public AlertDialog shareText(CharSequence text) {
+    public boolean shareText(CharSequence text) {
         return shareText(text, "TEXT_TYPE");
     }
 
@@ -346,10 +329,9 @@ public class IntentIntegrator {
      * @param text the text string to encode as a barcode
      * @param type type of data to encode. See {@code com.google.zxing.client.android.Contents.Type}
      * constants.
-     * @return the {@link AlertDialog} that was shown to the user prompting them
      * to download the app if a prompt was needed, or null otherwise
      */
-    public AlertDialog shareText(CharSequence text, CharSequence type) {
+    public boolean shareText(CharSequence text, CharSequence type) {
         Intent intent = new Intent();
         intent.addCategory(Intent.CATEGORY_DEFAULT);
         intent.setAction(BS_PACKAGE + ".ENCODE");
@@ -357,14 +339,15 @@ public class IntentIntegrator {
         intent.putExtra("ENCODE_DATA", text);
         String targetAppPackage = findTargetAppPackage(intent);
         if (targetAppPackage == null) {
-            return showDownloadDialog();
+            showDownloadDialog();
+            return false;
         }
         intent.setPackage(targetAppPackage);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
         attachMoreExtras(intent);
         activity.startActivity(intent);
-        return null;
+        return true;
     }
 
     private static Collection<String> list(String... values) {

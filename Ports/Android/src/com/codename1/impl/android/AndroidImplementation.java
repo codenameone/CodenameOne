@@ -4589,7 +4589,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(activity);
-            in.initiateScan(in.QR_CODE_TYPES);
+            if(!in.initiateScan(in.QR_CODE_TYPES)){
+                // restore old activity handling
+                 Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            CodeScannerImpl.this.callback.scanError(-1, "no scan app");
+                            CodeScannerImpl.this.callback = null;
+                        }
+                    });
+                 
+                if (activity instanceof CodenameOneActivity) {
+                    ((CodenameOneActivity) activity).restoreIntentResultListener();
+                }
+            }
         }
 
         @Override
@@ -4599,7 +4612,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(activity);
-            in.initiateScan(in.PRODUCT_CODE_TYPES);
+            if(!in.initiateScan(in.PRODUCT_CODE_TYPES)){
+                // restore old activity handling
+                 Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            CodeScannerImpl.this.callback.scanError(-1, "no scan app");
+                            CodeScannerImpl.this.callback = null;
+                        }
+                    });
+                 
+                if (activity instanceof CodenameOneActivity) {
+                    ((CodenameOneActivity) activity).restoreIntentResultListener();
+                }
+            }
         }
 
         public void onActivityResult(int requestCode, final int resultCode, Intent data) {
