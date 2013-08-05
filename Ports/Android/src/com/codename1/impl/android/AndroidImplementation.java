@@ -876,7 +876,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createImage(String path) throws IOException {
-        int IMAGE_MAX_SIZE = getDisplayHeight() * 2;
+        int IMAGE_MAX_SIZE = getDisplayHeight();
         if (exists(path)) {
             Bitmap b = null;
             try {
@@ -898,6 +898,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
                 o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 o2.inSampleSize = scale;
+                o2.inPurgeable = true;
+                o2.inInputShareable = true;
                 fis = new FileInputStream(path);
                 b = BitmapFactory.decodeStream(fis, null, o2);
                 fis.close();
