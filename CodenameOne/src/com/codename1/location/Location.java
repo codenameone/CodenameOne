@@ -106,7 +106,7 @@ public class Location {
     }
 
     /**
-     * Returns the velocity of this Location
+     * Returns the velocity of this Location in meters per second (m/s)
      * @return velocity
      */
     public float getVelocity() {
