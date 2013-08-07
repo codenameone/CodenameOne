@@ -101,6 +101,16 @@ public class Image {
         Object w = Display.getInstance().createSoftWeakRef(i);
         getScaleCache().put(size, w);
     }
+    
+    /**
+     * Async lock is the equivalent of a lock operation, however it uses the given image as
+     * the hard cache and performs the actual image loading asynchronously. On completion this
+     * method will invoke repaint on the main form if applicable.
+     * 
+     * @param internal the image to show while the actual image loads.
+     */
+    public void asyncLock(Image internal) {
+    }
 
     /**
      * This callback indicates that a component pointing at this image is initialized, this allows
@@ -111,6 +121,14 @@ public class Image {
     public void lock() {
     }
 
+    /**
+     * Returns true if the image is locked
+     * @return false by default 
+     */
+    public boolean isLocked() {
+        return false;
+    }
+    
     /**
      * This callback indicates that a component pointing at this image is now deinitilized
      * This method may be invoked multiple times.

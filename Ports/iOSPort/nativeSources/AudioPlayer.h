@@ -27,6 +27,7 @@
 
 @interface AudioPlayer : NSObject {
     AVAudioPlayer* playerInstance;
+    AVPlayer* avPlayerInstance;
     NSError* errorInfo;
     void* runnableCallback;
 }

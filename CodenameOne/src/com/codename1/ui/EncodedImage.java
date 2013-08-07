@@ -232,10 +232,61 @@ public class EncodedImage extends Image {
     /**
      * @inheritDoc
      */
+    public boolean isLocked() {
+        return locked;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void asyncLock(final Image internal) {
+        if(!locked) {
+            locked = true;
+            if(cache != null) {
+                hardCache = (Image)Display.getInstance().extractHardRef(cache);
+                if(hardCache != null) {
+                    return;
+                }
+            }
+            hardCache = internal;
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                public void run() {
+                    try {
+                        byte[] b = getImageData();
+                        final Image i = Image.createImage(b, 0, b.length);
+                        if(opaqueChecked) {
+                            i.setOpaque(opaque);
+                        }
+                        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+                        impl.setImageName(i.getImage(), getImageName());
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                if(locked) {
+                                    hardCache = i;
+                                    cache = Display.getInstance().createSoftWeakRef(i);
+                                    Display.getInstance().getCurrent().repaint();
+                                }
+                                width = i.getWidth();
+                                height = i.getHeight();
+                            }
+                        });
+                    } catch(Exception err) {
+                        err.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public void lock() {
-        locked = true;
-        if(cache != null) {
-            hardCache = (Image)Display.getInstance().extractHardRef(cache);
+        if(!locked) {
+            locked = true;
+            if(cache != null) {
+                hardCache = (Image)Display.getInstance().extractHardRef(cache);
+            }
         }
     }
 
@@ -243,12 +294,15 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     public void unlock() {
-        if(hardCache != null) {
-            if(cache == null || Display.getInstance().extractHardRef(cache) == null) {
-                cache = Display.getInstance().createSoftWeakRef(hardCache);
+        if(locked) {
+            if(hardCache != null) {
+                if(cache == null || Display.getInstance().extractHardRef(cache) == null) {
+                    cache = Display.getInstance().createSoftWeakRef(hardCache);
+                }
+                hardCache = null;
             }
+            locked = false;
         }
-        locked = false;
     }
 
     /**
@@ -323,6 +377,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+        Display.getInstance().getImplementation().drawingEncodedImage(this);
         Image internal = getInternalImpl();
         if(width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
             internal.drawImage(g, nativeGraphics, x, y, width, height);
@@ -335,6 +390,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+        Display.getInstance().getImplementation().drawingEncodedImage(this);
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
     }
 

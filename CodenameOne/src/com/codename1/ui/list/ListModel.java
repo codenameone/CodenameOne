@@ -37,14 +37,14 @@ import com.codename1.ui.events.SelectionListener;
  * 
  * @author Chen Fishbein
  */
-public interface ListModel {
+public interface ListModel<T> {
     
     /**
      * Returns the item at the given offset
      * @param index an index into this list
      * @return the item at the specified index
      */
-    public Object getItemAt(int index);
+    public T getItemAt(int index);
     
     /**
      * Returns the number of items in the list
@@ -95,7 +95,7 @@ public interface ListModel {
      * exception if a list model is not mutable.
      * @param item the item to be added
      */
-    public void addItem(Object item);
+    public void addItem(T item);
     
     /**
      * Removes the item at the specified position in this list.

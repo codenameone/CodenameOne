@@ -33,15 +33,28 @@ AudioPlayer* currentlyPlaying = nil;
     if (self) {
         runnableCallback = callback;
         errorInfo = nil;
-        playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
-        playerInstance.delegate = self;
-        if(volume > -1) {
-            playerInstance.volume = volume;
-        }
+        playerInstance = nil;
+        avPlayerInstance = nil;
         if(currentlyPlaying == nil) {
             currentlyPlaying = self;
         }
-        [playerInstance retain];
+        if ([url hasPrefix:@"http"]) {
+            avPlayerInstance = [[AVPlayer alloc] initWithURL:[NSURL URLWithString:url]];
+            avPlayerInstance.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+            
+            [[NSNotificationCenter defaultCenter] addObserver:self
+                                                     selector:@selector(playerItemDidReachEnd:)
+                                                         name:AVPlayerItemDidPlayToEndTimeNotification
+                                                       object:[avPlayerInstance currentItem]];
+            [avPlayerInstance retain];
+        } else {
+            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
+            playerInstance.delegate = self;
+            if(volume > -1) {
+                playerInstance.volume = volume;
+            }
+            [playerInstance retain];
+        }
     }
     
     return self;    
@@ -66,7 +79,6 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)audioPlayerBeginInterruption:(AVAudioPlayer *)player {
-    
 }
 
 - (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(NSError *)error {
@@ -81,29 +93,59 @@ AudioPlayer* currentlyPlaying = nil;
     }
 }
 
+- (void)playerItemDidReachEnd:(NSNotification *)notification {
+    if(runnableCallback != 0) {
+        (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+    }
+}
+
 - (void)audioPlayerEndInterruption:(AVAudioPlayer *)player {
     
 }
 
 - (int)getAudioDuration {
-    return (int)(playerInstance.duration * 1000);
+    if(playerInstance != nil) {
+        return (int)(playerInstance.duration * 1000);
+    }
+    if(avPlayerInstance.currentItem != nil) {
+        return (int)(CMTimeGetSeconds(avPlayerInstance.currentItem.duration) * 1000);
+    }
+    return -1;
 }
 
 - (int)getAudioTime {
-    return (int)(playerInstance.currentTime * 1000);
+    if(playerInstance != nil) {
+        return (int)(playerInstance.currentTime * 1000);
+    }
+    if(avPlayerInstance.currentItem != nil) {
+        return (int)(CMTimeGetSeconds(avPlayerInstance.currentItem.currentTime) * 1000);
+    }
+    return -1;
 }
 
 - (void)playAudio {
     currentlyPlaying = self;
-    [playerInstance play];
+    if(playerInstance != nil) {
+        [playerInstance play];
+    } else {
+        [avPlayerInstance play];
+    }
 }
 
 - (void)pauseAudio {
-    [playerInstance pause];
+    if(playerInstance != nil) {
+        [playerInstance pause];
+    } else {
+        [avPlayerInstance pause];
+    }
 }
 
 - (void)setAudioTime:(int)time {
-    playerInstance.currentTime = ((float)time) / 1000.0;
+    if(playerInstance != nil) {
+        playerInstance.currentTime = ((float)time) / 1000.0;
+    } else {
+        [avPlayerInstance seekToTime:CMTimeMakeWithSeconds(((float)time) / 1000.0, avPlayerInstance.currentItem.currentTime.timescale)];
+    }
 }
 
 + (float)getVolume {
@@ -111,7 +153,9 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)vol:(float)vol {
-    playerInstance.volume = vol;
+    if(playerInstance != nil) {
+        playerInstance.volume = vol;
+    }
 }
 
 + (void)setVolume:(float)vol {
@@ -122,14 +166,23 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (BOOL) isPlaying {
-    return playerInstance.isPlaying;
+    if(playerInstance != nil) {
+        return playerInstance.isPlaying;
+    }
+    return [avPlayerInstance rate] != 0.0;
 }
 
 -(void)dealloc {
     if(currentlyPlaying == self) {
         currentlyPlaying = nil;
     }
-    [playerInstance release];
+    if(playerInstance != nil) {
+        [playerInstance release];
+        playerInstance = nil;
+    } else {
+        [avPlayerInstance release];
+        avPlayerInstance = nil;
+    }
 	[super dealloc];
 }
 

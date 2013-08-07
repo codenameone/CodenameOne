@@ -285,6 +285,9 @@ public class MapComponent extends Container {
         draggedy = y;
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     public void pointerDragged(int[] x, int[] y) {
         if (x.length > 1) {

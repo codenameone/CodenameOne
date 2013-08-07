@@ -152,9 +152,13 @@ public class Log {
                 com.codename1.io.Preferences.set("UDeviceId__$", di.readLong());
             }
             
-            protected void handleErrorResponseCode(int code, String message) {}
+            protected void handleErrorResponseCode(int code, String message) {
+                System.out.print("Error in sending log to server: " + code + " " + message);
+            }
             
-            protected void handleException(Exception err) {}
+            protected void handleException(Exception err) {
+                err.printStackTrace();
+            }
         };
         r.setPost(false);
         r.setUrl("https://codename-one.appspot.com/registerDeviceServlet");

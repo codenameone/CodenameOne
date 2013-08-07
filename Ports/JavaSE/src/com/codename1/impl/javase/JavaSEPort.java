@@ -101,6 +101,7 @@ import com.codename1.media.Media;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
@@ -688,7 +689,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
-            if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
+            if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -741,7 +742,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
-            if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
+            if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
@@ -770,7 +771,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void mouseExited(MouseEvent e) {
             e.consume();
         }
-
         public void mouseDragged(MouseEvent e) {
             e.consume();
             if (!isEnabled()) {
@@ -797,6 +797,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.pointerReleased(x, y);
                     releaseLock = true;
                 }
+                return;
+            }
+            
+            // right click dragging means a pinch to zoom
+            if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
+                int x = scaleCoordinateX(e.getX());
+                int y = scaleCoordinateY(e.getY());
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                    if (touchDevice) {
+                        JavaSEPort.this.pointerDragged(new int[]{x, 0}, new int[]{y, 0});
+                    }
+                } 
+                return;
             }
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
@@ -3029,6 +3042,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void drawingEncodedImage(EncodedImage img) {
+        if (perfMonitor != null && !img.isLocked()) {
+            perfMonitor.printToLog("Drawing unlocked image: " + img.getImageName());
+        }
+    }
+
     /**
      * @inheritDoc
      */
@@ -3378,13 +3398,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-    public void exitApplication() {
-        try {
+    public void exitApplication() {        
+        // causes a simulator with a dialog open to freeze
+        /*try {
             Executor.stopApp();
             Executor.destroyApp();
         } catch (Throwable t) {
             t.printStackTrace();
-        }
+        }*/
         try {
             System.exit(0);
         } catch (Throwable t) {
@@ -4054,6 +4075,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return getStorageDir().list();
     }
 
+    /**
+     * @inheritDoc
+     */
+    public int getStorageEntrySize(String name) {
+        return (int)new File(getStorageDir(), name).length();
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4857,7 +4885,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         width = img.getWidth();
                     }
                     if (height < 0) {
-                        width = img.getHeight();
+                        height = img.getHeight();
                     }
                     ImageIO.write(((BufferedImage) img.getImage()), f, response);
                 }

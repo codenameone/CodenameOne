@@ -242,6 +242,8 @@ public class Component implements Animation, StyleListener {
     private String cloudDestinationProperty;
     boolean noBind;
     private Runnable refreshTask;
+    private double pinchDistance;
+    private static int restoreDragPercentage = -1;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -1917,6 +1919,26 @@ public class Component implements Animation, StyleListener {
         dragActivated = false;
         clearDrag();
     }
+    
+    /**
+     * Invoked by subclasses interested in handling pinch to zoom events, if true is returned 
+     * other drag events will not be broadcast
+     * 
+     * @param the scaling of the pinch operation a number larger than 1 means scaling up and smaller than 1 means scaling down.
+     * It is recommended that code would threshold the number (so a change between 1.0 and 1.02 shouldn't necessarily trigger zoom).
+     * Notice that this number is relevant to current zoom levels and unaware of them so you should also enforce limits of maximum/minimum
+     * zoom levels.
+     * @return false by default
+     */
+    protected boolean pinch(float scale) {
+        return false;
+    }
+
+    private double distance(int[] x, int[] y) {
+        int disx = x[0] - x[1];
+        int disy = y[0] - y[1];
+        return Math.sqrt(disx * disx + disy * disy);
+    }
 
     /**
      * If this Component is focused, the pointer dragged event
@@ -1926,9 +1948,21 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerDragged(int[] x, int[] y) {
+        if(x.length > 1) {
+            double currentDis = distance(x, y);
+            
+            // prevent division by 0
+            if (pinchDistance <= 0) {
+                pinchDistance = currentDis;
+            }
+            double scale = currentDis / pinchDistance;
+            if(pinch((float)scale)) {
+                return;
+            }
+        }
         pointerDragged(x[0], y[0]);
     }
-
+    
     /**
      * This method returns an image representing the dragged component, it can be overriden by subclasses to customize the look
      * of the image, the image will be overlaid on top of the form during a drag and drop operation
@@ -2224,6 +2258,10 @@ public class Component implements Animation, StyleListener {
     public void pointerPressed(int x, int y) {
         dragActivated = false;
         clearDrag();
+        if(isDragAndDropOperation(x, y)) {
+            restoreDragPercentage = Display.getInstance().getDragStartPercentage();
+            Display.getInstance().setDragStartPercentage(1);
+        }
     }
 
     void initDragAndDrop(int x, int y) {
@@ -2411,6 +2449,10 @@ public class Component implements Animation, StyleListener {
     }
 
     private void pointerReleaseImpl(int x, int y) {
+        if(restoreDragPercentage > -1) {
+            Display.getInstance().setDragStartPercentage(restoreDragPercentage);
+        }
+        pinchDistance = -1;
         if (dragActivated) {
             int scroll = scrollY;
             dragActivated = false;

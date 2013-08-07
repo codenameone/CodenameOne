@@ -178,31 +178,128 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private CodeScannerImpl scannerInstance;
     private HashMap apIds;
 
-    public static void appendNotification(String type, String body) {
-        Vector v = (Vector)Storage.getInstance().readObject("CN1$AndroidPendingNotifications");
-        if(v == null) {
-            v = new Vector();
-        }
-        v.add(new Object[] {type, body});
-        Storage.getInstance().writeObject("CN1$AndroidPendingNotifications", v);
+    /**
+     * Copy the input stream into the output stream, closes both streams when finishing or in
+     * a case of an exception
+     * 
+     * @param i source
+     * @param o destination
+     */
+    private static void copy(InputStream i, OutputStream o) throws IOException {
+        copy(i, o, 8192);
     }
 
-    public static void firePendingPushes(final PushCallback c) {
-        if(c != null) {
-            final Vector v = (Vector)Storage.getInstance().readObject("CN1$AndroidPendingNotifications");
-            if(v != null) {
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        for(Object o : v) {
-                            Object[] arr = (Object[])o;
-                            Display.getInstance().setProperty("pushType", (String)arr[0]);
-                            c.push((String)arr[1]);
-                        }
-                        Storage.getInstance().deleteStorageFile("CN1$AndroidPendingNotifications");
-                    }
-                });
+    /**
+     * Copy the input stream into the output stream, closes both streams when finishing or in
+     * a case of an exception
+     *
+     * @param i source
+     * @param o destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
+     */
+    private static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        try {
+            byte[] buffer = new byte[bufferSize];
+            int size = i.read(buffer);
+            while(size > -1) {
+                o.write(buffer, 0, size);
+                size = i.read(buffer);
             }
+        } finally {
+            sCleanup(o);
+            sCleanup(i);
+        }
+    }
+
+    private static void sCleanup(Object o) {
+        try {
+            if(o != null) {
+                if(o instanceof InputStream) {
+                    ((InputStream)o).close();
+                    return;
+                }
+                if(o instanceof OutputStream) {
+                    ((OutputStream)o).close();
+                    return;
+                }
+            }
+        } catch(Throwable t) {}
+    }
+    
+    /**
+     * Copied here since the cleanup method in util would crash append notification that runs when the app isn't in the foreground
+     */
+    private static byte[] readInputStream(InputStream i) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        copy(i, b);
+        return b.toByteArray();
+    }
+    
+    
+    public static void appendNotification(String type, String body, Context a) {
+        try {
+            String[] fileList = a.fileList();
+            byte[] data = null;
+            for (int iter = 0; iter < fileList.length; iter++) {
+                if (fileList[iter].equals("CN1$AndroidPendingNotifications")) {
+                    InputStream is = a.openFileInput("CN1$AndroidPendingNotifications");
+                    if(is != null) {
+                        data = readInputStream(is);
+                        sCleanup(a);
+                        break;
+                    }
+                }
+            }
+            DataOutputStream os = new DataOutputStream(a.openFileOutput("CN1$AndroidPendingNotifications", 0));
+            if(data != null) {
+                data[0]++;
+                os.write(data);
+            } else {
+                os.writeByte(1);
+            }
+            if(type != null) {
+                os.writeBoolean(true);
+                os.writeUTF(type);
+            } else {
+                os.writeBoolean(false);
+            }
+            os.writeUTF(body);
+            os.writeLong(System.currentTimeMillis());
+        } catch(IOException err) {
+            err.printStackTrace();
+        }
+    }
+
+    public static void firePendingPushes(final PushCallback c, Activity a) {
+        try {
+            if(c != null) {
+                InputStream i = a.openFileInput("CN1$AndroidPendingNotifications");
+                if(i == null) {
+                    return;
+                }
+                DataInputStream is = new DataInputStream(i);
+                int count = is.readByte();
+                for(int iter = 0 ; iter < count ; iter++) {
+                    boolean hasType = is.readBoolean();
+                    String actualType = null;
+                    if(hasType) {
+                        actualType = is.readUTF();
+                    }
+                    final String t = actualType;
+                    final String b = is.readUTF();
+                    long s = is.readLong();
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            Display.getInstance().setProperty("pushType", t);
+                            c.push(b);
+                        }
+                    });
+                }
+                a.deleteFile("CN1$AndroidPendingNotifications");
+            }
+        } catch(IOException err) {
+            err.printStackTrace();
         }
     }
     
@@ -488,7 +585,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.lastSizeChangeH = h;
     }
 
-    @Override
+    /*@Override
     public boolean handleEDTException(final Throwable err) {
 
         final boolean[] messageComplete = new boolean[]{false};
@@ -539,7 +636,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
         return true;
-    }
+    }*/
 
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
@@ -3410,6 +3507,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return getContext().fileList();
     }
 
+    /**
+     * @inheritDoc
+     */
+    public int getStorageEntrySize(String name) {
+        return (int)new File(getContext().getFilesDir(), name).length();
+    }
+    
     /**
      * @inheritDoc
      */

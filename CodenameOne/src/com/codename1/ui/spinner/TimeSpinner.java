@@ -248,6 +248,7 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
+     * The hour from 1-12 or 0-23
      * @return the currentHour
      */
     public int getCurrentHour() {
@@ -258,6 +259,7 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
+     * Set the hour from 1-12 or 0-23
      * @param currentHour the currentHour to set
      */
     public void setCurrentHour(int currentHour) {

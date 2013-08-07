@@ -54,15 +54,14 @@ extern UIView *editingComponent;
 #ifdef INCLUDE_CN1_PUSH
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
-    if( [apsInfo objectForKey:@"alert"] != NULL)
+    NSLog(@"Received notification on start: %@", userInfo);
+    if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
-        NSLog(@"Received notification: %@", userInfo);
         NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
     }
-    if( [apsInfo objectForKey:@"meta"] != NULL)
+    if( [[userInfo valueForKey:@"aps"] valueForKey:@"meta"] != NULL)
     {
-        NSLog(@"Received notification: %@", userInfo);
         NSString* alertValue = [userInfo valueForKey:@"meta"];
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         JAVA_OBJECT key = fromNSString(@"pushType");
@@ -154,15 +153,14 @@ extern UIView *editingComponent;
 }
 
 - (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo {
-    if( [userInfo objectForKey:@"alert"] != NULL)
+    NSLog(@"Received notification while running: %@", userInfo);
+    if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
-        NSLog(@"Received notification: %@", userInfo);
 	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
     }
-    if( [userInfo objectForKey:@"meta"] != NULL)
+    if( [[userInfo valueForKey:@"aps"] valueForKey:@"meta"] != NULL)
     {
-        NSLog(@"Received notification: %@", userInfo);
         NSString* alertValue = [userInfo valueForKey:@"meta"];
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         JAVA_OBJECT key = fromNSString(@"pushType");

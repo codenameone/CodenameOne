@@ -22,6 +22,7 @@
  */
 package com.codename1.l10n;
 
+import com.codename1.ui.Display;
 import java.util.Date;
 
 /**
@@ -162,5 +163,13 @@ public class L10NManager {
      */
     public String getLocale() {
         return locale;
+    }
+    
+    /**
+     * Convenience method that invokes Display.getLocalizationManager()
+     * @return the L10NManager instance
+     */
+    public static L10NManager getInstance() {
+        return Display.getInstance().getLocalizationManager();
     }
 }

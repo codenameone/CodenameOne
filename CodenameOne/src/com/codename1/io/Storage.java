@@ -157,6 +157,15 @@ public class Storage {
     }
 
     /**
+     * Returns the size in bytes of the given entry
+     * @param name the name of the entry
+     * @return the size in bytes
+     */
+    public int entrySize(String name) {
+        return Util.getImplementation().getStorageEntrySize(name);
+    }
+    
+    /**
      * Writes the given object to storage assuming it is an externalizable type
      * or one of the supported types
      *

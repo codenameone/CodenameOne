@@ -35,7 +35,7 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
-public class DefaultListModel implements ListModel {
+public class DefaultListModel<T> implements ListModel<T> {
     
     private java.util.List items;
 
@@ -56,7 +56,7 @@ public class DefaultListModel implements ListModel {
      * 
      * @param items the items in the model
      */
-    public DefaultListModel(Vector items) {
+    public DefaultListModel(Vector<T> items) {
         this.items = new ArrayList(items);
     }
 
@@ -65,7 +65,7 @@ public class DefaultListModel implements ListModel {
      * 
      * @param items the items in the model
      */
-    public DefaultListModel(Collection items) {
+    public DefaultListModel(Collection<T> items) {
         this.items = new ArrayList(items);
     }
 
@@ -74,7 +74,7 @@ public class DefaultListModel implements ListModel {
      * 
      * @param items the items in the model
      */
-    public DefaultListModel(Object[] items) {
+    public DefaultListModel(T[] items) {
         this.items = createList(items);
     }
 
@@ -92,9 +92,9 @@ public class DefaultListModel implements ListModel {
     /**
      * @inheritDoc
      */
-    public Object getItemAt(int index) {
+    public T getItemAt(int index) {
         if(index < getSize() && index >= 0){
-            return items.get(index);
+            return (T)items.get(index);
         }
         return null;
     }
@@ -116,7 +116,7 @@ public class DefaultListModel implements ListModel {
     /**
      * @inheritDoc
      */
-    public void addItem(Object item){
+    public void addItem(T item){
         items.add(item);
         fireDataChangedEvent(DataChangedListener.ADDED, items.size());
     }
@@ -127,7 +127,7 @@ public class DefaultListModel implements ListModel {
      * @param index the offset for the item
      * @param item the value to set
      */
-    public void setItem(int index, Object item){
+    public void setItem(int index, T item){
         items.set(index, item);
         fireDataChangedEvent(DataChangedListener.CHANGED, index);
     }
@@ -137,7 +137,7 @@ public class DefaultListModel implements ListModel {
      * @param item - the item to add
      * @param index - the index position in the list
      */
-    public void addItemAtIndex(Object item, int index){
+    public void addItemAtIndex(T item, int index){
         if (index <= items.size()) {
             items.add(index, item);
             fireDataChangedEvent(DataChangedListener.ADDED, index);

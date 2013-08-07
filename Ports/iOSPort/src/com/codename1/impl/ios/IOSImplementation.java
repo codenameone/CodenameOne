@@ -3095,6 +3095,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public int getStorageEntrySize(String name) {
+        return nativeInstance.getFileSize(nativeInstance.getCachesDir() + "/" + name);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public String[] listFilesystemRoots() {
         String[] roots = new String[] {
             nativeInstance.getCachesDir(),

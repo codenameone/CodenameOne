@@ -34,6 +34,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -89,7 +90,7 @@ public abstract class CodenameOneImplementation {
     private int dragActivationCounter = 0;
     private int dragActivationX = 0;
     private int dragActivationY = 0;
-    private int dragStartPercentage = 1;
+    private int dragStartPercentage = 3;
     private Form currentForm;
     private static Object displayLock;
     private Animation[] paintQueue = new Animation[100];
@@ -3673,6 +3674,30 @@ public abstract class CodenameOneImplementation {
     public abstract String[] listStorageEntries();
 
     /**
+     * Returns the size of the entry in bytes
+     * @param name the entry name
+     * @return the size
+     */
+    public int getStorageEntrySize(String name) {
+        long size = -1;
+        try {
+            InputStream i = createStorageInputStream(name);
+            long val = i.skip(1000000);
+            if(val > -1) {
+                size = 0;
+                while(val > -1) {
+                    size += val;
+                    val = i.skip(1000000);
+                }
+            }
+            Util.cleanup(i);
+        } catch(IOException err) {
+            err.printStackTrace();
+        }
+        return (int)size;
+    }
+    
+    /**
      * Returns the filesystem roots from which the structure of the file system
      * can be traversed
      *
@@ -4795,5 +4820,9 @@ public abstract class CodenameOneImplementation {
         return Thread.NORM_PRIORITY + 1;
     }
 
-
+    /**
+     * This method is used by the JavaSE implementation for performance logging
+     * @param img the image being drawn
+     */
+    public void drawingEncodedImage(EncodedImage img) {}
 }

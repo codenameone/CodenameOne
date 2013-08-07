@@ -33,8 +33,6 @@ import com.codename1.util.StringUtil;
 import java.util.Hashtable;
 import java.util.ArrayList; 
 import java.util.HashMap; 
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 /**
@@ -136,7 +134,7 @@ public class JavascriptContext  {
     /**
      * A map of JSObjects that is used for cleanup when they are no longer needed.
      */
-    private  Map<Integer,Object> objectMap = new HashMap<Integer,Object>();
+    private  HashMap<Integer,Object> objectMap = new HashMap<Integer,Object>();
     
     /**
      * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
@@ -220,10 +218,10 @@ public class JavascriptContext  {
         if ( DEBUG ){
             Log.p("Cleaning up Javascript lookup table.");
         }
-        List<Integer> remove = new ArrayList<Integer>();
-        for ( Map.Entry<Integer,Object> e : objectMap.entrySet()){
-            if ( Display.getInstance().extractHardRef(e.getValue()) == null ){
-                remove.add(e.getKey());
+        ArrayList<Integer> remove = new ArrayList<Integer>();
+        for ( Integer i : objectMap.keySet()){
+            if ( Display.getInstance().extractHardRef(objectMap.get(i)) == null ){
+                remove.add(i);
             }
         }
                 
