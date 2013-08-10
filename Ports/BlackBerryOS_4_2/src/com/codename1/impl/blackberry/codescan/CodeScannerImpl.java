@@ -31,7 +31,6 @@ import net.rim.device.api.ui.container.MainScreen;
  */
 public class CodeScannerImpl extends CodeScanner{
 
-    private Hashtable hints;
     private MultimediaManager multimediaManager;
     private ScanResult callback;
     private boolean isQRScanning;
@@ -45,8 +44,6 @@ public class CodeScannerImpl extends CodeScanner{
     
     public CodeScannerImpl(MultimediaManager multimediaManager) {
         // Setup barcode decoding hints, arg passed is not used at present
-        hints = new Hashtable();
-        hints.put(DecodeHintType.TRY_HARDER, Boolean.FALSE);
         this.multimediaManager = multimediaManager;
     }
     
@@ -180,12 +177,11 @@ public class CodeScannerImpl extends CodeScanner{
                         source));
 
                 if(isQRScanning){
-                    Reader reader = new QRCodeReader();
-                    result = reader.decode(bitmap, hints);
+                    QRCodeReader reader = new QRCodeReader();
+                    result = reader.decodeQR(bitmap);
                 }else{
-                    Reader reader = new MultiFormatReader();
-                    hints.put(DecodeHintType.PURE_BARCODE, Boolean.TRUE);                            
-                    result = reader.decode(bitmap, hints);                
+                    MultiFormatReader reader = new MultiFormatReader();
+                    result = reader.decodeBarcode(bitmap);                
                 }
                 handleDecodedText(result);
                 timer.cancel(); // stop the timer

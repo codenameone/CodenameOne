@@ -81,9 +81,6 @@
                 <exclude name="META-INF/*" />
                 <exclude name="**/ImplementationFactory*" />
             </zipfileset>
-            <zipfileset src="${file.reference.zxing_lib.jar}" excludes="META-INF/*" />
-            <zipfileset src="lib/zxing_lib.jar">
-            </zipfileset>
             <manifest>
             </manifest>
         </jar>
