@@ -86,7 +86,6 @@
         <jar jarfile="${dist.jar}">
             <zipfileset src="${dist.jar}.old" excludes="META-INF/*" />
             <zipfileset src="${reference.CodenameOne.jar}" excludes="META-INF/*,**/ImplementationFactory*" />
-            <zipfileset src="${file.reference.zxing_lib.jar}" excludes="META-INF/*" />
             <manifest>
             </manifest>
         </jar>

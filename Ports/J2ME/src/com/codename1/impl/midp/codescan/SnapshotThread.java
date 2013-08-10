@@ -95,12 +95,8 @@ final class SnapshotThread implements Runnable {
                     Reader reader = new QRCodeReader();
                     result = reader.decode(bitmap);
                 }else{
-                    Reader reader = new MultiFormatReader();
-                    Hashtable hints = new Hashtable();
-                    hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-                    hints.put(DecodeHintType.PURE_BARCODE, Boolean.TRUE);
-                            
-                    result = reader.decode(bitmap, hints);                
+                    MultiFormatReader reader = new MultiFormatReader();
+                    result = reader.decodeBarcode(bitmap);                
                 }
                 barCodeScanner.handleDecodedText(result);                
                 
