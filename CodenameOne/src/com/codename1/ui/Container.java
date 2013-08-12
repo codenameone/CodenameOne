@@ -2067,6 +2067,11 @@ public class Container extends Component {
      * @param duration the duration in milliseconds for the animation
      */
     private void animateLayout(final int duration, boolean wait, int opacity) {
+        // this happens for some reason
+        Form f = getComponentForm();
+        if(f == null) {
+            return;
+        }
         setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         final int componentCount = getComponentCount();
@@ -2105,7 +2110,7 @@ public class Container extends Component {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
-        getComponentForm().registerAnimated(a);
+        f.registerAnimated(a);
         if(wait) {
             Display.getInstance().invokeAndBlock(a);
         }

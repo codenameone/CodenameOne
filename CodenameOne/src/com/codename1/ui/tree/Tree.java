@@ -125,6 +125,13 @@ public class Tree extends Container {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String[][]"};
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
             return ((StringArrayTreeModel)model).arr;
@@ -220,7 +227,10 @@ public class Tree extends Container {
         Label dummy = new Label();
         parent.addComponent(BorderLayout.CENTER, dummy);
         buildBranch(o, depth, dest);
-        parent.replaceAndWait(dummy, dest, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+        // prevent a race condition on node expansion contraction
+        if(dummy.getParent() == parent) {
+            parent.replaceAndWait(dummy, dest, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+        }
     }
 
     private void collapseNode(Component c) {

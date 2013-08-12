@@ -389,6 +389,16 @@ public class ConnectionRequest implements IOProgressListener {
      * might contain a temporary (e.g. redirect) code while the request is in progress
      * @return the response code
      */
+    public int getResponseCode() {
+        return responseCode;
+    }
+
+    /**
+     * Returns the response code for this request, this is only relevant after the request completed and
+     * might contain a temporary (e.g. redirect) code while the request is in progress
+     * @return the response code
+     * @deprecated misspelled method name please use getResponseCode
+     */
     public int getResposeCode() {
         return responseCode;
     }

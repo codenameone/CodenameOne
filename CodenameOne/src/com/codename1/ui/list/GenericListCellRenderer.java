@@ -57,7 +57,7 @@ import java.util.ArrayList;
  *
  * @author Shai Almog
  */
-public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
+public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRenderer<T> {
     private Button lastClickedComponent;
     private ArrayList<Image> pendingAnimations;
 
@@ -197,7 +197,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     /**
      * @inheritDoc
      */
-    public Component getCellRendererComponent(Component list, Object model, Object value, int index, boolean isSelected) {
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         Component cmp;
         Component[] entries;
         if(!fisheye && !Display.getInstance().shouldRenderSelection(list)) {
@@ -327,7 +327,7 @@ public class GenericListCellRenderer implements ListCellRenderer, CellRenderer {
     /**
      * @inheritDoc
      */
-    public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+    public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
     }
 

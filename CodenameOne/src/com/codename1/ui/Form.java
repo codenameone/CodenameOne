@@ -2712,6 +2712,13 @@ public class Form extends Container {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String", "String"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if(name.equals("titleUIID")) {
             if(getTitleComponent() != null) {

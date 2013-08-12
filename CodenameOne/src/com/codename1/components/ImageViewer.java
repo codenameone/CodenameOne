@@ -54,7 +54,9 @@ public class ImageViewer extends Component {
     
     // return values from image aspect calc
     private int prefX, prefY, prefW, prefH;
-            
+
+    private boolean eagerLock = true;
+    
     /**
      * Default constructor
      */
@@ -70,6 +72,37 @@ public class ImageViewer extends Component {
     public void initComponent() {
         super.initComponent();
         image.lock();
+        eagerLock();
+    }
+    
+    private void eagerLock() {
+        if(eagerLock) {
+            if(swipeableImages != null && swipeableImages.getSize() > 1) {
+                Image left = getImageLeft();
+                if(swipePlaceholder != null) {
+                    left.asyncLock(swipePlaceholder);
+                } else {
+                    left.lock();
+                }            
+                if(swipeableImages.getSize() > 2) {
+                    Image right = getImageRight();
+                    if(swipePlaceholder != null) {
+                        right.asyncLock(swipePlaceholder);
+                    } else {
+                        right.lock();
+                    }            
+                }
+            }
+        }        
+    }
+    
+    private void eagerUnlock() {
+        if(eagerLock) {
+            if(swipeableImages != null && swipeableImages.getSize() > 1) {
+                getImageLeft().unlock();
+                getImageRight().unlock();
+            }
+        }        
     }
     
     /**
@@ -79,6 +112,7 @@ public class ImageViewer extends Component {
     public void deinitialize() {
         super.deinitialize();
         image.unlock();
+        eagerUnlock();
     }
 
     /**
@@ -410,6 +444,24 @@ public class ImageViewer extends Component {
     public void setSwipePlaceholder(Image swipePlaceholder) {
         this.swipePlaceholder = swipePlaceholder;
     }
+
+    /**
+     * Eager locking effectively locks the right/left images as well as the main image, as a result
+     * more heap is taken
+     * @return the eagerLock
+     */
+    public boolean isEagerLock() {
+        return eagerLock;
+    }
+
+    /**
+     * Eager locking effectively locks the right/left images as well as the main image, as a result
+     * more heap is taken
+     * @param eagerLock the eagerLock to set
+     */
+    public void setEagerLock(boolean eagerLock) {
+        this.eagerLock = eagerLock;
+    }
     
     class AnimatePanX implements Animation {
         private Motion motion;
@@ -429,8 +481,23 @@ public class ImageViewer extends Component {
             panPositionX = v;
             if(motion.isFinished()) {
                 if(replaceImage != null) {
-                    getImage().unlock();
-                    setImage(replaceImage);
+                    if(!eagerLock) {
+                        getImage().unlock();
+                        setImage(replaceImage);
+                    } else {
+                        setImage(replaceImage);
+                        Image left = getImageLeft();
+                        Image right = getImageRight();
+                        if(left != replaceImage) {
+                            left.unlock();
+                        }
+                        if(right != replaceImage) {
+                            right.unlock();
+                        }
+                        swipeableImages.setSelectedIndex(updatePos);
+                        replaceImage.lock();
+                        eagerLock();
+                    }
                     swipeableImages.setSelectedIndex(updatePos);
                     panPositionX = 0.5f;
                     panPositionY = 0.5f;

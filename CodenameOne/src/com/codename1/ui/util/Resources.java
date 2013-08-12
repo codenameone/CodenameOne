@@ -166,6 +166,54 @@ public class Resources {
         resources.clear();
         input = null;
     }
+
+    Timeline readTimeline(DataInputStream input) throws IOException {
+        int duration = input.readInt();
+        int width = input.readInt();
+        int height = input.readInt();
+        AnimationObject[] animations = new AnimationObject[input.readShort()];
+        for(int iter = 0 ; iter < animations.length ; iter++) {
+            String name = input.readUTF();
+            int startTime = input.readInt();
+            int animDuration = input.readInt();
+            int x = input.readInt();
+            int y = input.readInt();
+            Image i = getImage(name);
+            if(i == null) {
+                animations[iter] = AnimationObject.createAnimationImage(name, this, x, y);
+            } else {
+                animations[iter] = AnimationObject.createAnimationImage(i, x, y);
+            }
+            animations[iter].setStartTime(startTime);
+            animations[iter].setEndTime(startTime + animDuration);
+            int frameDelay = input.readInt();
+            if(frameDelay > -1) {
+                int frameWidth = input.readInt();
+                int frameHeight = input.readInt();
+                animations[iter].defineFrames(frameWidth, frameHeight, frameDelay);
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineMotionX(input.readInt(), startTime, animDuration, x, input.readInt());
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineMotionY(input.readInt(), startTime, animDuration, y, input.readInt());
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineWidth(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineHeight(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineOpacity(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
+            }
+            if(input.readBoolean()) {
+                animations[iter].defineOrientation(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
+            }
+        }
+        Timeline tl = Timeline.createTimeline(duration, animations, new Dimension(width, height));
+        return tl;
+    }
     
     /**
      * This method is used by the Codename One Designer
@@ -956,50 +1004,7 @@ public class Resources {
                     return readMultiImage(input);
 
                 case 0xEF:
-                    int duration = input.readInt();
-                    int width = input.readInt();
-                    int height = input.readInt();
-                    AnimationObject[] animations = new AnimationObject[input.readShort()];
-                    for(int iter = 0 ; iter < animations.length ; iter++) {
-                        String name = input.readUTF();
-                        int startTime = input.readInt();
-                        int animDuration = input.readInt();
-                        int x = input.readInt();
-                        int y = input.readInt();
-                        Image i = getImage(name);
-                        if(i == null) {
-                            animations[iter] = AnimationObject.createAnimationImage(name, this, x, y);
-                        } else {
-                            animations[iter] = AnimationObject.createAnimationImage(i, x, y);
-                        }
-                        animations[iter].setStartTime(startTime);
-                        animations[iter].setEndTime(startTime + animDuration);
-                        int frameDelay = input.readInt();
-                        if(frameDelay > -1) {
-                            int frameWidth = input.readInt();
-                            int frameHeight = input.readInt();
-                            animations[iter].defineFrames(frameWidth, frameHeight, frameDelay);
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineMotionX(input.readInt(), startTime, animDuration, x, input.readInt());
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineMotionY(input.readInt(), startTime, animDuration, y, input.readInt());
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineWidth(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineHeight(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineOpacity(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
-                        }
-                        if(input.readBoolean()) {
-                            animations[iter].defineOrientation(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
-                        }
-                    }
-                    Timeline tl = Timeline.createTimeline(duration, animations, new Dimension(width, height));
+                    Timeline tl = readTimeline(input);
                     return tl;
 
                 // Fail this is the wrong data type

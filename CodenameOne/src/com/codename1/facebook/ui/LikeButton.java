@@ -117,6 +117,13 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String", "String", "String", "String", "String[]"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
             return getAppId();

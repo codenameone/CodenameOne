@@ -38,7 +38,7 @@ import java.util.Hashtable;
  *
  * @author Chen Fishbein
  */
-public class DefaultListCellRenderer extends Label implements ListCellRenderer, CellRenderer {
+public class DefaultListCellRenderer<T> extends Label implements ListCellRenderer<T>, CellRenderer<T> {
     private boolean showNumbers;
     private boolean showNumbersForce;
     private static boolean showNumbersDefault = true;
@@ -94,7 +94,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
     /**
      * @inheritDoc
      */
-    public Component getCellRendererComponent(Component list, Object model, Object value, int index, boolean isSelected) {
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         if(!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
             isSelected = false;
         }
@@ -151,7 +151,7 @@ public class DefaultListCellRenderer extends Label implements ListCellRenderer, 
     /**
      * @inheritDoc
      */
-    public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+    public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
     }
 

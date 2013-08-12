@@ -907,9 +907,20 @@ public final class Display {
         }
         long currentTime = System.currentTimeMillis();
 
-        while(inputEvents.size() > 0) {
-            int[] i = (int[])inputEvents.get(0);
-            inputEvents.remove(0);
+        // this code looks a bit weird so we won't synchronize on a lock within the loop all the time
+        // and so that the handle event method will not hold the lock during its entire execution 
+        // effectively preventing further input!
+        int i_size;
+        synchronized(lock) {
+            i_size = inputEvents.size();
+        }
+        while(i_size > 0) {
+            int[] i;
+            synchronized(lock) {
+                i = (int[])inputEvents.get(0);
+                inputEvents.remove(0);
+                i_size = inputEvents.size();
+            }
             handleEvent(i);
         }
 

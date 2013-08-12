@@ -55,7 +55,7 @@ import java.util.Vector;
  * @see com.codename1.ui.list
  * @author Chen Fishbein
  */
-public class List extends Component {
+public class List<T> extends Component {
     /**
      * Indicates the list isn't fixed and that selection is movable
      */
@@ -128,15 +128,15 @@ public class List extends Component {
     /**
      * @see setRenderingPrototype
      */
-    private Object renderingPrototype;
+    private T renderingPrototype;
     /**
      * Indicates whether selection is fixable to place in which case all the
      * elements in the list move and selection stays in place. Fixed selection
      * can be one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER
      */
     private int fixedSelection;
-    private ListModel model;
-    private ListCellRenderer renderer = new DefaultListCellRenderer();
+    private ListModel<T> model;
+    private ListCellRenderer<T> renderer = new DefaultListCellRenderer<T>();
     private int orientation = VERTICAL;
     /**
      * Indicates the list orientation is VERTICAL
@@ -241,7 +241,7 @@ public class List extends Component {
      *
      * @param items set of items placed into the list model
      */
-    public List(Object[] items) {
+    public List(T[] items) {
         this(new DefaultListModel(items));
     }
 
@@ -455,7 +455,7 @@ public class List extends Component {
      *
      * @return the current selected item in the list
      */
-    public Object getSelectedItem() {
+    public T getSelectedItem() {
         int idx = model.getSelectedIndex();
         if (idx < model.getSize() && idx > -1) {
             return model.getItemAt(idx);
@@ -468,7 +468,7 @@ public class List extends Component {
      *
      * @param item the current selected item in the list
      */
-    public void setSelectedItem(Object item) {
+    public void setSelectedItem(T item) {
         int size = model.getSize();
         for (int iter = 0; iter < size; iter++) {
             Object current = model.getItemAt(iter);
@@ -484,7 +484,7 @@ public class List extends Component {
      *
      * @return the model underlying the list
      */
-    public ListModel getModel() {
+    public ListModel<T> getModel() {
         return model;
     }
 
@@ -1205,7 +1205,7 @@ public class List extends Component {
                 }
             }
         } else {
-            Object valueAt0 = getModel().getItemAt(0);
+            T valueAt0 = getModel().getItemAt(0);
             Component selectionCmp;
             int selectedIndex = getSelectedIndex();
             if(selectedIndex > -1 && selectedIndex < numOfcomponents) {
@@ -1270,7 +1270,7 @@ public class List extends Component {
             calculateComponentPosition(i, width, pos, rendererSize, getElementSize(true, true), i <= getCurrentSelected());
 
             if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {
-                Object value = model.getItemAt(i);
+                T value = model.getItemAt(i);
                 Component cmp = renderer.getListCellRendererComponent(this, value, i, false);
                 cmp.setCellRenderer(true);
                 Dimension sizeC = pos.getSize();
@@ -1444,7 +1444,7 @@ public class List extends Component {
             super.fireActionEvent();
             dispatcher.fireActionEvent(a);
             if(isCommandList() && !a.isConsumed()) {
-                Object i = getSelectedItem();
+                T i = getSelectedItem();
                 if(i != null && i instanceof Command && ((Command)i).isEnabled()) {
                     ((Command)i).actionPerformed(a);
                     if(!a.isConsumed()) {
@@ -1535,7 +1535,7 @@ public class List extends Component {
      * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
      * size of a list component.
      */
-    public void setRenderingPrototype(Object renderingPrototype) {
+    public void setRenderingPrototype(T renderingPrototype) {
         this.renderingPrototype = renderingPrototype;
     }
 
@@ -1545,7 +1545,7 @@ public class List extends Component {
      * @see #setRenderingPrototype(java.lang.Object)
      * @return the value of the rendering prototype
      */
-    public Object getRenderingPrototype() {
+    public T getRenderingPrototype() {
         return renderingPrototype;
     }
 
@@ -1950,7 +1950,7 @@ public class List extends Component {
      *
      * @param item the item to be added to a list model
      */
-    public void addItem(Object item) {
+    public void addItem(T item) {
         model.addItem(item);
     }
 

@@ -1135,6 +1135,13 @@ public class Tabs extends Container {
            com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), 
            com.codename1.impl.CodenameOneImplementation.getImageArrayClass()};
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String[]", "Image[]", "Image[]"};
+    }
 
     /**
      * @inheritDoc

@@ -232,6 +232,9 @@ public class ResourceEditorView extends FrameView {
         initComponents();
         
         livePreviewUI.setSelected(Preferences.userNodeForPackage(getClass()).getBoolean("LivePreview", false));
+        boolean isXMLEnabled = Preferences.userNodeForPackage(getClass()).getBoolean("XMLFileMode", false);
+        EditableResources.setXMLEnabled(isXMLEnabled);
+        enableXMLTeamMode.setSelected(isXMLEnabled);
         
         initNativeTheme();
         LocalServer.startServer(mainPanel);
@@ -780,6 +783,7 @@ public class ResourceEditorView extends FrameView {
         jSeparator6 = new javax.swing.JSeparator();
         checkerboardColors = new javax.swing.JMenuItem();
         jSeparator4 = new javax.swing.JSeparator();
+        enableXMLTeamMode = new javax.swing.JCheckBoxMenuItem();
         jSeparator1 = new javax.swing.JSeparator();
         exitMenuItem = new javax.swing.JMenuItem();
         editMenu = new javax.swing.JMenu();
@@ -1224,6 +1228,7 @@ public class ResourceEditorView extends FrameView {
         fileMenu.setMnemonic('F');
         fileMenu.setText("File");
         fileMenu.setName("fileMenu"); // NOI18N
+        fileMenu.addActionListener(formListener);
 
         newMenuItem.setAction(newResourceAction);
         newMenuItem.setMnemonic('N');
@@ -1308,6 +1313,10 @@ public class ResourceEditorView extends FrameView {
         lookAndFeelMenu.add(jSeparator4);
 
         fileMenu.add(lookAndFeelMenu);
+
+        enableXMLTeamMode.setText("XML Team Mode");
+        enableXMLTeamMode.setName("enableXMLTeamMode"); // NOI18N
+        fileMenu.add(enableXMLTeamMode);
 
         jSeparator1.setName("jSeparator1"); // NOI18N
         fileMenu.add(jSeparator1);
@@ -1667,6 +1676,9 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == iosNativeTheme) {
                 ResourceEditorView.this.iosNativeThemeActionPerformed(evt);
             }
+            else if (evt.getSource() == ios7NativeTheme) {
+                ResourceEditorView.this.ios7NativeThemeActionPerformed(evt);
+            }
             else if (evt.getSource() == android2NativeTheme) {
                 ResourceEditorView.this.android2NativeThemeActionPerformed(evt);
             }
@@ -1745,8 +1757,8 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
             }
-            else if (evt.getSource() == ios7NativeTheme) {
-                ResourceEditorView.this.ios7NativeThemeActionPerformed(evt);
+            else if (evt.getSource() == fileMenu) {
+                ResourceEditorView.this.fileMenuActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -3327,6 +3339,11 @@ private void ios7NativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//G
     setNativeTheme("/iOS7Theme.res", true);
 }//GEN-LAST:event_ios7NativeThemeActionPerformed
 
+private void fileMenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fileMenuActionPerformed
+    Preferences.userNodeForPackage(getClass()).putBoolean("XMLFileMode", enableXMLTeamMode.isSelected());
+    EditableResources.setXMLEnabled(enableXMLTeamMode.isSelected());
+}//GEN-LAST:event_fileMenuActionPerformed
+
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
         
@@ -4039,7 +4056,8 @@ public static void openInIDE(File f, int lineNumber) {
                 try {
                     JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
                     loadedFile = selection;
-                    loadedResources.openFile(new FileInputStream(selection));
+                    loadedResources.openFileWithXMLSupport(selection);
+                    //loadedResources.openFile(new FileInputStream(selection));
                     File codenameone_settings = new File(selection.getParentFile().getParentFile(), "codenameone_settings.properties");
                     if(codenameone_settings.exists()) {
                         projectGeneratorSettings = new Properties();
@@ -4221,6 +4239,7 @@ public static void openInIDE(File f, int lineNumber) {
                         fileOut = new FileOutputStream(loadedFile);
                         loadedResources.save(fileOut);
                     }
+                    loadedResources.saveXML(loadedFile);
                     getFrame().setTitle(loadedFile.getName() + " - Codename One Designer");
 
                     // generate the code for the resource editor
@@ -4876,6 +4895,7 @@ public static void openInIDE(File f, int lineNumber) {
     private javax.swing.JMenuItem deleteUnusedImages;
     private javax.swing.JMenuItem duplicateItem;
     private javax.swing.JMenu editMenu;
+    private javax.swing.JCheckBoxMenuItem enableXMLTeamMode;
     private javax.swing.JMenuItem exitMenuItem;
     private javax.swing.JMenuItem exportRes;
     private javax.swing.JMenu fileMenu;

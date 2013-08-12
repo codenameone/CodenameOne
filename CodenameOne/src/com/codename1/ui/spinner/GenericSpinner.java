@@ -233,6 +233,13 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"ListModel", "ListCellRenderer", "String[]", "int"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if(name.equals("items")) {
             ListModel m = getModel();

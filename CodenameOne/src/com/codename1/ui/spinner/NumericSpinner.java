@@ -155,6 +155,13 @@ public class NumericSpinner extends BaseSpinner {
     public Class[] getPropertyTypes() {
        return new Class[] {Double.class, Double.class, Double.class, Double.class};
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"double", "double", "double", "double", "double"};
+    }
 
     /**
      * @inheritDoc

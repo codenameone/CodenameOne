@@ -62,7 +62,7 @@ import com.codename1.ui.List;
  * 
  * @author Chen Fishbein, Shai Almog
  */
-public interface CellRenderer { 
+public interface CellRenderer<T> { 
     /**
      * Returns a component instance that is already set to render "value". While it is not a requirement
      * many renderes often derive from a component (such as a label) and return "this".
@@ -76,7 +76,7 @@ public interface CellRenderer {
      * @param isSelected whether the entry is selected
      * @return a component to paint within the list
      */
-    public Component getCellRendererComponent(Component list, Object model, Object value, int index, boolean isSelected);
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected);
     
     /**
      * Returns a component instance that is painted under the currently focused renderer

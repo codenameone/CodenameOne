@@ -50,23 +50,37 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
+import com.codename1.ui.util.xml.Data;
+import com.codename1.ui.util.xml.Entry;
+import com.codename1.ui.util.xml.L10n;
+import com.codename1.ui.util.xml.Lang;
+import com.codename1.ui.util.xml.LegacyFont;
+import com.codename1.ui.util.xml.ResourceFileXML;
+import com.codename1.ui.util.xml.Theme;
+import com.codename1.ui.util.xml.Ui;
+import com.codename1.ui.util.xml.Val;
 import java.awt.Frame;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -77,6 +91,8 @@ import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
 
 /**
  * This class enhances the resources class by inheriting it and using package
@@ -97,6 +113,11 @@ public class EditableResources extends Resources implements TreeModel {
     private EditableResources overrideResource;
     private File overrideFile;
     private EditableResources parentResource;
+    private static boolean xmlEnabled;
+    
+    public static void setXMLEnabled(boolean b) {
+        xmlEnabled = b;
+    }
     
     public void setOverrideMode(EditableResources overrideResource, File overrideFile) {
         this.overrideResource = overrideResource;
@@ -336,7 +357,835 @@ public class EditableResources extends Resources implements TreeModel {
         }
         updateModified();
     }
+    
+    private byte[] readFile(File f) throws IOException {
+        byte[] data = new byte[(int)f.length()];
+        DataInputStream fi = new DataInputStream(new FileInputStream(f));
+        fi.readFully(data);
+        fi.close();
+        return data;
+    }
 
+    public void openFileWithXMLSupport(File f) throws IOException {
+        if(xmlEnabled && f.getParentFile().getName().equals("src")) {
+            File res = new File(f.getParentFile().getParentFile(), "res");
+            if(res.exists()) {
+                File xml = new File(res, f.getName().substring(0, f.getName().length() - 3) + "xml");
+                if(xml.exists()) {
+                    loadingMode = true;
+                    com.codename1.ui.Font.clearBitmapCache();
+                    try {
+                        File resDir = new File(res, f.getName().substring(0, f.getName().length() - 4));
+                        
+                        // open the XML file...
+                        JAXBContext ctx = JAXBContext.newInstance(ResourceFileXML.class);
+                        ResourceFileXML xmlData = (ResourceFileXML)ctx.createUnmarshaller().unmarshal(xml);
+                        
+                        if(xmlData.getData() != null) {
+                            for(Data d : xmlData.getData()) {
+                                setResource(d.getName(), MAGIC_DATA, readFile(new File(resDir, d.getName())));
+                            }
+                        }
+                        
+                        if(xmlData.getUi() != null) {
+                            for(Ui d : xmlData.getUi()) {
+                                setResource(d.getName(), MAGIC_UI, readFile(new File(resDir, d.getName())));
+                            }
+                        }
+                        
+                        if(xmlData.getLegacyFont() != null) {
+                            for(LegacyFont d : xmlData.getLegacyFont()) {
+                                DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, d.getName())));
+                                setResource(d.getName(), MAGIC_FONT, loadFont(fi, d.getName(), false));
+                                fi.close();
+                            }
+                        }
+                        
+                        if(xmlData.getImage() != null) {
+                            for(com.codename1.ui.util.xml.Image d : xmlData.getImage()) {
+                                if(d.getType() == null) {
+                                    // standara JPG or PNG
+                                    FileInputStream fi = new FileInputStream(new File(resDir, d.getName()));
+                                    EncodedImage e = EncodedImage.create(fi);
+                                    fi.close();
+                                    setResource(d.getName(), MAGIC_IMAGE, e);
+                                    continue;
+                                }
+
+                                if("svg".equals(d.getType())) {
+                                    setResource(d.getName(), MAGIC_IMAGE, Image.createSVG(d.getType(), false, readFile(new File(resDir, d.getName()))));
+                                    continue;
+                                }
+
+                                if("timeline".equals(d.getType())) {
+                                    DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, d.getName())));
+                                    setResource(d.getName(), MAGIC_IMAGE, readTimeline(fi));
+                                    fi.close();
+                                    continue;
+                                }
+                                
+                                if("multi".equals(d.getType())) {
+                                    File multiImageDir = new File(resDir, d.getName());
+                                    File hd = new File(multiImageDir, "hd.png");
+                                    File veryhigh = new File(multiImageDir, "veryhigh.png");
+                                    File high = new File(multiImageDir, "high.png");
+                                    File medium = new File(multiImageDir, "medium.png");
+                                    File low = new File(multiImageDir, "low.png");
+                                    File veryLow = new File(multiImageDir, "verylow.png");
+                                    
+                                    Map<Integer, EncodedImage> images = new HashMap<Integer, EncodedImage>();
+                                    if(hd.exists()) {
+                                        images.put(new Integer(Display.DENSITY_HD), EncodedImage.create(readFile(hd)));
+                                    }
+                                    if(veryhigh.exists()) {
+                                        images.put(new Integer(Display.DENSITY_VERY_HIGH), EncodedImage.create(readFile(veryhigh)));
+                                    }
+                                    if(high.exists()) {
+                                        images.put(new Integer(Display.DENSITY_HIGH), EncodedImage.create(readFile(high)));
+                                    }
+                                    if(medium.exists()) {
+                                        images.put(new Integer(Display.DENSITY_MEDIUM), EncodedImage.create(readFile(medium)));
+                                    }
+                                    if(low.exists()) {
+                                        images.put(new Integer(Display.DENSITY_LOW), EncodedImage.create(readFile(low)));
+                                    }
+                                    if(veryLow.exists()) {
+                                        images.put(new Integer(Display.DENSITY_VERY_LOW), EncodedImage.create(readFile(veryLow)));
+                                    }
+                                    
+                                    int[] dpis = new int[images.size()];
+                                    EncodedImage[] imageArray = new EncodedImage[images.size()];
+                                    
+                                    int count = 0;
+                                    for(Map.Entry<Integer, EncodedImage> m : images.entrySet()) {
+                                        dpis[count] = m.getKey().intValue();
+                                        imageArray[count] = m.getValue();
+                                        count++;
+                                    }
+                                    
+                                    MultiImage result = new MultiImage();
+                                    result.setDpi(dpis);
+                                    result.setInternalImages(imageArray);
+                                    setResource(d.getName(), MAGIC_IMAGE, result);
+                                    continue;
+                                }
+                            }
+                        }
+
+                        if(xmlData.getL10n() != null) {
+                            for(L10n d : xmlData.getL10n()) {
+                                Hashtable<String, Hashtable<String, String>> l10n = new Hashtable<String, Hashtable<String, String>>();
+                                
+                                for(Lang l : d.getLang()) {
+                                    Hashtable<String, String> language = new Hashtable<String, String>();
+                                    
+                                    for(Entry e : l.getEntry()) {
+                                        language.put(e.getKey(), e.getValue());
+                                    }
+                                    
+                                    l10n.put(l.getName(), language);
+                                }
+                                
+                                setResource(d.getName(), MAGIC_L10N, l10n);
+                            }
+                        }
+                        
+                        if(xmlData.getTheme() != null) {
+                            for(Theme d : xmlData.getTheme()) {
+                                Hashtable<String, Object> theme = new Hashtable<String, Object>();
+                                theme.put("uninitialized", Boolean.TRUE);
+                                
+                                if(d.getVal() != null) {
+                                    for(Val v : d.getVal()) {
+                                        String key = v.getKey();
+                                    
+                                        if(key.endsWith("align") || key.endsWith("textDecoration")) {
+                                            theme.put(key, Integer.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
+                                            theme.put(key, Byte.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        // padding and or margin type
+                                        if(key.endsWith("Unit")) {
+                                            String[] s = v.getValue().split(",");
+                                            theme.put(key, new byte[] {Byte.parseByte(s[0]), Byte.parseByte(s[1]), Byte.parseByte(s[2]), Byte.parseByte(s[3])}); 
+                                            continue;
+                                        }
+                                        theme.put(key, v.getValue());
+                                    }
+                                }
+                                
+                                if(d.getBorder() != null) {
+                                    for(com.codename1.ui.util.xml.Border b : d.getBorder()) {
+                                        if("empty".equals(b.getType())) {
+                                            theme.put(b.getKey(), Border.createEmpty());
+                                            continue;
+                                        }
+
+                                        if("line".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue()));
+                                            } else {
+                                                theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue(), b.getColor().intValue()));
+                                            }
+                                            continue;
+                                        }
+
+                                        if("rounded".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createRoundBorder(b.getArcW().intValue(), b.getArcH().intValue()));
+                                            } else {
+                                                theme.put(b.getKey(), Border.createRoundBorder(b.getArcW().intValue(), b.getArcH().intValue(), b.getColor().intValue()));
+                                            }
+                                            continue;
+                                        }
+
+                                        if("etchedRaised".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createEtchedRaised());
+                                            } else {
+                                                theme.put(b.getKey(), Border.createEtchedRaised(b.getColor().intValue(), b.getColorB().intValue()));
+                                            }
+                                            continue;
+                                        }
+
+                                        if("etchedLowered".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createEtchedLowered());
+                                            } else {
+                                                theme.put(b.getKey(), Border.createEtchedLowered(b.getColor().intValue(), b.getColorB().intValue()));
+                                            }
+                                            continue;
+                                        }
+                                        if("bevelLowered".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createBevelLowered());
+                                            } else {
+                                                theme.put(b.getKey(), Border.createBevelLowered(b.getColor().intValue(), b.getColorB().intValue(), b.getColorC().intValue(), b.getColorD().intValue()));
+                                            }
+                                            continue;
+                                        }
+                                        if("bevelRaised".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createBevelRaised());
+                                            } else {
+                                                theme.put(b.getKey(), Border.createBevelRaised(b.getColor().intValue(), b.getColorB().intValue(), b.getColorC().intValue(), b.getColorD().intValue()));
+                                            }
+                                            continue;
+                                        }
+                                        if("image".equals(b.getType())) {
+                                            int imageCount = 2;
+                                            if(b.getI9() != null) {
+                                                imageCount = 9;
+                                            } else {
+                                                if(b.getI8() != null) {
+                                                    imageCount = 8;
+                                                } else {
+                                                    if(b.getI3() != null) {
+                                                        imageCount = 3;
+                                                    }
+                                                }
+                                            }
+
+                                            String[] borderInstance;
+                                            switch(imageCount) {
+                                                case 2:
+                                                    borderInstance = new String[] {b.getI1(), b.getI2()};
+                                                    break;
+                                                case 3:
+                                                    borderInstance = new String[] {b.getI1(), b.getI2(), b.getI3()};
+                                                    break;
+                                                case 8:
+                                                    borderInstance = new String[] {b.getI1(), b.getI2(), b.getI3(), b.getI4(), b.getI5(), b.getI6(), b.getI7(), b.getI8()};
+                                                    break;
+                                                default:
+                                                    borderInstance = new String[] {b.getI1(), b.getI2(), b.getI3(), b.getI4(), b.getI5(), b.getI6(), b.getI7(), b.getI8(), b.getI9()};
+                                                    break;
+                                            }
+
+                                            theme.put(b.getKey(), borderInstance);
+                                            continue;
+                                        }
+                                        if("imageH".equals(b.getType())) {
+                                            theme.put(b.getKey(), new String[] {"h", b.getI1(), b.getI2(), b.getI3()} );
+                                            continue;
+                                        }
+                                        if("imageV".equals(b.getType())) {
+                                            theme.put(b.getKey(), new String[] {"v", b.getI1(), b.getI2(), b.getI3()} );
+                                            continue;
+                                        }
+                                    }
+                                }
+                                
+                                if(d.getFont() != null) {
+                                    for(com.codename1.ui.util.xml.Font b : d.getFont()) {
+                                        if("ttf".equals(b.getType())) {
+                                            com.codename1.ui.Font system = com.codename1.ui.Font.createSystemFont(b.getFace().intValue(), b.getStyle().intValue(), b.getSize().intValue());
+                                            EditorTTFFont t = new EditorTTFFont(new File(f.getParentFile(), b.getName()), b.getSize().intValue(), b.getActualSize().floatValue(), system);
+                                            theme.put(b.getKey(), t);
+                                            continue;
+                                        }
+                                        if("system".equals(b.getType())) {
+                                            com.codename1.ui.Font system = com.codename1.ui.Font.createSystemFont(b.getFace().intValue(), b.getStyle().intValue(), b.getSize().intValue());
+                                            theme.put(b.getKey(), system);
+                                            continue;
+                                        }
+                                        // bitmap fonts aren't supported right now
+                                    }
+                                }
+
+                                if(d.getGradient() != null) {
+                                    for(com.codename1.ui.util.xml.Gradient b : d.getGradient()) {
+                                        theme.put(b.getKey(), new Object[] {
+                                            b.getColor1(), b.getColor2(), b.getPosX(), b.getPosY(), b.getRadius()
+                                        });                                    
+                                    }
+                                }
+
+                                setResource(d.getName(), MAGIC_THEME, theme);
+                            }
+                        }
+                        
+                        loadingMode = false;
+                        modified = false;
+                        updateModified();
+
+                        // can occure when a resource file is opened via the constructor
+                        if(undoQueue != null) {
+                            undoQueue.clear();
+                            redoQueue.clear();
+                        }
+                        
+                        return;
+                    } catch(JAXBException err) {
+                        err.printStackTrace();
+                    }
+                }
+            }
+        } 
+        openFile(new FileInputStream(f));
+    }
+    
+    private void writeToFile(byte[] data, File f) throws IOException {
+        FileOutputStream o = new FileOutputStream(f);
+        o.write(data);
+        o.close();
+    }
+    
+    /**
+     * Converts a String to XML body string
+     * @param s the string to convert
+     * @return XMLized string with entity escapes
+     */
+    static String xmlize(String s) {
+        s = s.replaceAll("&", "&amp;");
+        s = s.replaceAll("<", "&lt;");
+        s = s.replaceAll(">", "&gt;");
+        s = s.replaceAll("\"", "&quot;");
+        int charCount = s.length();
+        for(int iter = 0 ; iter < charCount ; iter++) {
+            char c = s.charAt(iter);
+            if(c > 127) {
+                // we need to localize the string...
+                StringBuilder b = new StringBuilder();
+                for(int counter = iter ; counter < charCount ; counter++) {
+                    c = s.charAt(counter);
+                    if(c > 127) {
+                        b.append("&#x");
+                        b.append(Integer.toHexString(c));
+                        b.append(";");
+                    } else {
+                        b.append(c);
+                    }
+                }
+                return b.toString();
+            }
+        }
+        return s;
+    }
+    
+    
+    private void saveXMLFile(File xml, File resourcesDir) throws IOException {
+        // disable override for the duration of the save so stuff from the override doesn't
+        // get into the main resource file
+        File overrideFileBackup = overrideFile;
+        EditableResources overrideResourceBackup = overrideResource;
+        overrideResource = null;
+        overrideFile = null;
+        try {
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(xml), "UTF-8"));
+            String[] resourceNames = getResourceNames();
+
+            bw.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
+            bw.write("<resource majorVersion=\"" + MAJOR_VERSION + "\" minorVersion=\"" + MINOR_VERSION + "\">\n");
+            
+            for(int iter = 0 ; iter < resourceNames.length ; iter++) {
+                String xResourceName = xmlize(resourceNames[iter]);
+                // write the magic number
+                byte magic = getResourceType(resourceNames[iter]);
+                switch(magic) {
+                    case MAGIC_TIMELINE:
+                    case MAGIC_ANIMATION_LEGACY:
+                    case MAGIC_IMAGE_LEGACY:
+                    case MAGIC_INDEXED_IMAGE_LEGACY:
+                        magic = MAGIC_IMAGE;
+                        break;
+                    case MAGIC_THEME_LEGACY:
+                        magic = MAGIC_THEME;
+                        break;
+                    case MAGIC_FONT_LEGACY:
+                        magic = MAGIC_FONT;
+                        break;
+                }
+                
+                switch(magic) {
+                    case MAGIC_IMAGE:
+                        Object o = getResourceObject(resourceNames[iter]);
+                        if(!(o instanceof MultiImage)) {
+                            o = null;
+                        }
+                        bw.write("    <image name=\"" + xResourceName + "\" ");
+                        com.codename1.ui.Image image = getImage(resourceNames[iter]);
+                        MultiImage mi = (MultiImage)o;
+                        int rType = getImageType(image, mi);
+                        switch(rType) {
+                            // PNG file
+                            case 0xf1:
+
+                            // JPEG File
+                            case 0xf2:
+                                if(image instanceof EncodedImage) {
+                                    byte[] data = ((EncodedImage)image).getImageData();
+                                    writeToFile(data, new File(resourcesDir, resourceNames[iter]));
+                                } else {
+                                    FileOutputStream fo = new FileOutputStream(new File(resourcesDir, resourceNames[iter]));
+                                    BufferedImage buffer = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                                    buffer.setRGB(0, 0, image.getWidth(), image.getHeight(), image.getRGB(), 0, image.getWidth());
+                                    ImageIO.write(buffer, "png", fo);
+                                    fo.close();
+                                }
+                                break;
+
+                            // SVG
+                            case 0xf5:
+                            // multiimage with SVG
+                            case 0xf7:
+                                SVG s = (SVG)image.getSVGDocument();
+                                writeToFile(s.getSvgData(), new File(resourcesDir, resourceNames[iter]));
+
+                                if(s.getBaseURL() != null && s.getBaseURL().length() > 0) {
+                                    bw.write("baseUrl=\"" + s.getBaseURL() + "\" ");
+                                }
+                                bw.write("type=\"svg\" ");
+                                break;
+
+                            case 0xF6:
+                                File multiImageDir = new File(resourcesDir, resourceNames[iter]);
+                                multiImageDir.mkdirs();
+                                for(int imageIter = 0 ; imageIter < mi.getDpi().length ; imageIter++) {
+                                    File f = null;
+                                    switch(mi.getDpi()[imageIter]) {
+                                        case Display.DENSITY_HD:
+                                            f = new File(multiImageDir, "hd.png");
+                                            break;
+                                        case Display.DENSITY_VERY_HIGH:
+                                            f = new File(multiImageDir, "veryhigh.png");
+                                            break;
+                                        case Display.DENSITY_HIGH:
+                                            f = new File(multiImageDir, "high.png");
+                                            break;
+                                        case Display.DENSITY_MEDIUM:
+                                            f = new File(multiImageDir, "medium.png");
+                                            break;
+                                        case Display.DENSITY_LOW:
+                                            f = new File(multiImageDir, "low.png");
+                                            break;
+                                        case Display.DENSITY_VERY_LOW:
+                                            f = new File(multiImageDir, "verylow.png");
+                                            break;
+                                    }
+                                    writeToFile(mi.getInternalImages()[imageIter].getImageData(), f);
+                                }
+                                bw.write("type=\"multi\" ");
+                                break;
+
+                            // Timeline
+                            case MAGIC_TIMELINE:
+                                File timeline = new File(resourcesDir, resourceNames[iter]);
+                                DataOutputStream timelineOut = new DataOutputStream(new FileOutputStream(timeline));
+                                writeTimeline(timelineOut, (Timeline)image);
+                                timelineOut.close();
+                                bw.write("type=\"timeline\" ");
+                                break;
+
+                            // Fail this is the wrong data type
+                            default:
+                                throw new IOException("Illegal type while creating image: " + Integer.toHexString(rType));
+                        }
+                        bw.write(" />\n");
+
+                        continue;
+                    case MAGIC_THEME:
+                        Hashtable<String, Object> theme = getTheme(resourceNames[iter]);
+                        theme.remove("name");
+                        bw.write("    <theme name=\"" + xResourceName + "\">\n");
+
+                        for(String key : theme.keySet()) {
+
+                            if(key.startsWith("@")) {
+                                if(key.endsWith("Image")) {
+                                    bw.write("        <val key=\"" + key + "\" value=\"" + findId(theme.get(key), true) + "\" />\n");
+                                } else {
+                                    bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                }
+                                continue;
+                            }
+
+                            // if this is a simple numeric value
+                            if(key.endsWith("Color")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            } 
+
+                            if(key.endsWith("align") || key.endsWith("textDecoration")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + ((Number)theme.get(key)).shortValue() + "\" />\n");
+                                continue;
+                            }
+
+                            // if this is a short numeric value
+                            if(key.endsWith("transparency")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            } 
+
+                            // if this is a padding or margin then we will have the 4 values as bytes
+                            if(key.endsWith("padding") || key.endsWith("margin")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
+                            // padding and or margin type
+                            if(key.endsWith("Unit")) {
+                                byte[] b = (byte[])theme.get(key);
+                                bw.write("        <val key=\"" + key + "\" value=\"" + b[0] + "," + b[1] + "," + b[2] + "," + b[3] + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith("border")) {                                
+                                Border border = (Border)theme.get(key);
+                                int type = Accessor.getType(border);
+                                switch(type) {
+                                    case BORDER_TYPE_EMPTY:
+                                        bw.write("        <border key=\"" + key + "\" type=\"empty\" />\n");
+                                        continue;
+                                    case BORDER_TYPE_LINE:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"line\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"line\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_ROUNDED:
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"rounded\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" arcW=\""
+                                                    + Accessor.getArcWidth(border) + "\" arcH=\""
+                                                    + Accessor.getArcHeight(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"rounded\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" arcW=\""
+                                                    + Accessor.getArcWidth(border) + "\" arcH=\""
+                                                    + Accessor.getArcHeight(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_ETCHED_RAISED:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"etchedRaised\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"etchedRaised\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" colorB=\""
+                                                    + Accessor.getColorB(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_ETCHED_LOWERED:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"etchedLowered\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"etchedLowered\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" colorB=\""
+                                                    + Accessor.getColorB(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_BEVEL_LOWERED:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"bevelLowered\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"bevelLowered\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" colorB=\""
+                                                    + Accessor.getColorB(border) + "\" colorC=\""
+                                                    + Accessor.getColorC(border) + "\" colorD=\""
+                                                    + Accessor.getColorD(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_BEVEL_RAISED:
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"bevelRaised\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"bevelRaised\" "
+                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" colorB=\""
+                                                    + Accessor.getColorB(border) + "\" colorC=\""
+                                                    + Accessor.getColorC(border) + "\" colorD=\""
+                                                    + Accessor.getColorD(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    //case BORDER_TYPE_IMAGE_SCALED:
+                                    case BORDER_TYPE_IMAGE: {
+                                        Image[] images = Accessor.getImages(border);
+                                        int resourceCount = 0;
+                                        for(int counter = 0 ; counter < images.length ; counter++) {
+                                            if(images[counter] != null && findId(images[counter], true) != null) {
+                                                resourceCount++;
+                                            }
+                                        }
+                                        if(resourceCount != 2 && resourceCount != 3 && resourceCount != 8 && resourceCount != 9) {
+                                            System.out.println("Odd resource count for image border: " + resourceCount);
+                                            resourceCount = 2;
+                                        }
+                                        switch(resourceCount) {
+                                            case 2:
+                                                bw.write("        <border key=\"" + key + "\" type=\"image\" "
+                                                        + "i1=\"" + findId(images[0], true) + "\" "
+                                                        + "i2=\"" + findId(images[4], true) + "\" />\n");
+                                                break;
+                                            case 3:
+                                                bw.write("        <border key=\"" + key + "\" type=\"image\" "
+                                                        + "i1=\"" + findId(images[0], true) + "\" "
+                                                        + "i2=\"" + findId(images[4], true) + "\" "
+                                                        + "i3=\"" + findId(images[8], true) + "\" />\n");
+                                                break;
+                                            case 8:
+                                                bw.write("        <border key=\"" + key + "\" type=\"image\" "
+                                                        + "i1=\"" + findId(images[0], true) + "\" "
+                                                        + "i2=\"" + findId(images[1], true) + "\" "
+                                                        + "i3=\"" + findId(images[2], true) + "\" "
+                                                        + "i4=\"" + findId(images[3], true) + "\" "
+                                                        + "i5=\"" + findId(images[4], true) + "\" "
+                                                        + "i6=\"" + findId(images[5], true) + "\" "
+                                                        + "i7=\"" + findId(images[6], true) + "\" "
+                                                        + "i8=\"" + findId(images[7], true) + "\" />\n");
+                                                break;
+                                            case 9:
+                                                bw.write("        <border key=\"" + key + "\" type=\"image\" "
+                                                        + "i1=\"" + findId(images[0], true) + "\" "
+                                                        + "i2=\"" + findId(images[1], true) + "\" "
+                                                        + "i3=\"" + findId(images[2], true) + "\" "
+                                                        + "i4=\"" + findId(images[3], true) + "\" "
+                                                        + "i5=\"" + findId(images[4], true) + "\" "
+                                                        + "i6=\"" + findId(images[5], true) + "\" "
+                                                        + "i7=\"" + findId(images[6], true) + "\" "
+                                                        + "i8=\"" + findId(images[7], true) + "\" "
+                                                        + "i9=\"" + findId(images[8], true) + "\" />\n");
+                                                break;
+                                        }
+                                        continue;
+                                    }
+                                    case BORDER_TYPE_IMAGE_HORIZONTAL: {
+                                        Image[] images = Accessor.getImages(border);
+                                        bw.write("        <border key=\"" + key + "\" type=\"imageH\" "
+                                                + "i1=\"" + findId(images[0], true) + "\" "
+                                                + "i2=\"" + findId(images[1], true) + "\" "
+                                                + "i3=\"" + findId(images[2], true) + "\" />\n");
+                                        continue;
+                                    }
+                                    case BORDER_TYPE_IMAGE_VERTICAL: {
+                                        Image[] images = Accessor.getImages(border);
+                                        bw.write("        <border key=\"" + key + "\" type=\"imageV\" "
+                                                + "i1=\"" + findId(images[0], true) + "\" "
+                                                + "i2=\"" + findId(images[1], true) + "\" "
+                                                + "i3=\"" + findId(images[2], true) + "\" />\n");
+                                        continue;
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // if this is a font
+                            if(key.endsWith("font")) {
+                                com.codename1.ui.Font f = (com.codename1.ui.Font)theme.get(key);
+
+                                // is this a new font?
+                                boolean newFont = f instanceof EditorFont;
+                                if(newFont) {
+                                    bw.write("        <font key=\"" + key + "\" type=\"named\" "
+                                            + "name=\"" + findId(f) + "\" />\n");
+                                } else {
+                                    if(f instanceof EditorTTFFont && ((EditorTTFFont)f).getFontFile() != null) {
+                                        EditorTTFFont ed = (EditorTTFFont)f;
+                                        bw.write("        <font key=\"" + key + "\" type=\"ttf\" "
+                                                + "face=\"" + f.getFace() + "\" "
+                                                + "style=\"" + f.getStyle() + "\" "
+                                                + "size=\"" + f.getSize() + "\" "
+                                                + "name=\"" + ed.getFontFile().getName() + "\" "
+                                                + "family=\"" + ((java.awt.Font)ed.getNativeFont()).getFamily() + "\" "
+                                                + "sizeSettings=\"" + ed.getSizeSetting() + "\" "
+                                                + "actualSize=\"" + ed.getActualSize() + "\" />\n");
+                                    } else {
+                                        bw.write("        <font key=\"" + key + "\" type=\"system\" "
+                                                + "face=\"" + f.getFace() + "\" "
+                                                + "style=\"" + f.getStyle() + "\" "
+                                                + "size=\"" + f.getSize() + "\" />\n");
+                                    }
+                                }
+                                continue;
+                            } 
+
+                            // if this is a background image
+                            if(key.endsWith("bgImage")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + findId(theme.get(key), true) + "\" />\n");
+                                continue;
+                            } 
+
+                            if(key.endsWith("scaledImage")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith("derive")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
+                            // if this is a background gradient
+                            if(key.endsWith("bgGradient")) {
+                                Object[] gradient = (Object[])theme.get(key);
+                                bw.write("        <gradient key=\"" + key + "\" color1=\"" + gradient[0] + "\""
+                                        + "\" color2=\"" + gradient[1] + "\""
+                                        + "\" posX=\"" + gradient[2] + "\""
+                                        + "\" posY=\"" + gradient[3] + "\""
+                                        + "\" radius=\"" + gradient[4] + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
+                            // thow an exception no idea what this is
+                            throw new IOException("Error while trying to read theme property: " + key);
+                        }
+                        
+                        
+                        bw.write("    </theme>\n");
+                        continue;
+                    case MAGIC_FONT:
+                        File legacyFont = new File(resourcesDir, resourceNames[iter]);
+                        DataOutputStream legacyFontOut = new DataOutputStream(new FileOutputStream(legacyFont));
+                        saveFont(legacyFontOut, false, resourceNames[iter]);
+                        legacyFontOut.close();
+                        bw.write("    <legacyFont name=\"" + xResourceName + "\" />\n");
+                        continue;
+                    case MAGIC_DATA: {
+                        File dataFile = new File(resourcesDir, resourceNames[iter]);
+                        DataOutputStream dataFileOut = new DataOutputStream(new FileOutputStream(dataFile));
+                        InputStream i = getData(resourceNames[iter]);
+                        ByteArrayOutputStream outArray = new ByteArrayOutputStream();
+                        int val = i.read();
+                        while(val != -1) {
+                            outArray.write(val);
+                            val = i.read();
+                        }
+                        byte[] data = outArray.toByteArray();
+                        dataFileOut.write(data);
+                        dataFileOut.close();
+                        bw.write("    <data name=\"" + xResourceName + "\" />\n");
+                        continue;
+                    }
+                    case MAGIC_UI: {
+                        File ui = new File(resourcesDir, resourceNames[iter]);
+                        DataOutputStream uiOut = new DataOutputStream(new FileOutputStream(ui));
+                        InputStream i = getUi(resourceNames[iter]);
+                        ByteArrayOutputStream outArray = new ByteArrayOutputStream();
+                        int val = i.read();
+                        while(val != -1) {
+                            outArray.write(val);
+                            val = i.read();
+                        }
+                        byte[] data = outArray.toByteArray();
+                        uiOut.write(data);
+                        uiOut.close();
+                        bw.write("    <ui name=\"" + xResourceName + "\" />\n");
+                        continue;
+                    }
+                    case MAGIC_L10N:
+                        // we are getting the theme which allows us to acces the l10n data
+                        bw.write("    <l10n name=\"" + xResourceName + "\">\n");
+                        Hashtable<String, Object> l10n = getTheme(resourceNames[iter]);
+                        for(String locale : l10n.keySet()) {
+                            bw.write("        <lang name=\"" + locale + "\">\n");
+                            
+                            Hashtable<String, String> current = (Hashtable<String, String>)l10n.get(locale);
+                            for(String key : current.keySet()) {
+                                String val = current.get(key);
+                                bw.write("            <entry key=\"" + xmlize(key) + "\" value=\"" + xmlize(val) + "\" />\n");
+                            }
+                            bw.write("        </lang>\n");
+                        }
+                        bw.write("    </l10n>\n");
+                        continue;
+                    default:
+                        throw new IOException("Corrupt theme file unrecognized magic number: " + Integer.toHexString(magic & 0xff));
+                }
+            }
+            bw.write("</resource>\n");
+            bw.close();
+        } finally {
+            overrideFile = overrideFileBackup;
+            overrideResource = overrideResourceBackup;
+        }
+    }
+    
+    public void saveXML(File resFile) throws IOException {
+        if(xmlEnabled && resFile.getParentFile().getName().equals("src")) {
+            if(new File(resFile.getParentFile().getParentFile(), "codenameone_settings.properties").exists()) {
+                File res = new File(resFile.getParentFile().getParentFile(), "res");
+                res.mkdir();
+                String filename = resFile.getName();
+                filename = filename.substring(0, filename.length() - 4);
+                File xml = new File(res, filename + ".xml");
+                File resources = new File(res, filename);
+                resources.mkdir();
+                
+                
+                if(overrideFile != null) {
+                    String name = overrideFile.getName();
+                    name = name.substring(0, name.length() - 4);
+                    File overrideDir = new File(resources, name);
+                    overrideDir.mkdirs();
+                    overrideResource.saveXMLFile(new File(resources, name + ".xml"), overrideDir);
+                }
+                saveXMLFile(xml, resources);
+            }
+        } 
+    }
 
     @Override
     public void openFile(final InputStream input) throws IOException {
@@ -681,7 +1530,7 @@ public class EditableResources extends Resources implements TreeModel {
         return super.getUi(id);
     }
 
-    public Hashtable getTheme(String id) {
+    public Hashtable<String, Object> getTheme(String id) {
         if(overrideResource != null) {
             Hashtable h = overrideResource.getTheme(id);
             if(h != null) {

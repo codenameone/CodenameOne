@@ -857,6 +857,7 @@ public class Dialog extends Form {
      * Places the given commands in the dialog command area, this is very useful for touch devices.
      *
      * @param cmds the commands to place
+     * @deprecated this method shouldn't be invoked externally, it should have been private
      */
     public void placeButtonCommands(Command[] cmds) {
         buttonCommands = cmds;

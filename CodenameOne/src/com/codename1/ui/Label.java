@@ -582,6 +582,13 @@ public class Label extends Component {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if(name.equals("maskName")) {
             return getMaskName();

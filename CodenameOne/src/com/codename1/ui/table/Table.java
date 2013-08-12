@@ -701,6 +701,13 @@ public class Table extends Container {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(), 
            com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String[][]", "String[]"};
+    }
 
     /**
      * @inheritDoc

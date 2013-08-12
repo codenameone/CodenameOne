@@ -279,6 +279,13 @@ public class ContainerList extends Container {
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"Object[]", "CellRenderer"};
+    }
 
     /**
      * @inheritDoc

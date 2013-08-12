@@ -263,9 +263,9 @@ public class EncodedImage extends Image {
                             public void run() {
                                 if(locked) {
                                     hardCache = i;
-                                    cache = Display.getInstance().createSoftWeakRef(i);
-                                    Display.getInstance().getCurrent().repaint();
                                 }
+                                cache = Display.getInstance().createSoftWeakRef(i);
+                                Display.getInstance().getCurrent().repaint();                                
                                 width = i.getWidth();
                                 height = i.getHeight();
                             }

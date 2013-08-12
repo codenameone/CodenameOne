@@ -3573,6 +3573,16 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * This method is here to workaround an XMLVM array type bug where property types aren't
+     * identified properly, it returns the names of the types using the following type names:
+     * String,int,double,long,byte,short,char,String[],String[][],byte[],Image,Image[],Object[],ListModel,ListCellRenderer
+     * @return Array of type names
+     */
+    public String[] getPropertyTypeNames() {
+        return null;
+    }
+    
+    /**
      * Returns the current value of the property name, this method is used by the GUI builder
      *
      * @param name the name of the property

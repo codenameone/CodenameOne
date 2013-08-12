@@ -169,6 +169,13 @@ public class SpanButton extends Container {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String", "Image", "String"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if(name.equals("text")) {
             return getText();

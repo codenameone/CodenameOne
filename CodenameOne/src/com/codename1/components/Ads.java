@@ -511,6 +511,13 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * @inheritDoc
      */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String", "int", "String", "String", "String", "String", "String[]"};
+    }
+
+    /**
+     * @inheritDoc
+     */
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
             return getAppID();

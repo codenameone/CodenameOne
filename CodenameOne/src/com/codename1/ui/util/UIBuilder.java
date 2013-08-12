@@ -792,28 +792,51 @@ public class UIBuilder { //implements Externalizable {
         }
     }
     
-    private Object readCustomPropertyValue(DataInputStream in, Class type, Resources res, String name) throws IOException {
+    private Object readCustomPropertyValue(DataInputStream in, Class type, String typeName, Resources res, String name) throws IOException {
         if(type == String.class) {
             return in.readUTF();
         }
 
-        if(type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {
-            String[] result = new String[in.readInt()];
-            for(int i = 0 ; i < result.length ; i++) {
-                result[i] = in.readUTF();
+        if(typeName != null) {
+            if("String[]".equals(typeName)) {
+                String[] result = new String[in.readInt()];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = in.readUTF();
+                }
+                return result;
             }
-            return result;
+        } else {
+            if(type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {
+                String[] result = new String[in.readInt()];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = in.readUTF();
+                }
+                return result;
+            }
         }
 
-        if(type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {
-            String[][] result = new String[in.readInt()][];
-            for(int i = 0 ; i < result.length ; i++) {
-                result[i] = new String[in.readInt()];
-                for(int j = 0 ; j < result[i].length ; j++) {
-                    result[i][j] = in.readUTF();
+        if(typeName != null) {
+            if("String[][]".equals(typeName)) {
+                String[][] result = new String[in.readInt()][];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = new String[in.readInt()];
+                    for(int j = 0 ; j < result[i].length ; j++) {
+                        result[i][j] = in.readUTF();
+                    }
                 }
+                return result;
             }
-            return result;
+        } else {
+            if(type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {
+                String[][] result = new String[in.readInt()][];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = new String[in.readInt()];
+                    for(int j = 0 ; j < result[i].length ; j++) {
+                        result[i][j] = in.readUTF();
+                    }
+                }
+                return result;
+            }
         }
 
         if(type == Integer.class) {
@@ -843,12 +866,22 @@ public class UIBuilder { //implements Externalizable {
             return Boolean.FALSE;
         }
 
-        if(type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {
-            Image[] result = new Image[in.readInt()];
-            for(int i = 0 ; i < result.length ; i++) {
-                result[i] = res.getImage(in.readUTF());
+        if(typeName != null) {
+            if("Image[]".equals(typeName)) {
+                Image[] result = new Image[in.readInt()];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = res.getImage(in.readUTF());
+                }
+                return result;
             }
-            return result;
+        } else {
+            if(type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {
+                Image[] result = new Image[in.readInt()];
+                for(int i = 0 ; i < result.length ; i++) {
+                    result[i] = res.getImage(in.readUTF());
+                }
+                return result;
+            }
         }
 
         if(type == Image.class) {
@@ -1004,7 +1037,12 @@ public class UIBuilder { //implements Externalizable {
                     for(int iter = 0 ; iter < propertyNames.length ; iter++) {
                         if(propertyNames[iter].equals(customPropertyName)) {
                             Class type = cmp.getPropertyTypes()[iter];
-                            Object value = readCustomPropertyValue(in, type, res, propertyNames[iter]);
+                            String[] typeNames = cmp.getPropertyTypeNames();
+                            String typeName = null;
+                            if(typeNames != null && typeNames.length > iter) {
+                                typeName = typeNames[iter];
+                            }
+                            Object value = readCustomPropertyValue(in, type, typeName, res, propertyNames[iter]);
                             if(cl && customPropertyName.equals("ListItems") && setListModel((ContainerList)cmp)) {
                                 break;
                             }
@@ -2249,12 +2287,12 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
-        if(Display.getInstance().getCurrent() instanceof Dialog) {
+        Form currentForm = Display.getInstance().getCurrent();
+        if(currentForm != null && currentForm instanceof Dialog) {
             ((Dialog)Display.getInstance().getCurrent()).dispose();
         }
         Vector formNavigationStack = baseFormNavigationStack;
-        if(sourceCommand != null && Display.getInstance().getCurrent().getBackCommand() == sourceCommand) {
-            Form currentForm = Display.getInstance().getCurrent();
+        if(sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
             if(currentForm != null) {
                 exitForm(currentForm);
             }
@@ -2274,7 +2312,6 @@ public class UIBuilder { //implements Externalizable {
             f.showBack();
             postShowImpl(f);
         } else {
-            Form currentForm = Display.getInstance().getCurrent();
             if(currentForm != null) {
                 exitForm(currentForm);
             }

@@ -2175,6 +2175,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 onPositionSizeChange();
             }
         }
+
+        private void doSetVisibilityInternal(final boolean visible) {
+            activity.runOnUiThread(new Runnable() {
+                public void run() {
+                    v.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+                    if (visible) {
+                        v.bringToFront();
+                    }
+                }
+            });
+        }
         
         protected void deinitialize() {
             super.deinitialize();
@@ -2289,7 +2300,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (v.getVisibility() == View.INVISIBLE
                     && f != null
                     && Display.getInstance().getCurrent() == f) {
-                doSetVisibility(true);
+                doSetVisibilityInternal(true);
                 return;
             }
 
@@ -4699,8 +4710,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                  Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            CodeScannerImpl.this.callback.scanError(-1, "no scan app");
-                            CodeScannerImpl.this.callback = null;
+                            if(CodeScannerImpl.this != null && CodeScannerImpl.this.callback != null) {
+                                CodeScannerImpl.this.callback.scanError(-1, "no scan app");
+                                CodeScannerImpl.this.callback = null;
+                            }
                         }
                     });
                  
