@@ -4212,6 +4212,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
                 Cursor cursor = activity.getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+                
+                // this happens on Android devices, not exactly sure what the use case is
+                if(cursor == null) {
+                    callback.fireActionEvent(null);
+                    return;
+                }
+                
                 cursor.moveToFirst();
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
