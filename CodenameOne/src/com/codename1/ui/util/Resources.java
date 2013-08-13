@@ -671,6 +671,7 @@ public class Resources {
             InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr");
             if(i != null) {
                 r.override(i);
+                i.close();
             }
         }
         
