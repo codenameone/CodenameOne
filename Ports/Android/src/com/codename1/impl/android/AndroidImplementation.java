@@ -4397,7 +4397,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static String convertImageUriToFilePath(Uri imageUri, Activity activity) {
         Cursor cursor = null;
         String[] proj = {MediaStore.Images.Media.DATA};
-        cursor = activity.managedQuery(imageUri, proj, null, null, null);
+        cursor = activity.getContentResolver().query(imageUri, proj, null, null, null);
         int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
         cursor.moveToFirst();
         String path = cursor.getString(column_index);
