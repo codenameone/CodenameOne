@@ -172,7 +172,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
-    private Uri imageUri;
     private EventDispatcher callback;
     private int timeout = -1;
     private CodeScannerImpl scannerInstance;
@@ -2172,7 +2171,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
             if(visible){
-                onPositionSizeChange();
+                layoutPeer();
             }
         }
 
@@ -2303,7 +2302,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 doSetVisibilityInternal(true);
                 return;
             }
+            layoutPeer();
+        }
 
+        protected void layoutPeer(){
             // called by Codename One EDT to position the native component.
             activity.runOnUiThread(new Runnable() {
                 public void run() {
@@ -2322,9 +2324,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                     }
                 }
-            });
+            });        
         }
-
+        
         void blockNativeFocus(boolean block) {
             if (layoutWrapper != null) {
                 layoutWrapper.setDescendantFocusability(block
@@ -4155,7 +4157,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
-                    String path = convertImageUriToFilePath(imageUri, activity);
+                    String path = (String) Storage.getInstance().readObject("imageUri");
+                    Storage.getInstance().deleteStorageFile("imageUri");
                     
                     Bitmap picture;
                     if(Display.getInstance().getProperty("normalizeImage", "false").equals("true")) {
@@ -4246,10 +4249,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String fileName = "temp.jpg";
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.TITLE, fileName);
-        imageUri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        Uri imageUri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        
+        Storage.getInstance().writeObject("imageUri", convertImageUriToFilePath(imageUri, activity));
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
-
         this.activity.startActivityForResult(intent, CAPTURE_IMAGE);
     }
 
