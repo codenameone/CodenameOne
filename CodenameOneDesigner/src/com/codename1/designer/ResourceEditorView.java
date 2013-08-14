@@ -1228,7 +1228,6 @@ public class ResourceEditorView extends FrameView {
         fileMenu.setMnemonic('F');
         fileMenu.setText("File");
         fileMenu.setName("fileMenu"); // NOI18N
-        fileMenu.addActionListener(formListener);
 
         newMenuItem.setAction(newResourceAction);
         newMenuItem.setMnemonic('N');
@@ -1316,6 +1315,7 @@ public class ResourceEditorView extends FrameView {
 
         enableXMLTeamMode.setText("XML Team Mode");
         enableXMLTeamMode.setName("enableXMLTeamMode"); // NOI18N
+        enableXMLTeamMode.addActionListener(formListener);
         fileMenu.add(enableXMLTeamMode);
 
         jSeparator1.setName("jSeparator1"); // NOI18N
@@ -1757,8 +1757,8 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
             }
-            else if (evt.getSource() == fileMenu) {
-                ResourceEditorView.this.fileMenuActionPerformed(evt);
+            else if (evt.getSource() == enableXMLTeamMode) {
+                ResourceEditorView.this.enableXMLTeamModeActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -2378,6 +2378,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("import com.codename1.ui.*;\n");
             w.write("import com.codename1.ui.util.*;\n");
             w.write("import com.codename1.ui.plaf.*;\n");
+            w.write("import java.util.Hashtable;\n");
             if(hasIo) {
                 w.write("import com.codename1.ui.io.*;\n");
                 w.write("import com.codename1.components*;\n");
@@ -2546,11 +2547,15 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             writeFormCallbackCode(w, "    protected void exitForm(Form f) {\n", "f.getName()", "exit", "f", "Form f");
             writeFormCallbackCode(w, "    protected void beforeShow(Form f) {\n    aboutToShowThisContainer = f;\n", 
                     "f.getName()", "before", "f", "Form f");
-            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n    aboutToShowThisContainer = c;\n", 
+            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n        aboutToShowThisContainer = c;\n", 
                     "c.getName()", "beforeContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void postShow(Form f) {\n", "f.getName()", "post", "f", "Form f");
             writeFormCallbackCode(w, "    protected void postShowContainer(Container c) {\n", "c.getName()", "postContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void onCreateRoot(String rootName) {\n", "rootName", "onCreate", "", "");
+            writeFormCallbackCode(w, "    protected Hashtable getFormState(Form f) {\n        Hashtable h = super.getFormState(f);\n", 
+                    "f.getName()", "getState", "f, h", "Form f, Hashtable h", "return h;");
+            writeFormCallbackCode(w, "    protected void setFormState(Form f, Hashtable state) {\n        super.setFormState(f, state);\n", 
+                    "f.getName()", "setState", "f, state", "Form f, Hashtable state");
 
             List<String> listComponents = new ArrayList<String>();
             for(String currentName : allComponents.keySet()) {
@@ -2661,6 +2666,10 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     }
 
     private static void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition) throws IOException {
+        writeFormCallbackCode(w, methodSig, getString, prefix, args, argDefinition, "return;");
+    }
+    
+    private static void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition, String returnStatement) throws IOException {
         w.write(methodSig);
         for(String ui : loadedResources.getUIResourceNames()) {
             w.write("        if(\"");
@@ -2675,9 +2684,13 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write(args);
             w.write(");\n");    
             w.write("            aboutToShowThisContainer = null;\n");
-            w.write("            return;\n");
-            w.write("        }\n\n");
+            w.write("            ");
+            w.write(returnStatement);
+            w.write("\n        }\n\n");
         }
+        w.write("            ");
+        w.write(returnStatement);
+        w.write("\n");
         w.write("    }\n\n");
         for(String ui : loadedResources.getUIResourceNames()) {
             w.write("\n    protected void ");
@@ -2689,15 +2702,38 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("    }\n\n");
         }
     }
-
+    
 private void deleteUnusedImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteUnusedImagesActionPerformed
-    Vector images = new Vector();
+    Vector<String> images = new Vector<String>();
     for(String img : loadedResources.getImageResourceNames()) {
         if(!isInUse(img)) {
             images.add(img);
         }
     }
     if(images.size() > 0) {
+        if(loadedFile != null && loadedFile.getParentFile().getName().equals("src")) {
+            File source = new File(loadedFile.getParentFile(), "userclasses/StateMachine.java");
+            if(source.exists()) {
+                byte[] data = new byte[(int)source.length()];
+                try {
+                    DataInputStream di = new DataInputStream(new FileInputStream(source));
+                    di.readFully(data);
+                    String s = new String(data);
+                    Vector<String> notUsedInCode = new Vector<String>();
+                    for(String img : images) {
+                        if(!s.contains("\"" + img + "\"")) {
+                            notUsedInCode.add(img);
+                        }
+                    }
+                    if(notUsedInCode.size() == 0) {
+                        return;
+                    }
+                    images = notUsedInCode;
+                } catch(Exception err) {
+                    err.printStackTrace();
+                }
+            }
+        }
         Collections.sort(images);
         JList imgs = new JList(images);
         imgs.setSelectionInterval(0, images.size());
@@ -3339,10 +3375,10 @@ private void ios7NativeThemeActionPerformed(java.awt.event.ActionEvent evt) {//G
     setNativeTheme("/iOS7Theme.res", true);
 }//GEN-LAST:event_ios7NativeThemeActionPerformed
 
-private void fileMenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fileMenuActionPerformed
+private void enableXMLTeamModeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_enableXMLTeamModeActionPerformed
     Preferences.userNodeForPackage(getClass()).putBoolean("XMLFileMode", enableXMLTeamMode.isSelected());
     EditableResources.setXMLEnabled(enableXMLTeamMode.isSelected());
-}//GEN-LAST:event_fileMenuActionPerformed
+}//GEN-LAST:event_enableXMLTeamModeActionPerformed
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
