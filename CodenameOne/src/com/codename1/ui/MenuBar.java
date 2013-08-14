@@ -224,7 +224,7 @@ public class MenuBar extends Container implements ActionListener {
         softCommand = new Command[soft.length];
     }
 
-    private int getCommandBehavior() {
+    int getCommandBehavior() {
         int i = Display.getInstance().getCommandBehavior();
         if (Display.getInstance().getImplementation().getSoftkeyCount() == 0) {
             if (i != Display.COMMAND_BEHAVIOR_BUTTON_BAR && i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
@@ -1041,8 +1041,10 @@ public class MenuBar extends Container implements ActionListener {
                 if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && cmd == parent.getBackCommand()) {
                     return;
                 }
-                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS
-                        || behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)
+                if(behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+                    return;
+                }
+                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS)
                         && parent.getTitle() != null && parent.getTitle().length() > 0) {
                     synchronizeCommandsWithButtonsInBackbutton();
                     return;

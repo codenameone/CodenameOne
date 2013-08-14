@@ -302,6 +302,18 @@ public class UIBuilder { //implements Externalizable {
         }
     }
     
+    /**
+     * Useful method for logging form navigation, it returns a string representing the navigation state which 
+     * can be used to analyze crash reports
+     * @return A string representing form states
+     */
+    protected String formNavigationStackDebug() {
+        if(baseFormNavigationStack != null) {
+            return baseFormNavigationStack.toString();
+        }
+        return "Null navigation stack";
+    }
+    
     private Vector getFormNavigationStackForComponent(Component c) {
         if(baseFormNavigationStack == null) {
             return null;

@@ -76,6 +76,7 @@ public final class Display {
     private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
+    private boolean inNativeUI;
 
     /**
      * A common sound type that can be used with playBuiltinSound
@@ -917,9 +918,14 @@ public final class Display {
         while(i_size > 0) {
             int[] i;
             synchronized(lock) {
+                i_size = inputEvents.size();
+                if(i_size == 0) {
+                    // race condition due to double locking on a multi-core device (ugh)
+                    // this happens on Android devices
+                    break;
+                }
                 i = (int[])inputEvents.get(0);
                 inputEvents.remove(0);
-                i_size = inputEvents.size();
             }
             handleEvent(i);
         }
@@ -1293,7 +1299,7 @@ public final class Display {
         current = newForm;
         impl.setCurrentForm(current);
         current.setVisible(true);
-        if(forceShow || !allowMinimizing) {
+        if(forceShow || !allowMinimizing || inNativeUI) {
             impl.confirmControlView();
         }
         int w = current.getWidth();
@@ -1716,7 +1722,7 @@ public final class Display {
 
             // make sure the released event is sent to the same Form that got a
             // pressed event
-            if(x == f){
+            if(x == f || (f != null && f.shouldSendPointerReleaseToOtherForm())){
                 f.pointerReleased(pointerEvent(1, ev), pointerEvent(2, ev));
             }
             recursivePointerReleaseA = false;
@@ -2310,6 +2316,7 @@ public final class Display {
      * @param nativeFullScreenPeer the native screen peer
      */
     public void showNativeScreen(Object nativeFullScreenPeer) {
+        inNativeUI = true;
         impl.showNativeScreen(nativeFullScreenPeer);
     }
 

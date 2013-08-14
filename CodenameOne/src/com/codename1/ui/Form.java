@@ -1234,6 +1234,15 @@ public class Form extends Container {
             revalidate();
         }
     }
+    
+    /**
+     * @inheritDoc
+     */
+    void deinitializeImpl() {
+        super.deinitializeImpl();
+        buttonsAwatingRelease = null;
+        dragged = null;
+    }
 
     /**
      * @inheritDoc
@@ -1632,6 +1641,10 @@ public class Form extends Container {
         }
     }
 
+    boolean shouldSendPointerReleaseToOtherForm() {
+        return false;
+    }
+    
     /**
      * @inheritDoc
      */

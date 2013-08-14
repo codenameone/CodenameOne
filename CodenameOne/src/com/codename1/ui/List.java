@@ -227,6 +227,8 @@ public class List<T> extends Component {
 
     private Label hintLabel;
 
+    private boolean longPointerPressAction = true;
+    
     /**
      * Creates a new instance of List
      *
@@ -657,6 +659,22 @@ public class List<T> extends Component {
      */
     public void setListSizeCalculationSampleCount(int listSizeCalculationSampleCount) {
         this.listSizeCalculationSampleCount = listSizeCalculationSampleCount;
+    }
+
+    /**
+     * Enable/disable list action on long pointer press event
+     * @return the longPointerPressAction
+     */
+    public boolean isLongPointerPressActionEnabled() {
+        return longPointerPressAction;
+    }
+
+    /**
+     * Enable/disable list action on long pointer press event
+     * @param longPointerPressAction the longPointerPressAction to set
+     */
+    public void setLongPointerPressActionEnabled(boolean longPointerPressAction) {
+        this.longPointerPressAction = longPointerPressAction;
     }
 
 
@@ -1630,11 +1648,13 @@ public class List<T> extends Component {
      * @inheritDoc
      */
     public void longPointerPress(int x, int y) {
-        int s = pointerSelect(x, y);
-        if(s > -1) {
-            model.setSelectedIndex(s);
+        if(longPointerPressAction) {
+            int s = pointerSelect(x, y);
+            if(s > -1) {
+                model.setSelectedIndex(s);
+            }
+            pointerReleasedImpl(x, y, false, true);
         }
-        pointerReleasedImpl(x, y, false, true);
     }
 
     /**
@@ -2100,7 +2120,7 @@ public class List<T> extends Component {
      * element when it's been initialized.
      *
      * @param scrollToSelected if true the List scrolls to the selected element
-     * when It's been initalized.
+     * when It's been initialized.
      */
     public void setScrollToSelected(boolean scrollToSelected) {
         this.scrollToSelected = scrollToSelected;
