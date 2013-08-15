@@ -2032,7 +2032,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
-        CookieHandler.setDefault(null);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
@@ -3778,8 +3777,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
-        URL u = new URL(url);
-        CookieHandler.setDefault(null);
+        URL u = new URL(url);        
 
         URLConnection con = u.openConnection();
 
