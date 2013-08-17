@@ -270,6 +270,14 @@ public class SideMenuBar extends MenuBar {
 
     public void keyReleased(int keyCode) {
         if (keyCode == leftSK) {
+            if(getCommandCount() == 0) {
+                return;
+            }
+            if(parent.getCommandCount() == 1) {
+                if(parent.getCommand(0) == parent.getBackCommand()) {
+                    return;
+                }
+            }
             openMenu();
         }
         super.keyReleased(keyCode);
