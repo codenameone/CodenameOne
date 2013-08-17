@@ -228,6 +228,7 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     public void printToLog(String t) {
         performanceLog.append(t + "\n");
+        performanceLog.setCaretPosition(t.length());
     }   
     
     private void pauseContinueActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pauseContinueActionPerformed
@@ -236,6 +237,7 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     private void clearDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearDataActionPerformed
         ((Model)resultData.getModel()).clear();
+        performanceLog.setText("");
     }//GEN-LAST:event_clearDataActionPerformed
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
