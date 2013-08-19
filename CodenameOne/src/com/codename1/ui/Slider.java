@@ -658,6 +658,6 @@ public class Slider extends Label {
      * @inheritDoc
      */
     protected boolean shouldBlockSideSwipe() {
-        return !vertical;
+        return editable && !vertical;
     }
 }

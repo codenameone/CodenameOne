@@ -23,7 +23,6 @@
  */
 package com.codename1.ui.html;
 
-import com.codename1.util.CStringBuilder;
 import com.codename1.xml.ParserCallback;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -130,7 +129,7 @@ class CSSParser {
      */
     private String nextToken(ExtInputStreamReader r, boolean readNewline,boolean ignoreCommas,boolean ignoreColons,boolean ignoreWhiteSpaces) throws IOException {
         boolean newline = false;
-        CStringBuilder currentToken = new CStringBuilder();
+        StringBuilder currentToken = new StringBuilder();
         char c= r.readCharFromReader();
 
         // read the next token from the CSS stream
@@ -298,7 +297,7 @@ class CSSParser {
             c= r.readCharFromReader();
         }
 
-        CStringBuilder segment=new CStringBuilder();
+        StringBuilder segment=new StringBuilder();
         boolean match=mediaTypeMatches(token);
 
         int count=1; // counts the number of opened curly brackets

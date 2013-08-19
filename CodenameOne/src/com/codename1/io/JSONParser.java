@@ -23,7 +23,6 @@
  */
 package com.codename1.io;
 
-import com.codename1.util.CStringBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -94,7 +93,7 @@ public class JSONParser implements JSONParseCallback {
         boolean quoteMode = false;
         buffOffset = 0;
         buffSize = -1;
-        CStringBuilder currentToken = new CStringBuilder();
+        StringBuilder currentToken = new StringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;

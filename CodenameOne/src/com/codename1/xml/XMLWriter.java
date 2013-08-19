@@ -6,7 +6,6 @@
 
 package com.codename1.xml;
 
-import com.codename1.util.CStringBuilder;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Enumeration;
@@ -42,7 +41,7 @@ public class XMLWriter {
 	 * @throws IOException if a write operation fails.
 	 */
 	public void writeXML(Writer writer, Element element) throws IOException {
-		writeXML(writer, element, new CStringBuilder(), false);
+		writeXML(writer, element, new StringBuilder(), false);
 	}
 	
 	/**
@@ -55,7 +54,7 @@ public class XMLWriter {
 	 * @throws IOException if a write operation fails.
 	 */
 	private void writeXML(Writer writer, Element element,
-			CStringBuilder indentation, boolean isInline) throws IOException {
+			StringBuilder indentation, boolean isInline) throws IOException {
 		if (!isInline)
 			writer.write(indentation.toString());
 		

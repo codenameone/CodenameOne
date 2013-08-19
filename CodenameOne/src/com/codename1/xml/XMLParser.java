@@ -24,7 +24,6 @@
 package com.codename1.xml;
 
 import com.codename1.ui.html.HTMLUtils;
-import com.codename1.util.CStringBuilder;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Hashtable;
@@ -218,7 +217,7 @@ public class XMLParser {
         } catch (IllegalArgumentException iae) {
             notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, "Unrecognized char entity: "+charEntity);
             // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
-            return new CStringBuilder().append('&').append(charEntity).append(';').toString();
+            return new StringBuilder().append('&').append(charEntity).append(';').toString();
         }
 
         /*int charCode=-1;
@@ -395,16 +394,16 @@ public class XMLParser {
      * @throws IOException if an I/O error in the stream is encountered
      */
     protected void parseTagContent(Element element,Reader is) throws IOException {
-        CStringBuilder text=null;
+        StringBuilder text=null;
         boolean leadingSpace=false;
         char c=(char)read(is);
-        CStringBuilder charEntity = null;
+        StringBuilder charEntity = null;
 
         while((byte)c!=-1) {
             if (c=='<') {
                 if ((includeWhitespacesBetweenTags) && (leadingSpace) && (text==null) && (element!=null) && (element.getNumChildren()>0)) { 
                     leadingSpace=false;
-					text = new CStringBuilder().append(' ');
+					text = new StringBuilder().append(' ');
                 }
                     
                 if (text!=null) {
@@ -432,7 +431,7 @@ public class XMLParser {
                 Element childElement=parseTag(is);
                 if (childElement==END_TAG) { 
                     //was actually an ending tag
-                    CStringBuilder closingTag = new CStringBuilder();
+                    StringBuilder closingTag = new StringBuilder();
                     c=(char)read(is);
                     while ((c!='>')) {
                         closingTag.append(c);
@@ -474,16 +473,16 @@ public class XMLParser {
                         charEntity=null;
                     }
                 } else if (c=='&') { //start char entity
-                    charEntity = new CStringBuilder();
+                    charEntity = new StringBuilder();
                 } else {
                     text.append(c);
                 }
             } else if (!isWhiteSpace(c)) {
                 if (c=='&') { //text starts with a character entity (i.e. &nbsp;)
-                    charEntity = new CStringBuilder(); // The & is not included in the string we accumulate
-					text = new CStringBuilder(); //Initalize text so it won't be null
+                    charEntity = new StringBuilder(); // The & is not included in the string we accumulate
+					text = new StringBuilder(); //Initalize text so it won't be null
                 } else {
-                    text = new CStringBuilder().append(c);
+                    text = new StringBuilder().append(c);
                 }
             } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
                 leadingSpace=true;
@@ -513,9 +512,9 @@ public class XMLParser {
      * @throws IOException if an I/O error in the stream is encountered
      */
     protected Element parseTag(Reader is) throws IOException {
-        CStringBuilder tagName = new CStringBuilder();
-        CStringBuilder curAttribute = new CStringBuilder();
-        CStringBuilder curValue = new CStringBuilder();
+        StringBuilder tagName = new StringBuilder();
+        StringBuilder curAttribute = new StringBuilder();
+        StringBuilder curValue = new StringBuilder();
         //boolean procInst=false; // Support for the styleshhet processing instruction was removed, as it is not supported in most browsers, and it causes problems by adding tags before the HTML element (Makign the document with multiple roots)
 
         char c=(char)read(is);
@@ -604,7 +603,7 @@ public class XMLParser {
                     c=(char)read(is);
                 }
                 if (lastChar!='/') { // If this is an empty tag, no need to search for its closing tag as there's none...
-                    String endTag = new CStringBuilder().append('<').append('/').append(tagName).append('>').toString();
+                    String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
                     int index=0;
                     while(index<endTag.length()) {
                         c=(char)read(is);
@@ -694,7 +693,7 @@ public class XMLParser {
 				curValue.append(c);
             }
 
-            CStringBuilder charEntity = null;
+            StringBuilder charEntity = null;
             boolean ended=false;
             while (!ended) {
                 c=(char)read(is);
@@ -707,7 +706,7 @@ public class XMLParser {
                     if (charEntity!=null) {
 						curValue.append('&').append(charEntity); // Wasn't a char entit, probably a url as a parameter : i.e. param="/test?p=val&pw=val2&p3=val3
                     }
-                    charEntity = new CStringBuilder();
+                    charEntity = new StringBuilder();
                 } else {
                     if (charEntity!=null) {
                         if (c==';') {
@@ -779,7 +778,7 @@ public class XMLParser {
     protected Element parseCommentOrXMLDeclaration(Reader is,String endTag) throws IOException {
 		char endTagChars[] = endTag.toCharArray();
         int endTagPos=0;
-        CStringBuilder text = new CStringBuilder();
+        StringBuilder text = new StringBuilder();
         boolean ended=false;
         while (!ended) {
             int in = read(is);

@@ -30,7 +30,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
-import com.codename1.util.CStringBuilder;
 import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
@@ -254,7 +253,7 @@ public class ConnectionRequest implements IOProgressListener {
             if(v != null) {
                 int c = v.size();
                 if(c > 0) {
-                    CStringBuilder cookieStr = new CStringBuilder();
+                    StringBuilder cookieStr = new StringBuilder();
                     Cookie first = (Cookie)v.elementAt(0);
                     cookieStr.append(first.getName());
                     cookieStr.append("=");
@@ -518,7 +517,7 @@ public class ConnectionRequest implements IOProgressListener {
         }
         
         int index = lowerH.indexOf("domain=");
-        if (index != -1) {
+        if (index > -1) {
             String domain = h.substring(index + 7);
             index = domain.indexOf(';');
             if (index!=-1) {
@@ -536,10 +535,10 @@ public class ConnectionRequest implements IOProgressListener {
         }
         
         index = lowerH.indexOf("path=");
-        if (index != -1) {
+        if (index > -1) {
             String path = h.substring(index + 5);
             index = path.indexOf(';');
-            if (index!=-1) {
+            if (index > -1) {
                 path = path.substring(0, index);
             }
             
@@ -686,7 +685,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected String createRequestURL() {
         if(!post && requestArguments != null) {
-            CStringBuilder b = new CStringBuilder(url);
+            StringBuilder b = new StringBuilder(url);
             Enumeration e = requestArguments.keys();
             if(e.hasMoreElements()) {
                 b.append("?");
@@ -714,7 +713,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void buildRequestBody(OutputStream os) throws IOException {
         if(post && requestArguments != null) {
-            CStringBuilder val = new CStringBuilder();
+            StringBuilder val = new StringBuilder();
             Enumeration e = requestArguments.keys();
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();

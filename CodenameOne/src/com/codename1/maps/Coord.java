@@ -20,7 +20,6 @@
 package com.codename1.maps;
 
 import com.codename1.ui.geom.Dimension;
-import com.codename1.util.CStringBuilder;
 
 /**
  * This class declares a coordinate point on a map.
@@ -102,7 +101,7 @@ public class Coord {
      * @inheritDoc
      */
     public String toString() {
-        return new CStringBuilder().append("{'longitude':").append(getLongitude()).append(", 'latitude':").
+        return new StringBuilder().append("{'longitude':").append(getLongitude()).append(", 'latitude':").
                 append(getLatitude()).append("}").toString();
     }
 

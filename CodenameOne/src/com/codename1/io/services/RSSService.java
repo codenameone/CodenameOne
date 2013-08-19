@@ -29,7 +29,6 @@ import com.codename1.ui.Dialog;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Image;
-import com.codename1.util.CStringBuilder;
 import com.codename1.xml.Element;
 import com.codename1.xml.ParserCallback;
 import com.codename1.xml.XMLParser;
@@ -170,7 +169,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         String cType = "UTF-8";
         if(question == '?') {
             // we are in an XML header, check if the encoding section exists 
-            CStringBuilder cs = new CStringBuilder();
+            StringBuilder cs = new StringBuilder();
             question = input.read();
             while(question != '>') {
                 cs.append((char)question);
@@ -209,7 +208,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                     XMLParser x = new XMLParser();
                     Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
                     Vector results = e.getTextDescendants(null, false);
-                    CStringBuilder endResult = new CStringBuilder();
+                    StringBuilder endResult = new StringBuilder();
                     for(int i = 0 ; i < results.size() ; i++) {
                         endResult.append(((Element)results.elementAt(i)).getText());
                     }

@@ -3688,7 +3688,7 @@ public class Component implements Animation, StyleListener {
      * on top of said component.
      */
     protected boolean shouldBlockSideSwipe() {
-        return false;
+        return isScrollableX() || (parent != null && parent.shouldBlockSideSwipe());
     }
 
     /**
