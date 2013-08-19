@@ -82,6 +82,48 @@ public class Rectangle {
     }
 
     /**
+     * Helper method to set coordinates
+     */
+    public void setBounds(int x, int y, int w, int h) {
+        this.x = x;
+        this.y = y;
+        this.size.setWidth(w);
+        this.size.setHeight(h);
+    }
+    
+    /**
+     * Convenience method for getSize().getWidth();
+     * @return width
+     */
+    public int getWidth() {
+        return size.getWidth();
+    }
+    
+    /**
+     * Convenience method for getSize().setWidth();
+     * @param w the width
+     */
+    public void setWidth(int w) {
+        size.setWidth(w);
+    }
+
+    /**
+     * Convenience method for getSize().setHeight();
+     * @param h the height
+     */
+    public void setHeight(int h) {
+        size.setHeight(h);
+    }
+
+    /**
+     * Convenience method for getSize().getHeight();
+     * @return height
+     */
+    public int getHeight() {
+        return size.getHeight();
+    }
+    
+    /**
      * Return the dimension of the rectangle
      * 
      * @return the size of the rectangle

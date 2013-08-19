@@ -51,6 +51,22 @@ import java.util.Hashtable;
 public class Oauth2 {
 
     public static final String TOKEN = "access_token";
+
+    /**
+     * Enables going back to the parent form after login is completed
+     * @return the backToParent
+     */
+    public static boolean isBackToParent() {
+        return backToParent;
+    }
+
+    /**
+     * Enables going back to the parent form after login is completed
+     * @param aBackToParent the backToParent to set
+     */
+    public static void setBackToParent(boolean aBackToParent) {
+        backToParent = aBackToParent;
+    }
     private String token;
     private static String expires;
     private String clientId;
@@ -61,7 +77,8 @@ public class Oauth2 {
     private String tokenRequestURL;
     private Hashtable additionalParams;
     private Dialog login;
-
+    private static boolean backToParent = true;
+    
     /**
      * Simple constructor
      *
@@ -260,7 +277,7 @@ public class Oauth2 {
                             }
                             
                             protected void postResponse() {
-                                if(backToForm != null) {
+                                if(backToParent && backToForm != null) {
                                     backToForm.showBack();
                                 }
                                 if(al != null) {
@@ -298,7 +315,7 @@ public class Oauth2 {
                             if(login != null) {
                                 login.dispose();
                             }
-                            if(backToForm != null) {
+                            if(backToParent && backToForm != null) {
                                 backToForm.showBack();
                             }
                             if(al != null) {

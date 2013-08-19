@@ -205,7 +205,7 @@ public class Log {
             m.addData("log", read, "text/plain");
             m.setFailSilently(true);
             NetworkManager.getInstance().addToQueueAndWait(m);
-        } catch (IOException ex) {
+        } catch (Throwable ex) {
             ex.printStackTrace();
         }
     }

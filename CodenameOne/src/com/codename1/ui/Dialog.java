@@ -989,7 +989,7 @@ public class Dialog extends Form {
     }
 
     void onShowCompletedImpl() {
-        super.onShowCompleted();
+        onShowCompleted();
         if(isDisposed()) {
             disposeImpl();
         }

@@ -227,7 +227,7 @@ public class List<T> extends Component {
 
     private Label hintLabel;
 
-    private boolean longPointerPressAction = true;
+    private boolean longPointerPressAction;
     
     /**
      * Creates a new instance of List
@@ -272,6 +272,7 @@ public class List<T> extends Component {
         setSmoothScrolling(uim.getLookAndFeel().isDefaultSmoothScrolling());
         fixedSelection = uim.getThemeConstant("fixedSelectionInt", fixedSelection);
         itemGap = uim.getThemeConstant("listItemGapInt", itemGap);
+        longPointerPressAction = uim.isThemeConstant("listLongPressBool", true);
     }
 
     

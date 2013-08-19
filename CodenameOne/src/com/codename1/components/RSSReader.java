@@ -285,6 +285,7 @@ public class RSSReader extends List {
             updateComponentValues(newForm, h);
         } else {
             newForm = new Form((String)h.get("title"));
+            newForm.setScrollable(false);
             WebBrowser c = new WebBrowser();
             String s = (String)h.get("description");
             s = "<html><body>" + s + "</body></html>";
