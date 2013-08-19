@@ -58,6 +58,7 @@ public class SideMenuBar extends MenuBar {
     boolean sideSwipePotential;
     int initialDragX;
     int initialDragY;
+    boolean transitionRunning;
     
     /**
      * Empty Constructor
@@ -166,7 +167,7 @@ public class SideMenuBar extends MenuBar {
             });
             parent.addPointerPressedListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    sideSwipePotential = evt.getX() < Display.getInstance().getDisplayWidth() / 11;
+                    sideSwipePotential = !transitionRunning && evt.getX() < Display.getInstance().getDisplayWidth() / 11;
                     initialDragX = evt.getX();
                     initialDragY = evt.getY();
                     if(sideSwipePotential) {
@@ -302,7 +303,7 @@ public class SideMenuBar extends MenuBar {
      * Opens the menu if it is currently closed
      */
     public void openMenu() {
-        openMenu(-1, 400);
+        openMenu(-1, 300);
     }
     
     /**
@@ -315,7 +316,7 @@ public class SideMenuBar extends MenuBar {
             out = parent.getTransitionOutAnimator();
             in = parent.getTransitionInAnimator();
             parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(time, true, dest));
-            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(400, false, -1));
+            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(300, false, -1));
             menu.show();
         }
     }
@@ -495,7 +496,7 @@ public class SideMenuBar extends MenuBar {
             }
 
             public void pointerDragged(int[] x, int[] y) {
-                if(pressedInRightPanel) {
+                if(!transitionRunning && pressedInRightPanel) {
                     dragActivated = true;
                     pressedInRightPanel = false;
                 }
@@ -510,7 +511,7 @@ public class SideMenuBar extends MenuBar {
 
             public void pointerReleased(int x, int y) {
                 super.pointerReleased(x, y);
-                if(dragActivated && x > (Display.getInstance().getDisplayWidth() - rightPanel.getWidth()) / 2) {
+                if(!transitionRunning && dragActivated && x > (Display.getInstance().getDisplayWidth() - rightPanel.getWidth()) / 2) {
                     final Motion motion = Motion.createEaseInOutMotion(draggedX, Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), 200);
                     motion.start();
                     registerAnimated(new Animation() {
@@ -705,7 +706,8 @@ public class SideMenuBar extends MenuBar {
         public boolean animate() {
             if (motion != null) {
                 position = motion.getValue();
-                return !motion.isFinished();
+                transitionRunning = !motion.isFinished();
+                return transitionRunning;
             }
             return false;
         }
