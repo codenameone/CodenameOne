@@ -2812,7 +2812,7 @@ private static boolean configureNetbeans() {
     if(node != null) {
         Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", node);
     }
-    File[] result = showOpenFileChooser("Netbeans Executable", "exe", "app");
+    File[] result = showOpenFileChooser("Netbeans Executable", "");
     if(result != null) {
         if(ResourceEditorApp.IS_MAC) {
             String p = result[0].getAbsolutePath() + "/Contents/MacOS/netbeans";

@@ -437,6 +437,14 @@ public class UserInterfaceEditor extends BaseForm {
             DataInputStream r = null;
             try {
                 userStateMachineFile = new File(projectGeneratorSettings.getProperty("userClassAbs"));
+                if(!userStateMachineFile.exists()) {
+                    File parentDir = ResourceEditorView.getLoadedFile().getParentFile();
+                    userStateMachineFile = new File(parentDir, "userclasses/StateMachine.java");
+                    if(!userStateMachineFile.exists()) {
+                        projectGeneratorSettings = null;
+                        return;
+                    }
+                }
                 r = new DataInputStream(new FileInputStream(userStateMachineFile));
                 byte[] data = new byte[(int) userStateMachineFile.length()];
                 r.readFully(data);
