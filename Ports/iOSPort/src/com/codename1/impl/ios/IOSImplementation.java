@@ -3036,7 +3036,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     result.add(loaded + current);
                     loaded = null;
                 } else {
-                    int p = current.indexOf("expires=");
+                    int p = current.toLowerCase().indexOf("expires=");
                     int c = current.lastIndexOf(";");
                     if(c < p && p > 0) {
                         loaded = current;
