@@ -171,6 +171,16 @@ public class SideMenuBar extends MenuBar {
                     initialDragX = evt.getX();
                     initialDragY = evt.getY();
                     if(sideSwipePotential) {
+                        if(getCommandCount() == 0) {
+                            sideSwipePotential = false;
+                            return;
+                        }
+                        if(parent.getCommandCount() == 1) {
+                            if(parent.getCommand(0) == parent.getBackCommand()) {
+                                sideSwipePotential = false;
+                                return;
+                            }
+                        }
                         Component c = Display.getInstance().getCurrent().getComponentAt(initialDragX, initialDragY);
                         if(c != null && c.shouldBlockSideSwipe()) {
                             sideSwipePotential = false;
@@ -709,10 +719,12 @@ public class SideMenuBar extends MenuBar {
                 transitionRunning = !motion.isFinished();
                 return transitionRunning;
             }
+            transitionRunning = false;
             return false;
         }
 
         public void cleanup() {
+            transitionRunning = false;
             clean();
         }
 
