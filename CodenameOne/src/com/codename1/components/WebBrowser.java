@@ -55,6 +55,7 @@ public class WebBrowser extends Container {
     private Component internal;
     private boolean isNative;
     private String page;
+    private Loading loading;
 
     /**
      * Default constructor
@@ -139,6 +140,9 @@ public class WebBrowser extends Container {
                         protected void handleException(Exception err) {
                             System.out.println("Error occured");
                             err.printStackTrace();
+                            if(loading != null){
+                                loading.unInstall();
+                            }
                         }
 
                         public boolean onRedirect(String url) {
@@ -156,9 +160,7 @@ public class WebBrowser extends Container {
             });
             h.setIgnoreCSS(true);
             h.setHTMLCallback(new DefaultHTMLCallback() {
-                
-                private Loading loading;
-                
+                                
                 public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
                     Form f = htmlC.getComponentForm();
                     if(f != null){
