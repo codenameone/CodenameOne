@@ -1028,7 +1028,7 @@ public class Image {
      * @param maintainOpacity whether the opacity in the image should be maintained
      * @return a new image rotated by 90 degrees
      */
-    public Image rotateImage90Degrees(boolean maintainOpacity) {
+    public Image rotate90Degrees(boolean maintainOpacity) {
         return Display.getInstance().getImplementation().rotate90Degrees(this, maintainOpacity);
     }
     
@@ -1055,7 +1055,7 @@ public class Image {
      * @param maintainOpacity whether the opacity in the image should be maintained
      * @return a new image flipped
      */
-    public Image flipImageHorizontally(boolean maintainOpacity) {
+    public Image flipHorizontally(boolean maintainOpacity) {
         return Display.getInstance().getImplementation().flipImageHorizontally(this, maintainOpacity);
     }
     
@@ -1064,7 +1064,7 @@ public class Image {
      * @param maintainOpacity whether the opacity in the image should be maintained
      * @return a new image flipped
      */
-    public Image flipImageVertically(boolean maintainOpacity) {
+    public Image flipVertically(boolean maintainOpacity) {
         return Display.getInstance().getImplementation().flipImageVertically(this, maintainOpacity);
     }
 }
