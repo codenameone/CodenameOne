@@ -61,7 +61,7 @@ public class DateSpinner extends BaseSpinner {
         if(month == null) {
             day = Spinner.create(1, 32, currentDay, 1);
             month = Spinner.create(1, 13, currentMonth, 1);
-            DefaultListCellRenderer render = new DefaultListCellRenderer(false) {
+            SpinnerRenderer<Object> render = new SpinnerRenderer<Object>() {
                 public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                     if(value != null && value instanceof Integer) {
                         // round the number in the spinner to two digits

@@ -121,7 +121,7 @@ public class Storage {
      * Creates an output stream to the storage with the given name
      *
      * @param name the storage file name
-     * @return an output stream of limited capcity
+     * @return an output stream of limited capacity
      */
     public OutputStream createOutputStream(String name) throws IOException {
         return Util.getImplementation().createStorageOutputStream(name);

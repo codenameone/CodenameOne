@@ -108,6 +108,7 @@ final class IOSNative {
     native void fillLinearGradientMutable(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal);
 
     native boolean isTablet();
+    native boolean isIOS7();
     
     native void setImageName(long nativeImage, String name);
     

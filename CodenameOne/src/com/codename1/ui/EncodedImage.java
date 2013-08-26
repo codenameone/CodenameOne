@@ -24,6 +24,9 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Util;
+import com.codename1.ui.util.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -87,6 +90,55 @@ public class EncodedImage extends Image {
         EncodedImage e = new EncodedImage(data);
         e.dpis = dpis;
         return e;
+    }
+    
+    /**
+     * Tries to create an encoded image from RGB which is more efficient,
+     * however if this fails it falls back to regular RGB image. This method
+     * is slower than creating an RGB image (not to be confused with the RGBImage class which is
+     * something ENTIRELY different!).
+     * 
+     * @param argb an argb array
+     * @param width the width for the image
+     * @param height the height for the image
+     * @param jpeg uses jpeg format internally which is opaque and could be faster/smaller
+     * @return an image which we hope is an encoded image
+     */
+    public static Image createFromRGB(int[] argb, int width, int height, boolean jpeg) {
+        Image i = Image.createImage(argb, width, height);
+        ImageIO io = ImageIO.getImageIO();
+        if(io != null) {
+            String format;
+            if(jpeg) {
+                if(!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                    return i;
+                }
+                format = ImageIO.FORMAT_JPEG;
+            } else {
+                if(!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    return i;
+                }
+                format = ImageIO.FORMAT_PNG;
+            }
+            try {
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                io.save(i, bo, format, 0.9f);
+                Util.cleanup(bo);
+                EncodedImage enc = EncodedImage.create(bo.toByteArray());
+                enc.width = width;
+                enc.height = height;
+                if(jpeg) {
+                    enc.opaque = true;
+                    enc.opaqueChecked = true;
+                }
+                enc.cache = Display.getInstance().createSoftWeakRef(i);
+                return enc;
+            } catch(IOException err) {
+                err.printStackTrace();
+            }
+            
+        }
+        return i;
     }
     
     /**
@@ -444,6 +496,29 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     public Image scaled(int width, int height) {
+        if(width == getWidth() && height == getHeight()) {
+            return this;
+        }
+        try {
+            ImageIO io = ImageIO.getImageIO();
+            if(io != null && io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                // do an image IO scale which is more efficient
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                io.save(new ByteArrayInputStream(getImageData()), bo, ImageIO.FORMAT_PNG, width, height, 0.9f);
+                Util.cleanup(bo);
+                EncodedImage img = EncodedImage.create(bo.toByteArray());
+                img.opaque = opaque;
+                img.opaqueChecked = opaqueChecked;
+                if(width > -1 && height > -1) {
+                    img.width = width;
+                    img.height = height;
+                }
+                return img;
+            }
+        } catch(IOException err) {
+            // normally this shouldn't happen but this will keep falling back to the existing scaled code
+            err.printStackTrace();
+        }
         return getInternalImpl().scaled(width, height);
     }
 

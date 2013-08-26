@@ -87,6 +87,7 @@ class Spinner extends List {
     private boolean monthFirst;
     private int currentInputAlign = LEFT;
     private static int inputSkipDelay = 2000;
+    private boolean ios7Mode;
 
     /**
      * Creates a new time spinner instance, time is an integer represented in seconds
@@ -136,7 +137,7 @@ class Spinner extends List {
      * @deprecated use NumericSpinner
      */
     public static Spinner create(int min, int max, int currentValue, int step) {
-        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false));
+        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>());
         s.setRenderingPrototype(new Integer(max * 10));
         return s;
     }
@@ -153,7 +154,7 @@ class Spinner extends List {
      * @deprecated use NumericSpinner
      */
     public static Spinner create(double min, double max, double currentValue, double step) {
-        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new DefaultListCellRenderer(false) {
+        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>() {
             public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                 if(value != null && value instanceof Double) {
                     // round the number in the spinner to two digits
@@ -188,6 +189,11 @@ class Spinner extends List {
      */
     Spinner(ListModel model, ListCellRenderer rendererInstance) {
         super(model);
+        ios7Mode = UIManager.getInstance().isThemeConstant("ios7SpinnerBool", false);
+        if(ios7Mode) {
+            super.setMinElementHeight(6);
+        }
+        SpinnerRenderer.iOS7Mode = ios7Mode;
         setRenderer(rendererInstance);
         setUIID("Spinner");
         setFixedSelection(FIXED_CENTER);
@@ -209,6 +215,7 @@ class Spinner extends List {
         if (getRenderer() instanceof DateTimeRenderer) {
             quickType.setColumns(2);
         }
+        
     }
 
     void initSpinnerRenderer() {
@@ -287,7 +294,11 @@ class Spinner extends List {
 
         Dimension d;
         if(Display.getInstance().isTouchScreenDevice()) {
-            d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight * 3 + verticalPadding));
+            if(ios7Mode) {
+                d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight * 8 + verticalPadding));
+            } else {
+                d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight * getUIManager().getThemeConstant("spinnerElementsInt", 3) + verticalPadding));
+            }
         } else {
             d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight + verticalPadding));
         }

@@ -255,7 +255,7 @@ public class Calendar extends Container {
      */
     public void setDate(Date d) {
         mv.setSelectedDay(d.getTime());
-        mv.setCurrentDay(mv.currentDay, true);
+        mv.setCurrentDay(mv.selectedDay, true);
         componentChanged();
     }
 

@@ -209,7 +209,7 @@ public class Slider extends Label {
 
     /**
      * Indicates the value of progress made, this method is thread safe and
-     * can be invoked from any thread although discression should still be kept
+     * can be invoked from any thread although discretion should still be kept
      * so one thread doesn't regress progress made by another thread...
      *
      * @param value new value for progress
@@ -557,7 +557,8 @@ public class Slider extends Label {
     }
 
     /**
-     * Adds a listener to data changed events
+     * Adds a listener to data changed events, notice that the status argument to the data change listener
+     * shouldn't be relied upon. 
      *
      * @param l new listener
      */
@@ -566,7 +567,8 @@ public class Slider extends Label {
     }
 
     /**
-     * Removes a listener from data changed events
+     * Removes a listener from data changed events, notice that the status argument to the data change listener
+     * shouldn't be relied upon. 
      *
      * @param l listener to remove
      */

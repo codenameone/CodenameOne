@@ -256,14 +256,14 @@ public class BorderLayout extends Layout {
                 case CENTER_BEHAVIOR_CENTER_ABSOLUTE: {
                     Dimension d = c.getPreferredSize();
                     if(d.getWidth() < w) {
-                        int newX = targetWidth / 2 - d.getWidth() / 2;
+                        int newX = s.getPadding(target.isRTL(), Component.LEFT) + targetWidth / 2 - d.getWidth() / 2;
                         if(newX > x) {
                             x = newX;
                         }
                         w = d.getWidth();
                     }
                     if(d.getHeight() < h) {
-                        int newY = targetHeight / 2 - d.getHeight() / 2;
+                        int newY = s.getPadding(false, Component.TOP) + targetHeight / 2 - d.getHeight() / 2;
                         if(newY > y) {
                             y = newY;
                         }

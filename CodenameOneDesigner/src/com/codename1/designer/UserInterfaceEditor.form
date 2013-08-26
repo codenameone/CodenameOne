@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <AuxValues>
@@ -11,7 +11,7 @@
     <AuxValue name="FormSettings_listenerGenerationStyle" type="java.lang.Integer" value="1"/>
     <AuxValue name="FormSettings_variablesLocal" type="java.lang.Boolean" value="false"/>
     <AuxValue name="FormSettings_variablesModifier" type="java.lang.Integer" value="2"/>
-    <AuxValue name="designerSize" type="java.awt.Dimension" value="-84,-19,0,5,115,114,0,18,106,97,118,97,46,97,119,116,46,68,105,109,101,110,115,105,111,110,65,-114,-39,-41,-84,95,68,20,2,0,2,73,0,6,104,101,105,103,104,116,73,0,5,119,105,100,116,104,120,112,0,0,1,-64,0,0,3,103"/>
+    <AuxValue name="designerSize" type="java.awt.Dimension" value="-84,-19,0,5,115,114,0,18,106,97,118,97,46,97,119,116,46,68,105,109,101,110,115,105,111,110,65,-114,-39,-41,-84,95,68,20,2,0,2,73,0,6,104,101,105,103,104,116,73,0,5,119,105,100,116,104,120,112,0,0,2,-79,0,0,3,-45"/>
   </AuxValues>
 
   <Layout class="org.netbeans.modules.form.compat2.layouts.DesignBorderLayout"/>
@@ -180,13 +180,13 @@
                               <Group type="102" attributes="0">
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Component id="bindOnCreate" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="bindActionEvent" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="bindBeforeShow" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="bindPostShow" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="bindExitForm" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="bindListModel" alignment="0" pref="482" max="32767" attributes="0"/>
-                                      <Component id="whyAreEventsDisabled" alignment="0" pref="482" max="32767" attributes="0"/>
+                                      <Component id="bindOnCreate" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="bindActionEvent" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="bindBeforeShow" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="bindPostShow" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="bindExitForm" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="bindListModel" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="whyAreEventsDisabled" alignment="0" pref="558" max="32767" attributes="0"/>
                                   </Group>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
@@ -373,7 +373,7 @@
                                       <Component id="jLabel5" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="initialForm" alignment="3" min="-2" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace pref="165" max="32767" attributes="0"/>
+                                  <EmptySpace pref="175" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -431,7 +431,7 @@
                       <SubComponents>
                         <Component class="javax.swing.JTextPane" name="help">
                           <Properties>
-                            <Property name="contentType" type="java.lang.String" value="text/html"/>
+                            <Property name="contentType" type="java.lang.String" value="text/html" noResource="true"/>
                             <Property name="editable" type="boolean" value="false"/>
                             <Property name="text" type="java.lang.String" value="&lt;html&gt;&#xd;&#xa;  &lt;head&gt;&#xd;&#xa;&#xd;&#xa;  &lt;/head&gt;&#xd;&#xa;  &lt;body&gt;&#xd;&#xa;    &lt;p style=&quot;margin-top: 0&quot;&gt;&#xd;&#xa;      &#xd;To use the GUI builder drag components from the component palette at the bottom to either&#xa;the component tree on the right or into the actual UI. Components are arranged in a hierarchy &#xa;within containers, you can nest containers and components to create all forms of elaborate UI&apos;s.&#xa;To determine how components are arranged within a Container you need to determine the layout&#xa;manager of the container (click the layout field in the Properties section while a container is &#xa;selected, there is more documentation on layouts there).&#xa;    &lt;/p&gt;&#xd;&#xa;    &lt;p&gt;&#xa;      Attributes of a component can be customized when its selected in the tree or in the UI by &#xa;editing the properties tab content. Components can be dragged and rearranged both within the&#xa;UI preview and within the tree, a right click (meta-click) menu also exists to delete/copy/paste etc.&#xa;the existing components. To change the appearance of a component you need to work with&#xa;a theme, to apply a change only to a specific component you can change its UIID attribute and&#xa;edit that UIID in the theme (read more about UIID&apos;s in the theme section).&#xa;    &lt;/p&gt;&#xa;    &lt;p&gt;&#xa;      Navigation between forms in the GUI builder is possible with commands, in order to view the resulting UI &#xa;the theme can be selected (select the UI from the Preview Options area). In order for events to be mappable&#xa; via the GUI builder use the generate netbeans project functionality in the Application menu.&#xa;    &lt;/p&gt;&#xa;  &lt;/body&gt;&#xd;&#xa;&lt;/html&gt;&#xd;&#xa;" noResource="true"/>
                             <Property name="name" type="java.lang.String" value="help" noResource="true"/>
@@ -1107,6 +1107,23 @@
                                   </Properties>
                                   <Events>
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneOnOffSwitchActionPerformed"/>
+                                  </Events>
+                                </Component>
+                                <Component class="javax.swing.JButton" name="codenameOneImageViewer">
+                                  <Properties>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    </Property>
+                                    <Property name="text" type="java.lang.String" value="Image Viewer"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ImageViewer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Control allowing the user to view/pinch and optionally swipe between images&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                      <Border info="null"/>
+                                    </Property>
+                                    <Property name="horizontalAlignment" type="int" value="2"/>
+                                    <Property name="name" type="java.lang.String" value="codenameOneImageViewer" noResource="true"/>
+                                  </Properties>
+                                  <Events>
+                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneImageViewerActionPerformed"/>
                                   </Events>
                                 </Component>
                               </SubComponents>

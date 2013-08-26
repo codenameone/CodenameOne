@@ -386,6 +386,7 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
+            com.codename1.ui.util.UIBuilder.registerCustomComponent("ImageViewer", com.codename1.components.ImageViewer.class);
             Display.getInstance().callSerially(new Runnable() {
 
                 @Override

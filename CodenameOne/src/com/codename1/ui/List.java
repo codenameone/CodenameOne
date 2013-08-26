@@ -397,7 +397,11 @@ public class List<T> extends Component {
         return model.getSize();
     }
 
-    private int getCurrentSelected(){
+    /**
+     * Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
+     * @return visual selection
+     */
+    public int getCurrentSelected(){
         if(fixedSelection > FIXED_NONE_BOUNDRY && isDragActivated()){
             return fixedDraggedSelection;
         }

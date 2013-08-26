@@ -122,4 +122,63 @@ public class Effects {
         c.growShrink(duration);
     }
 
+    /**
+     * Skews an image in a faux perspective transform on the vertical axis, this is effectively a fast scale
+     * algorithm that both shrinks the image vertically and reduces the width
+     * @param topScaleRatio the amount by which the top portion should be scaled where 1.0 means none
+     * @param bottomScaleRatio the amount by which the bottom portion should be scaled where 1.0 means none
+     * @param verticalShrink the scale ratio for the image height where 1.0 means none
+     * @return the perspective translated image
+     */
+    public static Image verticalPerspective(Image i, float topScaleRatio, float bottomScaleRatio, float verticalShrink) {
+        int[] imageData = i.getRGB();
+        int sourceWidth = i.getWidth();
+        int sourceHeight = i.getHeight();
+        int destinationWidth = (int)(Math.max(topScaleRatio, bottomScaleRatio) * sourceWidth);
+        int destinationHeight = (int)(verticalShrink * sourceHeight);
+        int[] destinationArray = new int[destinationWidth * destinationHeight];
+        
+        // faster than math.min
+        float diff;
+        if(bottomScaleRatio < topScaleRatio) {
+            float smaller = bottomScaleRatio;
+            float larger = topScaleRatio;
+            diff = smaller - larger;
+        } else {
+            float larger = bottomScaleRatio;
+            float smaller = topScaleRatio;
+            diff = larger - smaller;
+        }
+        
+        if(destinationWidth > sourceWidth) {
+            for(int y = 0 ; y < destinationHeight ; y++) {
+                float positionY = ((float)y) / ((float)destinationHeight - 1);
+                int sourceY = (int)((float)(sourceHeight - 1) * positionY);
+                float currentRowRatio = (topScaleRatio + (diff * positionY)) / bottomScaleRatio;
+                //int minX = (int)(((float)destinationWidth - sourceWidth) / 2.0f * currentRowRatio);
+                int minX = (int)(((float)destinationWidth) * (1 - currentRowRatio));
+                int maxX = destinationWidth - minX;
+                float distance = maxX - minX;
+                for(int x = minX ; x < maxX ; x++) {
+                    int sourceX = (int)(((float)sourceWidth) * (((float)x - minX) / distance));
+                    destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];
+                }
+            }
+        } else {
+            for(int y = 0 ; y < destinationHeight ; y++) {
+                float positionY = ((float)y) / ((float)destinationHeight);
+                int sourceY = (int)((float)sourceHeight * positionY);
+                float currentRowRatio = topScaleRatio + (diff * positionY);
+                int minX = (int)(((float)destinationWidth) * (1 - currentRowRatio));
+                int maxX = destinationWidth - minX;
+                float distance = maxX - minX;
+                for(int x = minX ; x < maxX ; x++) {
+                    int sourceX = (int)(((float)sourceWidth) * (((float)x - minX) / distance));
+                    destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];
+                }
+            }
+        }
+        
+        return Image.createImage(destinationArray, destinationWidth, destinationHeight);
+    }
 }

@@ -170,6 +170,14 @@ public class ComboBox extends List {
     /**
      * @inheritDoc
      */
+    public Rectangle getSelectedRect() {
+        // the implemenation from list doesn't make sense here, restore the component implementation
+        return new Rectangle(getAbsoluteX(), getAbsoluteY(), getBounds().getSize());
+    }
+
+    /**
+     * @inheritDoc
+     */
     protected Rectangle getVisibleBounds() {
         return getBounds();
     }

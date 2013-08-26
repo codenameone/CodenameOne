@@ -2302,6 +2302,7 @@ public class UIBuilder { //implements Externalizable {
         Form currentForm = Display.getInstance().getCurrent();
         if(currentForm != null && currentForm instanceof Dialog) {
             ((Dialog)Display.getInstance().getCurrent()).dispose();
+            currentForm = Display.getInstance().getCurrent();
         }
         Vector formNavigationStack = baseFormNavigationStack;
         if(sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {

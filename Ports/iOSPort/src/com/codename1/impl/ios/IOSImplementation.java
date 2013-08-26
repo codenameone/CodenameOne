@@ -92,6 +92,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     static IOSNative nativeInstance = new IOSNative();
     private static PurchaseCallback purchaseCallback;
     private int timeout = 120000;
+    private static final Object CONNECTIONS_LOCK = new Object();
     private static Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
     private NativeFont defaultFont;
     private NativeGraphics currentlyDrawingOn;
@@ -440,7 +441,12 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public void installNativeTheme() {
         try {
-            Resources r = Resources.open("/iPhoneTheme.res");
+            Resources r;
+            if(nativeInstance.isIOS7() && Display.getInstance().getProperty("ios.oldLook", "false").equals("false")) {
+                r = Resources.open("/iOS7Theme.res");
+            } else {
+                r = Resources.open("/iPhoneTheme.res");
+            }
             UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -553,6 +559,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public int getGameAction(int keyCode) {
+        if(keyCode <= -20) {
+            // this effectively maps negative numbers to media game keys
+            return keyCode * -1;
+        }
         return -1;
     }
 
@@ -2659,7 +2669,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void appendData(long peer, byte[] data) {
-        NetworkConnection n = connections.get(peer);
+        NetworkConnection n;
+        synchronized(CONNECTIONS_LOCK) {
+            n = connections.get(peer);
+        }
         if(n != null) {
             synchronized(n.LOCK) {
                 n.appendData(data);
@@ -2670,7 +2683,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public static void streamComplete(long peer) {
-        NetworkConnection n = connections.get(peer);
+        NetworkConnection n;
+        synchronized(CONNECTIONS_LOCK) {
+            n = connections.get(peer);
+        }
         if(n != null) {
             synchronized(n.LOCK) {
                 n.connected = true;
@@ -2681,7 +2697,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public static void networkError(long peer, String error) {
-        NetworkConnection n = connections.get(peer);
+        NetworkConnection n;
+        synchronized(CONNECTIONS_LOCK) {
+            n = connections.get(peer);
+        }
         synchronized(n.LOCK) {
             if(error == null) {
                 n.error = "Unknown server error";
@@ -2743,7 +2762,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         public NetworkConnection(long peer) {
             this.peer = peer;
-            connections.put(peer, this);
+            synchronized(CONNECTIONS_LOCK) {
+                connections.put(peer, this);
+            }
         }
         
         public void addHeader(String key, String value) {
@@ -2827,6 +2848,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 pendingData = null;
                 super.close();
                 nativeInstance.closeConnection(peer);
+            }
+            synchronized(CONNECTIONS_LOCK) {
                 connections.remove(peer);
             }
         }

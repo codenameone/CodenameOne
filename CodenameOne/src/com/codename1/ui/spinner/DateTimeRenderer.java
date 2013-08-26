@@ -36,7 +36,7 @@ import java.util.Date;
  *
  * @author Shai Almog
  */
-class DateTimeRenderer extends DefaultListCellRenderer {
+class DateTimeRenderer extends SpinnerRenderer<Object> {
     static final String[] MONTHS = {
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     };
@@ -58,7 +58,6 @@ class DateTimeRenderer extends DefaultListCellRenderer {
     }
     
     private DateTimeRenderer() {
-        super(false);
     }
 
     boolean isShowSeconds() {

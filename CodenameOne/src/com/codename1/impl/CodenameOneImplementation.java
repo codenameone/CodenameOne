@@ -644,6 +644,116 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Rotates the given image by 90 degrees while changing the ratio of the picture 
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 90 degrees
+     */
+    public Image rotate90Degrees(Image image, boolean maintainOpacity) {
+        int[] rgb = image.getRGB();
+        int[] newRGB = new int[rgb.length];
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        for(int y = 0 ; y < height ; y++) {
+            for(int x = 0 ; x < width ; x++) {
+                int destX = height - y - 1;
+                newRGB[destX + x * height] = rgb[x + y * width];
+            }
+        }
+        
+        // we reverse width/height
+        return EncodedImage.createFromRGB(newRGB, height, width, !maintainOpacity);
+    }
+    
+    /**
+     * Rotates the given image by 180 degrees 
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 180 degrees
+     */
+    public Image rotate180Degrees(Image image, boolean maintainOpacity) {
+        int[] rgb = image.getRGB();
+        int[] newRGB = new int[rgb.length];
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        for(int y = 0 ; y < height ; y++) {
+            for(int x = 0 ; x < width ; x++) {
+                int destX = width - x - 1;
+                newRGB[destX + (height - y - 1) * width] = rgb[x + y * width];
+            }
+        }
+        
+        return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
+    }
+    
+    /**
+     * Rotates the given image by 270 degrees while changing the ratio of the picture 
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 270 degrees
+     */
+    public Image rotate270Degrees(Image image, boolean maintainOpacity) {
+        int[] rgb = image.getRGB();
+        int[] newRGB = new int[rgb.length];
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        for(int y = 0 ; y < height ; y++) {
+            for(int x = 0 ; x < width ; x++) {
+                newRGB[y + x * height] = rgb[x + y * width];
+            }
+        }
+        
+        // we reverse width/height
+        return EncodedImage.createFromRGB(newRGB, height, width, !maintainOpacity);
+    }
+    
+    /**
+     * Flips the given image on the horizontal axis
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipImageHorizontally(Image image, boolean maintainOpacity) {
+        int[] rgb = image.getRGB();
+        int[] newRGB = new int[rgb.length];
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        for(int y = 0 ; y < height ; y++) {
+            for(int x = 0 ; x < width ; x++) {
+                newRGB[(width - x - 1) + y * width] = rgb[x + y * width];
+            }
+        }
+        
+        return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
+    }
+    
+    /**
+     * Flips the given image on the vertical axis
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipImageVertically(Image image, boolean maintainOpacity) {
+        int[] rgb = image.getRGB();
+        int[] newRGB = new int[rgb.length];
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        for(int y = 0 ; y < height ; y++) {
+            for(int x = 0 ; x < width ; x++) {
+                newRGB[x + (height - y - 1) * width] = rgb[x + y * width];
+            }
+        }
+        
+        return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
+    }
+    
+    
+    /**
      * Returns the number of softkeys on the device
      * 
      * @return the number of softkey buttons on the device

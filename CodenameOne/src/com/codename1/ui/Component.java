@@ -970,6 +970,14 @@ public class Component implements Animation, StyleListener {
         impl.afterComponentPaint(this, g);
     }
 
+    protected boolean isInClippingRegion(Graphics g) {
+        int oX = g.getClipX();
+        int oY = g.getClipY();
+        int oWidth = g.getClipWidth();
+        int oHeight = g.getClipHeight();
+        return bounds.intersects(oX, oY, oWidth, oHeight);
+    }
+    
     private void paintInternalImpl(Graphics g, boolean paintIntersects) {
         int oX = g.getClipX();
         int oY = g.getClipY();

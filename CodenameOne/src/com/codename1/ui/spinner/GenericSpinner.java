@@ -24,7 +24,6 @@ package com.codename1.ui.spinner;
 
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
@@ -38,7 +37,7 @@ import com.codename1.ui.list.ListModel;
 public class GenericSpinner extends BaseSpinner {
     private Spinner[] spin;
     private ListModel[] model = new ListModel[] { new DefaultListModel(new Object[] {"Value 1", "Value 2", "Value 3"}) };
-    private ListCellRenderer[] renderer = new ListCellRenderer[] { new DefaultListCellRenderer(false) };
+    private ListCellRenderer[] renderer = new ListCellRenderer[] { new SpinnerRenderer<Object>() };
     private Object[] value;
     private String[] renderingPrototype;
     
@@ -46,7 +45,7 @@ public class GenericSpinner extends BaseSpinner {
      * Default constructor
      */
     public GenericSpinner() {
-        DefaultListCellRenderer render = (DefaultListCellRenderer) renderer[0];
+        SpinnerRenderer<Object> render = (SpinnerRenderer<Object>) renderer[0];
         render.setShowNumbers(false);
         render.setUIID("SpinnerRenderer");
     }

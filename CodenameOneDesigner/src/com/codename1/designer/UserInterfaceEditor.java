@@ -1871,6 +1871,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
         makeDraggable(codenameOneCalendar, com.codename1.ui.Calendar.class, "Calendar", null);
         makeDraggable(codenameOneOnOffSwitch, com.codename1.components.OnOffSwitch.class, "OnOffSwitch", null);
+        makeDraggable(codenameOneImageViewer, com.codename1.components.ImageViewer.class, "ImageViewer", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -4345,6 +4346,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMap = new javax.swing.JButton();
         codenameOneShare = new javax.swing.JButton();
         codenameOneOnOffSwitch = new javax.swing.JButton();
+        codenameOneImageViewer = new javax.swing.JButton();
         jPanel7 = new javax.swing.JPanel();
         codenameOneIOComponents = new javax.swing.JPanel();
         rssReader = new javax.swing.JButton();
@@ -4440,13 +4442,13 @@ public class UserInterfaceEditor extends BaseForm {
             .add(jPanel4Layout.createSequentialGroup()
                 .addContainerGap()
                 .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE)
-                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 482, Short.MAX_VALUE))
+                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
+                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel4Layout.setVerticalGroup(
@@ -4529,14 +4531,14 @@ public class UserInterfaceEditor extends BaseForm {
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel5)
                     .add(initialForm))
-                .addContainerGap(165, Short.MAX_VALUE))
+                .addContainerGap(175, Short.MAX_VALUE))
         );
 
         propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
 
         jScrollPane5.setName("jScrollPane5"); // NOI18N
 
-        help.setContentType("text/html");
+        help.setContentType("text/html"); // NOI18N
         help.setEditable(false);
         help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rTo use the GUI builder drag components from the component palette at the bottom to either\nthe component tree on the right or into the actual UI. Components are arranged in a hierarchy \nwithin containers, you can nest containers and components to create all forms of elaborate UI's.\nTo determine how components are arranged within a Container you need to determine the layout\nmanager of the container (click the layout field in the Properties section while a container is \nselected, there is more documentation on layouts there).\n    </p>\r\n    <p>\n      Attributes of a component can be customized when its selected in the tree or in the UI by \nediting the properties tab content. Components can be dragged and rearranged both within the\nUI preview and within the tree, a right click (meta-click) menu also exists to delete/copy/paste etc.\nthe existing components. To change the appearance of a component you need to work with\na theme, to apply a change only to a specific component you can change its UIID attribute and\nedit that UIID in the theme (read more about UIID's in the theme section).\n    </p>\n    <p>\n      Navigation between forms in the GUI builder is possible with commands, in order to view the resulting UI \nthe theme can be selected (select the UI from the Preview Options area). In order for events to be mappable\n via the GUI builder use the generate netbeans project functionality in the Application menu.\n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
         help.setName("help"); // NOI18N
@@ -4871,6 +4873,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneOnOffSwitch.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneOnOffSwitch);
 
+        codenameOneImageViewer.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneImageViewer.setText("Image Viewer");
+        codenameOneImageViewer.setToolTipText("<html><body><b>ImageViewer</b><br> \n<p>\nControl allowing the user to view/pinch and optionally swipe between images\n</p> </body> </html>"); // NOI18N
+        codenameOneImageViewer.setBorder(null);
+        codenameOneImageViewer.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneImageViewer.setName("codenameOneImageViewer"); // NOI18N
+        codenameOneImageViewer.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOneImageViewer);
+
         jPanel6.add(codenameOneExtraComponents, java.awt.BorderLayout.NORTH);
 
         jTabbedPane1.addTab("Additional Components", jPanel6);
@@ -4972,6 +4983,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneMultiButton) {
                 UserInterfaceEditor.this.codenameOneMultiButtonActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneSpanButton) {
+                UserInterfaceEditor.this.codenameOneSpanButtonActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneCheckBox) {
                 UserInterfaceEditor.this.codenameOneCheckBoxActionPerformed(evt);
             }
@@ -5065,8 +5079,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneSpanButton) {
-                UserInterfaceEditor.this.codenameOneSpanButtonActionPerformed(evt);
+            else if (evt.getSource() == codenameOneImageViewer) {
+                UserInterfaceEditor.this.codenameOneImageViewerActionPerformed(evt);
             }
         }
 
@@ -5750,6 +5764,14 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
         addComponentToContainer(new com.codename1.components.SpanButton(), "SpanButton");
 }//GEN-LAST:event_codenameOneSpanButtonActionPerformed
 
+    private void codenameOneImageViewerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneImageViewerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.ImageViewer(), "ImageViewer");
+    }//GEN-LAST:event_codenameOneImageViewerActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5860,6 +5882,7 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton codenameOneGenericSpinner;
     private javax.swing.JButton codenameOneHTMLComponent;
     private javax.swing.JPanel codenameOneIOComponents;
+    private javax.swing.JButton codenameOneImageViewer;
     private javax.swing.JButton codenameOneInfiniteProgress;
     private javax.swing.JButton codenameOneLabel;
     private javax.swing.JButton codenameOneLikeButton;

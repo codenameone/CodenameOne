@@ -29,7 +29,9 @@ import com.codename1.ui.Image;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
 
@@ -56,6 +58,7 @@ public class ImageViewer extends Component {
     private int prefX, prefY, prefW, prefH;
 
     private boolean eagerLock = true;
+    private boolean selectLock;
     
     /**
      * Default constructor
@@ -65,6 +68,84 @@ public class ImageViewer extends Component {
         setUIID("ImageViewer");
     }
 
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"eagerLock", "image", "imageList", "swipePlaceholder"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {Boolean.class, Image.class, 
+           com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), Image.class};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"Boolean", "Image", "Image[]", "Image"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("eagerLock")) {
+            if(isEagerLock()) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(name.equals("image")) {
+            return getImage();
+        }
+        if(name.equals("imageList")) {
+            if(getImageList() == null) {
+                return null;
+            }
+            Image[] a = new Image[getImageList().getSize()];
+            for(int iter = 0 ; iter < a.length ; iter++) {
+                a[iter] = getImageList().getItemAt(iter);
+            }
+            return a;
+        }
+        if(name.equals("swipePlaceholder")) {
+            return getSwipePlaceholder();
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("eagerLock")) {
+            setEagerLock(value != null && ((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("image")) {
+            setImage((Image)value);
+            return null;
+        }
+        if(name.equals("imageList")) {
+            if(value == null) {
+                setImageList(null);
+            } else {
+                setImageList(new DefaultListModel<Image>((Image[])value));
+            }
+            return null;
+        }
+        if(name.equals("swipePlaceholder")) {
+            setSwipePlaceholder((Image)value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
     /**
      * @inheritDoc
      */
@@ -122,6 +203,22 @@ public class ImageViewer extends Component {
     public ImageViewer(Image i) {
         this();
         setImage(i);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void keyReleased(int key) {
+        int gk = Display.getInstance().getGameAction(key);
+        if(gk == Display.GAME_LEFT || gk == Display.GAME_UP) {
+            new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
+            return;
+        }
+        if(gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT) {
+            new AnimatePanX(2, getImageRight(), getImageRightPos());
+            return;
+        }
     }
     
     /**
@@ -391,14 +488,29 @@ public class ImageViewer extends Component {
     public void setImageList(ListModel<Image> model) {
         if(swipeableImages != null) {
             swipeableImages.removeDataChangedListener(listListener);
+            swipeableImages.removeSelectionListener((SelectionListener)listListener);
             model.addDataChangedListener(listListener);
+            model.addSelectionListener((SelectionListener)listListener);
         } else {
-            listListener = new DataChangedListener() {
-                public void dataChanged(int type, int index) {
-                    setImage(swipeableImages.getItemAt(swipeableImages.getSelectedIndex()));
+            class Listener implements SelectionListener, DataChangedListener {
+                public void selectionChanged(int oldSelected, int newSelected) {
+                    if(selectLock) {
+                        return;
+                    }
+                    if(swipeableImages.getSize() > 0 && newSelected > -1 && newSelected < swipeableImages.getSize()) {
+                        setImage(swipeableImages.getItemAt(newSelected));
+                    }
                 }
-            };
+
+                public void dataChanged(int type, int index) {
+                    if(swipeableImages.getSize() > 0 && swipeableImages.getSelectedIndex() > -1 && swipeableImages.getSelectedIndex() < swipeableImages.getSize()) {
+                        setImage(swipeableImages.getItemAt(swipeableImages.getSelectedIndex()));
+                    }
+                }                
+            }
+            listListener = new Listener();
             model.addDataChangedListener(listListener);
+            model.addSelectionListener((SelectionListener)listListener);
         }
         this.swipeableImages = model;
     }
@@ -494,11 +606,15 @@ public class ImageViewer extends Component {
                         if(right != replaceImage) {
                             right.unlock();
                         }
+                        selectLock = true;
                         swipeableImages.setSelectedIndex(updatePos);
+                        selectLock = false;
                         replaceImage.lock();
                         eagerLock();
                     }
+                    selectLock = true;
                     swipeableImages.setSelectedIndex(updatePos);
+                    selectLock = false;
                     panPositionX = 0.5f;
                     panPositionY = 0.5f;
                     zoom = MIN_ZOOM;

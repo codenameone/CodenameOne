@@ -25,6 +25,9 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Util;
+import com.codename1.ui.util.ImageIO;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Hashtable;
@@ -768,7 +771,7 @@ public class Image {
             int y,
             int width,
             int height){
-        getRGB(image.getRGB(), destX * destY, x, y, width, height);
+        getRGB(image.getRGB(), destX + destY * image.getWidth(), x, y, width, height);
     }
     
     /**
@@ -862,10 +865,7 @@ public class Image {
      * @param height height of the scaled image
      * @return new image instance scaled to the given height and width
      */
-    public Image scaled(int width, int height) {
-        if(width == getWidth() && height == getHeight()) {
-            return this;
-        }
+    public Image scaled(int width, int height) {        
         if(width == -1) {
             return scaledHeight(height);
         } 
@@ -1022,4 +1022,49 @@ public class Image {
     }
     
     
+    /**
+     * Rotates this image by 90 degrees while changing the ratio of the picture 
+     * @param image the image
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 90 degrees
+     */
+    public Image rotateImage90Degrees(boolean maintainOpacity) {
+        return Display.getInstance().getImplementation().rotate90Degrees(this, maintainOpacity);
+    }
+    
+    /**
+     * Rotates the image by 180 degrees 
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 180 degrees
+     */
+    public Image rotate180Degrees(boolean maintainOpacity) {
+        return Display.getInstance().getImplementation().rotate180Degrees(this, maintainOpacity);
+    }
+    
+    /**
+     * Rotates the image by 270 degrees while changing the ratio of the picture 
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 270 degrees
+     */
+    public Image rotate270Degrees(boolean maintainOpacity) {
+        return Display.getInstance().getImplementation().rotate270Degrees(this, maintainOpacity);
+    }
+    
+    /**
+     * Flips this image on the horizontal axis
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipImageHorizontally(boolean maintainOpacity) {
+        return Display.getInstance().getImplementation().flipImageHorizontally(this, maintainOpacity);
+    }
+    
+    /**
+     * Flips this image on the vertical axis
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipImageVertically(boolean maintainOpacity) {
+        return Display.getInstance().getImplementation().flipImageVertically(this, maintainOpacity);
+    }
 }

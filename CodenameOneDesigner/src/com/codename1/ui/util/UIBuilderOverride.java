@@ -64,6 +64,7 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);
         registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
         registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
+        registerCustomComponent("ImageViewer", com.codename1.components.ImageViewer.class);
     }
 
     void modifyingProperty(com.codename1.ui.Component c, int p) {

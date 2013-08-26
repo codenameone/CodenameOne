@@ -4161,7 +4161,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Storage.getInstance().deleteStorageFile("imageUri");
                     
                     Bitmap picture;
-                    if(Display.getInstance().getProperty("normalizeImage", "false").equals("true")) {
+                    if(Display.getInstance().getProperty("normalizeImage", "true").equals("true")) {
                         ExifInterface exif = new ExifInterface(path);
                         int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 

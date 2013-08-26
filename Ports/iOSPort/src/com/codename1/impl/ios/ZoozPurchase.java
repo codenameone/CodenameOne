@@ -77,6 +77,9 @@ class ZoozPurchase extends Purchase implements Runnable {
 
     public Product[] getProducts(String[] skus) {
         final Product[] p = new Product[skus.length];
+        for(int iter = 0 ; iter < p.length ; iter++) {
+            p[iter] = new Product();
+        }
         nativeInstance.fetchProducts(skus, p);
 
         // wait for request to complete

@@ -1181,7 +1181,7 @@ public class Border {
                     int trackX = trackComponent.getAbsoluteX();
                     int cabsX = c.getAbsoluteX();
                     if(cabsY >= trackY + trackComponent.getHeight()) {
-                        // we are bellow the component
+                        // we are below the component
                         arrowUpImage = specialTile[0];
                         arrowPosition = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowUpImage.getWidth() / 2;
                     } else {    
@@ -1633,6 +1633,10 @@ public class Border {
         if(currentWidth > 0) {
             int currentX = x;
             currentX += left.getWidth();
+            int cx = g.getClipX();
+            int cy = g.getClipY();
+            int cw = g.getClipWidth();
+            int ch = g.getClipHeight();
             g.clipRect(currentX, y, currentWidth - left.getWidth(), center.getHeight());
             if(arrow != null) {
                 int destX = currentX + currentWidth;
@@ -1642,6 +1646,7 @@ public class Border {
                 }
                 imagePosition = Math.max(imagePosition, left.getWidth());
                 imagePosition = Math.min(imagePosition, destX - x - arrow.getWidth() - right.getWidth());
+                g.setClip(cx, cy, cw, ch);
                 if(farEdge) {
                     g.drawImage(arrow, x + imagePosition, y + center.getHeight() - arrow.getHeight());
                 } else {
@@ -1657,6 +1662,10 @@ public class Border {
         int currentHeight = height - bottom.getHeight();
         if(currentHeight > 0) {
             int currentY = y + top.getHeight();
+            int cx = g.getClipX();
+            int cy = g.getClipY();
+            int cw = g.getClipWidth();
+            int ch = g.getClipHeight();
             g.clipRect(x, currentY, center.getWidth(), currentHeight - top.getHeight());
             if(arrow != null) {
                 int destY = currentY + currentHeight;
@@ -1666,6 +1675,7 @@ public class Border {
                 }
                 imagePosition = Math.max(imagePosition, top.getHeight());
                 imagePosition = Math.min(imagePosition, destY - y - arrow.getHeight() - bottom.getHeight());
+                g.setClip(cx, cy, cw, ch);
                 if(farEdge) {
                     g.drawImage(arrow, x + center.getWidth() - arrow.getWidth(), y + imagePosition);
                 } else {

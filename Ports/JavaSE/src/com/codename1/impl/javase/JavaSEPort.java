@@ -2117,7 +2117,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             portrait = pref.getBoolean("Portrait", true);
-            if (!portrait) {
+            if (!portrait && getSkin() != null) {
                 canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
                 window.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
             }

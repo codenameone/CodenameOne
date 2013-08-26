@@ -241,6 +241,46 @@ public final class Display {
     public static final int GAME_DOWN = 6;
 
     /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_SKIP_FORWARD = 20;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_SKIP_BACK = 21;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY = 22;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_STOP = 23;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY_STOP = 24;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY_PAUSE = 25;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_FAST_FORWARD = 26;
+
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_FAST_BACKWARD = 27;
+    
+    /**
      * An attribute that encapsulates '#' int value.
      */
     public static final int KEY_POUND = '#';

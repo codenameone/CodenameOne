@@ -188,9 +188,20 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             }
             return;
         }
-        if((cmp instanceof Label || cmp instanceof TextArea) && cmp.getName() != null) {
-            dest.add(cmp);
-            return;
+        // performance optimization for fixed images in lists
+        if(cmp.getName() != null) {
+            if(cmp instanceof Label) {
+                Label l = (Label)cmp;
+                if(l.getName().toLowerCase().endsWith("fixed") && l.getIcon() != null) {
+                    l.getIcon().lock();
+                }
+                dest.add(cmp);
+                return;
+            }
+            if(cmp instanceof TextArea) {
+                dest.add(cmp);
+                return;
+            }
         }
     }
 
