@@ -44,15 +44,22 @@ public class LayeredLayout extends Layout {
      * @inheritDoc
      */
     public void layoutContainer(Container parent) {
+        Style s = parent.getStyle();
+        int top = s.getPadding(false, Component.TOP);
+        int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPadding(false, Component.BOTTOM);
+        int left = s.getPadding(parent.isRTL(), Component.LEFT);
+        int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPadding(parent.isRTL(), Component.RIGHT);
+        
         int numOfcomponents = parent.getComponentCount();
 
         for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            Style s = cmp.getStyle();
-            int x = s.getMargin(parent.isRTL(), Component.LEFT);
-            int y = s.getMargin(false, Component.TOP);
-            int w = parent.getWidth() - x - s.getMargin(parent.isRTL(), Component.RIGHT);
-            int h = parent.getHeight() - y - s.getMargin(false, Component.BOTTOM);
+            s = cmp.getStyle();
+            
+            int x = left + s.getMargin(parent.isRTL(), Component.LEFT);
+            int y = top + s.getMargin(parent.isRTL(), Component.TOP);
+            int w = right - left - s.getMargin(parent.isRTL(), Component.LEFT) - s.getMargin(parent.isRTL(), Component.RIGHT);
+            int h = bottom - top - s.getMargin(parent.isRTL(), Component.TOP) - s.getMargin(parent.isRTL(), Component.BOTTOM);
             cmp.setX(x);
             cmp.setY(y);
             cmp.setWidth(w);

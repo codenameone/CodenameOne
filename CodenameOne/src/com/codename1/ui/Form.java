@@ -695,6 +695,13 @@ public class Form extends Container {
         return contentPane;
     }
     
+    /**
+     * This method returns the layered pane of the Form, the layered pane is laid
+     * on top of the content pane and is created lazily upon calling this method the layer
+     * will be created.
+     * 
+     * @return the LayeredPane
+     */ 
     public Container getLayeredPane() {
         if(layeredPane == null){
             Container parent = new Container(new LayeredLayout());
