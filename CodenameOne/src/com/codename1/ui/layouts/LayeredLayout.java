@@ -32,10 +32,9 @@ import com.codename1.ui.plaf.Style;
  * Allows placing components one on top of the other like a stack, this layout
  * effectively allows us to build a UI of overlapping components. The components
  * may be containers with their own layout managers to allow elaborate arbitrary
- * looks.
- * Since the Z-ordering creates a great deal of complexity and inefficiency it
- * is recommended that you first try to achieve the desired UI without resorting to
- * this layout or coordinate layout.
+ * looks. Since the Z-ordering creates a great deal of complexity and
+ * inefficiency it is recommended that you first try to achieve the desired UI
+ * without resorting to this layout or coordinate layout.
  *
  * @author Shai Almog
  */
@@ -46,13 +45,14 @@ public class LayeredLayout extends Layout {
      */
     public void layoutContainer(Container parent) {
         int numOfcomponents = parent.getComponentCount();
-        Style s = parent.getStyle();
-        int x = s.getPadding(parent.isRTL(), Component.LEFT);
-        int y = s.getPadding(false, Component.TOP);
-        int w = parent.getWidth() - x - s.getPadding(parent.isRTL(), Component.RIGHT);
-        int h = parent.getHeight() - y - s.getPadding(false, Component.BOTTOM);
-        for(int i=0; i< numOfcomponents; i++){
+
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
+            Style s = cmp.getStyle();
+            int x = s.getMargin(parent.isRTL(), Component.LEFT);
+            int y = s.getMargin(false, Component.TOP);
+            int w = parent.getWidth() - x - s.getMargin(parent.isRTL(), Component.RIGHT);
+            int h = parent.getHeight() - y - s.getMargin(false, Component.BOTTOM);
             cmp.setX(x);
             cmp.setY(y);
             cmp.setWidth(w);
@@ -67,14 +67,14 @@ public class LayeredLayout extends Layout {
         int maxWidth = 0;
         int maxHeight = 0;
         int numOfcomponents = parent.getComponentCount();
-        for(int i=0; i< numOfcomponents; i++){
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
             maxHeight = Math.max(maxHeight, cmp.getPreferredH());
             maxWidth = Math.max(maxWidth, cmp.getPreferredW());
         }
         Style s = parent.getStyle();
-        Dimension d = new Dimension(maxWidth + s.getPadding(false, Component.LEFT)+ s.getPadding(false, Component.RIGHT),
-                maxHeight + s.getPadding(false, Component.TOP)+ s.getPadding(false, Component.BOTTOM));
+        Dimension d = new Dimension(maxWidth + s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT),
+                maxHeight + s.getPadding(false, Component.TOP) + s.getPadding(false, Component.BOTTOM));
         return d;
     }
 
@@ -88,7 +88,7 @@ public class LayeredLayout extends Layout {
     /**
      * @inheritDoc
      */
-    public boolean isOverlapSupported(){
+    public boolean isOverlapSupported() {
         return true;
     }
 }

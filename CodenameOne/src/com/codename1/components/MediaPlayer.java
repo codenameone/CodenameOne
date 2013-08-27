@@ -195,6 +195,7 @@ public class MediaPlayer extends Container {
     }
 
     private void initUI() {
+        removeAll();
         setLayout(new BorderLayout());        
         
         addComponent(BorderLayout.CENTER, video.getVideoComponent());        
