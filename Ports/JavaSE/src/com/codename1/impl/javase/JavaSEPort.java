@@ -4744,6 +4744,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void paint(Graphics g) {
             if (init) {
                 onPositionSizeChange();
+            }else{
+                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                    setLightweightMode(false);
+                }
             }
         }
 
