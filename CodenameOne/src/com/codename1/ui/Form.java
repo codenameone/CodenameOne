@@ -39,6 +39,7 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -89,14 +90,14 @@ public class Form extends Container {
     /**
      * Contains a list of components that would like to animate their state
      */
-    private Vector internalAnimatableComponents;
+    private ArrayList<Animation> internalAnimatableComponents;
     /**
      * Contains a list of components that would like to animate their state
      */
-    private Vector animatableComponents;
+    private ArrayList<Animation> animatableComponents;
     //private FormSwitcher formSwitcher;
     private Component focused;
-    private Vector mediaComponents;
+    private ArrayList<Component> mediaComponents;
     /**
      * This member allows us to define an animation that will draw the transition for
      * entering this form. A transition is an animation that would occur when 
@@ -132,11 +133,11 @@ public class Form extends Container {
     /**
      * Listeners for key release events 
      */
-    private Hashtable keyListeners;
+    private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /**
      * Listeners for game key release events 
      */
-    private Hashtable gameKeyListeners;
+    private HashMap<Integer, ArrayList<ActionListener>> gameKeyListeners;
     /**
      * Indicates whether focus should cycle within the form
      */
@@ -435,7 +436,7 @@ public class Form extends Container {
      */
     public void addKeyListener(int keyCode, ActionListener listener) {
         if (keyListeners == null) {
-            keyListeners = new Hashtable();
+            keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
         addKeyListener(keyCode, listener, keyListeners);
     }
@@ -466,33 +467,33 @@ public class Form extends Container {
         removeKeyListener(keyCode, listener, gameKeyListeners);
     }
 
-    private void addKeyListener(int keyCode, ActionListener listener, Hashtable keyListeners) {
+    private void addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
         if (keyListeners == null) {
-            keyListeners = new Hashtable();
+            keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
         Integer code = new Integer(keyCode);
-        Vector vec = (Vector) keyListeners.get(code);
+        ArrayList<ActionListener> vec = keyListeners.get(code);
         if (vec == null) {
-            vec = new Vector();
-            vec.addElement(listener);
+            vec = new ArrayList<ActionListener>();
+            vec.add(listener);
             keyListeners.put(code, vec);
             return;
         }
         if (!vec.contains(listener)) {
-            vec.addElement(listener);
+            vec.add(listener);
         }
     }
 
-    private void removeKeyListener(int keyCode, ActionListener listener, Hashtable keyListeners) {
+    private void removeKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
         if (keyListeners == null) {
             return;
         }
         Integer code = new Integer(keyCode);
-        Vector vec = (Vector) keyListeners.get(code);
+        ArrayList<ActionListener> vec = keyListeners.get(code);
         if (vec == null) {
             return;
         }
-        vec.removeElement(listener);
+        vec.remove(listener);
         if (vec.size() == 0) {
             keyListeners.remove(code);
         }
@@ -507,7 +508,7 @@ public class Form extends Container {
      */
     public void addGameKeyListener(int keyCode, ActionListener listener) {
         if (gameKeyListeners == null) {
-            gameKeyListeners = new Hashtable();
+            gameKeyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
         addKeyListener(keyCode, listener, gameKeyListeners);
     }
@@ -880,10 +881,10 @@ public class Form extends Container {
      */
     void registerMediaComponent(Component mediaCmp) {
         if (mediaComponents == null) {
-            mediaComponents = new Vector();
+            mediaComponents = new ArrayList<Component>();
         }
         if (!mediaComponents.contains(mediaCmp)) {
-            mediaComponents.addElement(mediaCmp);
+            mediaComponents.add(mediaCmp);
         }
     }
 
@@ -902,7 +903,7 @@ public class Form extends Container {
      * @param cmp component that would no longer receive animation events
      */
     void deregisterMediaComponent(Component mediaCmp) {
-        mediaComponents.removeElement(mediaCmp);
+        mediaComponents.remove(mediaCmp);
     }
 
     /**
@@ -914,10 +915,10 @@ public class Form extends Container {
      */
     public void registerAnimated(Animation cmp) {
         if (animatableComponents == null) {
-            animatableComponents = new Vector();
+            animatableComponents = new ArrayList<Animation>();
         }
         if (!animatableComponents.contains(cmp)) {
-            animatableComponents.addElement(cmp);
+            animatableComponents.add(cmp);
         }
         Display.getInstance().notifyDisplay();
     }
@@ -929,10 +930,10 @@ public class Form extends Container {
      */
     void registerAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents == null) {
-            internalAnimatableComponents = new Vector();
+            internalAnimatableComponents = new ArrayList<Animation>();
         }
         if (!internalAnimatableComponents.contains(cmp)) {
-            internalAnimatableComponents.addElement(cmp);
+            internalAnimatableComponents.add(cmp);
         }
         Display.getInstance().notifyDisplay();
     }
@@ -944,7 +945,7 @@ public class Form extends Container {
      */
     void deregisterAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents != null) {
-            internalAnimatableComponents.removeElement(cmp);
+            internalAnimatableComponents.remove(cmp);
         }
     }
 
@@ -955,7 +956,7 @@ public class Form extends Container {
      */
     public void deregisterAnimated(Animation cmp) {
         if (animatableComponents != null) {
-            animatableComponents.removeElement(cmp);
+            animatableComponents.remove(cmp);
         }
     }
 
@@ -982,11 +983,11 @@ public class Form extends Container {
         }
     }
 
-    private void loopAnimations(Vector v, Vector notIn) {
+    private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
         for (int iter = 0; iter < v.size(); iter++) {
-            Animation c = (Animation) v.elementAt(iter);
+            Animation c = (Animation) v.get(iter);
             if (c == null || notIn != null && notIn.contains(c)) {
                 continue;
             }
@@ -1768,13 +1769,13 @@ public class Form extends Container {
         fireKeyEvent(gameKeyListeners, game);
     }
 
-    private void fireKeyEvent(Hashtable keyListeners, int keyCode) {
+    private void fireKeyEvent(HashMap<Integer, ArrayList<ActionListener>> keyListeners, int keyCode) {
         if (keyListeners != null) {
-            Vector listeners = (Vector) keyListeners.get(new Integer(keyCode));
+            ArrayList<ActionListener> listeners = keyListeners.get(new Integer(keyCode));
             if (listeners != null) {
                 ActionEvent evt = new ActionEvent(this, keyCode);
                 for (int iter = 0; iter < listeners.size(); iter++) {
-                    ((ActionListener) listeners.elementAt(iter)).actionPerformed(evt);
+                    listeners.get(iter).actionPerformed(evt);
                     if (evt.isConsumed()) {
                         return;
                     }
@@ -2664,7 +2665,7 @@ public class Form extends Container {
         if (mediaComponents != null) {
             int size = mediaComponents.size();
             for (int i = 0; i < size; i++) {
-                Component mediaCmp = (Component) mediaComponents.elementAt(i);
+                Component mediaCmp = (Component) mediaComponents.get(i);
                 mediaCmp.setVisible(visible);
             }
         }

@@ -31,6 +31,7 @@ import java.util.Vector;
 
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLParser;
+import java.io.Reader;
 
 /**
  * A DOM accessor implementation for working with XML content.
@@ -66,6 +67,15 @@ class XMLContent implements StructuredContent {
 	 */
 	public XMLContent(InputStream content) {
 		this(new XMLParser().parse(new InputStreamReader(content)));
+	}
+	
+	/**
+	 * Construct from an XML inputstream
+	 * 
+	 * @param content XML reader
+	 */
+	public XMLContent(Reader content) {
+		this(new XMLParser().parse(content));
 	}
 	
 	/**

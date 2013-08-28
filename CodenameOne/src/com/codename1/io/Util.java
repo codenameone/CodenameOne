@@ -139,8 +139,20 @@ public class Util {
      * @throws IOException thrown by the stream
      */
     public static String readToString(InputStream i) throws IOException {
+        return readToString(i, "UTF-8");
+    }
+
+    /**
+     * Reads an input stream to a string
+     * 
+     * @param i the input stream
+     * @param encoding the encoding of the stream
+     * @return a string
+     * @throws IOException thrown by the stream
+     */
+    public static String readToString(InputStream i, String encoding) throws IOException {
         byte[] b = readInputStream(i);
-        return new String(b, 0, b.length, "UTF-8");
+        return new String(b, 0, b.length, encoding);
     }
 
     /**

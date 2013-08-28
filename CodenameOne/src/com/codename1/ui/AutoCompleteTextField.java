@@ -24,10 +24,11 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.FilterProxyListModel;
+import com.codename1.ui.list.ListModel;
 
 /**
  * This class is an editable TextField with predefined completion suggestion 
@@ -37,10 +38,8 @@ import com.codename1.ui.list.FilterProxyListModel;
  */
 public class AutoCompleteTextField extends TextField {
 
-    private String[] completion;
     private Container popup;
-    private FilterProxyListModel filter;
-    private List popupList;
+    private FilterProxyListModel<String> filter;
     private ActionListener listener = new FormPointerListener();
 
     /**
@@ -48,18 +47,40 @@ public class AutoCompleteTextField extends TextField {
      * @param completion a String array of suggestion for completion
      */ 
     public AutoCompleteTextField(String[] completion) {
-        this.completion = completion;
+        this(new DefaultListModel<String>(completion));
+    }
+
+    /**
+     * Constructor with completion suggestions, filtering is automatic in this case
+     * @param listModel a list model containing potential string suggestions
+     */ 
+    public AutoCompleteTextField(ListModel<String> listModel) {
         popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        filter = new FilterProxyListModel(new DefaultListModel(completion));
+        filter = new FilterProxyListModel<String>(listModel);
         popup.setScrollable(false);
     }
 
+    /**
+     * The default constructor is useful for cases of filter subclasses overriding the
+     * getSuggestionModel value
+     */
+    public AutoCompleteTextField() {
+        popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        popup.setScrollable(false);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     @Override
     protected void initComponent() {
         super.initComponent();
         getComponentForm().addPointerPressedListener(listener);
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -70,6 +91,9 @@ public class AutoCompleteTextField extends TextField {
         super.setText(text);
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     public void setText(String text) {
         super.setText(text);
@@ -77,14 +101,41 @@ public class AutoCompleteTextField extends TextField {
             //removePopup();
             return;
         }
-        if (filter != null) {
-            filter.filter(text);
-            Form f = getComponentForm();
-            if (f != null && f.getLayeredPane().getComponentCount() == 0) {
-                addPopup();
-            }
-            popup.revalidate();
+        if(filter(text)) {
+            updateFilterList();
+        } 
+    }
+    
+    /**
+     * In a case of an asynchronous filter this method can be invoked to refresh the completion list
+     */
+    protected void updateFilterList() {
+        Form f = getComponentForm();
+        if (f != null && f.getLayeredPane().getComponentCount() == 0) {
+            addPopup();
         }
+        popup.revalidate();
+    }
+    
+    /**
+     * Subclasses can override this method to perform more elaborate filter operations
+     * @param text the text to filter
+     * @return true if the filter has changed the list, false if it hasn't or is working asynchronously
+     */
+    protected boolean filter(String text) {
+        if(filter != null) {
+            filter.filter(text);        
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Returns the list model to show within the completion list
+     * @return the list model can be anything
+     */
+    protected ListModel<String> getSuggestionModel() {
+        return filter;
     }
 
     private void removePopup() {
@@ -99,7 +150,8 @@ public class AutoCompleteTextField extends TextField {
     private void addPopup() {
         Form f = getComponentForm();
         popup.removeAll();
-        final com.codename1.ui.List l = new com.codename1.ui.List(filter);
+        final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        ((DefaultListCellRenderer<String>)l.getRenderer()).setShowNumbers(false);
         l.setUIID("AutoCompletePopup");
         l.addActionListener(new ActionListener() {
 

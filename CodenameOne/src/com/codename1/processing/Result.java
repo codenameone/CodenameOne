@@ -49,6 +49,7 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 import com.codename1.xml.Element;
+import java.io.Reader;
 
 /**
  * An evaluator for a very small expression language to extract primitive types
@@ -211,6 +212,49 @@ public class Result {
 	}
 
 	/**
+	 * Create an evaluator object from a structured content document (XML, JSON,
+	 * etc) input stream. Normally you would use this method within a content
+	 * request implementation, for example:
+	 * 
+	 * <pre>
+	 * ConnectionRequest request = new ConnectionRequest() {
+	 * 	protected void readResponse(InputStream input) throws IOException {
+	 * 		Result evaluator = Result.fromContent(input, Result.JSON);
+	 * 		// ... evaluate the result here
+	 * 	}
+	 * 	// ... etc
+	 * };
+	 * </pre>
+	 * 
+	 * 
+	 * 
+	 * @param content structured content document as a string.
+	 * @param format an identifier for the type of content passed (ie. xml,
+	 *            json, etc).
+	 * @return Result a result evaluator object
+	 * @throws IllegalArgumentException thrown if null content or format is
+	 *             passed.
+	 */
+	public static Result fromContent(Reader content, String format)
+			throws IllegalArgumentException, IOException {
+		if (content == null) {
+			throw new IllegalArgumentException("content cannot be null");
+		}
+		if (format == null) {
+			throw new IllegalArgumentException("format cannot be null");
+		}
+		StructuredContent sc;
+		if ("xml".equals(format)) {
+			sc = new XMLContent(content);
+		} else if ("json".equals(format)) {
+			sc = new JSONContent(content);
+		} else {
+			throw new IllegalArgumentException("Unrecognized format: " + format);
+		}
+		return fromContent(sc);
+	}
+
+        /**
 	 * Create an evaluator object from a parsed XML DOM.
 	 * 
 	 * @param content a parsed XML DOM.

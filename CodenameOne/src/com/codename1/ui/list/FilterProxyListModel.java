@@ -22,29 +22,28 @@
  */
 package com.codename1.ui.list;
 
-import java.util.Hashtable;
-import java.util.Vector;
-
 import com.codename1.ui.List;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
+import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * This class allows filtering/sorting a list model dynamically using a text field
  *
  * @author Shai Almog
  */
-public class FilterProxyListModel implements ListModel, DataChangedListener {
-    private ListModel underlying;
-    private Vector filter;
-    private Vector listeners = new Vector();
+public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListener {
+    private ListModel<T> underlying;
+    private ArrayList<Integer> filter;
+    private ArrayList<DataChangedListener> listeners = new ArrayList<DataChangedListener>();
     
     /**
      * The proxy is applied to the actual model and effectively hides it
      * @param underlying the "real" model for the list
      */
-    public FilterProxyListModel(ListModel underlying) {
+    public FilterProxyListModel(ListModel<T> underlying) {
         this.underlying = underlying;
         underlying.addDataChangedListener(this);
     }
@@ -54,7 +53,7 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
             return index;
         }
         if(filter.size() > index) {
-            return ((Integer)filter.elementAt(index)).intValue();
+            return filter.get(index).intValue();
         }
         return -1;
     }
@@ -68,16 +67,16 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
         if(filter == null) {
             filterImpl("");
         }
-        Object[] filterArray = new Object[filter.size()];
-        Object[] tempArray = new Object[filter.size()];
+        Integer[] filterArray = new Integer[filter.size()];
+        Integer[] tempArray = new Integer[filter.size()];
         for(int iter = 0 ; iter < filter.size() ; iter++) {
-            filterArray[iter] = filter.elementAt(iter);
+            filterArray[iter] = filter.get(iter);
         }
         System.arraycopy(filterArray, 0, tempArray, 0, filterArray.length);
         mergeSort(filterArray, tempArray, 0, filterArray.length, 0, ascending);
 
         for(int iter = 0 ; iter < filter.size() ; iter++) {
-            filter.setElementAt(filterArray[iter], iter);
+            filter.set(iter, filterArray[iter]);
         }
         dataChanged(DataChangedListener.CHANGED, -1);
     }
@@ -103,8 +102,8 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
             s1 = (String) a;
             s2 = (String) b;
         } else {
-            s1 = (String) ((Hashtable) a).get("name");
-            s2 = (String) ((Hashtable) b).get("name");
+            s1 = (String) ((Map) a).get("name");
+            s2 = (String) ((Map) b).get("name");
         }
         s1 = s1.toUpperCase();
         s2 = s2.toUpperCase();
@@ -180,20 +179,20 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
     }
 
     private void filterImpl(String str) {
-        filter = new Vector();
+        filter = new ArrayList<Integer>();
         str = str.toUpperCase();
         for(int iter = 0 ; iter < underlying.getSize() ; iter++) {
             Object o = underlying.getItemAt(iter);
             if(o != null) {
-                if(o instanceof Hashtable) {
-                    Hashtable h = (Hashtable)o;
+                if(o instanceof Map) {
+                    Map h = (Map)o;
                     if(comp(h.get("name"), str)) {
-                        filter.addElement(new Integer(iter));
+                        filter.add(new Integer(iter));
                     }
                 } else {
                     String element = o.toString();
                     if(element.toUpperCase().indexOf(str) > -1) {
-                        filter.addElement(new Integer(iter));
+                        filter.add(new Integer(iter));
                     }
                 }
             }
@@ -216,7 +215,7 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
     /**
      * @inheritDoc
      */
-    public Object getItemAt(int index) {
+    public T getItemAt(int index) {
         return underlying.getItemAt(getFilterOffset(index));
     }
 
@@ -248,14 +247,14 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
      * @inheritDoc
      */
     public void addDataChangedListener(DataChangedListener l) {
-        listeners.addElement(l);
+        listeners.add(l);
     }
 
     /**
      * @inheritDoc
      */
     public void removeDataChangedListener(DataChangedListener l) {
-        listeners.removeElement(l);
+        listeners.remove(l);
     }
 
     /**
@@ -275,7 +274,7 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
     /**
      * @inheritDoc
      */
-    public void addItem(Object item) {
+    public void addItem(T item) {
         underlying.addItem(item);
     }
 
@@ -297,7 +296,7 @@ public class FilterProxyListModel implements ListModel, DataChangedListener {
             }
         }
         for(int iter = 0 ; iter < listeners.size() ; iter++) {
-            ((DataChangedListener)listeners.elementAt(iter)).dataChanged(type, index);
+            listeners.get(iter).dataChanged(type, index);
         }
     }
 

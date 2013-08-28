@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.util.Hashtable;
 
 import com.codename1.io.JSONParser;
+import java.io.Reader;
 
 /**
  * Internal class, do not use.
@@ -68,4 +69,13 @@ class JSONContent extends HashtableContent {
 		this(new JSONParser().parse(new InputStreamReader(content)));
 	}
 
+	/**
+	 * Construct from a JSON input stream
+	 * 
+	 * @param content a JSON reader
+	 * @throws IOException on error reading/parsing the stream
+	 */
+	public JSONContent(Reader content) throws IOException {
+		this(new JSONParser().parse(content));
+	}
 }

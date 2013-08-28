@@ -218,4 +218,18 @@ public abstract class Purchase {
     public boolean isUnsubscribeSupported() {
         return isSubscriptionSupported();
     }
+    
+    /**
+     * Indicates whether a purchase restore button is supported by the OS
+     * @return true if you can invoke the restore method
+     */
+    public boolean isRestoreSupported() {
+        return false;
+    }
+    
+    /**
+     * Restores purchases if applicable, this will only work if isRestoreSupported() returns true
+     */
+    public void restore() {
+    }
 }
