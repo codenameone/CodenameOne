@@ -329,6 +329,8 @@ public class WebBrowser extends Container {
      */
     public void destroy() {
         if (isNative) {
+            // workaround for issue 827
+            ((BrowserComponent) internal).setPage("<html><body></body></html>", null);
             ((BrowserComponent) internal).destroy();
         }
         internal = null;
