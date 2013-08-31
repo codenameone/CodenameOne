@@ -201,6 +201,15 @@ public class SideMenuBar extends MenuBar {
                     Button b = new Button(rightCommand);
                     b.setUIID("TitleCommand");
                     parent.getTitleArea().addComponent(BorderLayout.EAST, b);
+                } else {
+                    if(east instanceof Container) {
+                        Container cnt = (Container)east;
+                        if(cnt.getComponentCount() == 0) {
+                            Button b = new Button(rightCommand);
+                            b.setUIID("TitleCommand");
+                            cnt.addComponent(b);
+                        }
+                    }
                 }
             }
         }
