@@ -254,6 +254,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private int timeout = -1;
 
     private boolean includeHeaderInScreenshot = true;
+
+    private boolean slowConnectionMode;
+    private boolean disconnectedMode;
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -1303,6 +1306,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
 
+            JMenu networkDebug = new JMenu("Network");
+            simulatorMenu.add(networkDebug);
+            
             JMenuItem networkMonitor = new JMenuItem("Network Monitor");
             networkMonitor.addActionListener(new ActionListener() {
 
@@ -1315,7 +1321,59 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            simulatorMenu.add(networkMonitor);
+            networkDebug.add(networkMonitor);
+
+            JRadioButtonMenuItem regularConnection = new JRadioButtonMenuItem("Regular Connection");
+            regularConnection.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    slowConnectionMode = false;
+                    disconnectedMode = false;
+                    pref.putInt("connectionStatus", 0);
+                }
+            });
+            networkDebug.add(regularConnection);
+            
+            JRadioButtonMenuItem slowConnection = new JRadioButtonMenuItem("Slow Connection");
+            slowConnection.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    slowConnectionMode = true;
+                    disconnectedMode = false;
+                    pref.putInt("connectionStatus", 1);
+                }
+            });
+            networkDebug.add(slowConnection);
+            
+            JRadioButtonMenuItem disconnected = new JRadioButtonMenuItem("Disconnected");
+            disconnected.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    slowConnectionMode = false;
+                    disconnectedMode = true;
+                    pref.putInt("connectionStatus", 2);
+                }
+            });
+            networkDebug.add(disconnected);
+
+            ButtonGroup connectionGroup = new ButtonGroup();
+            connectionGroup.add(regularConnection);
+            connectionGroup.add(slowConnection);
+            connectionGroup.add(disconnected);
+            
+            switch(pref.getInt("connectionStatus", 0)) {
+                case 0:
+                    regularConnection.setSelected(true);
+                    break;
+                case 1:
+                    slowConnection.setSelected(true);
+                    slowConnectionMode = true;
+                    break;
+                case 2:
+                    disconnected.setSelected(true);
+                    disconnectedMode = true;
+                    break;
+            }
 
             JMenuItem componentTreeInspector = new JMenuItem("Component Inspector");
             componentTreeInspector.addActionListener(new ActionListener() {
@@ -3777,6 +3835,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
+        if(disconnectedMode && url.toLowerCase().startsWith("http")) {
+            throw new IOException("Unreachable");
+        }
         URL u = new URL(url);        
 
         URLConnection con = u.openConnection();
@@ -3842,6 +3903,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private NetworkRequestObject getByConnection(URLConnection con) {
+        if(netMonitor != null) {
+            return netMonitor.getByConnection((URLConnection) con);
+        }
+        return null;
+    }
 
     /**
      * @inheritDoc
@@ -3852,16 +3920,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
             return o;
         }
-        if (netMonitor != null) {
-            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-            if (nr != null) {
-                nr.setRequestBody("");
+        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
+            final NetworkRequestObject nr = getByConnection((URLConnection) connection);
+            if (nr != null || slowConnectionMode || disconnectedMode) {
+                if(disconnectedMode) {
+                    throw new IOException("Unreachable");
+                }
+                if(nr != null) {
+                    nr.setRequestBody("");
+                }
                 HttpURLConnection con = (HttpURLConnection) connection;
                 OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
 
                     public void write(byte b[], int off, int len) throws IOException {
                         super.write(b, off, len);
-                        nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
+                        if(nr != null) {
+                            nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
+                        }
+                        if(slowConnectionMode) {
+                            try {
+                                Thread.sleep(250);
+                            } catch(Exception e) {}
+                        }
+                        if(disconnectedMode) {
+                            throw new IOException("Unreachable");
+                        }
                     }
                 };
                 return o;
@@ -3891,24 +3974,44 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
             return o;
         }
-        if (netMonitor != null) {
-            final NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-            if (nr != null) {
+        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
+            final NetworkRequestObject nr = getByConnection((URLConnection) connection);
+            if (nr != null || slowConnectionMode || disconnectedMode) {
+                if(slowConnectionMode) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch(Exception e) {}
+                }
+                if(disconnectedMode) {
+                    throw new IOException("Unreachable");
+                }
                 HttpURLConnection con = (HttpURLConnection) connection;
                 String headers = "";
                 Map<String, List<String>> map = con.getHeaderFields();
                 for (String header : map.keySet()) {
                     headers += header + "=" + map.get(header) + "\n";
                 }
-                nr.setResponseHeaders(headers);
-                nr.setResponseBody("");
+                if(nr != null) {
+                    nr.setResponseHeaders(headers);
+                    nr.setResponseBody("");
+                }
                 InputStream i = new BufferedInputStream(con.getInputStream()) {
 
                     public synchronized int read(byte b[], int off, int len)
                             throws IOException {
                         int s = super.read(b, off, len);
-                        if (s > -1) {
-                            nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
+                        if(nr != null) {
+                            if (s > -1) {
+                                nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
+                            }
+                        }
+                        if(slowConnectionMode) {
+                            try {
+                                Thread.sleep(len);
+                            } catch(Exception e) {}
+                        }
+                        if(disconnectedMode) {
+                            throw new IOException("Unreachable");
                         }
                         return s;
                     }
@@ -3962,10 +4065,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getResponseCode(Object connection) throws IOException {
         int code = ((HttpURLConnection) connection).getResponseCode();
-        if (netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-            if (nr != null) {
-                nr.setResponseCode("" + code);
+        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
+            if(slowConnectionMode) {
+                try {
+                    Thread.sleep(250);
+                } catch(Exception e) {}
+            }
+            if(disconnectedMode) {
+                throw new IOException("Unreachable");
+            }
+            if(netMonitor != null) {
+                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+                if (nr != null) {
+                    nr.setResponseCode("" + code);
+                }
             }
         }
         return code;
