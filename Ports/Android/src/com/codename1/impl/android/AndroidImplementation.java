@@ -4584,11 +4584,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void run() {
             ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
-            if((title == null || title.length() == 0) && f.getCommandCount() == 0){
+            boolean hasMenuBtn = false;
+            if(android.os.Build.VERSION.SDK_INT >= 14){
+                hasMenuBtn = ViewConfiguration.get(activity).hasPermanentMenuKey();
+            }
+            if((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)){
+                activity.runOnUiThread(new NotifyActionBar(activity, true));
+            }else{
                 activity.runOnUiThread(new NotifyActionBar(activity, false));
                 return;
-            }else{
-                activity.runOnUiThread(new NotifyActionBar(activity, true));
             }
             
             ab.setTitle(title);
