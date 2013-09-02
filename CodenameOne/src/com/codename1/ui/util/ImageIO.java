@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
@@ -76,6 +77,21 @@ public abstract class ImageIO {
             saveImage(img, response, format, quality);
         }
     }
+
+    /**
+     * Saves an image file at the given resolution, scaling if necessary
+     * 
+     * @param imageFilePath the image file path
+     * @param response resulting image output will be written to this stream
+     * @param format the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @param width the width for the resulting image, use -1 to not scale
+     * @param height the height of the resulting image, use -1 to not scale
+     * @param quality the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1.
+     */
+    public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException{
+        save(FileSystemStorage.getInstance().openInputStream(imageFilePath), response, format, width, height, quality); 
+    }
+
 
     /**
      * Saves an image object to the given format
