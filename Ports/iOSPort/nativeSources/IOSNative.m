@@ -189,6 +189,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y);
 
 extern int isIPad();
+extern int isIOS7();
 
 JAVA_OBJECT utf8String = NULL;
 
@@ -737,6 +738,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__(JAVA_OBJECT instanceObj
     //XMLVM_END_WRAPPER
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(JAVA_OBJECT instanceObject)
+{
+    return isIOS7();
+}
+
+
 NSString* toNSString(JAVA_OBJECT str) {
     if(str == 0) {
         return 0;
@@ -1265,7 +1272,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(JAVA_OBJECT 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
     __block JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-    __block GLUIImage* g;
+    __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         UIView* v = (UIView*)peer;
@@ -1737,7 +1744,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(JAV
 }
 
 
-void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_boolean(JAVA_OBJECT instanceObject,
+void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(JAVA_OBJECT instanceObject,
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
@@ -1748,8 +1755,14 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
         picker.mailComposeDelegate = [CodenameOne_GLViewController instance];
         
         // Recipient.
-        NSString *recipient = toNSString(recipients);
-        NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
+        NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
+        org_xmlvm_runtime_XMLVMArray* strArray = recipients;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        int recipientCount = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+        for(int iter = 0 ; iter < recipientCount ; iter++) {
+            [recipientsArray addObject:toNSString(data[iter])];
+        }
+        
         [picker setToRecipients:recipientsArray];
         
         // Subject.
@@ -1759,15 +1772,25 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_java_l
         NSString *emailBody = toNSString(content);
         [picker setMessageBody:emailBody isHTML:htmlMail];
         if(attachment != nil) {
-            NSString* file = toNSString(attachment);
-            NSString* mime = toNSString(attachmentMimeType);
-            int pos = [file rangeOfString:@"/" options:NSBackwardsSearch].location + 1;
-            NSString* fileComponent = [file substringFromIndex:pos];
-            if([file hasPrefix:@"file:"]) {
-                file = [file substringFromIndex:5];
+            org_xmlvm_runtime_XMLVMArray* attachmentArray = attachment;
+            JAVA_ARRAY_OBJECT* attachmentData = (JAVA_ARRAY_OBJECT*)attachmentArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+            int attachmentCount = attachmentArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+
+            org_xmlvm_runtime_XMLVMArray* mimeArray = attachmentMimeType;
+            JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)mimeArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+
+            for(int iter = 0 ; iter < attachmentCount ; iter++) {
+                NSString* file = toNSString(attachmentData[iter]);
+                NSString* mime = toNSString(mimeData[iter]);
+
+                int pos = [file rangeOfString:@"/" options:NSBackwardsSearch].location + 1;
+                NSString* fileComponent = [file substringFromIndex:pos];
+                if([file hasPrefix:@"file:"]) {
+                    file = [file substringFromIndex:5];
+                }
+                NSData* d = [NSData dataWithContentsOfFile:file];
+                [picker addAttachmentData:d mimeType:mime fileName:fileComponent];
             }
-            NSData* d = [NSData dataWithContentsOfFile:file];
-            [picker addAttachmentData:d mimeType:mime fileName:fileComponent];
         }
         [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
         
@@ -2276,8 +2299,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(JAVA_OB
 void addToHashtable(JAVA_OBJECT hash, ABMultiValueRef ref, int count) {
     for(int iter = 0 ; iter < count ; iter++) {
         NSString *key = (NSString *)ABMultiValueCopyLabelAtIndex(ref, iter);
-        NSString *value = (NSString *)ABMultiValueCopyValueAtIndex(ref, iter);
-        java_util_Hashtable_put___java_lang_Object_java_lang_Object(hash, fromNSString(key), fromNSString(value));
+        if(key == nil) {
+            NSString *value = (NSString *)ABMultiValueCopyValueAtIndex(ref, iter);
+            java_util_Hashtable_put___java_lang_Object_java_lang_Object(hash, fromNSString(@""), fromNSString(value));
+        } else {
+            NSString *value = (NSString *)ABMultiValueCopyValueAtIndex(ref, iter);
+            java_util_Hashtable_put___java_lang_Object_java_lang_Object(hash, fromNSString(key), fromNSString(value));
+        }
     }
 }
 
@@ -2779,6 +2807,10 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(JAVA_OBJECT in
         paymentInstance = [SKPayment paymentWithProductIdentifier:toNSString(sku)];
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
+}
+
+void com_codename1_impl_ios_IOSNative_restorePurchases__(JAVA_OBJECT instanceObject) {
+    [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(JAVA_OBJECT instanceObject) {

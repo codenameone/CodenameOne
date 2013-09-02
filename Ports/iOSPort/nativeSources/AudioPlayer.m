@@ -22,6 +22,7 @@
  */
 #import "AudioPlayer.h"
 #include "java_lang_Runnable.h"
+#include "com_codename1_ui_Display.h"
 
 static float volume = -1;
 AudioPlayer* currentlyPlaying = nil;
@@ -89,13 +90,15 @@ AudioPlayer* currentlyPlaying = nil;
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
     if(runnableCallback != 0) {
-        (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
+        com_codename1_ui_Display_callSerially___java_lang_Runnable(o, runnableCallback);
     }
 }
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
     if(runnableCallback != 0) {
-        (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
+        com_codename1_ui_Display_callSerially___java_lang_Runnable(o, runnableCallback);
     }
 }
 

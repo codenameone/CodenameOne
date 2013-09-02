@@ -42,6 +42,8 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #import <MobileCoreServices/UTCoreTypes.h>
 #include "com_codename1_payment_Product.h"
+#include "com_codename1_ui_Display.h"
+#include "com_codename1_impl_CodenameOneImplementation.h"
 
 extern void repaintUI();
 
@@ -279,6 +281,10 @@ BOOL isRetina() {
         return !isRetinaBug();
     }
     return NO;
+}
+
+BOOL isIOS7() {
+    return !SYSTEM_VERSION_LESS_THAN(@"7.0");
 }
 
 
@@ -897,13 +903,55 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self.view addSubview:self.adView];
     [self.adView loadAd];
     [super viewDidLoad];
+    //replaceViewDidLoad
 }
 
 #pragma mark - <MPAdViewDelegate>
 - (UIViewController *)viewControllerForPresentingModalView {
     return self;
 }
+#else
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    //replaceViewDidLoad
+}
 #endif
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    
+    [self becomeFirstResponder];
+}
+
+- (void)remoteControlReceivedWithEvent:(UIEvent *)receivedEvent {
+    if (receivedEvent.type == UIEventTypeRemoteControl) {
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
+        o = com_codename1_ui_Display_getImplementation__(o);
+        switch (receivedEvent.subtype) {
+            case UIEventSubtypeRemoteControlTogglePlayPause:
+                NSLog(@"Play or stop invoked");
+                com_codename1_impl_CodenameOneImplementation_keyPressed___int(o, -24);
+                com_codename1_impl_CodenameOneImplementation_keyReleased___int(o, -24);
+                break;
+                
+            case UIEventSubtypeRemoteControlPreviousTrack:
+                NSLog(@"Previous invoked");
+                com_codename1_impl_CodenameOneImplementation_keyPressed___int(o, -21);
+                com_codename1_impl_CodenameOneImplementation_keyReleased___int(o, -21);
+                break;
+                
+            case UIEventSubtypeRemoteControlNextTrack:
+                NSLog(@"Next invoked");
+                com_codename1_impl_CodenameOneImplementation_keyPressed___int(o, -20);
+                com_codename1_impl_CodenameOneImplementation_keyReleased___int(o, -20);
+                break;
+                
+            default:
+                break;
+                
+        }
+    }
+}
 
 - (void)awakeFromNib
 {
@@ -1377,6 +1425,9 @@ bool lockDrawing;
 
 - (void)drawFrame:(CGRect)rect
 {
+    if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
+        return;
+    }
     [(EAGLView *)self.view setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {

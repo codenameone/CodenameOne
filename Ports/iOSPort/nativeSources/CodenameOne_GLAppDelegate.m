@@ -47,7 +47,12 @@ extern UIView *editingComponent;
     if(url != nil) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         JAVA_OBJECT key = fromNSString(@"AppArg");
-        JAVA_OBJECT value = fromNSString([url absoluteString]);
+        JAVA_OBJECT value;
+        if([url isFileURL]) {
+            value = fromNSString(url.path);
+        } else {
+            value = fromNSString([url absoluteString]);
+        }
         com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(o, key, value);
     }
     com_codename1_impl_ios_IOSImplementation_callback__();
