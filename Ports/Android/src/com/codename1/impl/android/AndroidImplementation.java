@@ -4610,7 +4610,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             String title = f.getTitle();
             boolean hasMenuBtn = false;
             if(android.os.Build.VERSION.SDK_INT >= 14){
-                hasMenuBtn = ViewConfiguration.get(activity).hasPermanentMenuKey();
+                try {
+                    ViewConfiguration vc = ViewConfiguration.get(activity);
+                    Method m = vc.getClass().getMethod("hasPermanentMenuKey", (Class[])null);
+                    hasMenuBtn = ((Boolean)m.invoke(vc, (Object[])null)).booleanValue();
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                }
             }
             if((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)){
                 activity.runOnUiThread(new NotifyActionBar(activity, true));
