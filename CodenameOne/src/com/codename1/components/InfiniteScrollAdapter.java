@@ -72,11 +72,25 @@ public class InfiniteScrollAdapter {
      */
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore) {
         InfiniteScrollAdapter a = new InfiniteScrollAdapter();
+        cont.putClientProperty("cn1$infinite", a);
         a.infiniteContainer = cont;
         a.fetchMore = fetchMore;
         cont.addComponent(a.ip);
         Display.getInstance().callSerially(fetchMore);
         return a;
+    }
+    
+    /**
+     * Invoke this method to add additional components to the container, if you use 
+     * addComponent/removeComponent you will get undefined behavior.
+     * This is a convenience method saving the need to keep the InfiniteScrollAdapter as a variable
+     * @param cnt container to add the components to
+     * @param components the components to add
+     * @param areThereMore whether additional components exist
+     */
+    public static void addMoreComponents(Container cnt, Component[] components, boolean areThereMore) {
+        InfiniteScrollAdapter ia = (InfiniteScrollAdapter)cnt.getClientProperty("cn1$infinite");
+        ia.addMoreComponents(components, areThereMore);
     }
     
     /**
