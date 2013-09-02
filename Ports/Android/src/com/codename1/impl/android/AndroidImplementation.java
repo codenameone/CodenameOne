@@ -4521,6 +4521,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     b.compress(f, (int) (quality * 100), response);
                 }
 
+                public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
+                    Image i = Image.createImage(imageFilePath);
+                    Image newImage = i.scaled(width, height);
+                    i.dispose();
+                    save(newImage, response, format, quality);
+                    newImage.dispose();
+                } 
+
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
