@@ -95,6 +95,7 @@ import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -4353,7 +4354,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void sendMessage(String[] recieptents, String subject, Message msg) {
         if(recieptents != null){
             try {
-                Desktop.getDesktop().mail(new URI("mailto:"+ recieptents[0]));
+                String mailto = "mailto:" + recieptents[0];
+                for(int iter = 1 ; iter < recieptents.length ; iter++) {
+                    mailto += "," + recieptents[iter];
+                }
+                mailto += "?body=" + Util.encodeUrl(msg.getContent()) + "&subject=" + Util.encodeUrl(subject);
+                Desktop.getDesktop().mail(new URI(mailto));
             } catch (Exception ex) {
                 ex.printStackTrace();
             }

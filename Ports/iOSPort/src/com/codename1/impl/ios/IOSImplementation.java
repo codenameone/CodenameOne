@@ -442,7 +442,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void installNativeTheme() {
         try {
             Resources r;
-            if(nativeInstance.isIOS7() && Display.getInstance().getProperty("ios.oldLook", "false").equals("false")) {
+            if(nativeInstance.isIOS7() && Display.getInstance().getProperty("ios.oldLook", "true").equals("false")) {
                 r = Resources.open("/iOS7Theme.res");
             } else {
                 r = Resources.open("/iPhoneTheme.res");
@@ -2310,12 +2310,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void sendMessage(String[] recieptents, String subject, Message msg) {
-        String att = msg.getAttachment();
-        if(att != null && att.length() == 0) {
-            att = null;
+        String[] attachments = null;
+        String[] attachmentMime = null;
+        
+        if(msg.getAttachments().size() > 0) {
+            int counter = 0;
+            attachments = new String[msg.getAttachments().size()];
+            attachmentMime = new String[attachments.length];
+            for(String s : msg.getAttachments().keySet()) {
+                String mime = msg.getAttachments().get(s);
+                attachments[counter] = s;
+                attachmentMime[counter] = mime;
+                counter++;
+            }
         }
-        nativeInstance.sendEmailMessage(recieptents[0], subject, msg.getContent(),  
-                att, msg.getAttachmentMimeType(), msg.getMimeType().equals(Message.MIME_HTML));
+        
+        nativeInstance.sendEmailMessage(recieptents, subject, msg.getContent(),  
+                attachments, attachmentMime, msg.getMimeType().equals(Message.MIME_HTML));
     }
 
     @Override

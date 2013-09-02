@@ -3774,14 +3774,53 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return AndroidLocationManager.getInstance(activity);
     }
 
+    private String fixAttachmentPath(String attachment) {
+        if (attachment.contains(getAppHomePath())) {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            final char sep = fs.getFileSystemSeparator();
+            String fileName = attachment.substring(attachment.lastIndexOf(sep) + 1);
+            String[] roots = FileSystemStorage.getInstance().getRoots();
+            // iOS doesn't have an SD card
+            String root = roots[0];
+            for (int i = 0; i < roots.length; i++) {
+                if (FileSystemStorage.getInstance().getRootType(roots[i]) == FileSystemStorage.ROOT_TYPE_SDCARD) {
+                    root = roots[i];
+                    break;
+                }
+            }
+            String fileUri = root + sep + "tmp" + sep + fileName;
+            FileSystemStorage.getInstance().mkdir(root + sep + "tmp");
+            try {
+                InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
+                OutputStream os = FileSystemStorage.getInstance().openOutputStream(fileUri);
+                byte [] buf = new byte[1024];
+                int len;
+                while((len = is.read(buf)) > -1){
+                    os.write(buf, 0, len);
+                }
+                is.close();
+                os.close();
+            } catch (IOException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+            attachment = fileUri;
+        }
+        if (!attachment.startsWith("file://")) {
+            attachment = "file://" + attachment;
+        }
+        return attachment;
+    }
+    
     /**
      * @inheritDoc
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
         Intent emailIntent;
         String attachment = msg.getAttachment();
+        boolean hasAttachment = (attachment != null && attachment.length() > 0) || msg.getAttachments().size() > 0;
             
-        if(msg.getMimeType().equals(Message.MIME_TEXT) && attachment == null){
+        if(msg.getMimeType().equals(Message.MIME_TEXT) && !hasAttachment){
             StringBuilder to = new StringBuilder();
             for (int i = 0; i < recipients.length; i++) {
                 to.append(recipients[i]);
@@ -3793,50 +3832,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "?subject=" + Uri.encode(subject)
                     + "&body=" + Uri.encode(msg.getContent())));        
         }else{
-            emailIntent = new Intent(android.content.Intent.ACTION_SEND);
-            emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
-            emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
-            emailIntent.setType(msg.getMimeType());
-            if (attachment != null && attachment.length() > 0) {
-                emailIntent.setType(msg.getAttachmentMimeType());
-                //if the attachment is in the uder home dir we need to copy it 
-                //to an accessible dir
-                if (attachment.contains(getAppHomePath())) {
-                    FileSystemStorage fs = FileSystemStorage.getInstance();
-                    final char sep = fs.getFileSystemSeparator();
-                    String fileName = attachment.substring(attachment.lastIndexOf(sep) + 1);
-                    String[] roots = FileSystemStorage.getInstance().getRoots();
-                    // iOS doesn't have an SD card
-                    String root = roots[0];
-                    for (int i = 0; i < roots.length; i++) {
-                        if (FileSystemStorage.getInstance().getRootType(roots[i]) == FileSystemStorage.ROOT_TYPE_SDCARD) {
-                            root = roots[i];
-                            break;
-                        }
-                    }
-                    String fileUri = root + sep + "tmp" + sep + fileName;
-                    FileSystemStorage.getInstance().mkdir(root + sep + "tmp");
-                    try {
-                        InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
-                        OutputStream os = FileSystemStorage.getInstance().openOutputStream(fileUri);
-                        byte [] buf = new byte[1024];
-                        int len;
-                        while((len = is.read(buf)) > -1){
-                            os.write(buf, 0, len);
-                        }
-                        is.close();
-                        os.close();
-                    } catch (IOException ex) {
-                        Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            if (hasAttachment) {
+                if(msg.getAttachments().size() > 0) {
+                    emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
+                    emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+                    emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+                    emailIntent.setType(msg.getMimeType());
+                    ArrayList<Uri> uris = new ArrayList<Uri>();
+                    
+                    for(String path : msg.getAttachments().keySet()) {
+                        uris.add(Uri.parse(fixAttachmentPath(path)));
                     }
                     
-                    attachment = fileUri;
+                    emailIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+                } else {
+                    emailIntent = new Intent(android.content.Intent.ACTION_SEND);
+                    emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+                    emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+                    emailIntent.setType(msg.getMimeType());
+                    emailIntent.setType(msg.getAttachmentMimeType());
+                    //if the attachment is in the uder home dir we need to copy it 
+                    //to an accessible dir
+                    attachment = fixAttachmentPath(attachment);
+                    emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(attachment));
                 }
-                if (!attachment.startsWith("file://")) {
-                    attachment = "file://" + attachment;
-                }
-                emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(attachment));
-                
+            } else {
+                emailIntent = new Intent(android.content.Intent.ACTION_SEND);
+                emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
+                emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+                emailIntent.setType(msg.getMimeType());
             }
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                

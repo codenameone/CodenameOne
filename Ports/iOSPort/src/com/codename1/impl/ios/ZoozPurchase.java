@@ -165,4 +165,13 @@ class ZoozPurchase extends Purchase implements Runnable {
         }
     }
     
+    @Override
+    public boolean isRestoreSupported() {
+        return true;
+    }
+    
+    @Override
+    public void restore() {
+        nativeInstance.restorePurchases();
+    }
 }

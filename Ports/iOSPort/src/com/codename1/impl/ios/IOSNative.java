@@ -284,7 +284,7 @@ final class IOSNative {
     native void pauseAudioRecord(long peer);
     native void cleanupAudioRecord(long peer);
 
-    native void sendEmailMessage(String recipients, String subject, String content, String attachment, String attachmentMimeType, boolean htmlMail);
+    native void sendEmailMessage(String[] recipients, String subject, String content, String[] attachment, String[] attachmentMimeType, boolean htmlMail);
 
     native boolean isContactsPermissionGranted();
     native int getContactCount(boolean withNumbers);
@@ -346,6 +346,7 @@ final class IOSNative {
     native void fetchProducts(String[] skus, Product[] products);
     native void purchase(String sku);
     native boolean canMakePayments();
+    native void restorePurchases();
     native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
     native String formatInt(int i);
