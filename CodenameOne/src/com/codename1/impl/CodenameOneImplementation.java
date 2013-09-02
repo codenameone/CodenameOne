@@ -4262,11 +4262,11 @@ public abstract class CodenameOneImplementation {
 
     /**
      * Send an email using the platform mail client
-     * @param recieptents array of e-mail addresses
+     * @param recipients array of e-mail addresses
      * @param subject e-mail subject
      * @param msg the Message to send
      */
-    public void sendMessage(String[] recieptents, String subject, Message msg) {
+    public void sendMessage(String[] recipients, String subject, Message msg) {
     }
     
     /**

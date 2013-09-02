@@ -31,6 +31,7 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 import com.codename1.io.JSONParser;
+import java.io.Reader;
 
 /**
  * Internal class, do not use.
@@ -60,7 +61,7 @@ class HashtableContent implements StructuredContent {
 	 * @throws IOException on error reading/parsing the string
 	 */
 	public HashtableContent(String content) throws IOException {
-		this(new ByteArrayInputStream(content.getBytes()));
+		this(new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8"));
 	}
 
 	/**
@@ -71,6 +72,16 @@ class HashtableContent implements StructuredContent {
 	 */
 	public HashtableContent(InputStream content) throws IOException {
 		this(new JSONParser().parse(new InputStreamReader(content)));
+	}
+
+	/**
+	 * Construct from a JSON input stream.
+	 * 
+	 * @param content a JSON reader.
+	 * @throws IOException on error reading/parsing the stream
+	 */
+	public HashtableContent(Reader content) throws IOException {
+		this(new JSONParser().parse(content));
 	}
 
 	/**

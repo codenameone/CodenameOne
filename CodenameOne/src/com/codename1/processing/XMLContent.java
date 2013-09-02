@@ -32,6 +32,7 @@ import java.util.Vector;
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLParser;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
 
 /**
  * A DOM accessor implementation for working with XML content.
@@ -57,9 +58,18 @@ class XMLContent implements StructuredContent {
 	 * @param content an XML string
 	 */
 	public XMLContent(String content) {
-		this(new ByteArrayInputStream(content.getBytes()));
+		this(wrap(content));
 	}
 
+        private static Reader wrap(String content) {
+            try {
+                return new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8");
+            } catch(UnsupportedEncodingException err) {
+                err.printStackTrace();
+                return null;
+            }
+        }
+        
 	/**
 	 * Construct from an XML inputstream
 	 * 

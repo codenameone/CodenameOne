@@ -301,6 +301,14 @@ public class Calendar extends Container {
         mv.setCurrentDay(d.getTime(), true);
         componentChanged();
     }
+    
+    /**
+     * Returns the currently viewed date (as opposed to the selected date)
+     * @return the currently viewed date
+     */
+    public Date getCurrentDate() {
+        return new Date(mv.getCurrentDay());
+    }
 
     /**
      * Sets the Calendar timezone, if not specified Calendar will use the
@@ -441,6 +449,17 @@ public class Calendar extends Container {
         return dayh;
     }
 
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton the button to be updated
+     * @param day the new button day
+     */
+    protected void updateButtonDayDate(Button dayButton, int year, int currentMonth, int day) {
+        updateButtonDayDate(dayButton, currentMonth, day);
+    }
+
     /**
      * This method updates the Button day.
      *
@@ -460,6 +479,10 @@ public class Calendar extends Container {
         private Container titles;
         private Container days;
 
+        public long getCurrentDay() {
+            return currentDay;
+        }
+        
         public MonthView(long time) {
             super(new BoxLayout(BoxLayout.Y_AXIS));
             setUIID("MonthView");
@@ -570,7 +593,7 @@ public class Calendar extends Container {
                     }else{
                         buttons[j].setUIID("CalendarDay");
                     }
-                    updateButtonDayDate(buttons[j], month, j - i + 1);
+                    updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
                     startDate += DAY;
                 }
                 int d = 1;

@@ -152,7 +152,12 @@ public class ImageViewer extends Component {
     @Override
     public void initComponent() {
         super.initComponent();
-        image.lock();
+        if(image == null) {
+            // gui builder?
+            image = Image.createImage(50, 50, 0);
+        } else {
+            image.lock();
+        }
         eagerLock();
     }
     

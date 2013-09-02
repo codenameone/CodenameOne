@@ -56,7 +56,7 @@ class JSONContent extends HashtableContent {
 	 * @throws IOException on error reading/parsing string
 	 */
 	public JSONContent(String content) throws IOException {
-		this(new ByteArrayInputStream(content.getBytes()));
+		this(new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8"));
 	}
 
 	/**

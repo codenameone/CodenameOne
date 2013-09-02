@@ -49,6 +49,7 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 import com.codename1.xml.Element;
+import java.io.InputStreamReader;
 import java.io.Reader;
 
 /**
@@ -160,7 +161,7 @@ public class Result {
 			throw new IllegalArgumentException("format cannot be null");
 		}
 		try {
-			return fromContent(new ByteArrayInputStream(content.getBytes()),
+			return fromContent(new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8"),
 					format);
 		} catch (IOException e) {
 			// should never get here with a string

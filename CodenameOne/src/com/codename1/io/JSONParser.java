@@ -37,9 +37,30 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class JSONParser implements JSONParseCallback {
-    private static char[] buffer;
-    private static int buffOffset;
-    private static int buffSize = -1;
+    static class ReaderClass {
+        char[] buffer;
+        int buffOffset;
+        int buffSize = -1;
+        int read(Reader is) throws IOException {
+            int c = -1;
+            if(buffer == null) {
+                buffer = new char[8192];
+            }
+
+            if(buffSize < 0 || buffOffset >= buffSize) {
+                buffSize = is.read(buffer, 0, buffer.length);
+                if(buffSize < 0) {
+                    return -1;
+                }
+                buffOffset = 0;
+            }
+            c = buffer[buffOffset];
+            buffOffset ++;
+
+            return c;
+        }
+
+    }
 
     private Hashtable state;
     private Vector parseStack;
@@ -63,25 +84,6 @@ public class JSONParser implements JSONParseCallback {
 		}
 	};
     
-    private static int read(Reader is) throws IOException {
-        int c = -1;
-        if(buffer == null) {
-            buffer = new char[8192];
-        }
-        
-        if(buffSize < 0 || buffOffset >= buffSize) {
-            buffSize = is.read(buffer, 0, buffer.length);
-            if(buffSize < 0) {
-                return -1;
-            }
-            buffOffset = 0;
-        }
-        c = buffer[buffOffset];
-        buffOffset ++;
-        
-        return c;
-    }
-
     /**
      * Static method! Parses the given input stream and fires the data into the given callback.
      *
@@ -91,15 +93,16 @@ public class JSONParser implements JSONParseCallback {
      */
     public static void parse(Reader i, JSONParseCallback callback) throws IOException {
         boolean quoteMode = false;
-        buffOffset = 0;
-        buffSize = -1;
+        ReaderClass rc = new ReaderClass();
+        rc.buffOffset = 0;
+        rc.buffSize = -1;
         StringBuilder currentToken = new StringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;
         try {
             while (callback.isAlive()) {
-                int currentChar = read(i);
+                int currentChar = rc.read(i);
                 if (currentChar < 0) {
                     return;
                 }
@@ -120,9 +123,9 @@ public class JSONParser implements JSONParseCallback {
                             quoteMode = false;
                             continue;
                         case '\\':
-                            c = (char) read(i);
+                            c = (char) rc.read(i);
                             if (c == 'u') {
-                                String unicode = "" + ((char) read(i)) + ((char) read(i)) + ((char) read(i)) + ((char) read(i));
+                                String unicode = "" + ((char) rc.read(i)) + ((char) rc.read(i)) + ((char) rc.read(i)) + ((char) rc.read(i));
                                 try {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
@@ -151,9 +154,9 @@ public class JSONParser implements JSONParseCallback {
                     switch (c) {
                         case 'n':
                             // check for null
-                            char u = (char) read(i);
-                            char l = (char) read(i);
-                            char l2 = (char) read(i);
+                            char u = (char) rc.read(i);
+                            char l = (char) rc.read(i);
+                            char l2 = (char) rc.read(i);
                             if (u == 'u' && l == 'l' && l2 == 'l') {
                                 // this is null
                                 callback.stringToken(null);
@@ -169,9 +172,9 @@ public class JSONParser implements JSONParseCallback {
                             continue;
                         case 't':
                             // check for true
-                            char a1 = (char) read(i);
-                            char a2 = (char) read(i);
-                            char a3 = (char) read(i);
+                            char a1 = (char) rc.read(i);
+                            char a2 = (char) rc.read(i);
+                            char a3 = (char) rc.read(i);
                             if (a1 == 'r' && a2 == 'u' && a3 == 'e') {
                                 callback.stringToken("true");
                                 if (lastKey != null) {
@@ -192,10 +195,10 @@ public class JSONParser implements JSONParseCallback {
                                 continue;
                             }
                             // check for false
-                            char b1 = (char) read(i);
-                            char b2 = (char) read(i);
-                            char b3 = (char) read(i);
-                            char b4 = (char) read(i);
+                            char b1 = (char) rc.read(i);
+                            char b2 = (char) rc.read(i);
+                            char b3 = (char) rc.read(i);
+                            char b4 = (char) rc.read(i);
                             if (b1 == 'a' && b2 == 'l' && b3 == 's' && b4 == 'e') {
                                 callback.stringToken("false");
                                 if (lastKey != null) {

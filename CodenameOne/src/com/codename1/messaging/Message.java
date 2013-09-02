@@ -25,6 +25,8 @@ package com.codename1.messaging;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Display;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Represents a message to be sent using underlying platform e-mail client.
@@ -40,6 +42,8 @@ public class Message {
     private String mimeType = MIME_TEXT;
     
     private String attachmentMimeType = MIME_IMAGE_JPG;
+
+    private HashMap<String, String> attachments;
     
     public static final String MIME_TEXT = "text/plain";
     
@@ -74,6 +78,20 @@ public class Message {
     }
 
     /**
+     * Returns the attachment map which can be used to add multiple attachments
+     * @return a map of file name to mime type that can be used to add attachments
+     */
+    public Map<String, String> getAttachments() {
+        if(attachments == null) {
+            attachments = new HashMap<String, String>();
+        } 
+        if(fileUri != null && attachmentMimeType != null && fileUri.length() > 0 && attachmentMimeType.length() > 0 && !attachments.containsKey(fileUri)) {
+            attachments.put(fileUri, attachmentMimeType);
+        }
+        return attachments;
+    }
+    
+    /**
      * Sets the message mime type.
      * 
      * @param mimeType 
@@ -85,7 +103,7 @@ public class Message {
     /**
      * Gets the message mime type
      * 
-     * @return 
+     * @return the mime type
      */
     public String getMimeType() {
         return mimeType;
@@ -119,12 +137,12 @@ public class Message {
     
     /**
      * Send an email using the platform mail client
-     * @param recieptents array of e-mail addresses
+     * @param recipients array of e-mail addresses  
      * @param subject e-mail subject
      * @param msg the Message to send
      */
-    public static void sendMessage(String [] recieptents, String subject, Message msg){
-        Display.getInstance().sendMessage(recieptents, subject, msg);
+    public static void sendMessage(String [] recipients, String subject, Message msg){
+        Display.getInstance().sendMessage(recipients, subject, msg);
     }
     
 

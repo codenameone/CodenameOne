@@ -135,6 +135,10 @@ public class DefaultCrashReporter implements CrashReport {
             java.util.Timer t = new java.util.Timer();
             t.schedule(new TimerTask() {
                 public void run() {
+                    if(!Display.getInstance().isEdt()) {
+                        Display.getInstance().callSerially(this);
+                        return;
+                    }
                     Log.sendLog();
                 }
             }, frequency * 60000, frequency * 60000);

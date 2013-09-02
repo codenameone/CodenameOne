@@ -127,6 +127,14 @@ public class Preferences {
     }
 
     /**
+     * Remove all preferences
+     */
+    public static void clearAll() {
+        get().clear();
+        save();        
+    }
+
+    /**
      * Sets a preference value
      * 
      * @param pref the key any unique none null value that doesn't start with cn1
