@@ -89,7 +89,9 @@ public abstract class ImageIO {
      * @param quality the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1.
      */
     public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException{
-        save(FileSystemStorage.getInstance().openInputStream(imageFilePath), response, format, width, height, quality); 
+        InputStream in = FileSystemStorage.getInstance().openInputStream(imageFilePath);
+        save(in, response, format, width, height, quality); 
+        in.close();
     }
 
 
