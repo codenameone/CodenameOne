@@ -92,7 +92,7 @@ public class SideMenuBar extends MenuBar {
     public static void closeCurrentMenu() {
         Form f = Display.getInstance().getCurrent();
         SideMenuBar b = (SideMenuBar)f.getClientProperty("cn1$sideMenuParent");
-        if(b != null) {
+        if(b != null && !b.transitionRunning) {
             b.closeMenu();
         }
     }
@@ -106,7 +106,7 @@ public class SideMenuBar extends MenuBar {
     public static void closeCurrentMenu(final Runnable callback) {
         Form f = Display.getInstance().getCurrent();
         SideMenuBar b = (SideMenuBar)f.getClientProperty("cn1$sideMenuParent");
-        if(b != null) {
+        if(b != null && !b.transitionRunning) {
             b.parent.addShowListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     callback.run();
@@ -314,6 +314,9 @@ public class SideMenuBar extends MenuBar {
      * Closes the menu if it is currently open
      */
     public void closeMenu() {
+        if(transitionRunning) {
+            return;
+        }
         if (Display.getInstance().getCurrent()  == menu) {
             parent.showBack();
         }
@@ -604,6 +607,9 @@ public class SideMenuBar extends MenuBar {
 
             public void keyReleased(int keyCode) {
                 if (keyCode == leftSK) {
+                    if(transitionRunning) {
+                        return;
+                    }
                     closeMenu();
                     return;
                 }
@@ -619,6 +625,9 @@ public class SideMenuBar extends MenuBar {
         m.setBackCommand(new Command("") {
 
             public void actionPerformed(ActionEvent evt) {
+                if(transitionRunning) {
+                    return;
+                }
                 closeMenu();
             }
         });
@@ -778,6 +787,9 @@ public class SideMenuBar extends MenuBar {
         }
 
         public void actionPerformed(final ActionEvent evt) {
+            if(transitionRunning) {
+                return;
+            }
             closeMenu();
             clean();
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
