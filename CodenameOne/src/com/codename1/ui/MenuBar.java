@@ -382,7 +382,11 @@ public class MenuBar extends Container implements ActionListener {
             }
         }
         if (t.getComponentCount() > 1) {
-            titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            if (Display.COMMAND_BEHAVIOR_ICS == getCommandBehavior()) {
+                titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            } else {
+                titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+            }
             Label l = parent.getTitleComponent();
             if (l.getParent() != null) {
                 l.getParent().removeComponent(l);

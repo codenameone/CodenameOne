@@ -243,7 +243,15 @@ public abstract class FullScreenAdService {
             addComponent(BorderLayout.CENTER, ad);                
             Command open = new Command("Open") {
                 public void actionPerformed(ActionEvent ev) {
-                    Display.getInstance().execute(getAdDestination());
+                    blocked = false;
+                    
+                    // move to the next screen so the ad will be shown and so we 
+                    // can return to the next screen and not this screen
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Display.getInstance().execute(getAdDestination());
+                        }
+                    });
                 }
             };
             Command skip = new Command("Skip") {

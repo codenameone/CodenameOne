@@ -183,7 +183,7 @@ public class Base64 {
     public static String encodeNoNewline(byte[] in) {
         // notice that this method isn't genric to increase performance slightly
         int length = in.length * 4 / 3;
-        length += length / 76; 
+        length += length / 76 + 3; 
         byte[] out = new byte[length];
         int index = 0, i, end = in.length - in.length%3;
         for (i=0; i<end; i+=3) {

@@ -390,7 +390,7 @@ public class Table extends Container {
     protected Component createCell(Object value, int row, int column, boolean editable) {
         if(row == -1) {
             Label header = new Label((String)value);
-            header.setUIID("TableHeader");
+            header.setUIID(getUIID() + "Header");
             header.getUnselectedStyle().setAlignment(titleAlignment);
             header.getSelectedStyle().setAlignment(titleAlignment);
             header.setFocusable(true);
@@ -399,11 +399,11 @@ public class Table extends Container {
         if(editable) {
             TextField cell = new TextField("" + value, -1);
             cell.setLeftAndRightEditingTrigger(false);
-            cell.setUIID("TableCell");
+            cell.setUIID(getUIID() + "Cell");
             return cell;
         }
         Label cell = new Label("" + value);
-        cell.setUIID("TableCell");
+        cell.setUIID(getUIID() + "Cell");
         cell.getUnselectedStyle().setAlignment(cellAlignment);
         cell.getSelectedStyle().setAlignment(cellAlignment);
         cell.setFocusable(true);

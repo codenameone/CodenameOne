@@ -27,9 +27,14 @@ package com.codename1.io.services;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Label;
+import com.codename1.util.Base64;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Hashtable;
+import java.util.Vector;
 
 /**
  * Calls to the Twitter REST API can be performed via this class although currently
@@ -39,13 +44,19 @@ import java.io.InputStreamReader;
  * @author Shai Almog
  */
 public class TwitterRESTService extends ConnectionRequest {
+    private static String authToken;
+    private Hashtable parseTree;
+    
+    public static final String METHOD_USER_TIMELINE = "statuses/user_timeline";
+    public static final String METHOD_TWEETS = "search/tweets";
+    
     /**
      * The constructor accepts the method to invoke
      *
      * @param method the api method to invoke e.g. "statuses/public_timeline"
      */
     public TwitterRESTService(String method) {
-        this(method, "1", false);
+        this(method, "1.1", false);
     }
 
     /**
@@ -55,9 +66,47 @@ public class TwitterRESTService extends ConnectionRequest {
      * @param post true for post requests and false for get request
      */
     public TwitterRESTService(String method, boolean post) {
-        this(method, "1", post);
+        this(method, "1.1", post);
     }
 
+    /**
+     * Logs in to twitter as an application
+     * 
+     * @param consumerKey the key to login with
+     * @param consumerSecret the secret to to login with
+     * @return the authorization token
+     */
+    public static String initToken(String consumerKey, String consumerSecret) {
+        ConnectionRequest auth = new ConnectionRequest() {
+            protected void readResponse(InputStream input) throws IOException  {
+                JSONParser p = new JSONParser();
+                Hashtable h = p.parse(new InputStreamReader(input));
+                authToken = (String)h.get("access_token");
+                if(authToken == null) {
+                    return;
+                }
+            }
+        };
+        auth.setPost(true);
+        auth.setUrl("https://api.twitter.com/oauth2/token");
+        
+        // YOU MUST CHANGE THIS IF YOU BUILD YOUR OWN APP
+        String encoded = Base64.encodeNoNewline((consumerKey + ":" + consumerSecret).getBytes());
+        auth.addRequestHeader("Authorization", "Basic " + encoded);
+        auth.setContentType("application/x-www-form-urlencoded;charset=UTF-8");
+        auth.addArgument("grant_type", "client_credentials");
+        NetworkManager.getInstance().addToQueueAndWait(auth);
+        return authToken;
+    }
+    
+    /**
+     * For every request twitter now needs an authorization token
+     * @param token the token
+     */
+    public static void setToken(String token) {
+        authToken = token;
+    }
+    
     /**
      * The constructor accepts the method to invoke
      *
@@ -67,7 +116,10 @@ public class TwitterRESTService extends ConnectionRequest {
      */
     public TwitterRESTService(String method, String version, boolean post) {
         setPost(post);
-        setUrl("http://api.twitter.com/" + version + "/" + method + ".json");
+        setUrl("https://api.twitter.com/" + version + "/" + method + ".json");
+        addRequestHeader("Authorization", "Bearer " + authToken);
+        setContentType("application/json");
+        addRequestHeader("Accept", "application/json");
     }
 
 
@@ -76,6 +128,49 @@ public class TwitterRESTService extends ConnectionRequest {
      */
     protected void readResponse(InputStream input) throws IOException  {
         InputStreamReader i = new InputStreamReader(input, "UTF-8");
-        fireResponseListener(new NetworkEvent(this, new JSONParser().parse(i)));
+        parseTree = new JSONParser().parse(i);
+        fireResponseListener(new NetworkEvent(this, parseTree));
+    }
+    
+    /**
+     * Returns the full Hashtable parse tree read from the server
+     * @return the parse tree
+     */
+    public Hashtable<String, Object> getParseTree() {
+        return parseTree;
+    }
+    
+    /**
+     * Returns the number of statuses within the response
+     * @return the number of statuses
+     */
+    public int getStatusesCount() {
+        Vector v = (Vector)parseTree.get("statuses");
+        if(v == null) {
+            return 0;
+        }
+        return v.size();
+    }
+
+    /**
+     * Returns the status at the given offset
+     * @param offset  the offset for the status
+     * @return the status hashtable
+     */
+    public Hashtable<String, Object> getStatus(int offset) {
+        Vector v = (Vector)parseTree.get("statuses");
+        return (Hashtable<String, Object>)v.get(offset);
+    }
+    
+    /**
+     * Gets the id string of the first entry which is important if we want to set the id
+     * to start with in the next request
+     * @return the id of the first entry
+     */
+    public String getIdStr() {
+        if(getStatusesCount() > 0) {
+            return (String)getStatus(0).get("id_str");
+        }
+        return null;
     }
 }

@@ -78,6 +78,13 @@ public class ImageViewer extends Component {
     /**
      * @inheritDoc
      */
+    protected boolean shouldBlockSideSwipe() {
+        return true;
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public Class[] getPropertyTypes() {
        return new Class[] {Boolean.class, Image.class, 
            com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), Image.class};

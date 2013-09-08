@@ -241,6 +241,7 @@ public class SideMenuBar extends MenuBar {
             return;
         }
         addOpenButton();
+        installRightCommand();
         if (getBackCommand() != null
                 && getCommandCount() > 0
                 && !UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)
@@ -290,8 +291,8 @@ public class SideMenuBar extends MenuBar {
             }
             parent.getTitleArea().removeAll();
             parent.getTitleArea().addComponent(BorderLayout.CENTER, parent.getTitleComponent());
-
         }
+        installRightCommand();
     }
 
     public void keyReleased(int keyCode) {

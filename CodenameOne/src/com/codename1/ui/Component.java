@@ -1453,7 +1453,6 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollY(int scrollY) {
         // the setter must always update the value regardless... 
-        int oy = this.scrollY;
         this.scrollY = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             int h = getScrollDimension().getHeight() - getHeight();

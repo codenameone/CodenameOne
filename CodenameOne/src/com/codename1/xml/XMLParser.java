@@ -794,6 +794,14 @@ public class XMLParser {
                 }
             } else {
                 if (endTagPos!=0) { //add - or -- if it wasn't an end tag eventually
+                    // with cdata it might end with ]]> but we might have a string such as ]]]>
+                    // which is valid and the first ] is just a part of the string... So we need to check
+                    // for that special case http://code.google.com/p/codenameone/issues/detail?id=865
+                    if(c == endTagChars[0] && endTagPos > 1) {
+                        text.append(c);
+                        continue;
+                    }
+                    
                     text.append(endTagChars, 0, endTagPos);
                     endTagPos=0;
                 }

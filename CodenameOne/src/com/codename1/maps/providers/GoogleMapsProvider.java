@@ -37,6 +37,20 @@ import com.codename1.ui.geom.Dimension;
  * @author Chen
  */
 public class GoogleMapsProvider extends TiledProvider{
+
+    /**
+     * @return the tileSize
+     */
+    public static int getTileSize() {
+        return tileSize;
+    }
+
+    /**
+     * @param aTileSize the tileSize to set
+     */
+    public static void setTileSize(int aTileSize) {
+        tileSize = aTileSize;
+    }
     
     private String apiKey;
     
@@ -44,6 +58,8 @@ public class GoogleMapsProvider extends TiledProvider{
     
     private String language;
     private boolean sensor;
+    
+    private static int tileSize = 256;
     
     /**
      * This is a regular road map
@@ -66,7 +82,7 @@ public class GoogleMapsProvider extends TiledProvider{
      * https://developers.google.com/maps/documentation/staticmaps/#api_key
      */
      public GoogleMapsProvider(String apiKey) {
-        super("http://maps.googleapis.com/maps/api/staticmap?", new Mercator(), new Dimension(256, 256));
+        super("http://maps.googleapis.com/maps/api/staticmap?", new Mercator(), new Dimension(tileSize, tileSize));
         this.apiKey = apiKey;
     }
     
@@ -108,7 +124,10 @@ public class GoogleMapsProvider extends TiledProvider{
         sb.append(c.getLongitude());
         sb.append("&format=png");
         sb.append("&zoom="+_zoomLevel);
-        sb.append("&size=256x256");
+        sb.append("&size=");
+        sb.append(tileSize);
+        sb.append("x");
+        sb.append(tileSize);
         sb.append("&sensor=");
         sb.append(sensor);
         if(language != null) {
