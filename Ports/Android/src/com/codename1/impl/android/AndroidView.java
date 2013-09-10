@@ -360,6 +360,22 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
     }
 
     private boolean onKeyUpDown(boolean down, int keyCode, KeyEvent event) {
+        keyCode = this.internalKeyCodeTranslate(keyCode);
+        
+        switch(keyCode){
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_UP:
+            case KeyEvent.KEYCODE_SEARCH:
+            case KeyEvent.KEYCODE_SHIFT_LEFT:
+            case KeyEvent.KEYCODE_SHIFT_RIGHT:
+            case KeyEvent.KEYCODE_ALT_LEFT:
+            case KeyEvent.KEYCODE_ALT_RIGHT:
+            case KeyEvent.KEYCODE_SYM:
+            case KeyEvent.KEYCODE_ENTER:
+                return false;
+            default:
+        }
+        
         if (event.getRepeatCount() > 0) {
             // skip repeats
             return true;
@@ -373,7 +389,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
             return true;
         }
 
-        keyCode = this.internalKeyCodeTranslate(keyCode);
 
         if (keyCode == AndroidImplementation.DROID_IMPL_KEY_FIRE) {
             this.fireKeyDown = down;
@@ -413,17 +428,7 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
                     Display.getInstance().keyReleased(keyCode);
                 }
                 return true;
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
-            case KeyEvent.KEYCODE_VOLUME_UP:
-            case KeyEvent.KEYCODE_SEARCH:
-            case KeyEvent.KEYCODE_SHIFT_LEFT:
-            case KeyEvent.KEYCODE_SHIFT_RIGHT:
-            case KeyEvent.KEYCODE_ALT_LEFT:
-            case KeyEvent.KEYCODE_ALT_RIGHT:
-            case KeyEvent.KEYCODE_SYM:
-            case KeyEvent.KEYCODE_ENTER:
-                // skip
-                break;
+                
             default:
 
                 /**
@@ -453,7 +458,6 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
                 return true;
 
         }
-        return false;
     }
 
     @Override
