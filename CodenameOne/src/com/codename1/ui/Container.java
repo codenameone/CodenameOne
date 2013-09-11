@@ -830,6 +830,19 @@ public class Container extends Component {
             }
         }
     }
+    
+    /**
+     * @inheritDoc
+     */
+    public void clearClientProperties(){
+        super.clearClientProperties();
+        int c = getComponentCount();
+        for(int iter = 0 ; iter < c ; iter++) {
+            Component cmp = getComponentAt(iter);
+            cmp.clearClientProperties();
+        }    
+    }
+
 
     private void paintContainerChildrenForAnimation(Container cnt, Graphics g) {
         int ourX = getAbsoluteX();

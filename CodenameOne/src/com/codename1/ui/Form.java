@@ -244,6 +244,16 @@ public class Form extends Container {
         }
         showListener.removeListener(l);
     }
+    
+    /**
+     * Removes all Show Listeners from this Form
+     */ 
+    public void removeAllShowListeners(){
+        if(showListener != null){
+            showListener.getListenerVector().removeAllElements();
+            showListener = null;
+        }
+    }
 
     /**
      * This listener is invoked when device orientation changes on devices that support orientation change

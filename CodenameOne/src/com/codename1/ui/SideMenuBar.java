@@ -31,6 +31,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -381,7 +382,13 @@ public class SideMenuBar extends MenuBar {
     private void setMenuGlassPane(Form m) {
         final boolean isRTL = m.isRTL();
         final Image i = rightPanel.getStyle().getBgImage();
-
+        UIManager uim = rightPanel.getUIManager();
+        Image sh = (Image)uim.getThemeImageConstant("sideMenuShadowImage");
+        if(sh == null){
+            sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+        }
+        final Image shadow = sh;
+        
         if (m.getGlassPane() == null) {
             m.setGlassPane(new Painter() {
 
@@ -392,22 +399,36 @@ public class SideMenuBar extends MenuBar {
                         boolean b = c.isVisible();
                         c.setVisible(true);
                         if (isRTL) {
-                            int x = Math.max(draggedX, rightPanel.getWidth()) - c.getWidth();
+                            int x = Math.max(draggedX, rightPanel.getWidth()) - c.getWidth();                            
                             g.translate(x, 0);
+                            if(shadow != null){
+                                g.tileImage(shadow, x + c.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                            }
                             c.paintComponent(g, true);
                             g.translate(-x, 0);
                         } else {
                             int x = Math.min(draggedX, rightPanel.getX());
                             g.translate(x, 0);
+                            if(shadow != null){
+                                g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                            }
                             c.paintComponent(g, true);
                             g.translate(-x, 0);
                         }
                         c.setVisible(b);
                     } else {
                         if (isRTL) {
-                            g.drawImage(i, Math.max(draggedX, rightPanel.getWidth()) - i.getWidth(), 0);
+                            int x = Math.max(draggedX, rightPanel.getWidth()) - i.getWidth();
+                            if(shadow != null){
+                                g.tileImage(shadow, x + i.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                            }
+                            g.drawImage(i, x, 0);
                         } else {
-                            g.drawImage(i, Math.min(draggedX, rightPanel.getX()), 0);
+                            int x = Math.min(draggedX, rightPanel.getX());
+                            if(shadow != null){
+                                g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                            }
+                            g.drawImage(i, x, 0);
                         }
                     }
                 }
@@ -446,7 +467,30 @@ public class SideMenuBar extends MenuBar {
                 menu.addComponent(createTouchCommandButton(c));
             }
         }
-        return menu;
+        UIManager uim = menu.getUIManager();
+        Image sh = (Image)uim.getThemeImageConstant("sideMenuShadowImage");
+        if(sh == null){
+            sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+        }
+        final Image shadow = sh;
+        
+        if(shadow == null){
+            return menu;
+        }else{
+            Container main = new Container(new LayeredLayout());
+            Label shadowLabel = new Label();
+            shadowLabel.setPreferredW(shadow.getWidth());
+            shadowLabel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER);
+            shadowLabel.getStyle().setBgImage(shadow);
+            shadowLabel.getStyle().setPadding(0, 0, 0, 0);
+            shadowLabel.getStyle().setMargin(0, 0, 0, 0);
+            Container c = new Container(new BorderLayout());
+            c.addComponent(BorderLayout.EAST, shadowLabel);
+
+            main.addComponent(menu);
+            main.addComponent(c);
+            return main;
+        }
     }
 
     /**
@@ -671,7 +715,7 @@ public class SideMenuBar extends MenuBar {
         }
         sidePanel = createSideNavigationComponent(getCommands());
         m.addComponent(BorderLayout.CENTER, sidePanel);
-        m.addComponent(BorderLayout.EAST, rightPanel);
+        m.addComponent(BorderLayout.EAST, rightPanel);        
         m.putClientProperty("cn1$sideMenuParent", this);
         return m;
     }
@@ -684,7 +728,8 @@ public class SideMenuBar extends MenuBar {
         private int position;
         private Image buffer;
         private int dest;
-
+        private Image shadow;
+        
         public MenuTransition(int speed, boolean fwd, int dest) {
             this.speed = speed;
             this.fwd = fwd;
@@ -728,7 +773,11 @@ public class SideMenuBar extends MenuBar {
                     rightPanel.putClientProperty("$parent", getDestination());
                 }
             }
-
+            shadow = (Image)getUIManager().getThemeImageConstant("sideMenuShadowImage");
+            if(shadow == null){
+                shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+            }
+    
             motion.start();
         }
 
@@ -756,20 +805,32 @@ public class SideMenuBar extends MenuBar {
             if(Display.getInstance().areMutableImagesFast()) {
                 if (fwd) {
                     dest.paintComponent(g, true);
+                    if(shadow != null){
+                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
+                    }
                     g.drawImage(buffer, position, 0);
                 } else {
                     src.paintComponent(g, true);
+                    if(shadow != null){
+                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
+                    }
                     g.drawImage(buffer, position, 0);
                 }
             } else {
                 if (fwd) {
                     dest.paintComponent(g, true);
                     g.translate(position, 0);
+                    if(shadow != null){
+                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
+                    }
                     src.paintComponent(g, true);
                     g.translate(-position, 0);
                 } else {
                     src.paintComponent(g, true);
                     g.translate(position, 0);
+                    if(shadow != null){
+                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
+                    }
                     dest.paintComponent(g, true);
                     g.translate(-position, 0);
                 }

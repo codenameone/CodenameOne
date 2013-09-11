@@ -361,6 +361,16 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Clears all client properties from this Component
+     */ 
+    public void clearClientProperties(){
+        if(clientProperties != null){
+            clientProperties.clear();
+            clientProperties = null;
+        }
+    }
+    
+    /**
      * Client properties allow the association of meta-data with a component, this
      * is useful for some applications that construct GUI's on the fly and need
      * to track the connection between the UI and the data. Setting the value to
@@ -3269,7 +3279,7 @@ public class Component implements Animation, StyleListener {
             Painter p = stl.getBgPainter();
             if(p instanceof BGPainter) {
                 ((BGPainter)p).radialCache = null;
-            }
+            }           
             deinitialize();
         }
     }
