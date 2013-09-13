@@ -153,6 +153,10 @@ public class SideMenuBar extends MenuBar {
         } else {
             openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
         }
+        Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
+        if (p != null) {
+            openButton.setPressedIcon(p);
+        } 
         openButton.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
