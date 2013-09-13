@@ -471,6 +471,9 @@ public class SideMenuBar extends MenuBar {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         menu.setUIID("SideNavigationPanel");
         menu.setScrollableY(true);
+        if(!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
+            menu.setTensileDragEnabled(false);
+        }
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
             Component cmp = (Component) c.getClientProperty("SideComponent");
