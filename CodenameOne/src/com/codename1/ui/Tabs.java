@@ -87,9 +87,10 @@ public class Tabs extends Container {
     private int textPosition = -1;
     private boolean changeTabOnFocus;
     private boolean changeTabContainerStyleOnFocus;
-
+    private int tabsGap = 0;
     private Style originalTabsContainerUnselected, originalTabsContainerSelected;
-
+    
+    
     /**
      * Creates an empty <code>TabbedPane</code> with a default
      * tab placement of <code>Component.TOP</code>.
@@ -233,14 +234,15 @@ public class Tabs extends Container {
         if (slideToDestMotion != null && swipeActivated) {
             int motionX = slideToDestMotion.getValue();
             final int size = contentPane.getComponentCount();
+            int tabWidth = contentPane.getWidth() - tabsGap*2;
             for (int i = 0; i < size; i++) {
                 int xOffset;
                 if(isRTL()) {
-                    xOffset = (size - i) * contentPane.getWidth();
-                    xOffset -= ((size - active) * contentPane.getWidth());
+                    xOffset = (size - i) * tabWidth;
+                    xOffset -= ((size - active) * tabWidth);
                 } else {
-                    xOffset = i * contentPane.getWidth();
-                    xOffset -= (active * contentPane.getWidth());
+                    xOffset = i * tabWidth;
+                    xOffset -= (active * tabWidth);
                 }
                 xOffset += motionX;
                 Component component = contentPane.getComponentAt(i);
@@ -868,6 +870,20 @@ public class Tabs extends Container {
     public void setChangeTabContainerStyleOnFocus(boolean changeTabContainerStyleOnFocus) {
         this.changeTabContainerStyleOnFocus = changeTabContainerStyleOnFocus;
     }
+    
+    /**
+     * This method allows setting the Tabs content pane spacing (right and left), 
+     * This can be used to create an effect where the selected tab is smaller 
+     * and the right and left tabs are visible on the sides
+     * @param tabsGap the gap on the sides of the content in pixels, the value must
+     * be positive.
+     */
+    public void setTabsContentGap(int tabsGap){
+        if(tabsGap < 0){
+            throw new IllegalArgumentException("gap must be positive");
+        }
+        this.tabsGap = tabsGap;
+    }
 
     private void setTabsLayout(int tabPlacement) {
         if (tabPlacement == TOP || tabPlacement == BOTTOM) {
@@ -900,19 +916,21 @@ public class Tabs extends Container {
 
         public void layoutContainer(Container parent) {
             final int size = parent.getComponentCount();
+           
+            int tabWidth = parent.getWidth() - tabsGap*2;
             for (int i = 0; i < size; i++) {
                 int xOffset;
                 if(parent.isRTL()) {
-                    xOffset = (size - i) * parent.getWidth();
-                    xOffset -= ((size - activeComponent) * parent.getWidth());
+                    xOffset = (size - i) * tabWidth + tabsGap;
+                    xOffset -= ((size - activeComponent) * tabWidth);
                 } else {
-                    xOffset = i * parent.getWidth();
-                    xOffset -= (activeComponent * parent.getWidth());
+                    xOffset = i * tabWidth + tabsGap;
+                    xOffset -= (activeComponent * tabWidth);
                 }
                 Component component = parent.getComponentAt(i);
                 component.setX(component.getStyle().getMargin(Component.LEFT) + xOffset);
                 component.setY(component.getStyle().getMargin(Component.TOP));
-                component.setWidth(parent.getWidth() - component.getStyle().getMargin(Component.LEFT)
+                component.setWidth(tabWidth - component.getStyle().getMargin(Component.LEFT)
                         - component.getStyle().getMargin(Component.RIGHT));
                 component.setHeight(parent.getHeight() - component.getStyle().getMargin(Component.TOP)
                         - component.getStyle().getMargin(Component.BOTTOM));
@@ -1102,7 +1120,7 @@ public class Tabs extends Container {
                                 }
                             }
                             int start = contentPane.getComponentAt(active).getX();
-                            int end = 0;
+                            int end = tabsGap;
                             slideToDestMotion = Motion.createSplineMotion(start, end, 250);
                             slideToDestMotion.start();
                             Form form = getComponentForm();

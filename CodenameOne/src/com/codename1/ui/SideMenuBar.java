@@ -60,6 +60,8 @@ public class SideMenuBar extends MenuBar {
     int initialDragX;
     int initialDragY;
     boolean transitionRunning;
+    private ActionListener pointerDragged;
+    private ActionListener pointerPressed;
     
     /**
      * Empty Constructor
@@ -119,6 +121,18 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    @Override
+    protected void unInstallMenuBar() {
+        super.unInstallMenuBar();
+        if(pointerDragged != null){
+            parent.removePointerDraggedListener(pointerDragged);
+        }
+        if(pointerPressed != null){
+            parent.removePointerPressedListener(pointerPressed);
+        }
+    }
+
+    
     /**
      * @inheritDoc
      */
@@ -147,12 +161,12 @@ public class SideMenuBar extends MenuBar {
         });
         addOpenButton();
         
-        if(uim.isThemeConstant("sideMenuFoldedSwipe", true)) {
-            parent.addPointerDraggedListener(new ActionListener() {
+        if(uim.isThemeConstant("sideMenuFoldedSwipe", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
+            pointerDragged = new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     if(sideSwipePotential) {
-                        int x = evt.getX();
-                        int y = evt.getY();
+                        final int x = evt.getX();
+                        final int y = evt.getY();
                         if(Math.abs(y - initialDragY) > x - initialDragX) {
                             sideSwipePotential = false;
                             return;
@@ -161,12 +175,14 @@ public class SideMenuBar extends MenuBar {
                         if(x - initialDragX > Display.getInstance().getDisplayWidth() / 15) {
                             draggedX = x;
                             dragActivated = true;
+                            parent.pointerReleased(x, y);
                             openMenu(0, draggedX);
                         }
                     }
                 }
-            });
-            parent.addPointerPressedListener(new ActionListener() {
+            };
+            parent.addPointerDraggedListener(pointerDragged);
+            pointerPressed = new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     sideSwipePotential = !transitionRunning && evt.getX() < Display.getInstance().getDisplayWidth() / 11;
                     initialDragX = evt.getX();
@@ -188,7 +204,9 @@ public class SideMenuBar extends MenuBar {
                         }
                     }
                 }
-            });
+            };
+            parent.addPointerPressedListener(pointerPressed);
+            parent.putClientProperty("sideMenuFoldedSwipeListeners", "true");
         }
     }
 
@@ -365,9 +383,10 @@ public class SideMenuBar extends MenuBar {
             }
             titleArea.addComponent(BorderLayout.CENTER, l);
             installRightCommand();
+            ((BorderLayout)titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
         }
     }
-
+    
     private void clean() {
         if(out != null){
             parent.setTransitionOutAnimator(out);
