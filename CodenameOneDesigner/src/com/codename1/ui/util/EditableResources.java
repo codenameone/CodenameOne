@@ -76,11 +76,13 @@ import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -717,6 +719,7 @@ public class EditableResources extends Resources implements TreeModel {
         try {
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(xml), "UTF-8"));
             String[] resourceNames = getResourceNames();
+            Arrays.sort(resourceNames, String.CASE_INSENSITIVE_ORDER);
 
             bw.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
             bw.write("<resource majorVersion=\"" + MAJOR_VERSION + "\" minorVersion=\"" + MINOR_VERSION + "\">\n");
@@ -832,7 +835,9 @@ public class EditableResources extends Resources implements TreeModel {
                         theme.remove("name");
                         bw.write("    <theme name=\"" + xResourceName + "\">\n");
 
-                        for(String key : theme.keySet()) {
+                        ArrayList<String> setOfKeys = new ArrayList<String>(theme.keySet());
+                        Collections.sort(setOfKeys);
+                        for(String key : setOfKeys) {
 
                             if(key.startsWith("@")) {
                                 if(key.endsWith("Image")) {
