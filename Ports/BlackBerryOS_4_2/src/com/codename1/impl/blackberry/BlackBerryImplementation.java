@@ -1331,7 +1331,6 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         protected EditPopup(TextArea lightweightEdit, int maxSize) {
             super(new VerticalFieldManager(VerticalFieldManager.VERTICAL_SCROLL), Field.FOCUSABLE | Field.EDITABLE | Screen.DEFAULT_MENU);
-            
             UIManager m = UIManager.getInstance();
             okString = m.localize("ok", "OK");
             cancelString = m.localize("cancel", "Cancel");
@@ -1356,9 +1355,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
 
             if ((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
-                nativeEdit = new BBPasswordEditField(lightweightEdit, type, maxSize);
+                nativeEdit = new BBPasswordEditField(lightweightEdit, type, maxSize, 0xffffff);
             } else {
-                nativeEdit = new BBEditField(lightweightEdit, type, maxSize);
+                nativeEdit = new BBEditField(lightweightEdit, type, maxSize, 0xffffff);
             }
             
             
@@ -1477,11 +1476,17 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         private TextArea lightweightEdit = null;
         private NativeEditCallback callback = new NativeEditCallback();
+        private int fgColor;
 
+        public BBEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor) {
+            this(lightweightEdit, type, maxSize);
+            this.fgColor = fgColor;
+        }
+        
         public BBEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | Field.SPELLCHECKABLE | type);
             this.lightweightEdit = lightweightEdit;
-            systemOut("BBEditField");
+            this.fgColor = lightweightEdit.getSelectedStyle().getFgColor();
         }
 
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
@@ -1495,7 +1500,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         public void paint(net.rim.device.api.ui.Graphics g) {
             g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
-            g.setColor(lightweightEdit.getSelectedStyle().getFgColor());
+            g.setColor(fgColor);
             super.paint(g);
         }
 
@@ -1552,10 +1557,17 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         private TextArea lightweightEdit = null;
         private NativeEditCallback callback = new NativeEditCallback();
+        private int fgColor;
 
+        public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor) {
+            this(lightweightEdit, type, maxSize);
+            this.fgColor = fgColor;
+        }
+        
         public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, NO_COMPLEX_INPUT | Field.EDITABLE | Field.FOCUSABLE | type);
             this.lightweightEdit = lightweightEdit;
+            this.fgColor = lightweightEdit.getSelectedStyle().getFgColor();
         }
         
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
@@ -1566,9 +1578,8 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         public void paint(net.rim.device.api.ui.Graphics g) {
             g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
-            g.setColor(lightweightEdit.getSelectedStyle().getFgColor());
+            g.setColor(fgColor);
             g.drawText(getPasswordsChars(super.getText()), 0, 0);
-            //super.paint(g);
             
         }
 
