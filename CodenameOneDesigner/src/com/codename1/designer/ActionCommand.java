@@ -64,6 +64,7 @@ public class ActionCommand extends com.codename1.ui.Command {
     public boolean equals(Object o) {
         return super.equals(o) && o instanceof ActionCommand && 
                 (action == ((ActionCommand)o).action || action != null && action.equals(((ActionCommand)o).action)) &&
-                ((ActionCommand)o).backCommand == backCommand;
+                ((ActionCommand)o).backCommand == backCommand && ((ActionCommand)o).getPressedIcon() == getPressedIcon() && 
+                ((ActionCommand)o).getRolloverIcon()== getRolloverIcon();
     }
 }
