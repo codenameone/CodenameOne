@@ -511,7 +511,7 @@ public class ThemeEditor extends BaseForm {
                         resources.setThemeProperty(themeName, key + ".press#derive", key);
                         resources.setThemeProperty(themeName, key + ".dis#derive", key);
                     } else {
-                        resources.setThemeProperty(themeName, key + "." + destination + "derive", deriveKey);
+                        resources.setThemeProperty(themeName, key + "." + destination + "derive", key);
                     }
                     initTableModel(theme, null);
                     initTableModel(selectedStyles, "sel#");
