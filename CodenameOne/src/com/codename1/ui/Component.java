@@ -1434,6 +1434,26 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * This method can be overriden to receive scroll events, unlike overriding setScrollX 
+     * it will receive all calls for scrolling. Normally you should not override this method
+     * and try to find a more creative solution since scrolling is very specific to platform
+     * behavior.
+     * @param scrollX the X position of the scrolling
+     */
+    protected void onScrollX(int scrollX) {
+    }
+    
+    /**
+     * This method can be overriden to receive scroll events, unlike overriding setScrollY
+     * it will receive all calls for scrolling. Normally you should not override this method
+     * and try to find a more creative solution since scrolling is very specific to platform
+     * behavior.
+     * @param scrollY the Y position of the scrolling
+     */
+    protected void onScrollY(int scrollY) {
+    }
+    
+    /**
      * Indicates the X position of the scrolling, this number is relative to the
      * component position and so a position of 0 would indicate the x position
      * of the component.
@@ -1442,7 +1462,6 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollX(int scrollX) {
         // the setter must always update the value regardless...
-        int ox = this.scrollX;
         this.scrollX = scrollX;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             this.scrollX = Math.min(this.scrollX, getScrollDimension().getWidth() - getWidth());
@@ -1452,6 +1471,7 @@ public class Component implements Animation, StyleListener {
             onParentPositionChange();
             repaint();
         }
+        onScrollX(scrollX);
     }
 
     /**
@@ -1476,6 +1496,7 @@ public class Component implements Animation, StyleListener {
             onParentPositionChange();            
             repaint();
         }
+        onScrollY(scrollY);
     }
 
     /**
@@ -2961,11 +2982,14 @@ public class Component implements Animation, StyleListener {
                             draggedMotionY = null;
                         }
                     }
-
                 }
+                
+                // special callback to scroll Y to allow developers to override the setScrollY method effectively
+                setScrollY(dragVal);
             }
 
             scrollY = dragVal;
+            onScrollY(scrollY);
             updateTensileHighlightIntensity();
             animateY = true;
         }
@@ -2995,11 +3019,14 @@ public class Component implements Animation, StyleListener {
                             draggedMotionX = null;
                         }
                     }
-
                 }
+                
+                // special callback to scroll X to allow developers to override the setScrollY method effectively
+                setScrollX(dragVal);
             }
 
             scrollX = dragVal;
+            onScrollX(scrollX);
             animateX = true;
         }
         if(animateY || animateX){

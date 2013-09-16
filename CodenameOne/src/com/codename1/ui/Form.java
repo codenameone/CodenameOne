@@ -1291,6 +1291,7 @@ public class Form extends Container {
      */
     void initComponentImpl() {
         super.initComponentImpl();
+        dragged = null;
         if (Display.getInstance().isNativeCommands()) {
             Display.getInstance().getImplementation().setNativeCommands(menuBar.getCommands());
         }

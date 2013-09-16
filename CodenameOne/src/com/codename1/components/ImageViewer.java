@@ -498,6 +498,12 @@ public class ImageViewer extends Component {
      * @param list a list of images
      */
     public void setImageList(ListModel<Image> model) {
+        if(model == null || model.getSize() == 0) {
+            return;
+        }
+        if(image == null) {
+            image = model.getItemAt(0);
+        }
         if(swipeableImages != null) {
             swipeableImages.removeDataChangedListener(listListener);
             swipeableImages.removeSelectionListener((SelectionListener)listListener);

@@ -66,6 +66,7 @@ import com.codename1.ui.table.TableLayout;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -395,7 +396,11 @@ public class UIBuilder { //implements Externalizable {
 
     private Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
         onCreateRoot(resourceName);
-        DataInputStream in = new DataInputStream(res.getUi(resourceName));
+        InputStream source = res.getUi(resourceName);
+        if(source == null) {
+            throw new RuntimeException("Resource doesn't existing within the current resource object: " + resourceName);
+        }
+        DataInputStream in = new DataInputStream(source);
         try {
             Hashtable h = null;
             if(localComponentListeners != null) {
@@ -2331,7 +2336,13 @@ public class UIBuilder { //implements Externalizable {
             if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
                 if(currentForm != null) {
                     String nextForm = (String)f.getClientProperty("%next_form%");
-
+                    
+                    // we are in the sidemenu view we should really be using the parent form
+                    Form frm = (Form)currentForm.getClientProperty("cn1$sideMenuParent");
+                    if(frm != null) {
+                        currentForm = frm;
+                    }
+                    
                     // don't add back commands to transitional forms
                     if(nextForm == null) {
                         String commandAction = currentForm.getName();
@@ -2352,7 +2363,7 @@ public class UIBuilder { //implements Externalizable {
 
                             // trigger listener creation if this is the only command in the form
                             getFormListenerInstance(f, null);
-                            formNavigationStack.addElement(getFormState(Display.getInstance().getCurrent()));
+                            formNavigationStack.addElement(getFormState(currentForm));
                         }
                     }
                 }

@@ -32,6 +32,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -122,7 +123,7 @@ public class MenuBar extends Container implements ActionListener {
      */
     public MenuBar() {
     }
-
+    
     /**
      * Initialize the MenuBar
      * 
@@ -224,6 +225,20 @@ public class MenuBar extends Container implements ActionListener {
         softCommand = new Command[soft.length];
     }
 
+    /**
+     * This method removes empty J2ME softbuttons that don't have a command
+     */
+    public void removeEmptySoftbuttons() {
+        if(left != null && left.getParent() != null && left.getCommand() == null) {
+            left.getParent().removeComponent(left);
+            revalidate();
+        }
+        if(right != null && right.getParent() != null && right.getCommand() == null) {
+            right.getParent().removeComponent(right);
+            revalidate();
+        }
+    }
+    
     int getCommandBehavior() {
         int i = Display.getInstance().getCommandBehavior();
         if (Display.getInstance().getImplementation().getSoftkeyCount() == 0) {
