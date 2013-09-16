@@ -507,9 +507,9 @@ public class ThemeEditor extends BaseForm {
                         deriveKey += getCurrentStyleModel().prefix;
                     }
                     if (destination == null) {
-                        resources.setThemeProperty(themeName, key + ".sel#derive", deriveKey);
-                        resources.setThemeProperty(themeName, key + ".press#derive", deriveKey);
-                        resources.setThemeProperty(themeName, key + ".dis#derive", deriveKey);
+                        resources.setThemeProperty(themeName, key + ".sel#derive", key);
+                        resources.setThemeProperty(themeName, key + ".press#derive", key);
+                        resources.setThemeProperty(themeName, key + ".dis#derive", key);
                     } else {
                         resources.setThemeProperty(themeName, key + "." + destination + "derive", deriveKey);
                     }
