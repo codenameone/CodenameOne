@@ -132,7 +132,7 @@ import javax.swing.tree.TreePath;
 import org.jdesktop.swingx.JXComboBox;
 
 /**
- * The application's main frame UI moddled around the app framework logic
+ * The application's main frame UI modeled around the app framework logic
  *
  * @author Shai Almog
  */
@@ -1405,6 +1405,7 @@ public class ResourceEditorView extends FrameView {
         iosNativeTheme.addActionListener(formListener);
         jMenu10.add(iosNativeTheme);
 
+        nativeThemeButtonGroup.add(ios7NativeTheme);
         ios7NativeTheme.setText("iOS 7");
         ios7NativeTheme.setName("ios7NativeTheme"); // NOI18N
         ios7NativeTheme.addActionListener(formListener);
@@ -1655,6 +1656,9 @@ public class ResourceEditorView extends FrameView {
             else if (evt.getSource() == checkerboardColors) {
                 ResourceEditorView.this.checkerboardColorsActionPerformed(evt);
             }
+            else if (evt.getSource() == enableXMLTeamMode) {
+                ResourceEditorView.this.enableXMLTeamModeActionPerformed(evt);
+            }
             else if (evt.getSource() == renameItem) {
                 ResourceEditorView.this.renameItemActionPerformed(evt);
             }
@@ -1756,9 +1760,6 @@ public class ResourceEditorView extends FrameView {
             }
             else if (evt.getSource() == about) {
                 ResourceEditorView.this.aboutActionPerformed(evt);
-            }
-            else if (evt.getSource() == enableXMLTeamMode) {
-                ResourceEditorView.this.enableXMLTeamModeActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -2815,8 +2816,13 @@ private static boolean configureNetbeans() {
     File[] result = showOpenFileChooser("Netbeans Executable", "");
     if(result != null) {
         if(ResourceEditorApp.IS_MAC) {
-            String p = result[0].getAbsolutePath() + "/Contents/MacOS/netbeans";
-            Preferences.userNodeForPackage(ResourceEditorView.class).put("netbeansInstall", p);
+            if(result[0].isDirectory()) {
+                String p = result[0].getAbsolutePath() + "/Contents/MacOS/netbeans";
+                Preferences.userNodeForPackage(ResourceEditorView.class).put("netbeansInstall", p);
+            } else {
+                String p = result[0].getAbsolutePath();
+                Preferences.userNodeForPackage(ResourceEditorView.class).put("netbeansInstall", p);
+            }
         } else {
             Preferences.userNodeForPackage(ResourceEditorView.class).put("netbeansInstall", result[0].getAbsolutePath());
         }

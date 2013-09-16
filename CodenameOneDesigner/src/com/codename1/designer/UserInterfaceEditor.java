@@ -1719,6 +1719,20 @@ public class UserInterfaceEditor extends BaseForm {
                         parent = assumedParent.getParent();
                     }
                     com.codename1.ui.Component cmp = (com.codename1.ui.Component)support.getTransferable().getTransferData(CODENAMEONE_COMPONENT_FLAVOR);
+                    
+                    if(cmp instanceof com.codename1.ui.Form) {
+                        return false;
+                    }
+                    
+                    if(parent != null) {
+                        com.codename1.ui.Component tmp = parent.getParent();
+                        while(tmp != null) {
+                            if(tmp == cmp) {
+                                return false;
+                            }
+                            tmp = tmp.getParent();
+                        }
+                    }
                     Object constraint = null;
                     com.codename1.ui.Container contentPane = parent;
                     if(parent instanceof com.codename1.ui.Form) {

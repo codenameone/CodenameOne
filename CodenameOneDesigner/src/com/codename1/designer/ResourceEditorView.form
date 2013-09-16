@@ -1091,6 +1091,9 @@
                 </MenuItem>
                 <MenuItem class="javax.swing.JCheckBoxMenuItem" name="ios7NativeTheme">
                   <Properties>
+                    <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+                      <ComponentRef name="nativeThemeButtonGroup"/>
+                    </Property>
                     <Property name="text" type="java.lang.String" value="iOS 7"/>
                     <Property name="name" type="java.lang.String" value="ios7NativeTheme" noResource="true"/>
                   </Properties>
