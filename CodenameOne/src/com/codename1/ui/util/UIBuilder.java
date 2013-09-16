@@ -1905,6 +1905,9 @@ public class UIBuilder { //implements Externalizable {
     }
         
     private void storeComponentStateImpl(Component c, Hashtable destination) {
+        if(c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty("CN1IgnoreStore") != null) {
+            return;
+        }
         if(c instanceof Tabs) {
             destination.put(c.getName(), new Integer(((Tabs)c).getSelectedIndex()));
         }
@@ -1914,9 +1917,6 @@ public class UIBuilder { //implements Externalizable {
             for(int iter = 0 ; iter < count ; iter++) {
                 storeComponentStateImpl(cnt.getComponentAt(iter), destination);
             }
-            return;
-        }
-        if(c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty("CN1IgnoreStore") != null) {
             return;
         }
         if(c instanceof List) {
@@ -2345,8 +2345,10 @@ public class UIBuilder { //implements Externalizable {
                                 backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
                                 backCommand.putClientProperty(COMMAND_ACTION, commandAction);
                             }
-                            f.addCommand(backCommand, f.getCommandCount());
-                            f.setBackCommand(backCommand);
+                            if(backCommand != null) {
+                                f.addCommand(backCommand, f.getCommandCount());
+                                f.setBackCommand(backCommand);
+                            }
 
                             // trigger listener creation if this is the only command in the form
                             getFormListenerInstance(f, null);
