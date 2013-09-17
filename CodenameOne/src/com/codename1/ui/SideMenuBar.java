@@ -187,7 +187,7 @@ public class SideMenuBar extends MenuBar {
         });
         addOpenButton(null, true);
         
-        if(uim.isThemeConstant("sideMenuFoldedSwipe", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
+        if(uim.isThemeConstant("sideMenuFoldedSwipeBool", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
             pointerDragged = new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     if(sideSwipePotential) {
@@ -550,6 +550,11 @@ public class SideMenuBar extends MenuBar {
                     if(i == null) {
                         // will happen for areMutableImagesFast returning false on iOS and Windows Phone
                         Component c = (Component)rightPanel.getClientProperty("$parent");
+                        
+                        // not sure what is happening here
+                        if(c == null) {
+                            return;
+                        }
                         boolean b = c.isVisible();
                         c.setVisible(true);
                         if (isRTL) {
@@ -643,6 +648,7 @@ public class SideMenuBar extends MenuBar {
             shadowLabel.getStyle().setBgImage(shadow);
             shadowLabel.getStyle().setPadding(0, 0, 0, 0);
             shadowLabel.getStyle().setMargin(0, 0, 0, 0);
+            shadowLabel.getStyle().setBgTransparency(0);
             Container c = new Container(new BorderLayout());
             if(placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
                 shadowLabel.setPreferredW(shadow.getWidth());
@@ -996,12 +1002,12 @@ public class SideMenuBar extends MenuBar {
                     }
                 }                
             } else {
+                isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
                 if(placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
                     isRTL = !isRTL;
                 }
                 if(Display.getInstance().areMutableImagesFast()) {
                     buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
-                    isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
                     if (fwd) {
                         Graphics g = buffer.getGraphics();
                         getSource().paintComponent(g);
