@@ -288,11 +288,17 @@ public class SideMenuBar extends MenuBar {
                 } else {
                     if(east instanceof Container) {
                         Container cnt = (Container)east;
-                        if(cnt.getComponentCount() == 0) {
-                            Button b = new Button(rightCommand);
-                            b.setUIID("TitleCommand");
-                            cnt.addComponent(b);
-                        }
+                        Button b = new Button(rightCommand);
+                        b.setUIID("TitleCommand");
+                        cnt.addComponent(b);
+                    }else{
+                        east.getParent().removeComponent(east);
+                        Container buttons = new Container();
+                        buttons.addComponent(east);
+                        Button b = new Button(rightCommand);
+                        b.setUIID("TitleCommand");
+                        buttons.addComponent(b);                        
+                        parent.getTitleArea().addComponent(BorderLayout.EAST, buttons);
                     }
                 }
             }
@@ -1179,5 +1185,13 @@ public class SideMenuBar extends MenuBar {
             });
 
         }
+    }
+    
+    /**
+     * Returns the Parent Form of this menu
+     * @return Form Object
+     */
+     public Form getParentForm(){
+        return parent;
     }
 }
