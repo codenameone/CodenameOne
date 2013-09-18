@@ -645,8 +645,8 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
             return;
         }
         byte bpsStatus = pushAppStatus.getStatus();
-        byte regReason = pushAppStatus.getReason();
-        String error = pushAppStatus.getError();
+        final byte regReason = pushAppStatus.getReason();
+        final String error = pushAppStatus.getError();
 
         boolean simChanged = false;
 
@@ -665,7 +665,11 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
                 });                
                 break;
             case PushApplicationStatus.STATUS_FAILED:
-                pushCallback.pushRegistrationError(error, regReason);
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        pushCallback.pushRegistrationError(error, regReason);
+                    }
+                });
                 logStatus = "Failed";
                 break;
             case PushApplicationStatus.STATUS_NOT_REGISTERED:
@@ -683,7 +687,12 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
                         // registration failed
                         break;
                 }
-                pushCallback.pushRegistrationError(logStatus + ": " + error, regReason);
+                final String finalLogStat = logStatus;
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        pushCallback.pushRegistrationError(finalLogStat + ": " + error, regReason);
+                    }
+                });
                 break;
             case PushApplicationStatus.STATUS_PENDING:
                 logStatus = "Pending";
