@@ -609,6 +609,16 @@ public class SideMenuBar extends MenuBar {
      * @param commands the Command objects
      * @return the Component to display on the navigation
      */
+    protected Container createSideNavigationComponent(Vector commands) {
+        return createSideNavigationComponent(commands, null);
+    }
+
+    /**
+     * Creates the side navigation component with the Commands
+     *
+     * @param commands the Command objects
+     * @return the Component to display on the navigation
+     */
     protected Container createSideNavigationComponent(Vector commands, String placement) {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         menu.setUIID("SideNavigationPanel");
