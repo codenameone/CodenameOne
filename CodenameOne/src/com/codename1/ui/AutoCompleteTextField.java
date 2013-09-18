@@ -97,8 +97,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     public void setText(String text) {
         super.setText(text);
-        if (text == null || text.length() == 0) {
-            //removePopup();
+        if (text == null) {
             return;
         }
         if(filter(text)) {
@@ -111,7 +110,7 @@ public class AutoCompleteTextField extends TextField {
      */
     protected void updateFilterList() {
         Form f = getComponentForm();
-        if (f != null && f.getLayeredPane().getComponentCount() == 0) {
+        if (f != null && popup.getParent() == null) {
             addPopup();
         }
         popup.revalidate();
@@ -141,7 +140,7 @@ public class AutoCompleteTextField extends TextField {
     private void removePopup() {
         Form f = getComponentForm();
         if (f != null) {
-            f.getLayeredPane().removeAll();
+            f.getLayeredPane().removeComponent(popup);
             popup.setParent(null);
             f.revalidate();
         }
@@ -150,6 +149,7 @@ public class AutoCompleteTextField extends TextField {
     private void addPopup() {
         Form f = getComponentForm();
         popup.removeAll();
+        filter(getText());
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
         ((DefaultListCellRenderer<String>)l.getRenderer()).setShowNumbers(false);
         l.setUIID("AutoCompletePopup");
@@ -167,7 +167,7 @@ public class AutoCompleteTextField extends TextField {
         popup.setPreferredW(getWidth());
         popup.setPreferredH(Display.getInstance().getDisplayHeight() - top);
         if (f != null) {
-            if (f.getLayeredPane().getComponentCount() == 0) {
+            if (popup.getParent() == null) {
                 f.getLayeredPane().addComponent(popup);
             }
             f.revalidate();
@@ -178,7 +178,7 @@ public class AutoCompleteTextField extends TextField {
 
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
-            if (f.getLayeredPane().getComponentCount() > 0) {
+            if (f.getLayeredPane().getComponentCount() > 0 && popup.getComponentCount() > 0) {
                 if (!popup.getComponentAt(0).
                         contains(evt.getX(), evt.getY())) {
                     removePopup();
