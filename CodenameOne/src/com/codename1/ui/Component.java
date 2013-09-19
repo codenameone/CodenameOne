@@ -4068,6 +4068,23 @@ public class Component implements Animation, StyleListener {
         this.cloudDestinationProperty = cloudDestinationProperty;
     }
     
+    /**
+     * Some components may optionally generate a state which can then be restored
+     * using setCompnentState(). This method is used by the UIBuilder.
+     * @return the component state or null for undefined state.
+     */
+    public Object getComponentState() {
+        return null;
+    }
+    
+    /**
+     * If getComponentState returned a value the setter can update the value and restore
+     * the prior state.
+     * @param state the non-null state
+     */
+    public void setComponentState(Object state) {
+    }
+    
     class BGPainter implements Painter, Animation {
         private Motion wMotion, hMotion;
         private Form previousTint;

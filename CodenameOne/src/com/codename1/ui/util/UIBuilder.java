@@ -1887,8 +1887,10 @@ public class UIBuilder { //implements Externalizable {
                             if(t.getTabCount() > val) {
                                 t.setSelectedIndex(val);
                             }
+                            continue;
                         }
                     }
+                    cmp.setComponentState(value);
                 }
             }
         }
@@ -1927,6 +1929,10 @@ public class UIBuilder { //implements Externalizable {
         if(c instanceof List) {
             destination.put(c.getName(), new Integer(((List)c).getSelectedIndex()));
             return;
+        }
+        Object o = c.getComponentState();
+        if(o != null) {
+            destination.put(c.getName(), o);
         }
     }
     

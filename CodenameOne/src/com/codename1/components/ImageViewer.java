@@ -197,7 +197,23 @@ public class ImageViewer extends Component {
             }
         }        
     }
+
+    /**
+     * Returns the x position of the image viewport which can be useful when it is being panned by the user
+     * @return x position within the image for the top left corner
+     */
+    public int getImageX() {
+        return imageX;
+    }
     
+    /**
+     * Returns the y position of the image viewport which can be useful when it is being panned by the user
+     * @return y position within the image for the top left corner
+     */
+    public int getImageY() {
+        return imageX;
+    }
+
     /**
      * @inheritDoc
      */

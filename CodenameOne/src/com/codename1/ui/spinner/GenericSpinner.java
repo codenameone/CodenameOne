@@ -347,4 +347,36 @@ public class GenericSpinner extends BaseSpinner {
     public void setRenderer(ListCellRenderer renderer) {
         setRenderer(0, renderer);
     }
+
+    /**
+     * Some components may optionally generate a state which can then be restored
+     * using setCompnentState(). This method is used by the UIBuilder.
+     * @return the component state or null for undefined state.
+     */
+    public Object getComponentState() {
+        if(getColumns() == 1) {
+            return getValue();
+        } 
+        Object[] o = new Object[getColumns()];
+        for(int iter = 0 ; iter < o.length ; iter++) {
+            o[iter] = getValue(iter);
+        }
+        return o;
+    }
+    
+    /**
+     * If getComponentState returned a value the setter can update the value and restore
+     * the prior state.
+     * @param state the non-null state
+     */
+    public void setComponentState(Object state) {
+        if(getColumns() == 1) {
+            setValue(state);
+            return;
+        }
+        Object[] o = (Object[])state;
+        for(int iter = 0 ; iter < o.length ; iter++) {
+            setValue(iter, o[iter]);
+        }
+    }
 }

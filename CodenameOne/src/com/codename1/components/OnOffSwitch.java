@@ -448,6 +448,27 @@ public class OnOffSwitch extends Container {
     }
 
     /**
+     * Some components may optionally generate a state which can then be restored
+     * using setCompnentState(). This method is used by the UIBuilder.
+     * @return the component state or null for undefined state.
+     */
+    public Object getComponentState() {
+        if(value) {
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
+    }
+    
+    /**
+     * If getComponentState returned a value the setter can update the value and restore
+     * the prior state.
+     * @param state the non-null state
+     */
+    public void setComponentState(Object state) {
+        value = ((Boolean)state).booleanValue();
+    }
+
+    /**
      * @inheritDoc
      */
     public Class[] getPropertyTypes() {
