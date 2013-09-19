@@ -721,6 +721,7 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         byte pasStatus = pushApplicationStatus.getStatus();
         if( pasStatus == PushApplicationStatus.STATUS_ACTIVE ) {
             // we already registered, update the statuses
+            onStatusChange(pushApplicationStatus);
             return;
             
         } else if( pasStatus == PushApplicationStatus.STATUS_PENDING ) {
