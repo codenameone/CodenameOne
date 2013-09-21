@@ -1024,14 +1024,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createImage(InputStream i) throws IOException {
-//        BitmapFactory.Options opts = new BitmapFactory.Options();
-//        try {
-//            BitmapFactory.Options.class.getField("inPurgeable").set(opts, true);
-//        } catch (Exception e) {
-//            // inPurgeable not supported
-//            // http://www.droidnova.com/2d-sprite-animation-in-android-addendum,505.html
-//        }
-        return BitmapFactory.decodeStream(i);
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        return BitmapFactory.decodeStream(i, null, opts);
     }
 
     @Override
