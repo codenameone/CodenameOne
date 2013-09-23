@@ -397,6 +397,7 @@ public class OnOffSwitch extends Container {
      */
     public void setOn(String on) {
         this.on = on;
+        initialize();
     }
 
     /**
@@ -413,6 +414,7 @@ public class OnOffSwitch extends Container {
      */
     public void setOff(String off) {
         this.off = off;
+        initialize();
     }
 
     /**
