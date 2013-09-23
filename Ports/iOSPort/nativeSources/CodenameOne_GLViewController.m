@@ -169,6 +169,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             int cccc = constraint & 0xff;
             if(cccc == 1) {
                 utf.keyboardType = UIKeyboardTypeEmailAddress;
+                utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
             } else {
                 // NUMERIC
                 if(cccc == 2) {
@@ -181,6 +182,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                         // URL
                         if(cccc == 4) {
                             utf.keyboardType = UIKeyboardTypeURL;
+                            utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
                         } else {
                             // DECIMAL
                             if(cccc == 5) {
@@ -228,12 +230,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 
                 NSString* buttonTitle;
                 
-                //TODO: should provide a mechanism to i18n Done and Next strings
+                JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+                JAVA_OBJECT str;
                 if (isLastEdit) {
-                    buttonTitle = @"Done";
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
                 } else {
-                    buttonTitle = @"Next";
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
                 }
+                buttonTitle = toNSString(str);
                 UIBarButtonItem *doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneNextClicked)];
 
                 NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
