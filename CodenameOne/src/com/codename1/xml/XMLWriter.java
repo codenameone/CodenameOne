@@ -18,8 +18,8 @@ public class XMLWriter {
 	private boolean encodeText;
 	
 	private static final String[][] escapes = {
-		{"\"", "&quot;"},
 		{"&", "&amp;"},
+		{"\"", "&quot;"},
 		{"<", "&lt;"},
 		{">", "&gt;"},
 		{"'", "&apos;"}
