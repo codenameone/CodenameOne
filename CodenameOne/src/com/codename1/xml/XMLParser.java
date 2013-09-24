@@ -755,6 +755,11 @@ public class XMLParser {
             } else if (c=='/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
                 c=(char)read(is);
                 if (c=='>') {
+                    // Solves the case of <a p="s"/> endTag("a") would not be called related to
+                    // http://code.google.com/p/codenameone/issues/detail?id=896
+                    if(eventParser) {
+                        endTag(tn);
+                    }
                     return element;
                 } else {
                     notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), curValue.toString(), "XML malformed - no > after /");
