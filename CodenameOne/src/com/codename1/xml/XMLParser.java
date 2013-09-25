@@ -560,7 +560,13 @@ public class XMLParser {
         		c = Character.toLowerCase(c);
         	}
         	tagName.append(c);
-            c=(char)read(is);
+                int i = read(is);
+                
+                // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+                if(i == -1) {
+                    return END_TAG;
+                }
+                c=(char)i;
         }
 
          //read and ignore any whitespaces after tag name
@@ -600,13 +606,25 @@ public class XMLParser {
                 char lastChar=c;
                 while (c!='>') { // Read till the end of the tag
                     lastChar=c;
-                    c=(char)read(is);
+                    int i = read(is);
+                    
+                    // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+                    if(i == -1) {
+                        return END_TAG;
+                    }
+                    c=(char)i;
                 }
                 if (lastChar!='/') { // If this is an empty tag, no need to search for its closing tag as there's none...
                     String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
                     int index=0;
                     while(index<endTag.length()) {
-                        c=(char)read(is);
+                        int i = read(is);
+
+                        // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+                        if(i == -1) {
+                            return END_TAG;
+                        }
+                        c=(char)i;
 
                         if ((c>='A') && (c<='Z')) {
                             c=(char)(c-'A'+'a');
