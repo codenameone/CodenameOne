@@ -1355,9 +1355,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             }
 
             if ((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
-                nativeEdit = new BBPasswordEditField(lightweightEdit, type, maxSize, 0xffffff);
+                nativeEdit = new BBPasswordEditField(lightweightEdit, type, maxSize, 0, 0xffffff);
             } else {
-                nativeEdit = new BBEditField(lightweightEdit, type, maxSize, 0xffffff);
+                nativeEdit = new BBEditField(lightweightEdit, type, maxSize, 0, 0xffffff);
             }
             
             
@@ -1476,30 +1476,33 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         private TextArea lightweightEdit = null;
         private NativeEditCallback callback = new NativeEditCallback();
+        private int bgColor;
         private int fgColor;
 
-        public BBEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor) {
+        public BBEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor, int bgColor) {
             this(lightweightEdit, type, maxSize);
             this.fgColor = fgColor;
+            this.bgColor = bgColor;
         }
         
         public BBEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, Field.EDITABLE | Field.FOCUSABLE | Field.SPELLCHECKABLE | type);
             this.lightweightEdit = lightweightEdit;
             this.fgColor = lightweightEdit.getSelectedStyle().getFgColor();
+            this.bgColor = lightweightEdit.getSelectedStyle().getBgColor();
         }
 
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
-            g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
-            g.setColor(lightweightEdit.getSelectedStyle().getBgColor());
+            g.setBackgroundColor(bgColor);
+            g.setColor(bgColor);
             super.paintBackground(g);
-            g.setColor(lightweightEdit.getSelectedStyle().getBgColor());
+            g.setColor(bgColor);
             g.fillRect(0, 0, this.getWidth(),
                     this.getHeight());
         }
 
         public void paint(net.rim.device.api.ui.Graphics g) {
-            g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
+            g.setBackgroundColor(bgColor);
             g.setColor(fgColor);
             super.paint(g);
         }
@@ -1557,27 +1560,33 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
 
         private TextArea lightweightEdit = null;
         private NativeEditCallback callback = new NativeEditCallback();
+        private int bgColor;
         private int fgColor;
 
-        public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor) {
+        public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize, int fgColor, int bgColor) {
             this(lightweightEdit, type, maxSize);
             this.fgColor = fgColor;
+            this.bgColor = bgColor;
         }
         
         public BBPasswordEditField(TextArea lightweightEdit, long type, int maxSize) {
             super("", lightweightEdit.getText(), maxSize, NO_COMPLEX_INPUT | Field.EDITABLE | Field.FOCUSABLE | type);
             this.lightweightEdit = lightweightEdit;
             this.fgColor = lightweightEdit.getSelectedStyle().getFgColor();
+            this.bgColor = lightweightEdit.getSelectedStyle().getBgColor();
         }
         
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
-            g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
-            g.setColor(lightweightEdit.getSelectedStyle().getBgColor());
+            g.setBackgroundColor(bgColor);
+            g.setColor(bgColor);
             super.paintBackground(g);
+            g.setColor(bgColor);
+            g.fillRect(0, 0, this.getWidth(),
+                    this.getHeight());
         }
-
+        
         public void paint(net.rim.device.api.ui.Graphics g) {
-            g.setBackgroundColor(lightweightEdit.getSelectedStyle().getBgColor());
+            g.setBackgroundColor(bgColor);
             g.setColor(fgColor);
             g.drawText(getPasswordsChars(super.getText()), 0, 0);
             
