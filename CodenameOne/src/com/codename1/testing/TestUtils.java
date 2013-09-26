@@ -565,7 +565,7 @@ public class TestUtils {
         Component c = findByName(componentName);
         int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
         int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
-        Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
     }
     
     /**
@@ -621,7 +621,7 @@ public class TestUtils {
         Component c = getComponentByPath(path);
         int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
         int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
-        Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
     }
 
     /**
