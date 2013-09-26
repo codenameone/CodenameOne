@@ -2259,7 +2259,6 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         private short key;
         private char letter = 'A';
         private ByteArrayOutputStream cache;
-        private int offset;
         public RMSOutputStream(short key) {
             this.key =  key;
 
@@ -2292,7 +2291,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                         } else {
                             letter++;
                         }
-                        cache.reset();
+                        cache = new ByteArrayOutputStream();
                     } catch (RecordStoreException ex) {
                         ex.printStackTrace();
                         cleanup(r);
