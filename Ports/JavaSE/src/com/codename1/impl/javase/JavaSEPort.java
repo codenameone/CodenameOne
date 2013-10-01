@@ -5531,7 +5531,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         if (fd.getFile() != null) {
             if (fd.getFile().endsWith("png") || fd.getFile().endsWith("jpg")
-                    || fd.getFile().endsWith("jpeg")) {
+                    || fd.getFile().endsWith("jpeg") || fd.getFile().endsWith("JPG")) {
                 return new File(fd.getDirectory(), fd.getFile());
             } else {
                 System.out.println("Please choose an image");
