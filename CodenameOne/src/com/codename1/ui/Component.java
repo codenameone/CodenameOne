@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -2134,8 +2134,8 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerDragged(int x, int y) {
+        Form p = getComponentForm();
         if(dragAndDropInitialized) {
-            Form p = getComponentForm();
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -2173,12 +2173,14 @@ public class Component implements Animation, StyleListener {
             getParent().scrollRectToVisible(draggedx, draggedy, getWidth(), getHeight(), getParent());
             return;
         }
-        if (isScrollable() && isSmoothScrolling()) {
+        boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
+        boolean shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
+        
+        if (isScrollable() && isSmoothScrolling() && shouldGrabScrollEvents) {
             if (!dragActivated) {
                 dragActivated = true;
                 lastScrollY = y;
                 lastScrollX = x;
-                Form p = getComponentForm();
                 p.setDraggedComponent(this);
                 p.registerAnimatedInternal(this);
                 Component fc = p.getFocused();
