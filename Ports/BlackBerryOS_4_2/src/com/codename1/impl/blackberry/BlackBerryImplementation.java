@@ -1493,18 +1493,30 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
+            int originalBGColor = g.getBackgroundColor();
+            int originalColor = g.getColor();
+            
             g.setBackgroundColor(bgColor);
             g.setColor(bgColor);
             super.paintBackground(g);
             g.setColor(bgColor);
             g.fillRect(0, 0, this.getWidth(),
                     this.getHeight());
+            
+            g.setBackgroundColor(originalBGColor);
+            g.setColor(originalColor);            
         }
 
         public void paint(net.rim.device.api.ui.Graphics g) {
+            int originalBGColor = g.getBackgroundColor();
+            int originalColor = g.getColor();
+            
             g.setBackgroundColor(bgColor);
             g.setColor(fgColor);
             super.paint(g);
+            
+            g.setBackgroundColor(originalBGColor);
+            g.setColor(originalColor);            
         }
 
         protected boolean keyDown(int keycode, int time) {
@@ -1577,19 +1589,30 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
         
         public void paintBackground(net.rim.device.api.ui.Graphics g) {
+            int originalBGColor = g.getBackgroundColor();
+            int originalColor = g.getColor();
+            
             g.setBackgroundColor(bgColor);
             g.setColor(bgColor);
             super.paintBackground(g);
             g.setColor(bgColor);
             g.fillRect(0, 0, this.getWidth(),
                     this.getHeight());
+            
+            g.setBackgroundColor(originalBGColor);
+            g.setColor(originalColor);
         }
         
         public void paint(net.rim.device.api.ui.Graphics g) {
+            int originalBGColor = g.getBackgroundColor();
+            int originalColor = g.getColor();
+            
             g.setBackgroundColor(bgColor);
             g.setColor(fgColor);
-            g.drawText(getPasswordsChars(super.getText()), 0, 0);
+            g.drawText(getPasswordsChars(super.getText()), 0, 0);            
             
+            g.setBackgroundColor(originalBGColor);
+            g.setColor(originalColor);
         }
 
         protected boolean keyDown(int keycode, int time) {
