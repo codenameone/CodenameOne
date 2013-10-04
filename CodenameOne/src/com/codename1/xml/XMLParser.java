@@ -432,12 +432,25 @@ public class XMLParser {
                 if (childElement==END_TAG) { 
                     //was actually an ending tag
                     StringBuilder closingTag = new StringBuilder();
-                    c=(char)read(is);
-                    while ((c!='>')) {
-                        closingTag.append(c);
-                        c=(char)read(is);
+                    int i = read(is);
+
+                    // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+                    if(i == -1) {
+                        childElement = END_TAG;
+                    } else {
+                        c=(char)i;
+                        while ((c!='>')) {
+                            closingTag.append(c);
+                            i = read(is);
+                            c=(char)i;
+                            if(i == -1) {
+                                childElement = END_TAG;
+                                break;
+                            }
+                        }
                     }
-					String ct = closingTag.toString();
+                    
+                    String ct = closingTag.toString();
                     if(eventParser) {
                         endTag(ct);
 			if (!isEmptyTag(ct)) {
