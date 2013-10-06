@@ -67,9 +67,9 @@ public final class Graphics {
     }
 
     /**
-     * Returns javax.microedition.lcdui.Graphics
+     * Returns the underlying native graphics object
      * 
-     * @return a javax.microedition.lcdui.Graphics object
+     * @return the underlying native graphics object
      */
     Object getGraphics() {
         return nativeGraphics;

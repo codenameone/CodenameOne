@@ -229,11 +229,11 @@ public class MenuBar extends Container implements ActionListener {
      * This method removes empty J2ME softbuttons that don't have a command
      */
     public void removeEmptySoftbuttons() {
-        if(left != null && left.getParent() != null && left.getCommand() == null) {
+        if(left != null && left.getParent() != null && "".equals(left.getText())) {
             left.getParent().removeComponent(left);
             revalidate();
         }
-        if(right != null && right.getParent() != null && right.getCommand() == null) {
+        if(right != null && right.getParent() != null && "".equals(right.getText())) {
             right.getParent().removeComponent(right);
             revalidate();
         }
@@ -1508,6 +1508,10 @@ public class MenuBar extends Container implements ActionListener {
         b.setTextPosition(Label.BOTTOM);
         b.setEndsWith3Points(false);
         b.setUIID("TouchCommand");
+        Integer gap = (Integer)b.getClientProperty("iconGap");
+        if(gap != null) {
+            b.setGap(gap.intValue());
+        }
         return b;
     }
 

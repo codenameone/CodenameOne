@@ -140,7 +140,7 @@ public class MapComponent extends Container {
         } else {
             _map = provider;
         }
-
+        
         if (centerPosition == null) {
             Location l = LocationManager.getLocationManager().getLastKnownLocation();
             if (l != null) {
@@ -207,7 +207,10 @@ public class MapComponent extends Container {
 
             g.translate(translateX, translateY);
         } else {
-
+            int clipx = g.getClipX();
+            int clipy = g.getClipY();
+            int clipw = g.getClipWidth();
+            int cliph = g.getClipHeight();
             if (scaleX > 0) {
                 float sx = (float) scaleX / (float) getWidth();
                 float sy = (float) scaleY / (float) getHeight();
@@ -223,6 +226,7 @@ public class MapComponent extends Container {
                 paintmap(g);
                 g.translate(translateX, translateY);
             }
+            g.setClip(clipx, clipy, clipw, cliph);
         }
     }
 
@@ -237,7 +241,7 @@ public class MapComponent extends Container {
         refreshLayers = true;
         _needTiles = true;
         buffer = null;
-        super.repaint();
+        //super.repaint();
     }
 
     /**

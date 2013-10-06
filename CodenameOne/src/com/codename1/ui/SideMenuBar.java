@@ -48,7 +48,6 @@ public class SideMenuBar extends MenuBar {
 
     private Button openButton;
     private Button rightSideButton;
-    private boolean hasTopMenu;
     private Form parent;
     private Form menu;
     private Container rightPanel;
@@ -987,7 +986,7 @@ public class SideMenuBar extends MenuBar {
         public void initTransition() {
             super.initTransition();
             if(placement == COMMAND_PLACEMENT_VALUE_TOP) {
-                if(Display.getInstance().areMutableImagesFast()) {
+                if(false) { //Display.getInstance().areMutableImagesFast()) {
                     buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
                     if (fwd) {
                         Graphics g = buffer.getGraphics();
