@@ -199,8 +199,8 @@ public class SideMenuBar extends MenuBar {
                         evt.consume();
                         if(x - initialDragX > Display.getInstance().getDisplayWidth() / 15) {
                             draggedX = x;
-                            dragActivated = true;
-                            parent.pointerReleased(x, y);
+                            dragActivated = true;                            
+                            parent.pointerReleased(0, 0);
                             openMenu(null, 0, draggedX);
                         }
                         return;
@@ -216,7 +216,7 @@ public class SideMenuBar extends MenuBar {
                         if(initialDragX - x > Display.getInstance().getDisplayWidth() / 15) {
                             draggedX = x;
                             dragActivated = true;
-                            parent.pointerReleased(x, y);
+                            parent.pointerReleased(0, 0);
                             openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX);
                         }
                     }
@@ -231,7 +231,7 @@ public class SideMenuBar extends MenuBar {
                         if(initialDragY - y > Display.getInstance().getDisplayHeight()/ 15) {
                             draggedX = y;
                             dragActivated = true;
-                            parent.pointerReleased(x, y);
+                            parent.pointerReleased(0, 0);
                             openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX);
                         }
                     }
