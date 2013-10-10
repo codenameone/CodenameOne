@@ -235,8 +235,10 @@ public class CodenameOneActivity extends Activity {
 
                     @Override
                     public void run() {
+                        //we need to handle other response code as well see Consts.ResponseCode
                         if (responseCode == Consts.ResponseCode.RESULT_OK) {
-                            // purchase was successfully sent to server
+                            // purchase was successfully sent to server                             
+                            pc.itemPurchased(request.mProductId);
                         } else if (responseCode == Consts.ResponseCode.RESULT_USER_CANCELED) {
                             // user canceled purchase
                             pc.itemPurchaseError(request.mProductId, "Canceled");
