@@ -2410,6 +2410,7 @@ public final class Display {
      * <li>AppVersion
      * <li>Platform - Similar to microedition.platform
      * <li>OS - returns what is the underlying platform e.g. - J2ME, RIM, SE...
+     * <li>OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
      *
      * </ol>
      * @param key the key of the property
@@ -2800,17 +2801,53 @@ public final class Display {
     /**
      * Place a notification on the device status bar (if device has this 
      * functionality).
-     * The notification will re-start the Application.
+     * Clicking the notification might re-start the Application.
      * 
      * @param tickerText the ticker text of the Notification
      * @param contentTitle the title of the Notification
      * @param contentBody the content of the Notification
      * @param vibrate enable/disable notification alert
      * @param flashLights enable/disable notification flashing
+     * @deprecated there is a new version of this method with a slightly improved
+     * signature
      */
     public void notifyStatusBar(String tickerText, String contentTitle, 
         String contentBody, boolean vibrate, boolean flashLights) {
-        impl.notifyStatusBar(tickerText, contentTitle, contentBody, vibrate, flashLights);
+        notifyStatusBar(tickerText, contentTitle, contentBody, vibrate, flashLights, null);
+    }
+    
+    /**
+     * Indicates whether the notify status bar method will present a notification to the user
+     * @return true if the notify status bar method will present a notification to the user
+     */
+    public boolean isNotificationSupported() {
+        return impl.isNotificationSupported();
+    }
+    
+    /**
+     * Place a notification on the device status bar (if device has this 
+     * functionality).
+     * Clicking the notification might re-start the Application.
+     * 
+     * @param tickerText the ticker text of the Notification
+     * @param contentTitle the title of the Notification
+     * @param contentBody the content of the Notification
+     * @param vibrate enable/disable notification alert
+     * @param flashLights enable/disable notification flashing
+     * @param args additional arguments to the notification
+     * @return a platform native object that allows modifying notification state
+     */
+    public Object notifyStatusBar(String tickerText, String contentTitle, 
+        String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
+        return impl.notifyStatusBar(tickerText, contentTitle, contentBody, vibrate, flashLights, args);
+    }
+    
+    /**
+     * Removes the notification previously posted with the notify status bar method
+     * @param o the object returned from the notifyStatusBar method
+     */
+    public void dismissNotification(Object o) {
+        impl.dismissNotification(o);
     }
     
     /**

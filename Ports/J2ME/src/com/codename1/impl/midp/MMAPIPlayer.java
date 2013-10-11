@@ -25,8 +25,10 @@ package com.codename1.impl.midp;
 
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
+import com.codename1.ui.Image;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Hashtable;
 import java.util.Vector;
 import javax.microedition.media.Manager;
 import javax.microedition.media.MediaException;
@@ -261,5 +263,10 @@ public class MMAPIPlayer implements PlayerListener, Media{
         return nativePlayer.getState() == Player.STARTED;
     }
     
-    
+    public void setVariable(String key, Object value) {
+    }
+
+    public Object getVariable(String key) {
+        return null;
+    }
 }

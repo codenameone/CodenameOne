@@ -207,7 +207,13 @@ final class IOSNative {
     native int setMediaTimeMS(long peer, int now);
 
     native int getMediaDuration(long peer);
-
+    
+    native void setMediaBgArtist(String artist);
+    native void setMediaBgTitle(String title);
+    native void setMediaBgDuration(long duration);
+    native void setMediaBgPosition(long position);
+    native void setMediaBgAlbumCover(long cover);
+    
     native boolean isVideoPlaying(long peer);
 
     native void setVideoFullScreen(long peer, boolean fullscreen);
@@ -259,6 +265,7 @@ final class IOSNative {
     native void closeConnection(long peer);
     
     native String getUDID();
+    native String getOSVersion();
     
     // location manager
     native long createCLLocation();

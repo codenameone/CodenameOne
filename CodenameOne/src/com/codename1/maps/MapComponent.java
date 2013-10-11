@@ -156,7 +156,7 @@ public class MapComponent extends Container {
         _zoom = zoomLevel;
         _layers = new Vector();
         setFocusable(false);
-        if (Display.getInstance().isTouchScreenDevice()) {
+        if (Display.getInstance().isTouchScreenDevice() && getUIManager().isThemeConstant("mapZoomButtonsBool", true)) {
             setLayout(new BorderLayout());
             Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
             Button out = new Button("-");

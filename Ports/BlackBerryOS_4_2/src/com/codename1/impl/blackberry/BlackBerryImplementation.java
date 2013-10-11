@@ -1805,6 +1805,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         if ("OS".equals(key)) {
             return "RIM";
         }
+        if("encodedImageScaling".equals(key)) {
+            return "false";
+        }
         
         if ("IMEI".equals(key)) {
             if(RadioInfo.getNetworkType() == RadioInfo.NETWORK_CDMA) {

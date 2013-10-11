@@ -291,7 +291,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         @Override
                         public void run() {
                             Display.getInstance().setProperty("pushType", t);
-                            c.push(b);
+                            if(t != null && "3".equals(t)) {                                
+                                String[] a = b.split(";");
+                                c.push(a[0]);
+                                c.push(a[1]);
+                            } else {
+                                c.push(b);
+                            }
                         }
                     });
                 }
@@ -1661,6 +1667,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ("User-Agent".equals(key)) {
             String ua = getUserAgent();
             return ua;
+        }
+        if("OSVer".equals(key)) {
+            return "" + android.os.Build.VERSION.RELEASE;
         }
         try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
@@ -3894,9 +3903,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ArrayList<String> parts = sms.divideMessage(message);
         sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
     }
+    
+    @Override
+    public void dismissNotification(Object o) {
+        Integer n = (Integer)o;
+        NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
+        notificationManager.cancel(n.intValue());
+    }
+    
+    @Override
+    public boolean isNotificationSupported() {
+        return true;
+    }
 
-    public void notifyStatusBar(String tickerText, String contentTitle,
-            String contentBody, boolean vibrate, boolean flashLights) {
+    @Override
+    public Object notifyStatusBar(String tickerText, String contentTitle,
+            String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         int id = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
 
         NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
@@ -3909,12 +3931,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (vibrate) {
             notification.defaults |= Notification.DEFAULT_VIBRATE;
         }
+        
+        int notifyId = 10001;
+        if(args != null) {
+            Boolean b = (Boolean)args.get("persist");
+            if(b != null && b.booleanValue()) {
+                notification.defaults |= Notification.FLAG_ONGOING_EVENT;
+            }
+            
+            Integer notId = (Integer)args.get("id");
+            if(notId != null) {
+                notifyId = notId.intValue();
+            }
+        }
+        
         Intent notificationIntent = new Intent();
         notificationIntent.setComponent(activity.getComponentName());
         PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, notificationIntent, 0);
 
         notification.setLatestEventInfo(activity, contentTitle, contentBody, contentIntent);
-        notificationManager.notify(10001, notification);
+        notificationManager.notify(notifyId, notification);
+        return new Integer(notifyId);
     }
 
     @Override
@@ -4163,6 +4200,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public boolean isPlaying() {
             return nativeVideo.isPlaying();
         }
+
+        public void setVariable(String key, Object value) {
+        }
+
+        public Object getVariable(String key) {
+            return null;
+        }
     }
 
     @Override
@@ -4338,7 +4382,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // Create the storage directory if it does not exist
             if (!mediaStorageDir.exists()) {
                 if (!mediaStorageDir.mkdirs()) {
-                    Log.d("MyCameraApp", "failed to create directory");
+                    Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "failed to create directory");
                     return null;
                 }
             }
@@ -4356,6 +4400,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             return mediaFile;
         }
+    }
+    
+    @Override
+    public void systemOut(String content){
+        Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), content);
     }
 
     private boolean hasAndroidMarket() {

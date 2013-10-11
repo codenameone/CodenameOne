@@ -1245,6 +1245,36 @@ public class IOSImplementation extends CodenameOneImplementation {
             public boolean isNativePlayerMode() {
                 return false;
             }
+
+            public void setVariable(String key, Object value) {
+                if(key.equals(Media.VARIABLE_BACKGROUND_ALBUM_COVER)) {
+                    NativeImage ni = (NativeImage)((Image)value).getImage();
+                    nativeInstance.setMediaBgAlbumCover(ni.peer);
+                    return;
+                }
+                if(key.equals(Media.VARIABLE_BACKGROUND_ARTIST)) {
+                    nativeInstance.setMediaBgArtist((String)value);
+                    return;
+                }
+                if(key.equals(Media.VARIABLE_BACKGROUND_DURATION)) {
+                    nativeInstance.setMediaBgDuration(((Long)value).longValue());
+                    return;
+                }
+                if(key.equals(Media.VARIABLE_BACKGROUND_POSITION)) {
+                    nativeInstance.setMediaBgPosition(((Long)value).longValue());
+                    return;
+                }
+                if(key.equals(Media.VARIABLE_BACKGROUND_TITLE)) {
+                    nativeInstance.setMediaBgTitle((String)value);
+                }
+            }
+
+            public Object getVariable(String key) {
+                if(VARIABLE_BACKGROUND_SUPPORTED.equals(key)) {
+                    return Boolean.TRUE;
+                }
+                return null;
+            }
         };
     }
     
@@ -1466,6 +1496,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public boolean isNativePlayerMode() {
             return nativePlayer;
+        }
+
+        public void setVariable(String key, Object value) {
+        }
+
+        public Object getVariable(String key) {
+            return null;
         }
     }
     
@@ -2207,6 +2244,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             // make app version case insensitive
             return super.getProperty("AppVersion", "");
         }
+        if("OSVer".equals(key)) {
+            return nativeInstance.getOSVersion();
+        }
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
@@ -2544,7 +2584,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         if(url.startsWith("jar://")) {
             url = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + url.substring(6);
-        }
+        } 
         nativeInstance.setBrowserURL(get(browserPeer), url);
     }
 
@@ -3310,10 +3350,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private static PushCallback pushCallback;
     
-    public static void pushReceived(final String message) {
+    public static void pushReceived(final String message, final String type) {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
+                    if(type != null) {
+                        Display.getInstance().setProperty("pushType", type);
+                    }
                     pushCallback.push(message);
                 }
             });
@@ -3327,7 +3370,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     // prevent infinite loop
                     if(pushCallback != null) {
-                        pushReceived(message); 
+                        pushReceived(message, type); 
                     }
                 }
             }.start();

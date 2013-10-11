@@ -288,9 +288,14 @@ public class TextArea extends Component {
      * string "" will be displayed
      */
     public TextArea(String text) {
-        this(text, Math.max(defaultMaxSize, text.length()), 1, 3, ANY);
+        this(text, Math.max(defaultMaxSize, nl(text)), 1, 3, ANY);
     }
 
+    private static int nl(String t) {
+        if(t == null) return 0;
+        return t.length();
+    }
+    
     /**
      * Creates an empty text area, this constructor
      * will create a single line text area similar to a text field! 

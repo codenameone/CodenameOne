@@ -26,11 +26,54 @@ import com.codename1.ui.Component;
 
 
 /**
- * This is the Media control interface 
+ * Media control interface allows for media playback, recording. To get an instance
+ * of this interface (implemented by the native port) see the MediaManager class.
+ * 
  * @see MediaManager
  */
 public interface Media {
-    
+    /**
+     * Write only variable that can be used with setVariable to pass a title for the 
+     * native layer so the currently playing media title will be displayed in the lock screen
+     * where applicable
+     */
+    public static final String VARIABLE_BACKGROUND_TITLE = "bgTitle";
+
+    /**
+     * Write only variable that can be used with setVariable to pass the artist name to the
+     * native layer so the currently playing media title will be displayed in the lock screen
+     * where applicable
+     */
+    public static final String VARIABLE_BACKGROUND_ARTIST = "bgArtist";
+
+    /**
+     * Write only variable that can be used with setVariable to pass the duration for the media as a Long object to the
+     * native layer so the currently playing media title will be displayed in the lock screen
+     * where applicable
+     */
+    public static final String VARIABLE_BACKGROUND_DURATION = "bgDuration";
+
+    /**
+     * Write only variable that can be used with setVariable to pass the album cover Image to the
+     * native layer so the currently playing media title will be displayed in the lock screen
+     * where applicable
+     */
+    public static final String VARIABLE_BACKGROUND_ALBUM_COVER = "bgCover";
+
+    /**
+     * Write only variable that can be used with setVariable to pass the position in the media (Long object) to the
+     * native layer so the currently playing media title will be displayed in the lock screen
+     * where applicable
+     */
+    public static final String VARIABLE_BACKGROUND_POSITION = "bgPosition";
+
+    /**
+     * Read only variable that can be used with getVariable to query whether the 
+     * native layer supports displaying the currently playing media information 
+     * in the lock screen. This will return null or Boolean.TRUE.
+     */
+    public static final String VARIABLE_BACKGROUND_SUPPORTED = "bgInfoSupported";
+            
     /**
      * Starts playing the audio file
      *
@@ -139,5 +182,18 @@ public interface Media {
      * @return  true if the player is in native mode
      */
     public boolean isNativePlayerMode();
+        
+    /**
+     * Allows for platform specific enhancements for media playback
+     * @param key the key to set to the media that is platform specific
+     * @param value the value
+     */
+    public void setVariable(String key, Object value);
     
+    /**
+     * Allows querying platform specific information from the media object
+     * @param key the key query
+     * @return the value or null
+     */
+    public Object getVariable(String key);
 }

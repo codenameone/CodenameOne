@@ -202,5 +202,11 @@ class Audio implements Runnable, com.codename1.media.Media {
     public boolean isPlaying() {
         return player != null && player.isPlaying();
     }
-    
+
+    public void setVariable(String key, Object value) {
+    }
+
+    public Object getVariable(String key) {
+        return null;
+    }
 }

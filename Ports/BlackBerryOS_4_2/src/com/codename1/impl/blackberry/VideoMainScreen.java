@@ -145,6 +145,10 @@ public class VideoMainScreen extends MainScreen implements Media {
         return super.keyDown(keycode, time);
     }
     
-    
-    
+    public void setVariable(String key, Object value) {
+    }
+
+    public Object getVariable(String key) {
+        return null;
+    }
 }

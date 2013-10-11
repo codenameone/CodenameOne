@@ -4570,12 +4570,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void run() {
                 File selected = pickImage();
 
-                com.codename1.ui.events.ActionEvent result;
+                com.codename1.ui.events.ActionEvent result = null;
                 if (selected != null) {
-                    result = new com.codename1.ui.events.ActionEvent(selected.getAbsolutePath());
-                } else {
-                    result = null;
-                }
+                    try {
+                        File tmp = File.createTempFile("temp", ".jpg");
+                        tmp.deleteOnExit();
+                        FileOutputStream fos = new FileOutputStream(tmp);
+                        FileInputStream fis = new FileInputStream(selected);
+                        Util.copy(fis, fos);
+                        Util.cleanup(fis);
+                        Util.cleanup(fos);
+                        result = new com.codename1.ui.events.ActionEvent(tmp.getAbsolutePath());
+                    } catch(IOException err) {
+                        err.printStackTrace();
+                    }
+                } 
                 final com.codename1.ui.events.ActionEvent finalResult = result;
                 Display.getInstance().callSerially(new Runnable() {
 
@@ -4773,6 +4782,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         public boolean isNativePlayerMode() {
             return false;
+        }
+
+        public void setVariable(String key, Object value) {
+        }
+
+        public Object getVariable(String key) {
+            return null;
         }
     }
 

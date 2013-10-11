@@ -4803,11 +4803,28 @@ public abstract class CodenameOneImplementation {
      * @param contentBody the content of the Notification
      * @param vibrate enable/disable notification alert
      * @param flashLights enable/disable notification flashing
+     * @param args additional arguments to the notification
+     * @return a platform native object that allows modifying notification state
      */
-    public void notifyStatusBar(String tickerText, String contentTitle,
-            String contentBody, boolean vibrate, boolean flashLights) {
+    public Object notifyStatusBar(String tickerText, String contentTitle,
+            String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
+        return null;
+    }
+    
+    /**
+     * Indicates whether the notify status bar method will present a notification to the user
+     * @return true if the notify status bar method will present a notification to the user
+     */
+    public boolean isNotificationSupported() {
+        return false;
     }
 
+    /**
+     * Removes the notification previously posted with the notify status bar method
+     * @param o the object returned from the notifyStatusBar method
+     */
+    public void dismissNotification(Object o) {
+    }
     
     /**
      * Returns the UDID for devices that support it

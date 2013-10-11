@@ -3184,6 +3184,15 @@ public class UserInterfaceEditor extends BaseForm {
                             out.writeInt(PROPERTY_LIST_ORIENTATION);
                             out.writeInt(lst.getOrientation());
                         }
+                        
+                        if(isPropertyModified(cmp, PROPERTY_HINT)) {
+                            out.writeInt(PROPERTY_HINT);
+                            out.writeUTF(lst.getHint());
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_HINT_ICON) && lst.getHintIcon() != null) {
+                            out.writeInt(PROPERTY_HINT_ICON);
+                            out.writeUTF(res.findId(lst.getHintIcon()));
+                        }
 
                         if(isPropertyModified(cmp, PROPERTY_LIST_RENDERER) && lst.getRenderer() instanceof com.codename1.ui.list.GenericListCellRenderer) {
                             out.writeInt(PROPERTY_LIST_RENDERER);
