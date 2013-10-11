@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 //#import "ZXingWidgetController.h"
 #import "ZBarSDK.h"
+#import "CVZBarReaderViewController.h"
 
 @interface ScanCodeImpl : UIViewController<ZBarReaderDelegate>//, ZXingDelegate>
 

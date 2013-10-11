@@ -56,6 +56,26 @@
 #endif
 #import "Rotate.h"
 
+/*static JAVA_OBJECT utf8_constant = JAVA_NULL;
+JAVA_OBJECT fromNSString(NSString* str)
+{
+    if (str == nil) {
+        return JAVA_NULL;
+    }
+    if (utf8_constant == JAVA_NULL) {
+        utf8_constant = xmlvm_create_java_string("UTF-8");
+    }
+    NSAutoreleasePool* p = [[NSAutoreleasePool alloc] init];
+    java_lang_String* s = __NEW_java_lang_String();
+    const char* chars = [str UTF8String];
+    int length = strlen(chars);
+    org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimensionWithData(__CLASS_byte, length, chars);
+    java_lang_String___INIT____byte_1ARRAY_java_lang_String(s, data, utf8_constant);
+    [p release];
+    return s;
+}*/
+
+
 extern void initVMImpl();
 
 extern void deinitVMImpl();
@@ -742,7 +762,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(JAVA_OBJECT instanceObjec
 {
     return isIOS7();
 }
-
 
 NSString* toNSString(JAVA_OBJECT str) {
     if(str == 0) {
@@ -1515,7 +1534,7 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
 }
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSObject* o = (NSObject*)peer;
         [o release];
     });
@@ -1838,6 +1857,103 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(JAVA_OBJECT in
     return responseGetMediaDuration;
 }
 
+void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT artist) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if ([MPNowPlayingInfoCenter class])  {
+            NSArray *keys = [NSArray arrayWithObjects:
+                             MPMediaItemPropertyArtist,
+                             MPNowPlayingInfoPropertyPlaybackRate,
+                             nil];
+            NSArray *values = [NSArray arrayWithObjects:
+                               toNSString(artist),
+                               [NSNumber numberWithInt:1],
+                               nil];
+            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        }
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if ([MPNowPlayingInfoCenter class])  {
+            NSArray *keys = [NSArray arrayWithObjects:
+                             MPMediaItemPropertyTitle,
+                             MPNowPlayingInfoPropertyPlaybackRate,
+                             nil];
+            NSArray *values = [NSArray arrayWithObjects:
+                               toNSString(title),
+                               [NSNumber numberWithInt:1],
+                               nil];
+            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        }
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setMediaBgDuration___long(JAVA_OBJECT instanceObject, JAVA_LONG dur) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if ([MPNowPlayingInfoCenter class])  {
+            NSArray *keys = [NSArray arrayWithObjects:
+                             MPMediaItemPropertyPlaybackDuration,
+                             MPNowPlayingInfoPropertyPlaybackRate,
+                             nil];
+            NSArray *values = [NSArray arrayWithObjects:
+                               [NSNumber numberWithLongLong:dur/1000],
+                               [NSNumber numberWithInt:1],
+                               nil];
+            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        }
+        [pool release];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(JAVA_OBJECT instanceObject, JAVA_LONG pos) {
+    /*dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if ([MPNowPlayingInfoCenter class])  {
+            NSArray *keys = [NSArray arrayWithObjects:
+                             MPMediaItemPropertyPlaybackDuration,
+                             MPNowPlayingInfoPropertyPlaybackRate,
+                             nil];
+            NSArray *values = [NSArray arrayWithObjects:
+                               [NSNumber numberWithLongLong:pos/1000],
+                               [NSNumber numberWithInt:1],
+                               nil];
+            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        }
+        [pool release];
+    });*/
+}
+
+void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if ([MPNowPlayingInfoCenter class])  {
+            UIImage* i = [(GLUIImage*)peer getImage];        
+            NSArray *keys = [NSArray arrayWithObjects:
+                             MPMediaItemPropertyArtwork,
+                             MPNowPlayingInfoPropertyPlaybackRate,
+                             nil];
+            NSArray *values = [NSArray arrayWithObjects:
+                               i,
+                               [NSNumber numberWithInt:1],
+                               nil];
+            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        }
+        [pool release];
+    });
+}
+
+
 JAVA_BOOLEAN responseIsVideoPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -2024,6 +2140,10 @@ int popoverSupported()
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(JAVA_OBJECT instanceObject) {
     return fromNSString([OpenUDID value]);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(JAVA_OBJECT instanceObject) {
+    return fromNSString([[UIDevice currentDevice] systemVersion]);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -2449,65 +2569,71 @@ void com_codename1_impl_ios_IOSNative_deregisterPush__(JAVA_OBJECT instanceObjec
 }
 
 UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
+    UIImage* scaledInstance = nil;
     const size_t originalWidth = img.size.width;
     const size_t originalHeight = img.size.height;
     
     CGContextRef bmContext = CGBitmapContextCreate(NULL, destWidth, destHeight, 8, destWidth * 4, CGColorSpaceCreateDeviceRGB(), kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedFirst);
     
-
-    if (!bmContext) {
-        return nil;
+    
+    if (bmContext) {
+        if (UIImageOrientationLeft == img.imageOrientation) {
+            CGContextRotateCTM(bmContext, M_PI_2);
+            CGContextTranslateCTM(bmContext, 0, -destHeight);
+        } else if (UIImageOrientationRight == img.imageOrientation) {
+            CGContextRotateCTM(bmContext, -M_PI_2);
+            CGContextTranslateCTM(bmContext, -destWidth, 0);
+        } else if (UIImageOrientationDown == img.imageOrientation) {
+            CGContextTranslateCTM(bmContext, destWidth, destHeight);
+            CGContextRotateCTM(bmContext, -M_PI);
+        }
+        
+        CGContextSetShouldAntialias(bmContext, true);
+        CGContextSetAllowsAntialiasing(bmContext, true);
+        CGContextSetInterpolationQuality(bmContext, kCGInterpolationHigh);
+        
+        CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), img.CGImage);
+        
+        CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
+        scaledInstance = [UIImage imageWithCGImage:scaledImageRef];
+        
+        CGImageRelease(scaledImageRef);
+        CGContextRelease(bmContext);
     }
-    
-    if (UIImageOrientationLeft == img.imageOrientation) {
-        CGContextRotateCTM(bmContext, M_PI_2);
-        CGContextTranslateCTM(bmContext, 0, -destHeight);
-    } else if (UIImageOrientationRight == img.imageOrientation) {
-        CGContextRotateCTM(bmContext, -M_PI_2);
-        CGContextTranslateCTM(bmContext, -destWidth, 0);
-    } else if (UIImageOrientationDown == img.imageOrientation) {
-        CGContextTranslateCTM(bmContext, destWidth, destHeight);
-        CGContextRotateCTM(bmContext, -M_PI);
-    }
-    
-    CGContextSetShouldAntialias(bmContext, true);
-    CGContextSetAllowsAntialiasing(bmContext, true);
-    CGContextSetInterpolationQuality(bmContext, kCGInterpolationHigh);
-    
-    CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), img.CGImage);
-    
-    CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
-    UIImage* scaled = [UIImage imageWithCGImage:scaledImageRef];
-    
-    CGImageRelease(scaledImageRef);
-    CGContextRelease(bmContext);
-    
+    UIImage* scaled = scaledInstance;
+    scaledInstance = nil;
     return scaled;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(JAVA_OBJECT instanceObject, JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    UIImage* i = [(GLUIImage*)imagePeer getImage];
-    if(width == -1) {
-        float aspect = height / i.size.height;
-        width = (int)(i.size.width * aspect);
-    }
-    if(height == -1) {
-        float aspect = width / i.size.width;
-        height = (int)(i.size.height * aspect);
-    }
-    NSData* data;
-    if(width != ((int)i.size.width) || height != ((int)i.size.height)) {
-        i = scaleImage(width, height, i);
-    } 
-    if(jpeg) {
-        data = UIImageJPEGRepresentation(i, quality);
-    } else {
-        data = UIImagePNGRepresentation(i);
-    }
-    
-    [data retain];
-    [pool release];
+    __block int blockWidth = width;
+    __block int blockHeight = height;
+    __block NSData* data = nil;
+    [imagePeer retain];
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIImage* i = [(GLUIImage*)imagePeer getImage];
+        if(width == -1) {
+            float aspect = height / i.size.height;
+            blockWidth = (int)(i.size.width * aspect);
+        }
+        if(height == -1) {
+            float aspect = width / i.size.width;
+            blockHeight = (int)(i.size.height * aspect);
+        }
+        if(blockWidth != ((int)i.size.width) || blockHeight != ((int)i.size.height)) {
+            i = scaleImage(blockWidth, blockHeight, i);
+        }
+        if(jpeg) {
+            data = UIImageJPEGRepresentation(i, quality);
+        } else {
+            data = UIImagePNGRepresentation(i);
+        }
+        
+        [data retain];
+        [pool release];
+    });
+    [imagePeer release];
     return data;
 }
 
@@ -2908,11 +3034,13 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(JAVA_OBJECT ins
 void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        ZBarReaderViewController *reader = [ZBarReaderViewController new];
+        CVZBarReaderViewController *reader = [CVZBarReaderViewController new];
         ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
         reader.readerDelegate = scanCall;
         reader.supportedOrientationsMask = ZBarOrientationMaskAll;
         
+        //ZBAR_CONFIGURATIONS
+
         ZBarImageScanner *scanner = reader.scanner;
         // TODO: (optional) additional reader configuration here
         

@@ -59,20 +59,19 @@ extern UIView *editingComponent;
 #ifdef INCLUDE_CN1_PUSH
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
+    if(userInfo == nil || apsInfo == nil) {
+        return YES;
+    }
     NSLog(@"Received notification on start: %@", userInfo);
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
         NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), nil);
     }
-    if( [[userInfo valueForKey:@"aps"] valueForKey:@"meta"] != NULL)
+    if( [userInfo valueForKey:@"meta"] != NULL)
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
-        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
-        JAVA_OBJECT key = fromNSString(@"pushType");
-        JAVA_OBJECT value = fromNSString(@"2");
-        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(o, key, value);
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), fromNSString(@"2"));
     }
 #endif
 
@@ -162,16 +161,12 @@ extern UIView *editingComponent;
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
 	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), nil);
     }
-    if( [[userInfo valueForKey:@"aps"] valueForKey:@"meta"] != NULL)
+    if( [userInfo valueForKey:@"meta"] != NULL)
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
-        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
-        JAVA_OBJECT key = fromNSString(@"pushType");
-        JAVA_OBJECT value = fromNSString(@"2");
-        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(o, key, value);
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String(fromNSString(alertValue));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), fromNSString(@"2"));
     }
 }
 #endif

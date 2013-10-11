@@ -927,11 +927,17 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self becomeFirstResponder];
 }
 
+- (BOOL)canBecomeFirstResponder {
+    return YES;
+}
+
 - (void)remoteControlReceivedWithEvent:(UIEvent *)receivedEvent {
     if (receivedEvent.type == UIEventTypeRemoteControl) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         o = com_codename1_ui_Display_getImplementation__(o);
         switch (receivedEvent.subtype) {
+            case UIEventSubtypeRemoteControlPlay:
+            case UIEventSubtypeRemoteControlPause:
             case UIEventSubtypeRemoteControlTogglePlayPause:
                 NSLog(@"Play or stop invoked");
                 com_codename1_impl_CodenameOneImplementation_keyPressed___int(o, -24);
