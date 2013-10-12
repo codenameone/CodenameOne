@@ -59,6 +59,8 @@ public class ImageViewer extends Component {
 
     private boolean eagerLock = true;
     private boolean selectLock;
+    private boolean cycleLeft = true;
+    private boolean cycleRight = true;
     
     /**
      * Default constructor
@@ -239,11 +241,11 @@ public class ImageViewer extends Component {
     @Override
     public void keyReleased(int key) {
         int gk = Display.getInstance().getGameAction(key);
-        if(gk == Display.GAME_LEFT || gk == Display.GAME_UP) {
+        if((gk == Display.GAME_LEFT || gk == Display.GAME_UP) && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
             new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
             return;
         }
-        if(gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT) {
+        if(gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
             new AnimatePanX(2, getImageRight(), getImageRightPos());
             return;
         }
@@ -286,7 +288,7 @@ public class ImageViewer extends Component {
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         if(panPositionX > 1) {
-            if(panPositionX >= 1.4f) {
+            if(panPositionX >= 1.4f && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
             } else {
                 // animate back
@@ -295,7 +297,7 @@ public class ImageViewer extends Component {
             return;
         } 
         if(panPositionX < 0) {
-            if(panPositionX <= -0.4f) {
+            if(panPositionX <= -0.4f && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
                 new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
             } else {
                 // animate back
@@ -444,15 +446,17 @@ public class ImageViewer extends Component {
             int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
             float ratio = ((float)width) * (panPositionX * -1);
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
-            Image left = getImageLeft();
-            if(swipePlaceholder != null) {
-                left.asyncLock(swipePlaceholder);
-            } else {
-                left.lock();
+            if (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos()) {
+                Image left = getImageLeft();
+                if(swipePlaceholder != null) {
+                    left.asyncLock(swipePlaceholder);
+                } else {
+                    left.lock();
+                }
+                ratio = ratio - width;
+                imageAspectCalc(left);
+                g.drawImage(left, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);            
             }
-            ratio = ratio - width;
-            imageAspectCalc(left);
-            g.drawImage(left, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);            
             return;
         }
         if(panPositionX > 1) {
@@ -460,15 +464,17 @@ public class ImageViewer extends Component {
             int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
             float ratio = ((float)width) * (1 - panPositionX);
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
-            Image right = getImageRight();
-            if(swipePlaceholder != null) {
-                right.asyncLock(swipePlaceholder);
-            } else {
-                right.lock();
+            if (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos()) {
+                Image right = getImageRight();
+                if(swipePlaceholder != null) {
+                    right.asyncLock(swipePlaceholder);
+                } else {
+                    right.lock();
+                }
+                ratio = ratio + width;
+                imageAspectCalc(right);
+                g.drawImage(right, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
             }
-            ratio = ratio + width;
-            imageAspectCalc(right);
-            g.drawImage(right, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
             return;
         }
         g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
@@ -607,6 +613,42 @@ public class ImageViewer extends Component {
      */
     public void setEagerLock(boolean eagerLock) {
         this.eagerLock = eagerLock;
+    }
+
+    /**
+     * By default the ImageViewer cycles from the beginning to the end of the list
+     * when going to the left, setting this to false prevents this behaviour
+     * @return true if it should cycle left from beginning
+     */
+    public boolean isCycleLeft() {
+        return cycleLeft;
+    }
+    
+    /**
+     * By default the ImageViewer cycles from the beginning to the end of the list
+     * when going to the left, setting this to false prevents this behaviour
+     * @param cycleLeft the cycle left to set
+     */
+    public void setCycleLeft(boolean cycleLeft) {
+        this.cycleLeft = cycleLeft;
+    }
+    
+    /**
+     * By default the ImageViewer cycles from the end to the beginning of the list
+     * when going to the right, setting this to false prevents this behaviour
+     * @return true if it should cycle right from the end
+     */
+    public boolean isCycleRight() {
+        return cycleRight;
+    }
+
+    /**
+     * By default the ImageViewer cycles from the end to the beginning of the list
+     * when going to the right, setting this to false prevents this behaviour
+     * @param cycleRight the cycle right to set
+     */
+    public void setCycleRight(boolean cycleRight) {
+        this.cycleRight = cycleRight;
     }
     
     class AnimatePanX implements Animation {
