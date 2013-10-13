@@ -23,6 +23,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
@@ -91,7 +92,7 @@ public abstract class ImageIO {
     public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException{
         InputStream in = FileSystemStorage.getInstance().openInputStream(imageFilePath);
         save(in, response, format, width, height, quality); 
-        in.close();
+        Util.cleanup(in);
     }
 
 

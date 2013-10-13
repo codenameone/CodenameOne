@@ -175,11 +175,9 @@ public class Capture {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if(scale != null) {
                     try {
-                        InputStream is = FileSystemStorage.getInstance().openInputStream(url);
                         OutputStream os = FileSystemStorage.getInstance().openOutputStream(url + "s");
-                        scale.save(is, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
+                        scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
                         Util.cleanup(os);
-                        Util.cleanup(is);
                         FileSystemStorage.getInstance().delete(url);
                         url = url + "s";
                     } catch (IOException ex) {
