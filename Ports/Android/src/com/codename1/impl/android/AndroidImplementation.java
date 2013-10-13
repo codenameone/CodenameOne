@@ -1006,6 +1006,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 fis = new FileInputStream(path);
                 b = BitmapFactory.decodeStream(fis, null, o2);
                 fis.close();
+                
+                //fix rotation 
+                ExifInterface exif = new ExifInterface(path);               
+                int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+                int angle = 0;
+                switch (orientation) {
+                    case ExifInterface.ORIENTATION_ROTATE_90:
+                        angle = 90;
+                        break;
+                    case ExifInterface.ORIENTATION_ROTATE_180:
+                        angle = 180;
+                        break;
+                    case ExifInterface.ORIENTATION_ROTATE_270:
+                        angle = 270;
+                        break;
+                }
+
+                if (angle != 0) {
+                    Matrix mat = new Matrix();
+                    mat.postRotate(angle);
+                    Bitmap correctBmp = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mat, true);
+                    b.recycle();
+                    b = correctBmp;
+                }
+                
+                
             } catch (IOException e) {
             }
             return b;
@@ -4220,50 +4247,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
-                    String path = (String) Storage.getInstance().readObject("imageUri");
-                    Storage.getInstance().deleteStorageFile("imageUri");
+                    String imageUri = (String) Storage.getInstance().readObject("imageUri");
+                    Vector pathandId = StringUtil.tokenizeString(imageUri, ";");
+                    String path = (String)pathandId.get(0);
+                    String lastId = (String)pathandId.get(1);                    
+                    Storage.getInstance().deleteStorageFile("imageUri");                    
                     
-                    Bitmap picture;
-                    if(Display.getInstance().getProperty("normalizeImage", "true").equals("true")) {
-                        ExifInterface exif = new ExifInterface(path);
-                        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-
-                        int angle = 0;
-
-                        switch(orientation) {
-                            case ExifInterface.ORIENTATION_ROTATE_90:
-                                angle = 90;
-                                break;
-                            case ExifInterface.ORIENTATION_ROTATE_180:
-                                angle = 180;
-                                break;
-                            case ExifInterface.ORIENTATION_ROTATE_270:
-                                angle = 270;
-                                break;
-                        }
-                        
-                        if(angle == 0) {
-                            picture = (Bitmap) createImage(path);
-                        } else {
-                            Matrix mat = new Matrix();
-                            mat.postRotate(angle);
-
-                            picture = (Bitmap) createImage(path);
-                            Bitmap correctBmp = Bitmap.createBitmap(picture, 0, 0, picture.getWidth(), picture.getHeight(), mat, true);
-                            picture.recycle();
-                            picture = correctBmp;
-                        }
-                    } else {
-                        picture = (Bitmap) createImage(path);
-                    }
-                    File f = getOutputMediaFile(false);
-                    FileOutputStream os = new FileOutputStream(f);
-                    picture.compress(Bitmap.CompressFormat.JPEG, 50, os);
-                    os.close();
-                    picture.recycle();
-                    picture = null;
-                    new File(path).delete();
-                    callback.fireActionEvent(new ActionEvent(f.getAbsolutePath()));
+                    clearMediaDB(lastId, path);
+                    scanMedia(new File(path));
+                    callback.fireActionEvent(new ActionEvent(path));
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -4309,12 +4301,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 
-        String fileName = "temp.jpg";
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.Images.Media.TITLE, fileName);
-        Uri imageUri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        File newFile = getOutputMediaFile(false);
+        Uri imageUri = Uri.fromFile(newFile);
+
+        intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
         
-        Storage.getInstance().writeObject("imageUri", convertImageUriToFilePath(imageUri, activity));
+        String lastImageID = getLastImageId();
+        Storage.getInstance().writeObject("imageUri", newFile.getAbsolutePath() + ";" + lastImageID);
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
         this.activity.startActivityForResult(intent, CAPTURE_IMAGE);
@@ -5007,4 +5000,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         cm.setNetworkPreference(info.getType());
     }
+    
+    private void scanMedia(File file) {
+        Uri uri = Uri.fromFile(file);
+        Intent scanFileIntent = new Intent(
+                Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri);
+        activity.sendBroadcast(scanFileIntent);
+    }
+    
+    /**
+     * Gets the last image id from the media store
+     *
+     * @return
+     */
+    private String getLastImageId() {
+        int idVal = 0;;
+        final String[] imageColumns = {MediaStore.Images.Media._ID};
+        final String imageOrderBy = MediaStore.Images.Media._ID + " DESC";
+        final String imageWhere = null;
+        final String[] imageArguments = null;
+        Cursor imageCursor = activity.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageColumns, imageWhere, imageArguments, imageOrderBy);
+        if (imageCursor.moveToFirst()) {
+            int id = imageCursor.getInt(imageCursor.getColumnIndex(MediaStore.Images.Media._ID));
+            imageCursor.close();
+            idVal = id;
+        } 
+        return "" + idVal;
+    }
+    
+    private void clearMediaDB(String lastId, String capturePath) {
+        final String[] imageColumns = {MediaStore.Images.Media.DATA, MediaStore.Images.Media.DATE_TAKEN, MediaStore.Images.Media.SIZE, MediaStore.Images.Media._ID};
+        final String imageOrderBy = MediaStore.Images.Media._ID + " DESC";
+        final String imageWhere = MediaStore.Images.Media._ID + ">?";
+        final String[] imageArguments = {lastId};
+        Cursor imageCursor = activity.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageColumns, imageWhere, imageArguments, imageOrderBy);
+        if (imageCursor.getCount() > 1) {
+            while (imageCursor.moveToNext()) {
+                int id = imageCursor.getInt(imageCursor.getColumnIndex(MediaStore.Images.Media._ID));
+                String path = imageCursor.getString(imageCursor.getColumnIndex(MediaStore.Images.Media.DATA));
+                Long takenTimeStamp = imageCursor.getLong(imageCursor.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN));
+                Long size = imageCursor.getLong(imageCursor.getColumnIndex(MediaStore.Images.Media.SIZE));
+                if (path.contentEquals(capturePath)) {
+                    // Remove it
+                    ContentResolver cr = activity.getContentResolver();
+                    cr.delete(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Images.Media._ID + "=?", new String[]{Long.toString(id)});
+                    break;
+                }
+            }
+        }
+        imageCursor.close();
+    }
+    
+    
 }
