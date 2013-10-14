@@ -129,7 +129,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
     dispatch_sync(dispatch_get_main_queue(), ^{
