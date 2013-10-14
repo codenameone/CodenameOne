@@ -260,6 +260,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                             break;
                     }
                 }
+                String hint = null;
+                if(currentEditing.getUIManager().isThemeConstant("nativeHintBool", false) && currentEditing.getHint() != null) {
+                    hint = currentEditing.getHint();
+                }
                 nativeInstance.editStringAt(x,
                         y,
                         w,
@@ -270,7 +274,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         pt,
                         pb,
                         pl,
-                        pr);
+                        pr, hint);
             }
         });
         editNext = false;

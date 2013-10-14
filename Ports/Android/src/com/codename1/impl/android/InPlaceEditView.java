@@ -267,6 +267,9 @@ public class InPlaceEditView extends FrameLayout {
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
         mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
+        if(textArea.getUIManager().isThemeConstant("nativeHintBool", false) && textArea.getHint() != null) {
+            mEditText.setHint(textArea.getHint());
+        }
         invalidate();
         setVisibility(VISIBLE);
         bringToFront();
