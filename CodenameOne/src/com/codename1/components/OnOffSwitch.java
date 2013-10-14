@@ -245,12 +245,6 @@ public class OnOffSwitch extends Container {
     
     private void flip() {
         setValue(!value);
-        if(iosMode) {
-            repaint();
-        } else {
-            updateButton();
-            animateLayout(150);
-        }
     }
     
     /**
@@ -431,12 +425,18 @@ public class OnOffSwitch extends Container {
      */
     public void setValue(boolean value) {
         boolean fireEvent = this.value != value;
-        this.value = value;
-        if(button != null) {
-            button.setSelected(value);
-        }
-        if(fireEvent){
+        if(fireEvent) {
+            this.value = value;
+            if(button != null) {
+                button.setSelected(value);
+            }
             fireActionEvent();
+            if(iosMode) {
+                repaint();
+            } else {
+                updateButton();
+                animateLayout(150);
+            }
         }
     }
 
