@@ -4487,6 +4487,16 @@ public abstract class CodenameOneImplementation {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
             registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+
+            // Call pushCallback's registeredForPush
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    final long pushId = Preferences.get("push_id", (long) -1);
+                    if (pushId > -1) {
+                        callback.registeredForPush("" + pushId);
+                    }
+                }
+            });
             registerPollingFallback();
         }
     }
