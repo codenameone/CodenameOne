@@ -76,8 +76,8 @@ public class LayeredLayout extends Layout {
         int numOfcomponents = parent.getComponentCount();
         for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            maxHeight = Math.max(maxHeight, cmp.getPreferredH());
-            maxWidth = Math.max(maxWidth, cmp.getPreferredW());
+            maxHeight = Math.max(maxHeight, cmp.getPreferredH() + cmp.getStyle().getMargin(false, Component.TOP) + cmp.getStyle().getMargin(false, Component.BOTTOM));
+            maxWidth = Math.max(maxWidth, cmp.getPreferredW()+ cmp.getStyle().getMargin(false, Component.LEFT) + cmp.getStyle().getMargin(false, Component.RIGHT));
         }
         Style s = parent.getStyle();
         Dimension d = new Dimension(maxWidth + s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT),
