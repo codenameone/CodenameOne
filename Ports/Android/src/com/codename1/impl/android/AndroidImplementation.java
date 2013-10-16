@@ -4289,6 +4289,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
         }
+        //clean imageUri
+        String imageUri = (String) Storage.getInstance().readObject("imageUri");
+        if(imageUri != null){
+            Storage.getInstance().deleteStorageFile("imageUri");                                        
+        }
+        
         if(callback != null) {
             callback.fireActionEvent(null);
         }
