@@ -29,6 +29,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -175,7 +176,8 @@ public class Capture {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if(scale != null) {
                     try {
-                        String path = url.substring(0, url.lastIndexOf(".")) + "s" + url.substring(url.lastIndexOf("."));
+                        
+                        String path = url.substring(0, url.indexOf(".")) + "s" + url.substring(url.indexOf("."));
                         OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
                         scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
                         Util.cleanup(os);
