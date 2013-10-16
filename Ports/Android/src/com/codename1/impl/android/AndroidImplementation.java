@@ -3674,7 +3674,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void deleteFile(String file) {
-        new File(file).delete();
+        File f = new File(file);
+        f.delete();
     }
 
     /**
@@ -4251,10 +4252,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Vector pathandId = StringUtil.tokenizeString(imageUri, ";");
                     String path = (String)pathandId.get(0);
                     String lastId = (String)pathandId.get(1);                    
-                    Storage.getInstance().deleteStorageFile("imageUri");                    
-                    
+                    Storage.getInstance().deleteStorageFile("imageUri");                                        
                     clearMediaDB(lastId, path);
-                    scanMedia(new File(path));
                     callback.fireActionEvent(new ActionEvent(path));
                     return;
                 } catch (Exception e) {
@@ -4561,9 +4560,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Image i = Image.createImage(imageFilePath);
                     Image newImage = i.scaled(width, height);
-                    i.dispose();
                     save(newImage, response, format, quality);
                     newImage.dispose();
+                    i.dispose();
                 } 
 
                 @Override
