@@ -25,10 +25,7 @@ package com.codename1.ui;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.list.DefaultListCellRenderer;
-import com.codename1.ui.list.DefaultListModel;
-import com.codename1.ui.list.FilterProxyListModel;
-import com.codename1.ui.list.ListModel;
+import com.codename1.ui.list.*;
 
 /**
  * This class is an editable TextField with predefined completion suggestion 
@@ -41,6 +38,7 @@ public class AutoCompleteTextField extends TextField {
     private Container popup;
     private FilterProxyListModel<String> filter;
     private ActionListener listener = new FormPointerListener();
+    private ListCellRenderer completionRenderer;
 
     /**
      * Constructor with completion suggestions
@@ -137,6 +135,16 @@ public class AutoCompleteTextField extends TextField {
         return filter;
     }
 
+    /**
+     * Sets a custom renderer to the completion suggestions list.
+     * @param completionRenderer a ListCellRenderer for the suggestions List
+     */ 
+    public void setCompletionRenderer(ListCellRenderer completionRenderer) {
+        this.completionRenderer = completionRenderer;
+    }
+    
+    
+
     private void removePopup() {
         Form f = getComponentForm();
         if (f != null) {
@@ -151,7 +159,11 @@ public class AutoCompleteTextField extends TextField {
         popup.removeAll();
         filter(getText());
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
-        ((DefaultListCellRenderer<String>)l.getRenderer()).setShowNumbers(false);
+        if(completionRenderer == null){
+            ((DefaultListCellRenderer<String>)l.getRenderer()).setShowNumbers(false);
+        }else{
+            l.setRenderer(completionRenderer);
+        }
         l.setUIID("AutoCompletePopup");
         l.addActionListener(new ActionListener() {
 
