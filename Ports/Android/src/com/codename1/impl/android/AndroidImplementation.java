@@ -2850,18 +2850,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public boolean isTablet() {
-        try {
-            // Compute screen size
-            DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-            float screenWidth = dm.widthPixels / dm.xdpi;
-            float screenHeight = dm.heightPixels / dm.ydpi;
-            double size = Math.sqrt(Math.pow(screenWidth, 2)
-                    + Math.pow(screenHeight, 2));
-            // Tablet devices should have a screen size greater than 6 inches
-            return size >= 6;
-        } catch (Throwable t) {
-            return false;
-        }
+        return (activity.getResources().getConfiguration().screenLayout
+                & Configuration.SCREENLAYOUT_SIZE_MASK)
+                >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
     public int convertToPixels(int dipCount, boolean horizontal) {
