@@ -11,7 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- *
+ * 
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
@@ -127,20 +127,16 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
     }
 
     @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-//        if (this.implementation.editInProgress()) {
-//            /**
-//             * while edit is in progress a virtual keyboard might
-//             * resize everything.  this is problematic because the
-//             * editing (as it is implemented now) blocks the EDT.
-//             * so we just drop these resize events for now.  once
-//             * editing is complete we might apply the last state.
-//             */
-//            this.implementation.setLastSizeChangedWH(w, h);
-//            return;
-//        }
+    public void surfaceChanged(SurfaceHolder holder, int format, final int w, final int h) {
+        if(!Display.isInitialized()) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
 
-        this.handleSizeChange(w, h);
+            public void run() {
+                handleSizeChange(w, h);
+            }
+        });
     }
 
     @Override
@@ -189,16 +185,23 @@ public class AndroidView extends SurfaceView implements SurfaceHolder.Callback{
     }
 
     @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+    protected void onSizeChanged(final int w, final int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
 
+        if(!Display.isInitialized()) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+
+            public void run() {
+                handleSizeChange(w, h);
+            }
+        });
         this.handleSizeChange(w, h);
     }
 
     public void handleSizeChange(int w, int h) {
-        if(!Display.isInitialized()) {
-            return;
-        }
+        
         if ((this.width != w && (this.width < w || this.height < h)) ||
                 (bitmap.getHeight() < h) ) {
             this.initBitmaps(w, h);
