@@ -4255,7 +4255,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            } else if (requestCode == CAPTURE_VIDEO || requestCode == CAPTURE_AUDIO) {
+            } else if (requestCode == CAPTURE_VIDEO) {
+                String path = (String) Storage.getInstance().readObject("videoUri");
+                Storage.getInstance().deleteStorageFile("videoUri");                                        
+                callback.fireActionEvent(new ActionEvent(path));
+                return;
+            } else if (requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, activity);
                 callback.fireActionEvent(new ActionEvent(path));
@@ -4311,6 +4316,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Storage.getInstance().writeObject("imageUri", newFile.getAbsolutePath() + ";" + lastImageID);
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
         this.activity.startActivityForResult(intent, CAPTURE_IMAGE);
     }
 
@@ -4319,6 +4326,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
+        
+        File newFile = getOutputMediaFile(true);
+        Uri videoUri = Uri.fromFile(newFile);
+
+        Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());
+
+        intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, videoUri);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
         this.activity.startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
