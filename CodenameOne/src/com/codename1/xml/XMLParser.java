@@ -727,10 +727,18 @@ public class XMLParser {
             StringBuilder charEntity = null;
             boolean ended=false;
             while (!ended) {
-                c=(char)read(is);
+                int i = read(is);
+                if(i < 0) {
+                    return END_TAG;
+                }
+                c=(char)i;
                 if (c==quote) {
                     ended=true;
-                    c=(char)read(is);
+                    i = read(is);
+                    if(i < 0) {
+                        return END_TAG;
+                    }
+                    c=(char)i;
                 } else if ((quote==' ') && ((c=='/') || (c=='>') || (isWhiteSpace(c)))) {
                     ended=true;
                 } else if (c=='&') {
@@ -775,7 +783,11 @@ public class XMLParser {
 
              //read and ignore any whitespaces after attribute/value pair
             while (isWhiteSpace(c)) {
-                c=(char)read(is);
+                int i = read(is);
+                if(i < 0) {
+                    return END_TAG;
+                }
+                c=(char)i;
             }
 
             if (c=='>') { //tag declartion ended, process content
@@ -784,7 +796,11 @@ public class XMLParser {
                 }
                 return element;
             } else if (c=='/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
-                c=(char)read(is);
+                int i = read(is);
+                if(i < 0) {
+                    return END_TAG;
+                }
+                c=(char)i;
                 if (c=='>') {
                     // Solves the case of <a p="s"/> endTag("a") would not be called related to
                     // http://code.google.com/p/codenameone/issues/detail?id=896
