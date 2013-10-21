@@ -156,6 +156,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
+            if(hintString != nil) {
+                utf.placeholder = hintString;
+            }
+
             if((constraint & 0x80000) == 0x80000) {
                 utf.autocorrectionType = UITextAutocorrectionTypeNo;
             }
@@ -777,6 +781,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height) {
     if([CodenameOne_GLViewController instance].currentMutableImage == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    // set all pixels to transparent white to solve http://code.google.com/p/codenameone/issues/detail?id=923
+    for(int iter = 0 ; iter < width * height ; iter++) {
+        arr[iter] = 0xffffff;
     }
     UIImage* img = [(GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
