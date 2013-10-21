@@ -3724,6 +3724,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new FileInputStream(file);
     }
 
+    @Override
+    public boolean isMultiTouch() {
+        return true;
+    }
+
     /**
      * @inheritDoc
      */

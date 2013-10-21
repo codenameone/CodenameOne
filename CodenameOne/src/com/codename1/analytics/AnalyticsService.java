@@ -23,8 +23,10 @@
 package com.codename1.analytics;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -41,6 +43,8 @@ import java.io.InputStream;
 public class AnalyticsService {
     private static AnalyticsService instance;
 
+    private static boolean appsMode = false;
+    
     /**
      * Indicates whether analytics server failures should brodcast an error event
      * @return the failSilently
@@ -56,6 +60,23 @@ public class AnalyticsService {
     public static void setFailSilently(boolean aFailSilently) {
         failSilently = aFailSilently;
     }
+
+    /**
+     * Apps mode allows improved analytics using the newer google analytics API designed for apps
+     * @return the appsMode
+     */
+    public static boolean isAppsMode() {
+        return appsMode;
+    }
+
+    /**
+     * Apps mode allows improved analytics using the newer google analytics API designed for apps
+     * @param aAppsMode the appsMode to set
+     */
+    public static void setAppsMode(boolean aAppsMode) {
+        appsMode = aAppsMode;
+    }
+    
     private String agent;
     private String domain;
     private static boolean failSilently = true;
@@ -117,24 +138,69 @@ public class AnalyticsService {
      * @param referer the page from which the user came
      */
     protected void visitPage(String page, String referer) {
-        String url = "https://codename-one.appspot.com/anal";
-        ConnectionRequest r = new ConnectionRequest();
-        r.setUrl(url);
-        r.setPost(false);
-        r.setFailSilently(failSilently);
-        r.addArgument("guid", "ON");
-        r.addArgument("utmac", instance.agent);
-        r.addArgument("utmn", Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));
-        if(page == null || page.length() == 0) {
-            page = "-";
+        if(appsMode) {
+            // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#apptracking
+            ConnectionRequest req = GetGARequest();
+            req.addArgument("t", "appview");
+            req.addArgument("an", Display.getInstance().getProperty("AppName", "Codename One App"));
+            String version = Display.getInstance().getProperty("AppVersion", "1.0");
+            req.addArgument("av", version);
+            req.addArgument("cd", page);
+
+            NetworkManager.getInstance().addToQueue(req);
+        } else {
+            String url = "https://codename-one.appspot.com/anal";
+            ConnectionRequest r = new ConnectionRequest();
+            r.setUrl(url);
+            r.setPost(false);
+            r.setFailSilently(failSilently);
+            r.addArgument("guid", "ON");
+            r.addArgument("utmac", instance.agent);
+            r.addArgument("utmn", Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));
+            if(page == null || page.length() == 0) {
+                page = "-";
+            }
+            r.addArgument("utmp", page);
+            if(referer == null || referer.length() == 0) {
+                referer = "-";
+            }
+            r.addArgument("utmr", referer);
+            r.addArgument("d", instance.domain);
+            r.setPriority(ConnectionRequest.PRIORITY_LOW);
+            NetworkManager.getInstance().addToQueue(r);
         }
-        r.addArgument("utmp", page);
-        if(referer == null || referer.length() == 0) {
-            referer = "-";
+    }
+    
+    /**
+     * In apps mode we can send information about an exception to the analytics server
+     * @param t the exception
+     * @param message up to 150 character message, 
+     * @param fatal is the exception fatal
+     */
+    public static void sendCrashReport(Throwable t, String message, boolean fatal) {
+        // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#exception
+        ConnectionRequest req = GetGARequest();
+        req.addArgument("t", "exception");
+        System.out.println(message);
+        req.addArgument("exd", message.substring(0, Math.min(message.length(), 150) - 1));
+        if(fatal) {
+            req.addArgument("exf", "1");
+        } else {
+            req.addArgument("exf", "0");
         }
-        r.addArgument("utmr", referer);
-        r.addArgument("d", instance.domain);
-        r.setPriority(ConnectionRequest.PRIORITY_LOW);
-        NetworkManager.getInstance().addToQueue(r);
+        
+        NetworkManager.getInstance().addToQueue(req);
+    }
+
+    private static ConnectionRequest GetGARequest() {
+        ConnectionRequest req = new ConnectionRequest();
+        req.setUrl("http://www.google-analytics.com/collect");
+        req.setPost(true);
+        req.setFailSilently(true);
+        req.addArgument("v", "1");
+        req.addArgument("tid", instance.agent);
+        long uniqueId = Log.getUniqueDeviceId();
+        req.addArgument("cid", String.valueOf(uniqueId));
+        return req;
     }
 }

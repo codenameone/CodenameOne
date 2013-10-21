@@ -4476,6 +4476,15 @@ public abstract class CodenameOneImplementation {
         return packageName;
     }
     
+    class RPush implements Runnable {
+        public void run() {
+            final long pushId = Preferences.get("push_id", (long) -1);
+            if (pushId > -1) {
+                callback.registeredForPush("" + pushId);
+            }
+        }
+    }
+    
     /**
      * User register to receive push notification
      * 
@@ -4489,14 +4498,7 @@ public abstract class CodenameOneImplementation {
             registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
 
             // Call pushCallback's registeredForPush
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    final long pushId = Preferences.get("push_id", (long) -1);
-                    if (pushId > -1) {
-                        callback.registeredForPush("" + pushId);
-                    }
-                }
-            });
+            Display.getInstance().callSerially(new RPush());
             registerPollingFallback();
         }
     }

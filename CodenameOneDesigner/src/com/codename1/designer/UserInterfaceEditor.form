@@ -186,7 +186,7 @@
                                       <Component id="bindPostShow" alignment="0" pref="558" max="32767" attributes="0"/>
                                       <Component id="bindExitForm" alignment="0" pref="558" max="32767" attributes="0"/>
                                       <Component id="bindListModel" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="whyAreEventsDisabled" alignment="0" pref="558" max="32767" attributes="0"/>
+                                      <Component id="whyAreEventsDisabled" alignment="0" pref="407" max="32767" attributes="0"/>
                                   </Group>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
@@ -512,7 +512,7 @@
 
                               <Layout class="org.netbeans.modules.form.compat2.layouts.DesignGridLayout">
                                 <Property name="columns" type="int" value="2"/>
-                                <Property name="rows" type="int" value="8"/>
+                                <Property name="rows" type="int" value="9"/>
                               </Layout>
                               <SubComponents>
                                 <Component class="javax.swing.JButton" name="codenameOneLabel">
@@ -530,6 +530,23 @@
                                   </Properties>
                                   <Events>
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneLabelActionPerformed"/>
+                                  </Events>
+                                </Component>
+                                <Component class="javax.swing.JButton" name="codenameOneSpanLabel">
+                                  <Properties>
+                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXLabel32.png"/>
+                                    </Property>
+                                    <Property name="text" type="java.lang.String" value="Span Label"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Label&lt;/b&gt;&lt;br&gt; &lt;p&gt;A label that automatically breaks lines when running out of space&lt;br&gt;&#xa;Notice that this is expensive and more complex to layout hence it is&lt;br&gt;&#xa;recommended to use a Label unless you really need this functionality.&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                      <Border info="null"/>
+                                    </Property>
+                                    <Property name="horizontalAlignment" type="int" value="2"/>
+                                    <Property name="name" type="java.lang.String" value="codenameOneSpanLabel" noResource="true"/>
+                                  </Properties>
+                                  <Events>
+                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneSpanLabelActionPerformed"/>
                                   </Events>
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneButton">

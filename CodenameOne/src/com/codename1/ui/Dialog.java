@@ -993,6 +993,9 @@ public class Dialog extends Form {
         if(isDisposed()) {
             disposeImpl();
         }
+        if (showListener != null) {
+            showListener.fireActionEvent(new ActionEvent(this));
+        }
     }
     
     /**

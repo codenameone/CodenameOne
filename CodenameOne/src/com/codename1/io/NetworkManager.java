@@ -75,6 +75,23 @@ public class NetworkManager {
 
     private static final Object LOCK = new Object();
     private static final NetworkManager INSTANCE = new NetworkManager();
+
+    /**
+     * This URL is used to check whether an Internet connection is available
+     * @return the autoDetectURL
+     */
+    public static String getAutoDetectURL() {
+        return autoDetectURL;
+    }
+
+    /**
+     * This URL is used to check whether an Internet connection is available
+     * @param aAutoDetectURL the autoDetectURL to set
+     */
+    public static void setAutoDetectURL(String aAutoDetectURL) {
+        autoDetectURL = aAutoDetectURL;
+    }
+    
     private Vector pending = new Vector();
     private boolean running;
     private int threadCount = 1;
@@ -85,7 +102,8 @@ public class NetworkManager {
     private Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
     private boolean autoDetected;
-
+    private static String autoDetectURL = "http://www.google.com/";
+    
     private NetworkManager() {
     }
     
@@ -372,7 +390,7 @@ public class NetworkManager {
             r.setPost(false);
             r.currentAP = currentAP;
             r.aps = aps;
-            r.setUrl("http://codename-one.appspot.com/t.html");
+            r.setUrl(autoDetectURL);
             r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
             addToQueue(r);
         }
@@ -600,7 +618,7 @@ public class NetworkManager {
             if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
                 AutoDetectAPN r = new AutoDetectAPN();
                 r.setPost(false);
-                r.setUrl("http://codename-one.appspot.com/t.html");
+                r.setUrl(autoDetectURL);
                 r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
                 addToQueue(r, false);
             }

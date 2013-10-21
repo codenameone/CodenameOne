@@ -59,6 +59,7 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("InfiniteProgress", com.codename1.components.InfiniteProgress.class);
         registerCustomComponent("MultiButton", com.codename1.components.MultiButton.class);
         registerCustomComponent("SpanButton", com.codename1.components.SpanButton.class);
+        registerCustomComponent("SpanLabel", com.codename1.components.SpanLabel.class);
         registerCustomComponent("Ads", com.codename1.components.Ads.class);
         registerCustomComponent("MapComponent", com.codename1.maps.MapComponent.class);
         registerCustomComponent("MultiList", com.codename1.ui.list.MultiList.class);

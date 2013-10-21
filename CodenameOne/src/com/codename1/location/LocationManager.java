@@ -67,12 +67,74 @@ public abstract class LocationManager {
     }
 
     /**
-     * Gets the current Location of the device, in most cases this uses the GPS
+     * Gets the current Location of the device, in most cases this uses the GPS. Notice! This method
+     * will only return a valid value after the location listener callback returns
      * @return a Location Object
      * @throws IOException if Location cannot be retrieve from the device
      */
     public abstract Location getCurrentLocation() throws IOException;
 
+    class LL implements Runnable, LocationListener {
+        Location result;
+        boolean finished;
+        
+        public void bind() {
+            setLocationListener(this);
+            Display.getInstance().invokeAndBlock(this);
+        }
+        
+        public void locationUpdated(Location location) {
+            result = location;
+            finished = true;
+            setLocationListener(null);
+        }
+
+        public void providerStateChanged(int newState) {
+            if(newState == AVAILABLE) {
+                try {
+                    result = getCurrentLocation();
+                } catch(IOException err) {
+                    err.printStackTrace();
+                    result = null;
+                }
+            } else {
+                result = null;
+            }
+            finished = true;
+            setLocationListener(null);
+        }
+        
+        public void run() {
+            while(!finished) {
+                try {
+                    Thread.sleep(20);
+                } catch(InterruptedException er) {}
+            }
+        }
+    }
+    
+    /**
+     * Returns the current location synchronously, this is useful if you just want
+     * to know the location NOW and don't care about tracking location. Notice that
+     * this method will block until a result is returned so you might want to use something
+     * like InfiniteProgress while this is running
+     * 
+     * @return the current location or null in case of an error
+     */
+    public Location getCurrentLocationSync() {
+        try {
+            if(getStatus() != AVAILABLE) {
+                LL l = new LL();
+                l.bind();
+                return l.result;
+            }
+            return getCurrentLocation();
+        } catch(IOException err) {
+            err.printStackTrace();
+            return null;
+        }
+    }
+    
     /**
      * Gets the last known Location of the device.
      * 

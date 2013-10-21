@@ -1879,6 +1879,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneInfiniteProgress, com.codename1.components.InfiniteProgress.class, "InfiniteProgress", null);
         makeDraggable(codenameOneMultiButton, com.codename1.components.MultiButton.class, "MultiButton", null);
         makeDraggable(codenameOneSpanButton, com.codename1.components.SpanButton.class, "SpanButton", null);
+        makeDraggable(codenameOneSpanLabel, com.codename1.components.SpanLabel.class, "SpanLabel", null);
         makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
         makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
@@ -4335,6 +4336,7 @@ public class UserInterfaceEditor extends BaseForm {
         jPanel1 = new javax.swing.JPanel();
         coreComponents = new javax.swing.JPanel();
         codenameOneLabel = new javax.swing.JButton();
+        codenameOneSpanLabel = new javax.swing.JButton();
         codenameOneButton = new javax.swing.JButton();
         codenameOneMultiButton = new javax.swing.JButton();
         codenameOneSpanButton = new javax.swing.JButton();
@@ -4471,7 +4473,7 @@ public class UserInterfaceEditor extends BaseForm {
                     .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
                     .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
                     .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE))
+                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 407, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel4Layout.setVerticalGroup(
@@ -4587,7 +4589,7 @@ public class UserInterfaceEditor extends BaseForm {
         jPanel1.setLayout(new java.awt.BorderLayout());
 
         coreComponents.setName("coreComponents"); // NOI18N
-        coreComponents.setLayout(new java.awt.GridLayout(8, 2));
+        coreComponents.setLayout(new java.awt.GridLayout(9, 2));
 
         codenameOneLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXLabel32.png"))); // NOI18N
         codenameOneLabel.setText("Label");
@@ -4597,6 +4599,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneLabel.setName("codenameOneLabel"); // NOI18N
         codenameOneLabel.addActionListener(formListener);
         coreComponents.add(codenameOneLabel);
+
+        codenameOneSpanLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXLabel32.png"))); // NOI18N
+        codenameOneSpanLabel.setText("Span Label");
+        codenameOneSpanLabel.setToolTipText("<html><body><b>Label</b><br> <p>A label that automatically breaks lines when running out of space<br>\nNotice that this is expensive and more complex to layout hence it is<br>\nrecommended to use a Label unless you really need this functionality.</p> </body> </html>"); // NOI18N
+        codenameOneSpanLabel.setBorder(null);
+        codenameOneSpanLabel.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneSpanLabel.setName("codenameOneSpanLabel"); // NOI18N
+        codenameOneSpanLabel.addActionListener(formListener);
+        coreComponents.add(codenameOneSpanLabel);
 
         codenameOneButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
         codenameOneButton.setText("Button");
@@ -5096,14 +5107,17 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneOnOffSwitch) {
                 UserInterfaceEditor.this.codenameOneOnOffSwitchActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneImageViewer) {
+                UserInterfaceEditor.this.codenameOneImageViewerActionPerformed(evt);
+            }
             else if (evt.getSource() == rssReader) {
                 UserInterfaceEditor.this.rssReaderActionPerformed(evt);
             }
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneImageViewer) {
-                UserInterfaceEditor.this.codenameOneImageViewerActionPerformed(evt);
+            else if (evt.getSource() == codenameOneSpanLabel) {
+                UserInterfaceEditor.this.codenameOneSpanLabelActionPerformed(evt);
             }
         }
 
@@ -5795,6 +5809,14 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
         addComponentToContainer(new com.codename1.components.ImageViewer(), "ImageViewer");
     }//GEN-LAST:event_codenameOneImageViewerActionPerformed
 
+    private void codenameOneSpanLabelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneSpanLabelActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.components.SpanLabel(), "SpanLabel");
+    }//GEN-LAST:event_codenameOneSpanLabelActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5920,6 +5942,7 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton codenameOneShare;
     private javax.swing.JButton codenameOneSlider;
     private javax.swing.JButton codenameOneSpanButton;
+    private javax.swing.JButton codenameOneSpanLabel;
     private javax.swing.JButton codenameOneTable;
     private javax.swing.JButton codenameOneTabs;
     private javax.swing.JButton codenameOneTextArea;

@@ -25,25 +25,26 @@ package com.codename1.components;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
- * A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
- * Unlike the multi button the span button has the UIID style of a button.
+ * A multi line label component that can be easily localized, this is simply based
+ * on a text area combined with a label.
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container {
-    private Button actualButton;
+public class SpanLabel extends Container {
+    private Label icon;
     private TextArea text;
     
     /**
      * Default constructor will be useful when adding this to the GUI builder
      */
-    public SpanButton() {
+    public SpanLabel() {
         this("");
     }
     
@@ -51,49 +52,37 @@ public class SpanButton extends Container {
     /**
      * Constructor accepting default text
      */
-    public SpanButton(String txt) {
-        setUIID("Button");
+    public SpanLabel(String txt) {
+        setUIID("Label");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
-        text.setUIID("Button");
+        text.setUIID("Label");
         text.setEditable(false);
         text.setFocusable(false);
-        removeBackground(text.getUnselectedStyle());
-        removeBackground(text.getSelectedStyle());
-        removeBackground(text.getPressedStyle());
-        removeBackground(text.getDisabledStyle());
-        actualButton = new Button();
-        actualButton.setUIID("icon");
-        addComponent(BorderLayout.WEST, actualButton);
+        icon = new Label();
+        icon.setUIID("icon");
+        addComponent(BorderLayout.WEST, icon);
         addComponent(BorderLayout.CENTER, text);
-        setLeadComponent(actualButton);
     }
     
-    private void removeBackground(Style s) {
-        s.setBackgroundType(Style.BACKGROUND_NONE);
-        s.setBgImage(null);
-        s.setBorder(null);
-        s.setBgTransparency(0);
-    } 
-    
     /**
-     * Set the text of the button
-     * @param t text of the button
+     * Set the text of the label
+     * @param t text of the label
      */
     public void setText(String t) {
         text.setText(getUIManager().localize(t, t));
     }
 
     /**
-     * Sets the icon for the button
+     * Sets the icon for the label
      * @param i the icon
      */
     public void setIcon(Image i) {
-        actualButton.setIcon(i);
+        icon.setIcon(i);
     }
     
     /**
-     * Returns the text of the button
+     * Returns the text of the label
      * @return the text
      */
     public String getText() {
@@ -105,24 +94,7 @@ public class SpanButton extends Container {
      * @return the icon
      */
     public Image getIcon() {
-        return actualButton.getIcon();
-    }
-    
-    /**
-     * Binds an action listener to button events
-     * 
-     * @param l the listener
-     */
-    public void addActionListener(ActionListener l) {
-        actualButton.addActionListener(l);
-    }
-
-    /**
-     * Removes the listener from tracking button events
-     * @param l the listener
-     */
-    public void removeActionListener(ActionListener l) {
-        actualButton.removeActionListener(l);
+        return icon.getIcon();
     }
     
     /**
@@ -131,8 +103,8 @@ public class SpanButton extends Container {
      * @param s position either North/South/East/West
      */
     public void setIconPosition(String t) {
-        removeComponent(actualButton);
-        addComponent(t, actualButton);
+        removeComponent(icon);
+        addComponent(t, icon);
         revalidate();
     }
     
@@ -142,7 +114,7 @@ public class SpanButton extends Container {
      * @return position either North/South/East/West
      */
     public String getIconPosition() {
-        return (String)getLayout().getComponentConstraint(actualButton);
+        return (String)getLayout().getComponentConstraint(icon);
     }
     
 

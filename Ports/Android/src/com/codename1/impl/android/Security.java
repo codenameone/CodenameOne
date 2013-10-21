@@ -126,7 +126,12 @@ public class Security {
              * Generally, encryption keys / passwords should only be kept in memory
              * long enough to perform the operation they need to perform.
              */
-            String base64EncodedPublicKey = Display.getInstance().getProperty("android.licenseKey", null);
+            String base64EncodedPublicKey = null;
+            //base64EncodedPublicKeyBegin
+            if(Display.isInitialized()) {
+                base64EncodedPublicKey = Display.getInstance().getProperty("android.licenseKey", null);
+            } 
+            //base64EncodedPublicKeyEnd
             if(base64EncodedPublicKey != null) {
                 PublicKey key = Security.generatePublicKey(base64EncodedPublicKey);
                 verified = Security.verify(key, signedData, signature);

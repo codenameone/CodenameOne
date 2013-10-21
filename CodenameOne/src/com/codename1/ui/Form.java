@@ -143,7 +143,7 @@ public class Form extends Container {
      */
     private boolean cyclicFocus = true;
     private int tactileTouchDuration;
-    private EventDispatcher showListener;
+    EventDispatcher showListener;
     int initialPressX;
     int initialPressY;
     private EventDispatcher orientationListener;

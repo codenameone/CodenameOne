@@ -456,7 +456,9 @@ public class CodenameOneActivity extends Activity {
                 BitmapDrawable d = new BitmapDrawable(b);
                 item.setIcon(d);
             }
-            
+            if(!command.isEnabled()) {
+                item.setEnabled(false);
+            }
             if (android.os.Build.VERSION.SDK_INT >= 11 && command.getClientProperty("android:showAsAction") != null) {
                 String androidShowAsAction = command.getClientProperty("android:showAsAction").toString();
                 // From https://developer.android.com/guide/topics/resources/menu-resource.html
