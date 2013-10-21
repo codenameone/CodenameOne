@@ -552,21 +552,11 @@ public class Result {
 	 * @throws IllegalArgumentException
 	 */
 	private Object _internalGet(final String path) throws IllegalArgumentException {
-		final Vector tokens = new ResultTokenizer(path).tokenize(namespaceAliases);
-		final StructuredContent obj = apply(root, tokens, 0);
-		if (obj == null) {
+		Vector v = _internalGetAsArray(path);
+		if (v == null || v.size() == 0) {
 			return null;
 		}
-		String tagName = (String) tokens.lastElement();
-		if (tagName.startsWith("@")) {
-			return obj.getAttribute(tagName.substring(1));
-		} else {
-			Vector result = obj.getChildren(tagName);
-			if (result.size() == 0) {
-				return null;
-			}
-			return result.elementAt(0);
-		}
+		return v.elementAt(0);
 	}
 	
 	/**
@@ -949,7 +939,7 @@ public class Result {
 						children = start.getChildren(tok1);
 					}
 					if (children.size() > 0) {
-						return apply((StructuredContent) children.elementAt(0),
+						return apply(new SubContent(children, start),
 								tokens, i + 2);
 					}
 					return null;
@@ -1000,14 +990,13 @@ public class Result {
 						return apply((StructuredContent) selected, tokens,
 								i + 1);
 					} else {
-						// TODO: need to fix complete this,
-						// return apply((Vector)selected, tokens, i + 1);
-						// For now only processing the first result:
-						if (((Vector) selected).size() > 0) {
-							return apply(
-									(StructuredContent) ((Vector) selected)
-											.elementAt(0),
-									tokens, i + 1);
+						if (selected != null && ((Vector) selected).size() > 0) {
+							Vector v = new Vector();
+							for (Object o : (Vector)selected) {
+								StructuredContent sc = apply((StructuredContent)o, tokens, i + 1);
+								v.add(sc);
+							}
+							return new SubContent(v, start);
 						}
 					}
 			}
