@@ -135,7 +135,8 @@ public class MenuBar extends Container implements ActionListener {
         cancelMenuItem = createMenuCancelCommand();
         UIManager manager = parent.getUIManager();
         LookAndFeel lf = manager.getLookAndFeel();
-        minimizeOnBack = manager.isThemeConstant("minimizeOnBackBool", true);
+        //don't minimize the app if it's a Dialog
+        minimizeOnBack = manager.isThemeConstant("minimizeOnBackBool", true) && !(parent instanceof Dialog);
         hideEmptyCommands = manager.isThemeConstant("hideEmptyCommandsBool", false);
         menuStyle = manager.getComponentStyle("Menu");
         setUIID("SoftButton");
