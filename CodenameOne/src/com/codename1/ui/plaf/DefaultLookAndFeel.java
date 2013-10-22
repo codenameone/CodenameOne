@@ -1339,7 +1339,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     }
                 }
 
-                displayX = ta.getX() + ta.getWidth() - style.getPadding(false, Component.RIGHT) - f.stringWidth(displayText) + x;
+                displayX = ta.getX() + ta.getWidth() - style.getPadding(false, Component.RIGHT) - style.getPadding(false, Component.LEFT) - f.stringWidth(displayText) + x;
             }
 
             int cx = g.getClipX();
