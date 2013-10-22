@@ -16,14 +16,14 @@ import java.io.InputStream;
  * @author Chen
  */
 class Audio implements Runnable, com.codename1.media.Media {
+
     private MediaPlayer player;
     private Runnable onComplete;
     private InputStream stream;
     private int lastTime;
     private int lastDuration;
     private Activity activity;
-    
-   
+
     public Audio(Activity activity, MediaPlayer player, InputStream stream, Runnable onComplete) {
         this.activity = activity;
         this.player = player;
@@ -31,9 +31,7 @@ class Audio implements Runnable, com.codename1.media.Media {
         this.onComplete = onComplete;
         bindPlayerCleanupOnComplete();
     }
-    
-    
-        
+
     private void cleanVars() {
         if (player != null) {
             try {
@@ -63,21 +61,21 @@ class Audio implements Runnable, com.codename1.media.Media {
         }
     }
 
-
     private void bindPlayerCleanupOnComplete() {
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
             public void onCompletion(MediaPlayer arg0) {
                 run();
             }
         });
         player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+
             public boolean onError(MediaPlayer arg0, int arg1, int arg2) {
                 run();
                 return false;
             }
         });
     }
-
 
     @Override
     public void cleanup() {
@@ -106,7 +104,7 @@ class Audio implements Runnable, com.codename1.media.Media {
             player.pause();
         }
     }
-    
+
     @Override
     public int getTime() {
         if (player == null) {
@@ -148,11 +146,15 @@ class Audio implements Runnable, com.codename1.media.Media {
         if (player == null) {
             return lastDuration;
         }
-        int d = player.getDuration();
-        if(d == 0){
+        try {
+            int d = player.getDuration();
+            if (d == 0) {
+                return -1;
+            }
+            lastDuration = d;
+        } catch (IllegalStateException err) {
             return -1;
         }
-        lastDuration = d;
         return lastDuration;
     }
 
