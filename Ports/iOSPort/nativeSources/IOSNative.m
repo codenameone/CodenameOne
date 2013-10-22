@@ -289,6 +289,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(JAVA_OBJECT instanc
     //XMLVM_END_WRAPPER
 }
 
+NSString* toNSString(JAVA_OBJECT str) {
+    if(str == 0) {
+        return 0;
+    }
+    const char* chrs = stringToUTF8(str);
+    return [NSString stringWithUTF8String:chrs];
+}
+
 void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String(
         JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, 
         JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
@@ -761,14 +769,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__(JAVA_OBJECT instanceObj
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(JAVA_OBJECT instanceObject)
 {
     return isIOS7();
-}
-
-NSString* toNSString(JAVA_OBJECT str) {
-    if(str == 0) {
-        return 0;
-    }
-    const char* chrs = stringToUTF8(str);
-    return [NSString stringWithUTF8String:chrs];
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
@@ -2207,6 +2207,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted__(JAVA
 }
 
 
+void throwError(CFErrorRef error) {
+    if (error != nil) {
+        NSLog(@"error %@", error);
+        CFStringRef errorDesc = CFErrorCopyDescription(error);
+        CFIndex length = CFStringGetLength(errorDesc);
+        char *buffer = (char *)malloc(length + 1);
+        if(CFStringGetCString(errorDesc, buffer, length,
+                           kCFStringEncodingUTF8)) {
+            XMLVM_THROW_WITH_CSTRING(java_lang_RuntimeException, buffer);
+        }
+    }
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT firstName, JAVA_OBJECT surname, JAVA_OBJECT officePhone, JAVA_OBJECT homePhone, JAVA_OBJECT cellPhone, JAVA_OBJECT email) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     
@@ -2214,7 +2227,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
     if(!grantedPermission) {
         return JAVA_NULL;
     }
-    CFErrorRef  error = NULL;
+    CFErrorRef  error = nil;
     
     ABRecordRef person = ABPersonCreate();
     if(firstName != nil) {
@@ -2228,6 +2241,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
         ABMutableMultiValueRef emailVal = ABMultiValueCreateMutable(kABMultiStringPropertyType);
         ABMultiValueAddValueAndLabel(emailVal, toNSString(email), CFSTR("email"), NULL);
         ABRecordSetValue(person, kABPersonEmailProperty, emailVal, &error);
+        throwError(error);
     }
 
     if(officePhone != nil || homePhone != nil || cellPhone != nil) {
@@ -2242,8 +2256,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
             ABMultiValueAddValueAndLabel(phoneVal, toNSString(cellPhone), kABPersonPhoneMobileLabel, NULL);
         }
         ABRecordSetValue(person, kABPersonPhoneProperty, phoneVal, &error);
+        throwError(error);
     }
-    ABAddressBookSave(addressBook, nil);
+    ABAddressBookAddRecord(addressBook, person, &error);
+    throwError(error);
+    ABAddressBookSave(addressBook, &error);
+    throwError(error);
     JAVA_OBJECT o = fromNSString([NSString stringWithFormat:@"%i", ABRecordGetRecordID(person)]);
     [pool release];
     return o;

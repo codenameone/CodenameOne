@@ -26,6 +26,8 @@
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
+//GL_APP_DELEGATE_INCLUDE
+
 extern UIView *editingComponent;
 
 #define INCLUDE_CN1_PUSH
