@@ -246,8 +246,12 @@ public class InPlaceEditView extends FrameLayout {
 
         mEditText.setLayoutParams(mEditLayoutParams);
 
-        // Align text to top
-        mEditText.setGravity(Gravity.LEFT | Gravity.TOP);
+        if(textArea.isRTL()){
+            mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);        
+        }else{
+            mEditText.setGravity(Gravity.LEFT | Gravity.TOP);
+        }
+        
         mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         addView(mEditText, mEditLayoutParams);
 
