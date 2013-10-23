@@ -648,8 +648,9 @@ public class SideMenuBar extends MenuBar {
             }
         }
         UIManager uim = menu.getUIManager();
+        boolean shadowEnabled = uim.isThemeConstant("sideMenuShadowBool", true);
         Image sh = (Image)uim.getThemeImageConstant("sideMenuShadowImage");
-        if(sh == null){
+        if(sh == null && shadowEnabled){
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
         }
         final Image shadow = sh;
@@ -705,6 +706,7 @@ public class SideMenuBar extends MenuBar {
     private Form createMenu(final String placement) {
         final Form m = new Form() {
             private boolean pressedInRightPanel;
+            private boolean manualMotionLock;
             boolean shouldSendPointerReleaseToOtherForm() {
                 return true;
             }
@@ -755,6 +757,9 @@ public class SideMenuBar extends MenuBar {
             }
 
             public void pointerPressed(int x, int y) {
+                if(manualMotionLock) {
+                    return;
+                }
                 super.pointerPressed(x, y);
                 if (rightPanel.contains(x, y)) {
                     pressedInRightPanel = true;
@@ -762,6 +767,9 @@ public class SideMenuBar extends MenuBar {
             }
 
             public void pointerDragged(int[] x, int[] y) {
+                if(manualMotionLock) {
+                    return;
+                } 
                 if(!transitionRunning && pressedInRightPanel) {
                     dragActivated = true;
                     pressedInRightPanel = false;
@@ -776,6 +784,9 @@ public class SideMenuBar extends MenuBar {
             }
 
             public void pointerReleased(int x, int y) {
+                if(manualMotionLock) {
+                    return;
+                }
                 super.pointerReleased(x, y);
                 boolean isRTLValue = isRTL();
                 if(placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
@@ -835,6 +846,10 @@ public class SideMenuBar extends MenuBar {
                     }
                     final Motion motion = Motion.createEaseInOutMotion(start, end, 300);
                     motion.start();
+                    manualMotionLock = true;
+                    sideSwipePotential = false;
+                    rightSideSwipePotential = false;
+                    topSwipePotential = false;
                     registerAnimated(new Animation() {
 
                         public boolean animate() {
@@ -1062,8 +1077,10 @@ public class SideMenuBar extends MenuBar {
                     }
                 }
             }
+            boolean shadowEnabled = getUIManager().isThemeConstant("sideMenuShadowBool", true);
+            
             shadow = (Image)getUIManager().getThemeImageConstant("sideMenuShadowImage");
-            if(shadow == null){
+            if(shadow == null && shadowEnabled){
                 shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
             }
     

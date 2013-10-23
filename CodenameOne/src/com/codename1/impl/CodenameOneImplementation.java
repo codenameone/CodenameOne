@@ -3352,8 +3352,20 @@ public abstract class CodenameOneImplementation {
      * Callback allowing the implementation to perform an operation on the init thread
      * after initialization was completed
      */
-    public void postInit() {}
+    public void postInit() {
+        initDefaultUserAgent();
+    }
 
+    /**
+     * Some old platforms might need this but for modern platforms the user agent should "just work".
+     */
+    protected void initDefaultUserAgent() {
+        //sets the default device user agent if available by the platform, by default
+        //we set Nokia, beacause if the user agent is empty it is most likely a J2ME device
+        ConnectionRequest.setDefaultUserAgent(Display.getInstance().getProperty("User-Agent", 
+                "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124"));
+    }
+    
     /**
      * Allows for easier debugging of native implementations by setting the image name to
      * the native image object

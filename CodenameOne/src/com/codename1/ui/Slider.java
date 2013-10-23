@@ -24,6 +24,8 @@
 package com.codename1.ui;
 
 
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -44,6 +46,7 @@ public class Slider extends Label {
     private boolean vertical;
     private boolean editable;
     private EventDispatcher listeners = new EventDispatcher();
+    private EventDispatcher actionListeners = new EventDispatcher();
     private int increments = 4;
     private int previousX = -1, previousY = -1;
     private Style sliderFull;
@@ -476,10 +479,18 @@ public class Slider extends Label {
         if(!editable) {
             return;
         }
+        fireActionEventImpl();
         previousX = -1;
         previousY = -1;
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void keyReleased(int code) {
+        fireActionEventImpl();
+    }
+    
     /**
      * @inheritDoc
      */
@@ -555,6 +566,10 @@ public class Slider extends Label {
     private void fireDataChanged(int event, int val){
         listeners.fireDataChangeEvent(val, event);
     }
+    
+    private void fireActionEventImpl() {
+        actionListeners.fireActionEvent(new ActionEvent(this));
+    }
 
     /**
      * Adds a listener to data changed events, notice that the status argument to the data change listener
@@ -575,7 +590,23 @@ public class Slider extends Label {
     public void removeDataChangedListener(DataChangedListener l){
         listeners.removeListener(l);
     }
+    
+    /**
+     * Action listeners give a more coarse event only when the user lifts the finger from the slider
+     * @param l the listener
+     */
+    public void addActionListener(ActionListener l) {
+        actionListeners.addListener(l);
+    }
 
+    /**
+     * Action listeners give a more coarse event only when the user lifts the finger from the slider
+     * @param l the listener
+     */
+    public void removeActionListener(ActionListener l) {
+        actionListeners.removeListener(l);
+    }
+    
     /**
      * Indicates that the value of the slider should be rendered with a percentage sign
      * on top of the slider.

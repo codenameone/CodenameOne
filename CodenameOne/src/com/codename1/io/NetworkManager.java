@@ -549,21 +549,29 @@ public class NetworkManager {
 
             public void actionPerformed(ActionEvent evt) {
                 NetworkEvent e = (NetworkEvent)evt;
-                 if(e.getConnectionRequest() == request) {
-                     if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                         if(request.retrying) {
-                             request.retrying = false;
-                             return;
-                         }
-                         finishedWaiting = true;
-                         removeProgressListener(this);
-                         return;
-                     }
-                 }
+                if(e.getError() != null) {
+                    finishedWaiting = true;
+                    removeProgressListener(this);
+                    removeErrorListener(this);
+                    return;
+                }
+                if(e.getConnectionRequest() == request) {
+                    if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                        if(request.retrying) {
+                            request.retrying = false;
+                            return;
+                        }
+                        finishedWaiting = true;
+                        removeProgressListener(this);
+                        removeErrorListener(this);
+                        return;
+                    }
+                }
             }
         }
         WaitingClass w = new WaitingClass();
         addProgressListener(w);
+        addErrorListener(w);
         addToQueue(request);
         if(Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(w);
