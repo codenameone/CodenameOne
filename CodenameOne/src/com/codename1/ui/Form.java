@@ -1849,11 +1849,23 @@ public class Form extends Container {
                 cmp.initDragAndDrop(x, y);
                 if (cmp.hasLead) {
                     Container parent = cmp.getParent();
-                    if(parent != null && parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                    boolean scrolling = false;
+                    //loop over the parents to check if there is a scrolling 
+                    //gesture that should be stopped
+                    while (parent != null) {
+                        if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                            scrolling = true;
+                            break;
+                        }
+                        parent = parent.getParent();
+                    }
+
+                    if (scrolling) {
                         dragStopFlag = true;
                         parent.clearDrag();
                         return;
                     }
+
                     Container leadParent;
                     if (cmp instanceof Container) {
                         leadParent = ((Container) cmp).getLeadParent();
@@ -1865,7 +1877,18 @@ public class Form extends Container {
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     Container parent = cmp.getParent();
-                    if(parent != null && parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                    boolean scrolling = false;
+                    //loop over the parents to check if there is a scrolling 
+                    //gesture that should be stopped
+                    while (parent != null) {
+                        if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                            scrolling = true;
+                            break;
+                        }
+                        parent = parent.getParent();
+                    }
+
+                    if (scrolling) {
                         dragStopFlag = true;
                         parent.clearDrag();
                         return;
@@ -1892,7 +1915,7 @@ public class Form extends Container {
 
     /**
      * Adds a listener to the pointer event
-     * 
+     *
      * @param l callback to receive pointer events
      */
     public void addPointerPressedListener(ActionListener l) {
@@ -2025,6 +2048,10 @@ public class Form extends Container {
 
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        // disable the drag stop flag if we are dragging again
+        if(dragStopFlag) {
+            pointerPressed(x, y);
+        }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
@@ -2180,6 +2207,7 @@ public class Form extends Container {
             dragged = null;
             return;
         }
+        
         if (dragged == null) {
             //if the pointer was released on the menu invoke the appropriate
             //soft button.
