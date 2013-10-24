@@ -1848,21 +1848,10 @@ public class Form extends Container {
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
                 if (cmp.hasLead) {
-                    Container parent = cmp.getParent();
-                    boolean scrolling = false;
-                    //loop over the parents to check if there is a scrolling 
-                    //gesture that should be stopped
-                    while (parent != null) {
-                        if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
-                            scrolling = true;
-                            break;
-                        }
-                        parent = parent.getParent();
-                    }
 
-                    if (scrolling) {
+                    if (isCurrentlyScrolling(cmp)) {
                         dragStopFlag = true;
-                        parent.clearDrag();
+                        cmp.clearDrag();
                         return;
                     }
 
@@ -1876,23 +1865,13 @@ public class Form extends Container {
                     setFocused(leadParent);
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
-                    Container parent = cmp.getParent();
-                    boolean scrolling = false;
-                    //loop over the parents to check if there is a scrolling 
-                    //gesture that should be stopped
-                    while (parent != null) {
-                        if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
-                            scrolling = true;
-                            break;
-                        }
-                        parent = parent.getParent();
-                    }
-
-                    if (scrolling) {
+                    
+                    if (isCurrentlyScrolling(cmp)) {
                         dragStopFlag = true;
-                        parent.clearDrag();
+                        cmp.clearDrag();
                         return;
                     }
+                    
                     if (cmp.isEnabled()) {
                         if (cmp.isFocusable()) {
                             setFocused(cmp);
@@ -1907,10 +1886,24 @@ public class Form extends Container {
             if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                 cmp.pointerPressed(x, y);
                 tactileTouchVibe(x, y, cmp);
-            }
+            }   
+
         }
         initialPressX = x;
         initialPressY = y;
+    }
+    
+    private boolean isCurrentlyScrolling(Component cmp) {
+        Container parent = cmp.getParent();
+        //loop over the parents to check if there is a scrolling 
+        //gesture that should be stopped
+        while (parent != null) {
+            if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+        return false;
     }
 
     /**
