@@ -200,7 +200,7 @@ public class SideMenuBar extends MenuBar {
                         if(x - initialDragX > Display.getInstance().getDisplayWidth() / 15) {
                             draggedX = x;
                             dragActivated = true;                            
-                            parent.pointerReleased(0, 0);
+                            parent.pointerReleased(-1, -1);
                             openMenu(null, 0, draggedX);
                         }
                         return;
@@ -216,7 +216,7 @@ public class SideMenuBar extends MenuBar {
                         if(initialDragX - x > Display.getInstance().getDisplayWidth() / 15) {
                             draggedX = x;
                             dragActivated = true;
-                            parent.pointerReleased(0, 0);
+                            parent.pointerReleased(-1, -1);
                             openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX);
                         }
                     }
@@ -231,7 +231,7 @@ public class SideMenuBar extends MenuBar {
                         if(initialDragY - y > Display.getInstance().getDisplayHeight()/ 15) {
                             draggedX = y;
                             dragActivated = true;
-                            parent.pointerReleased(0, 0);
+                            parent.pointerReleased(-1, -1);
                             openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX);
                         }
                     }
@@ -531,13 +531,13 @@ public class SideMenuBar extends MenuBar {
         in = null;
     }
 
-    private void setMenuGlassPane(Form m, String placement) {
+    private void setMenuGlassPane(Form m, final String placement) {
         boolean isRTLValue = m.isRTL();
         if(placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
             isRTLValue = !isRTLValue;
         }
         final boolean isRTL = isRTLValue;
-        final Image i = rightPanel.getStyle().getBgImage();
+        final Image image = rightPanel.getStyle().getBgImage();
         UIManager uim = rightPanel.getUIManager();
         Image sh = (Image)uim.getThemeImageConstant("sideMenuShadowImage");
         if(sh == null){
@@ -550,9 +550,9 @@ public class SideMenuBar extends MenuBar {
         
         if (m.getGlassPane() == null) {
             m.setGlassPane(new Painter() {
-
+                Image img = image;
                 public void paint(Graphics g, Rectangle rect) {
-                    if(i == null) {
+                    if(img == null) {
                         // will happen for areMutableImagesFast returning false on iOS and Windows Phone
                         Component c = (Component)rightPanel.getClientProperty("$parent");
                         
@@ -581,18 +581,23 @@ public class SideMenuBar extends MenuBar {
                         }
                         c.setVisible(b);
                     } else {
-                        if (isRTL) {
-                            int x = Math.max(draggedX, rightPanel.getWidth()) - i.getWidth();
-                            if(shadow != null){
-                                g.tileImage(shadow, x + i.getWidth() - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                        if(Display.getInstance().areMutableImagesFast()) {
+                            if(img.getHeight() != Display.getInstance().getDisplayHeight()) {
+                                img = updateRightPanelBgImage(placement, parent);
                             }
-                            g.drawImage(i, x, 0);
+                        }
+                        if (isRTL) {
+                            int x = Math.max(draggedX, rightPanel.getWidth()) - img.getWidth();
+                            if(shadow != null){
+                                g.tileImage(shadow, x + img.getWidth() - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
+                            }
+                            g.drawImage(img, x, 0);
                         } else {
                             int x = Math.min(draggedX, rightPanel.getX());
                             if(shadow != null){
                                 g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
                             }
-                            g.drawImage(i, x, 0);
+                            g.drawImage(img, x, 0);
                         }
                     }
                 }
@@ -984,6 +989,18 @@ public class SideMenuBar extends MenuBar {
         m.putClientProperty("cn1$sideMenuParent", this);
         return m;
     }
+    
+    Image updateRightPanelBgImage(String placement, Component c) {
+        Image img = rightPanel.getStyle().getBgImage();
+        if(img != null && img.getHeight() == Display.getInstance().getDisplayHeight()) {
+            return img;
+        }
+        Image buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        Graphics g = buffer.getGraphics();
+        c.paintComponent(g);
+        rightPanel.getStyle().setBgImage(buffer);
+        return buffer;
+    }
 
     class MenuTransition extends Transition {
 
@@ -1008,18 +1025,15 @@ public class SideMenuBar extends MenuBar {
             super.initTransition();
             if(placement == COMMAND_PLACEMENT_VALUE_TOP) {
                 if(Display.getInstance().areMutableImagesFast()) {
-                    buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
                     if (fwd) {
-                        Graphics g = buffer.getGraphics();
-                        getSource().paintComponent(g);
+                        buffer = updateRightPanelBgImage(placement, getSource());
                         if(dest > -1) {
                             motion = Motion.createEaseInOutMotion(0, dest, speed);
                         } else {
                             motion = Motion.createEaseInOutMotion(0, buffer.getHeight() - rightPanel.getHeight(), speed);
                         }
                     } else {
-                        Graphics g = buffer.getGraphics();
-                        getDestination().paintComponent(g);
+                        buffer = updateRightPanelBgImage(placement, getDestination());
                         if(dest > -1) {
                             motion = Motion.createEaseInOutMotion(dest, 0, speed);
                         } else {
@@ -1027,7 +1041,6 @@ public class SideMenuBar extends MenuBar {
                         }
                     }
                     rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP);
-                    rightPanel.getStyle().setBgImage(buffer);
                 } else {
                     if (fwd) {
                         motion = Motion.createEaseInOutMotion(0, Display.getInstance().getDisplayHeight()- rightPanel.getHeight(), speed);
@@ -1043,18 +1056,15 @@ public class SideMenuBar extends MenuBar {
                     isRTL = !isRTL;
                 }
                 if(Display.getInstance().areMutableImagesFast()) {
-                    buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
                     if (fwd) {
-                        Graphics g = buffer.getGraphics();
-                        getSource().paintComponent(g);
+                        buffer = updateRightPanelBgImage(placement, getSource());
                         if(dest > -1) {
                             motion = Motion.createEaseInOutMotion(0, dest, speed);
                         } else {
                             motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);
                         }
                     } else {
-                        Graphics g = buffer.getGraphics();
-                        getDestination().paintComponent(g);
+                        buffer = updateRightPanelBgImage(placement, getDestination());
                         if(dest > -1) {
                             motion = Motion.createEaseInOutMotion(dest, 0, speed);
                         } else {
@@ -1103,6 +1113,16 @@ public class SideMenuBar extends MenuBar {
         }
 
         public void paint(Graphics g) {
+            if(Display.getInstance().areMutableImagesFast()) {
+                // workaround for Android issue where the VKB breaks on screen size change
+                if(buffer.getHeight() != Display.getInstance().getDisplayHeight()) {
+                    if (fwd) {
+                        buffer = updateRightPanelBgImage(placement, getSource());
+                    } else {
+                        buffer = updateRightPanelBgImage(placement, getDestination());
+                    }
+                }
+            }
             Component src = getSource();
             Component dest = getDestination();
             if(placement == COMMAND_PLACEMENT_VALUE_TOP) {
