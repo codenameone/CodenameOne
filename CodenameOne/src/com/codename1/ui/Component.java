@@ -159,7 +159,7 @@ public class Component implements Animation, StyleListener {
     private int scrollOpacity = 0xff;
     private EventDispatcher dropListener;
     private EventDispatcher dragOverListener;
-
+            
     /**
      * Indicates the decrement units for the scroll opacity
      */
@@ -178,8 +178,8 @@ public class Component implements Animation, StyleListener {
      */
     private int animationSpeed;
     private Motion animationMotion;
-    private Motion draggedMotionX;
-    private Motion draggedMotionY;
+    Motion draggedMotionX;
+    Motion draggedMotionY;
 
     /**
      * Allows us to flag a drag operation in action thus preventing the mouse pointer
@@ -308,7 +308,6 @@ public class Component implements Animation, StyleListener {
         }
         return parent.getUIManager();        
     }
-    
     
     /**
      * Returns the current component x location relatively to its parent container
@@ -2486,6 +2485,8 @@ public class Component implements Animation, StyleListener {
                 frm.registerAnimatedInternal(this);
             }
         }
+        dragActivated = false;
+        dragAndDropInitialized = false;
     }
 
     private void pointerReleaseImpl(int x, int y) {

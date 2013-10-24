@@ -77,6 +77,24 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public static final byte PRIORITY_REDUNDANT = (byte)0;
 
+    /**
+     * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+     * customize the name of the cookie header to Cookie
+     * @return the cookieHeader
+     */
+    public static String getCookieHeader() {
+        return cookieHeader;
+    }
+
+    /**
+     * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+     * customize the name of the cookie header to Cookie
+     * @param aCookieHeader the cookieHeader to set
+     */
+    public static void setCookieHeader(String aCookieHeader) {
+        cookieHeader = aCookieHeader;
+    }
+
     private EventDispatcher actionListeners;
 
     /**
@@ -127,6 +145,12 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean readResponseForErrors;
     private String responseContentType;
     private boolean redirecting;
+
+    /**
+     * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+     * customize the name of the cookie header to Cookie
+     */
+    private static String cookieHeader = "cookie";
     
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
@@ -265,7 +289,7 @@ public class ConnectionRequest implements IOProgressListener {
                         cookieStr.append("=");
                         cookieStr.append(current.getValue());
                     }
-                    impl.setHeader(connection, "cookie", cookieStr.toString());
+                    impl.setHeader(connection, cookieHeader, cookieStr.toString());
                 }
             }
             if(isWriteRequest()) {

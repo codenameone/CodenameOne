@@ -149,7 +149,8 @@ public class Form extends Container {
     private EventDispatcher orientationListener;
     private UIManager uiManager;
     private Component stickyDrag;
-    
+    private boolean dragStopFlag;
+            
     /**
      * Default constructor creates a simple form
      */
@@ -1828,6 +1829,7 @@ public class Form extends Container {
      */
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
+        dragStopFlag = false;
         if (pointerPressedListeners != null) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
@@ -1846,6 +1848,12 @@ public class Form extends Container {
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
                 if (cmp.hasLead) {
+                    Container parent = cmp.getParent();
+                    if(parent != null && parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                        dragStopFlag = true;
+                        parent.clearDrag();
+                        return;
+                    }
                     Container leadParent;
                     if (cmp instanceof Container) {
                         leadParent = ((Container) cmp).getLeadParent();
@@ -1856,6 +1864,12 @@ public class Form extends Container {
                     setFocused(leadParent);
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
+                    Container parent = cmp.getParent();
+                    if(parent != null && parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                        dragStopFlag = true;
+                        parent.clearDrag();
+                        return;
+                    }
                     if (cmp.isEnabled()) {
                         if (cmp.isFocusable()) {
                             setFocused(cmp);
@@ -1976,6 +1990,10 @@ public class Form extends Container {
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
+        // disable the drag stop flag if we are dragging again
+        if(dragStopFlag) {
+            pointerPressed(x, y);
+        }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
@@ -2156,6 +2174,11 @@ public class Form extends Container {
         }
         if (pointerReleasedListeners != null) {
             pointerReleasedListeners.fireActionEvent(new ActionEvent(this, x, y));
+        }
+        if(dragStopFlag) {
+            dragStopFlag = false;
+            dragged = null;
+            return;
         }
         if (dragged == null) {
             //if the pointer was released on the menu invoke the appropriate
