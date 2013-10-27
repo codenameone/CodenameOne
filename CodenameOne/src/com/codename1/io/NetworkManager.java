@@ -595,21 +595,26 @@ public class NetworkManager {
      * a network thread or a Codename One thread!
      * @param request
      */
-    public void killAndWait(ConnectionRequest request) {
+    public void killAndWait(final ConnectionRequest request) {
         request.kill();
-        for(int iter = 0 ; iter < threadCount ; iter++) {
-            if(networkThreads[iter].currentRequest == request) {
-                synchronized(LOCK) {
-                    while(networkThreads[iter].currentRequest == request) {
-                        try {
-                            LOCK.wait(20);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
+        class KillWaitingClass implements Runnable {
+            public void run() {
+                for(int iter = 0 ; iter < threadCount ; iter++) {
+                    if(networkThreads[iter].currentRequest == request) {
+                        synchronized(LOCK) {
+                            while(networkThreads[iter].currentRequest == request) {
+                                try {
+                                    LOCK.wait(20);
+                                } catch (InterruptedException ex) {
+                                    ex.printStackTrace();
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+        Display.getInstance().invokeAndBlock(new KillWaitingClass());
     }
 
     /**

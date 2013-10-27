@@ -107,6 +107,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.util.UITimer;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.TextEvent;
@@ -206,6 +207,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
+    private static boolean simulateAndroidKeyboard = false;
     private static boolean scrollableSkin = true;
     private JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
     private JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
@@ -1481,6 +1483,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
             simulatorMenu.add(nativeInputFlag);
 
+            final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
+            //simulatorMenu.add(simulateAndroidVKBFlag);
+
             final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
             simulatorMenu.add(scrollFlag);
 
@@ -1602,6 +1607,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     } else {
                         Display.getInstance().setDefaultVirtualKeyboard(new VirtualKeyboard());
                     }
+                }
+            });
+            
+            simulateAndroidVKBFlag.addItemListener(new ItemListener() {
+
+                public void itemStateChanged(ItemEvent ie) {
+                    simulateAndroidKeyboard = !simulateAndroidKeyboard;
                 }
             });
 
@@ -2341,6 +2353,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             text += ((char) keyCode);
             setText(tf, text);
             setCaretPosition(tf, text.length());
+            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
         } else {
             setText(tf, text);
         }
@@ -2443,6 +2456,32 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         tf.addKeyListener(l);
         tf.addFocusListener(l);
+        if(simulateAndroidKeyboard) {
+            java.util.Timer t = new java.util.Timer();
+            TimerTask tt = new TimerTask() {
+                @Override
+                public void run() {
+                    if(!Display.getInstance().isEdt()) {
+                        Display.getInstance().callSerially(this);
+                        return;
+                    }
+                    if(tf.getParent() != null) {
+                        final int height = getScreenCoordinates().height;
+                        JavaSEPort.this.sizeChanged(getScreenCoordinates().width, height / 2);
+                        new UITimer(new Runnable() {
+                            public void run() {
+                                if(tf.getParent() != null) {
+                                    new UITimer(this).schedule(100, false, Display.getInstance().getCurrent());
+                                } else {
+                                    JavaSEPort.this.sizeChanged(getScreenCoordinates().width, height);
+                                }
+                            }
+                        }).schedule(100, false, Display.getInstance().getCurrent());
+                    }
+                }
+            };
+            t.schedule(tt, 300);
+        }
         Display.getInstance().invokeAndBlock(l);
     }
 

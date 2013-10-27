@@ -995,10 +995,13 @@ public class SideMenuBar extends MenuBar {
         if(img != null && img.getHeight() == Display.getInstance().getDisplayHeight()) {
             return img;
         }
+        boolean v = c.isVisible();
+        c.setVisible(true);
         Image buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
         Graphics g = buffer.getGraphics();
         c.paintComponent(g);
         rightPanel.getStyle().setBgImage(buffer);
+        c.setVisible(v);
         return buffer;
     }
 

@@ -2855,13 +2855,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
-    public int convertToPixels(int dipCount, boolean horizontal) {
-        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-        if (horizontal) {
-            return (int) (((float) dipCount) / 25.4f * dm.xdpi);
-        }
-        return (int) (((float) dipCount) / 25.4f * dm.ydpi);
+public int convertToPixels(int dipCount, boolean horizontal) {
+    DisplayMetrics dm = activity.getResources().getDisplayMetrics();
+    if (horizontal) {
+        return (int) (((float) dipCount) / 25.4f * dm.xdpi);
     }
+    return (int) (((float) dipCount) / 25.4f * dm.ydpi);
+}
 
     public boolean isPortrait() {
         int orientation = activity.getResources().getConfiguration().orientation;
