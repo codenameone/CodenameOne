@@ -22,35 +22,24 @@
  */
 package com.codename1.impl.android;
 
-import android.content.Intent;
+import android.graphics.Rect;
+import android.view.View;
 
 /**
  *
  * @author Chen
  */
-public class IntentResult {
-    private int requestCode;
-    private int resultCode;
-    private Intent data;
-
-    public IntentResult(int requestCode, int resultCode, Intent data) {
-        this.requestCode = requestCode;
-        this.resultCode = resultCode;
-        this.data = data;
-    }
-
-    public int getRequestCode() {
-        return requestCode;
-    }
-
-    public Intent getData() {
-        return data;
-    }
-
-    public int getResultCode() {
-        return resultCode;
-    }
+public interface CodenameOneSurface {
     
+    public int getViewHeight();
+
+    public int getViewWidth();
     
+    public void flushGraphics(Rect rect);
+
+    public void flushGraphics();
     
+    public View getAndroidView();
+    
+    public Object getGraphics();
 }

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
 package com.codename1.impl.android;
 
 import android.app.*;
@@ -154,7 +176,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static final int DROID_IMPL_KEY_VOLUME_DOWN = -23458;
     static final int DROID_IMPL_KEY_MUTE = -23459;
     static int[] leftSK = new int[]{DROID_IMPL_KEY_MENU};
-    static AndroidView myView = null;
+    static CodenameOneSurface myView = null;
     private Paint defaultFont;
     private final char[] tmpchar = new char[1];
     private final RectF tmprectF = new RectF();
@@ -474,22 +496,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 RelativeLayout.LayoutParams.FILL_PARENT));
         relativeLayout.setFocusable(false);
 
-        myView = new AndroidView(activity, AndroidImplementation.this);
-        myView.setVisibility(View.VISIBLE);
+        if (android.os.Build.VERSION.SDK_INT < 14){
+            myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
+        }else{
+            myView = new AndroidTextureView(activity, AndroidImplementation.this);                
+        }
+        myView.getAndroidView().setVisibility(View.VISIBLE);
 
-        relativeLayout.addView(myView);
-        myView.setVisibility(View.VISIBLE);
+        relativeLayout.addView(myView.getAndroidView());
+        myView.getAndroidView().setVisibility(View.VISIBLE);
         
         int id = activity.getResources().getIdentifier("main", "layout", activity.getApplicationInfo().packageName);
         LinearLayout root = (LinearLayout) LayoutInflater.from(activity).inflate(id, null);
         root.addView(relativeLayout);
         activity.setContentView(root);
-        myView.requestFocus();
+        myView.getAndroidView().requestFocus();
     }
 
     @Override
     public void confirmControlView() {
-        myView.setVisibility(View.VISIBLE);
+        myView.getAndroidView().setVisibility(View.VISIBLE);
     }
 
     public void hideNotifyPublic() {
@@ -1495,14 +1521,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isTouchDevice() {
-        Configuration c = this.myView.getResources().getConfiguration();
+        Configuration c = this.myView.getAndroidView().getResources().getConfiguration();
         return c.touchscreen != Configuration.TOUCHSCREEN_NOTOUCH;
     }
 
     @Override
     public boolean hasPendingPaints() {
         //if the view is not visible make sure the edt won't wait.
-        if (myView != null && myView.getVisibility() != View.VISIBLE) {
+        if (myView != null && myView.getAndroidView().getVisibility() != View.VISIBLE) {
             return true;
         } else {
             return super.hasPendingPaints();
@@ -1511,7 +1537,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void revalidate() {
         if (myView != null) {
-            myView.setVisibility(View.VISIBLE);
+            myView.getAndroidView().setVisibility(View.VISIBLE);
             getCurrentForm().revalidate();
             flushGraphics();
         }
@@ -1856,7 +1882,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     if (myView != null) {
-                        myView.playSoundEffect(AudioManager.FX_KEY_CLICK);
+                        myView.getAndroidView().playSoundEffect(AudioManager.FX_KEY_CLICK);
                     }
                 }
             });
@@ -2120,7 +2146,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                  * the native wrappers, we have to simulate key events to make
                  * Codename One move the focus to the next component.
                  */
-                if (!myView.isInTouchMode()) {
+                if (!myView.getAndroidView().isInTouchMode()) {
                     switch (lastDirectionalKeyEventReceivedByWrapper) {
                         case AndroidImplementation.DROID_IMPL_KEY_LEFT:
                         case AndroidImplementation.DROID_IMPL_KEY_RIGHT:
@@ -2282,10 +2308,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                         layoutWrapper.setOnKeyListener(new View.OnKeyListener() {
                             public boolean onKey(View view, int i, KeyEvent ke) {
-                                lastDirectionalKeyEventReceivedByWrapper = AndroidView.internalKeyCodeTranslate(ke.getKeyCode());
+                                lastDirectionalKeyEventReceivedByWrapper = CodenameOneView.internalKeyCodeTranslate(ke.getKeyCode());
 
                                 // move focus back to base view.
-                                AndroidImplementation.this.myView.requestFocus();
+                                AndroidImplementation.this.myView.getAndroidView().requestFocus();
 
                                 /**
                                  * if the wrapper has focus, then only because
@@ -2305,7 +2331,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                         layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
                             public boolean onTouch(View v, MotionEvent me) {
-                                return myView.onTouchEvent(me);
+                                return myView.getAndroidView().onTouchEvent(me);
                             }
                         });
                     }
@@ -4496,7 +4522,7 @@ public int convertToPixels(int dipCount, boolean horizontal) {
         @Override
         public boolean dispatchKeyEvent(KeyEvent event) {
             int keycode = event.getKeyCode();
-            keycode = AndroidView.internalKeyCodeTranslate(keycode);
+            keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
             if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
                 Display.getInstance().keyPressed(keycode);
                 Display.getInstance().keyReleased(keycode);
