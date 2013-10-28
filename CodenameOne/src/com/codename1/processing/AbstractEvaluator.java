@@ -25,6 +25,8 @@ package com.codename1.processing;
 import java.util.Enumeration;
 import java.util.Vector;
 
+import com.codename1.util.StringUtil;
+
 /**
  * Private class, do not use.
  * 
@@ -125,6 +127,10 @@ abstract class AbstractEvaluator implements Evaluator {
 		if (index != -1) {
 			return _evaluate(element, index);
 		}
+		index = expr.indexOf("%");
+		if (index != -1) {
+			return _evaluate(element, index);
+		}
 		return _evaluateSingle(element);
 
 	}
@@ -154,6 +160,8 @@ abstract class AbstractEvaluator implements Evaluator {
 			return _evaluateLeftGreaterRight(element, lvalue, rvalue);
 		case '<':
 			return _evaluateLeftLessRight(element, lvalue, rvalue);
+		case '%':
+			return _evaluateLeftContainsRight(element, lvalue, rvalue);
 		}
 		return null;
 	}
@@ -241,6 +249,30 @@ abstract class AbstractEvaluator implements Evaluator {
 	 * @param rvalue
 	 *            rvalue of predicate expression
 	 * @return either a StructuredContent or Vector object.
+	 * @see #evaluateLeftContainsRight(Vector, String, String)
+	 * @see #evaluateLeftContainsRight(StructuredContent, String, String)
+	 */
+	private Object _evaluateLeftContainsRight(Object element, String lvalue,
+			String rvalue) {
+		if (element instanceof Vector) {
+			return evaluateLeftContainsRight((Vector) element, lvalue, rvalue);
+		} else {
+			return evaluateLeftContainsRight((StructuredContent) element, lvalue,
+					rvalue);
+		}
+	}
+
+	/**
+	 * This internal method simply makes a type safe call the the proper
+	 * abstract method based on the type of element passed.
+	 * 
+	 * @param element
+	 *            either a StructuredContent or Vector object.
+	 * @param lvalue
+	 *            lvalue of predicate expression
+	 * @param rvalue
+	 *            rvalue of predicate expression
+	 * @return either a StructuredContent or Vector object.
 	 * @see #evaluateSingle(StructuredContent, String)
 	 * @see #evaluateSingle(Vector, String)
 	 */
@@ -283,6 +315,27 @@ abstract class AbstractEvaluator implements Evaluator {
 			}
 		}
 		return buf.toString();
+	}
+	
+	/**
+	 * Utility method for subclasses to convert an string to an array,
+	 * delimited by comma, optionally enclosed in brackets, and elements 
+	 * optionally enclosed in quotes. 
+	 * 
+	 * @param text value to transform
+	 * @return the value as an array.
+	 */
+	protected String[] explode(String arrayAsString) {
+		arrayAsString = arrayAsString.trim();
+		if (arrayAsString.startsWith("(") && arrayAsString.endsWith(")")) {
+			arrayAsString = arrayAsString.substring(1, arrayAsString.length() - 1);
+		}
+		Vector v = StringUtil.tokenizeString(arrayAsString, ',');
+		String a[] = new String[v.size()];
+		for (int i = 0; i < v.size(); i++) {
+			a[i] = stripQuotes(v.elementAt(i).toString().trim());			
+		}
+		return a;
 	}
 	
 	/**
@@ -463,6 +516,52 @@ abstract class AbstractEvaluator implements Evaluator {
 	 *         StructuredContent object.
 	 */
 	protected Object evaluateLeftEqualsRight(StructuredContent element,
+			String lvalue, String rvalue) {
+		return null;
+	}
+
+	/**
+	 * Override this element to handle testing a predicate expression where
+	 * lvalue % rvalue.    By default, this implementation will call evaluateLeftContainsRight()
+	 * against each element of the array, and return an array of all elements
+	 * that didn't return null.
+	 * 
+	 * @param element
+	 *            an array of StructuredContent elements
+	 * @param expr
+	 *            the full predicate expression
+	 * @return either a single StructuredContent or an array (vector) of
+	 *         StructuredContent object.
+	 */
+	protected Object evaluateLeftContainsRight(Vector elements, String lvalue,
+			String rvalue) {
+		Vector array = new Vector();
+		for (Enumeration e = elements.elements(); e.hasMoreElements();) {
+			Object o = e.nextElement();
+			if (o instanceof StructuredContent) {
+				if ((o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue)) != null) {
+					array.addElement(o);
+				}
+			}
+		}
+		if (array.size() == 1) {
+			return (StructuredContent) array.elementAt(0);
+		}
+		return array;
+	}
+
+	/**
+	 * Override this element to handle testing a predicate expression where
+	 * lvalue % rvalue.
+	 * 
+	 * @param element
+	 *            a single StructuredContent element
+	 * @param expr
+	 *            the full predicate expression
+	 * @return either a single StructuredContent or an array (vector) of
+	 *         StructuredContent object.
+	 */
+	protected Object evaluateLeftContainsRight(StructuredContent element,
 			String lvalue, String rvalue) {
 		return null;
 	}

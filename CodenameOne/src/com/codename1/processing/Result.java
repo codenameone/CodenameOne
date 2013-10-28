@@ -883,7 +883,14 @@ public class Result {
 				array.addElement(new HashtableContent(v, obj));
 			}
 			return array;
-		}
+		} else if (key.charAt(0) == Result.ARRAY_END && tokens.size() >= 4) {
+			// Handle path ending with a predicate instead of a key
+			//key = (String)tokens.elementAt(tokens.size() - 4);
+			Vector array = new Vector();
+			//array.addElement(new HashtableContent(key, obj));
+			array.addElement(obj);
+			return array;
+		} 
 		// otherwise, last element of expression selects a child node.
 		return obj.getChildren(key);
 	}
@@ -965,18 +972,15 @@ public class Result {
 								"Syntax error: illegal close of array dimension: "
 										+ tok4);
 					}
-					if (i + 4 >= nTokens) {
-						throw new IllegalArgumentException(
-								"Syntax error: array close must be followed by a separator: "
-										+ tok1);
-					}
-					final String tok5 = (String) tokens.elementAt(i + 4);
-					if (tok5.length() != 1 && tok5.charAt(0) != SEPARATOR) {
-						throw new IllegalArgumentException(
+					i += 4;
+					if (i < nTokens) {
+						final String tok5 = (String) tokens.elementAt(i);
+						if (tok5.length() != 1 && tok5.charAt(0) != SEPARATOR) {
+							throw new IllegalArgumentException(
 								"Syntax error: illegal separator after array: "
 										+ tok4);
+						}
 					}
-					i += 4;
 					final Vector array;
 					if (glob) {
 						array = start.getDescendants(tok1);

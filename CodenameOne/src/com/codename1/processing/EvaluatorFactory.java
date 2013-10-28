@@ -61,6 +61,8 @@ class EvaluatorFactory {
 			return new IndexEvaluator(text);
 		} else if (text.startsWith("@")) {
 			return new AttributeEvaluator(text);
+		} else if (text.indexOf('%') != -1) {
+			return new ContainsEvaluator(text);
 		} else if (text.indexOf('=') != -1) {
 			return new TextEvaluator(text);
 		}
