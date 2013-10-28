@@ -26,6 +26,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.*;
+import java.util.ArrayList;
 
 /**
  * This class is an editable TextField with predefined completion suggestion 
@@ -39,7 +40,8 @@ public class AutoCompleteTextField extends TextField {
     private FilterProxyListModel<String> filter;
     private ActionListener listener = new FormPointerListener();
     private ListCellRenderer completionRenderer;
-
+    private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
+    
     /**
      * Constructor with completion suggestions
      * @param completion a String array of suggestion for completion
@@ -154,11 +156,34 @@ public class AutoCompleteTextField extends TextField {
         }
     }
 
+    /**
+     * Adds an action listener that fires an event when an entry in the auto-complete list is selected.
+     * Notice that this method will only take effect when the popup is reshown, if it is invoked when
+     * a popup is already showing it will have no effect.
+     * @param a the listener
+     */
+    public void addListListener(ActionListener a) {
+        listeners.add(a);
+    }
+
+    /**
+     * Removes an action listener that fires an event when an entry in the auto-complete list is selected.
+     * Notice that this method will only take effect when the popup is reshown, if it is invoked when
+     * a popup is already showing it will have no effect.
+     * @param a the listener
+     */
+    public void removeListListener(ActionListener a) {
+        listeners.remove(a);
+    }
+    
     private void addPopup() {
         Form f = getComponentForm();
         popup.removeAll();
         filter(getText());
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        for(ActionListener al : listeners) {
+            l.addActionListener(al);
+        }
         if(completionRenderer == null){
             ((DefaultListCellRenderer<String>)l.getRenderer()).setShowNumbers(false);
         }else{

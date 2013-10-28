@@ -68,6 +68,14 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableModel;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.ContentHandler;
+import org.xml.sax.InputSource;
+import org.xml.sax.Locator;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 /**
  * Editor for resource localization data
@@ -724,8 +732,36 @@ private void removePropertyActionPerformed(java.awt.event.ActionEvent evt) {//GE
         }
 }//GEN-LAST:event_removePropertyActionPerformed
 
+    static String xmlize(String s) {
+        s = s.replace("&", "&amp;");
+        s = s.replace("<", "&lt;");
+        s = s.replace(">", "&gt;");
+        s = s.replace("\"", "&quot;");
+        int charCount = s.length();
+        for(int iter = 0 ; iter < charCount ; iter++) {
+            char c = s.charAt(iter);
+            if(c > 127) {
+                // we need to localize the string...
+                StringBuilder b = new StringBuilder();
+                for(int counter = iter ; counter < charCount ; counter++) {
+                    c = s.charAt(counter);
+                    if(c > 127) {
+                        b.append("&#x");
+                        b.append(Integer.toHexString(c));
+                        b.append(";");
+                    } else {
+                        b.append(c);
+                    }
+                }
+                return b.toString();
+            }
+        }
+        return s;
+    }
+
+
 private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exportResourceActionPerformed
-        Object[] options = new Object[] {"Properties", "CSV With ;", "CSV With ,"};
+        Object[] options = new Object[] {"Properties", "CSV With ;", "CSV With ,", "Android Strings"};
         int result = JOptionPane.showOptionDialog(this, "Export file type", "File Type", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
         if(result == JOptionPane.CLOSED_OPTION) {
             return;
@@ -759,41 +795,61 @@ private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                     prop.store(out, "Export locale from the Codename One Designer");
                     out.close();
                 } else {
-                    char separator = ';';
-                    if(result == 2) {
-                        separator = ',';
-                    }
-                    out = new FileOutputStream(f);
-                    
-                    // Write BOM for excel/windows apps
-                    out.write(new byte[] {(byte)0xEF, (byte)0xBB, (byte)0xBF});
-                    out.flush();
-                    Writer w = new OutputStreamWriter(out, "UTF-8");
-                    
-                    
-                    TableModel m = bundleTable.getModel();
-                    
-                    int rowCount = m.getRowCount();
-                    int columnCount = m.getColumnCount();
-                    for(int col = 0 ; col < columnCount ; col++) {
-                        w.append(m.getColumnName(col));
-                        w.append(separator);
-                    }
-                    w.append('\n');
+                    if(result == 3) {
+                        out = new FileOutputStream(f);
+                        Writer w = new OutputStreamWriter(out, "UTF-8");
+                        w.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+                        w.write("<resources>");
+                        String locale = (String) locales.getSelectedItem();
+                        Hashtable<String, String> h = res.getL10N(localeName, locale);
+                        
+                        for(Map.Entry<String, String> e : h.entrySet()) {
+                            w.write("    <string name=\"");
+                            w.write(xmlize(e.getKey()));
+                            w.write("\">");
+                            w.write(xmlize(e.getValue()));
+                            w.write("</string>\n");
+                        }
+                        
+                        w.write("</resources>");
+                        w.close();
+                    } else {
+                        char separator = ';';
+                        if(result == 2) {
+                            separator = ',';
+                        }
+                        out = new FileOutputStream(f);
 
-                    for(int row = 0 ; row < rowCount ; row++) {
+                        // Write BOM for excel/windows apps
+                        out.write(new byte[] {(byte)0xEF, (byte)0xBB, (byte)0xBF});
+                        out.flush();
+                        Writer w = new OutputStreamWriter(out, "UTF-8");
+
+
+                        TableModel m = bundleTable.getModel();
+
+                        int rowCount = m.getRowCount();
+                        int columnCount = m.getColumnCount();
                         for(int col = 0 ; col < columnCount ; col++) {
-                            String c = (String)m.getValueAt(row, col);
-                            c = c.replaceAll("\"", "\"\"");
-                            w.append('"');
-                            w.append(c);
-                            w.append('"');
+                            w.append(m.getColumnName(col));
                             w.append(separator);
                         }
                         w.append('\n');
+
+                        for(int row = 0 ; row < rowCount ; row++) {
+                            for(int col = 0 ; col < columnCount ; col++) {
+                                String c = (String)m.getValueAt(row, col);
+                                c = c.replaceAll("\"", "\"\"");
+                                w.append('"');
+                                w.append(c);
+                                w.append('"');
+                                w.append(separator);
+                            }
+                            w.append('\n');
+                        }
+
+                        w.close();
                     }
-                    
-                    w.close();
                 }
             } catch (IOException ex) {
                 ex.printStackTrace();
@@ -803,23 +859,86 @@ private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
 }//GEN-LAST:event_exportResourceActionPerformed
 
 private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_importResourceActionPerformed
-        String locale = (String) locales.getSelectedItem();
+        final String locale = (String) locales.getSelectedItem();
         int val = JOptionPane.showConfirmDialog(this, "This will overwrite existing values for " + locale + "\nAre you sure?", "Import", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (val == JOptionPane.YES_OPTION) {
-            File[] files = ResourceEditorView.showOpenFileChooser("Properties", "prop", "properties", "l10n", "locale");
+            File[] files = ResourceEditorView.showOpenFileChooser("Properties Or XML", "prop", "properties", "l10n", "locale", "xml");
             if(files != null) {
                 FileInputStream f = null;
                 try {
                     f = new FileInputStream(files[0]);
-                    Properties prop = new Properties();
-                    prop.load(f);
-                    f.close();
-                    for (Object key : prop.keySet()) {
-                        res.setLocaleProperty(localeName, locale, (String)key, prop.getProperty((String)key));
+                    if(files[0].getName().toLowerCase().endsWith("xml")) {
+                        SAXParserFactory spf = SAXParserFactory.newInstance();
+                        SAXParser saxParser = spf.newSAXParser();
+                        XMLReader xmlReader = saxParser.getXMLReader();
+                        xmlReader.setContentHandler(new ContentHandler() {
+                            private String currentName;
+                            private StringBuilder chars = new StringBuilder();
+                            
+                            @Override
+                            public void setDocumentLocator(Locator locator) {
+                            }
+
+                            @Override
+                            public void startDocument() throws SAXException {
+                            }
+
+                            @Override
+                            public void endDocument() throws SAXException {
+                            }
+
+                            @Override
+                            public void startPrefixMapping(String prefix, String uri) throws SAXException {
+                            }
+
+                            @Override
+                            public void endPrefixMapping(String prefix) throws SAXException {
+                            }
+
+                            @Override
+                            public void startElement(String uri, String localName, String qName, Attributes atts) throws SAXException {
+                                if("string".equals(localName)) {
+                                    currentName = atts.getValue("name");
+                                    chars.setLength(0);
+                                }
+                            }
+
+                            @Override
+                            public void endElement(String uri, String localName, String qName) throws SAXException {
+                                if("string".equals(localName)) {
+                                    res.setLocaleProperty(localeName, locale, currentName, chars.toString());
+                                }
+                            }
+
+                            @Override
+                            public void characters(char[] ch, int start, int length) throws SAXException {
+                                chars.append(ch, start, length);
+                            }
+
+                            @Override
+                            public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
+                            }
+
+                            @Override
+                            public void processingInstruction(String target, String data) throws SAXException {
+                            }
+
+                            @Override
+                            public void skippedEntity(String name) throws SAXException {
+                            }
+                        });
+                        xmlReader.parse(new InputSource(f));
+                    } else {
+                        Properties prop = new Properties();
+                        prop.load(f);
+                        for (Object key : prop.keySet()) {
+                            res.setLocaleProperty(localeName, locale, (String)key, prop.getProperty((String)key));
+                        }
                     }
-                } catch (IOException ex) {
+                    f.close();
+                } catch (Exception ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(this, "Error: " + ex, "IO Error Occured", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "Error: " + ex, "Error Occured", JOptionPane.ERROR_MESSAGE);
                 } 
             }
         }    
