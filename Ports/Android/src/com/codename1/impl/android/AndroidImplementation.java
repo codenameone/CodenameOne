@@ -1928,7 +1928,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void run() {
                     VideoView v = new VideoView(activity);
-                    v = new VideoView(activity);
                     v.setZOrderMediaOverlay(true);
                     if (f != null) {
                         v.setVideoURI(Uri.fromFile(f));
@@ -2537,6 +2536,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             layoutParams.topMargin = y;
             return layoutParams;
         }
+        
+        @Override
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            int keycode = event.getKeyCode();
+            keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
+            if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
+                Display.getInstance().keyPressed(keycode);
+                Display.getInstance().keyReleased(keycode);
+                return true;
+            } else {
+                return super.dispatchKeyEvent(event);
+            }
+        }
+        
 
     }
     
@@ -3001,6 +3014,15 @@ public int convertToPixels(int dipCount, boolean horizontal) {
                     //show the progress only if there is no ActionBar
                     if(!hideProgress && !isNativeTitle()){
                         progressBar = ProgressDialog.show(activity, null, "Loading...");
+                        //if the page hasn't finished for more the 10 sec, dismiss 
+                        //the dialog
+                        Timer t= new Timer();
+                        t.schedule(new TimerTask() {
+                            @Override
+                            public void run() {
+                                dismissProgress();
+                            }
+                        }, 10000);
                     }
                 }
 
