@@ -76,7 +76,6 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
 
     private void visibilityChangedTo(boolean visible) {
         cn1View.visibilityChangedTo(visible);
-        flushGraphics();
     }
 
     @Override
@@ -113,6 +112,7 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
             if (c != null) {
                 cn1View.d(c);
             }
+            
         } catch (Throwable e) {
             Log.e("Codename One", "paint problem.", e);
         } finally {

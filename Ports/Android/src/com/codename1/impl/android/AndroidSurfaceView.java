@@ -75,7 +75,6 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
 
     private void visibilityChangedTo(boolean visible) {
         cn1View.visibilityChangedTo(visible);
-        flushGraphics();
     }
 
     @Override
