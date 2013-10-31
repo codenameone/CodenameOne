@@ -117,7 +117,12 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
             Log.e("Codename One", "paint problem.", e);
         } finally {
             if (c != null) {
-                this.unlockCanvasAndPost(c);
+                try {
+                    c.restoreToCount(1);
+                    this.unlockCanvasAndPost(c);                    
+                } catch (Exception e) {
+                    Log.e("Codename One", "unlockCanvasAndPost err", e);                    
+                }
             }
         }
     }
@@ -131,12 +136,17 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
             c = lockCanvas();
             if (c != null) {
                 cn1View.d(c);
-            }
+            }            
         } catch (Throwable e) {
             Log.e("Codename One", "paint problem.", e);
         } finally {
             if (c != null) {
-                this.unlockCanvasAndPost(c);
+                try {
+                    c.restoreToCount(1);
+                    this.unlockCanvasAndPost(c);                    
+                } catch (Exception e) {
+                    Log.e("Codename One", "unlockCanvasAndPost err", e);                    
+                }
             }
         }
     }
