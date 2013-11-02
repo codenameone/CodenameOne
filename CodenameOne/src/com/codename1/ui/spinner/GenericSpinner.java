@@ -329,7 +329,7 @@ public class GenericSpinner extends BaseSpinner {
      */
     public void setRenderer(int offset, ListCellRenderer renderer) {
         this.renderer[offset] = renderer;
-        if(spin[offset] != null) {
+        if(spin != null && spin[offset] != null) {
             spin[offset].setRenderer(renderer);
         }
     }
