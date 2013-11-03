@@ -331,6 +331,11 @@ public class Style {
     public static final byte TEXT_DECORATION_3D_LOWERED = (byte)16;
 
     /**
+     * 3D text effect using a font shadow
+     */
+    public static final byte TEXT_DECORATION_3D_SHADOW_NORTH = (byte)32;
+
+    /**
      * Indicates the unit type for padding/margin, the default is in device specific pixels
      */
     public static final byte UNIT_TYPE_PIXELS = 0;
@@ -952,6 +957,22 @@ public class Style {
         }
     }
 
+    /**
+     * Sets the text decoration to 3D text 
+     * @param north true to enable 3d text with the shadow on top false otherwise
+     */
+    public void set3DTextNorth(boolean north) {
+        textDecoration = TEXT_DECORATION_3D_SHADOW_NORTH;
+    }
+    
+    /**
+     * Returns the text decoration state for the north
+     * @return true if that is used
+     */
+    public boolean is3DTextNorth() {
+        return (textDecoration & TEXT_DECORATION_3D_SHADOW_NORTH) == TEXT_DECORATION_3D_SHADOW_NORTH;
+    }
+    
     /**
      * Returns true if the 3D text decoration is on, false otherwise
      *

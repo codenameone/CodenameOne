@@ -488,6 +488,7 @@ public class Slider extends Label {
      * @inheritDoc
      */
     public void keyReleased(int code) {
+        super.keyReleased(code);
         fireActionEventImpl();
     }
     

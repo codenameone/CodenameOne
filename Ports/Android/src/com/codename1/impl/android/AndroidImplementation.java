@@ -2679,6 +2679,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return false;
                             }
                         });
+                        wv.getSettings().setDomStorageEnabled(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
                         bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, activity, parent);
@@ -2894,13 +2895,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
-public int convertToPixels(int dipCount, boolean horizontal) {
-    DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-    if (horizontal) {
-        return (int) (((float) dipCount) / 25.4f * dm.xdpi);
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
+        if (horizontal) {
+            return (int) (((float) dipCount) / 25.4f * dm.xdpi);
+        }
+        return (int) (((float) dipCount) / 25.4f * dm.ydpi);
     }
-    return (int) (((float) dipCount) / 25.4f * dm.ydpi);
-}
 
     public boolean isPortrait() {
         int orientation = activity.getResources().getConfiguration().orientation;
@@ -4501,7 +4502,9 @@ public int convertToPixels(int dipCount, boolean horizontal) {
             ((CodenameOneActivity) activity).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(activity.getPackageName() + ".PushNotificationService", activity);
-            registerPushOnServer(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            if(!registerServerPush(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName())) {
+                sendPushRegistrationError("Server registration error", 1);
+            } 
         }
     }
 

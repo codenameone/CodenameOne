@@ -78,6 +78,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
+import com.codename1.media.MediaManager;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayOutputStream;
@@ -104,6 +105,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private Lifecycle life;
     private static CodeScannerImpl scannerInstance;
     private static boolean minimized;
+    private String userAgent;
 
     public void initEDT() {
         while(!initialized) {
@@ -126,6 +128,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void postInit() {
         nativeInstance.initVM();
+        super.postInit();
     }
     
     public void init(Object m) {
@@ -439,6 +442,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    private static String iosMode = "legacy";
+    
+    public static void setIosMode(String l) {
+        iosMode = l;
+    }
+    
     /**
      * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
      * might replace the DefaultLookAndFeel instance and the default transitions.
@@ -446,11 +455,26 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void installNativeTheme() {
         try {
             Resources r;
-            if(nativeInstance.isIOS7() && Display.getInstance().getProperty("ios.oldLook", "true").equals("false")) {
+            
+            if(iosMode.equals("modern")) {
                 r = Resources.open("/iOS7Theme.res");
-            } else {
-                r = Resources.open("/iPhoneTheme.res");
+                Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                if(!nativeInstance.isIOS7()) {
+                    tp.put("TitleArea.padding", "0,0,0,0");
+                }
+                UIManager.getInstance().setThemeProps(tp);
+                return;
             }
+            if(iosMode.equals("auto")) {
+                if(nativeInstance.isIOS7()) {
+                    r = Resources.open("/iOS7Theme.res");
+                } else {
+                    r = Resources.open("/iPhoneTheme.res");
+                }
+                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                return;
+            }
+            r = Resources.open("/iPhoneTheme.res");
             UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -1130,11 +1154,42 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void capturePictureResult(String r) {
         if(captureCallback != null) {
             if(r != null) {
-                captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                if(r.startsWith("file:")) {
+                    captureCallback.fireActionEvent(new ActionEvent(r));
+                } else {
+                    captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                }
             } else {
                 captureCallback.fireActionEvent(null);
             }
             captureCallback = null;
+        }
+    }
+    
+    public void captureAudio(ActionListener response) {
+        String p = FileSystemStorage.getInstance().getAppHomePath();
+        if(!p.endsWith("/")) {
+            p += "/";
+        }
+        try {
+            final Media media = MediaManager.createMediaRecorder(p + "cn1TempAudioFile", MediaManager.getAvailableRecordingMimeTypes()[0]);
+            media.play();
+
+            boolean b = Dialog.show("Recording", "", "Save", "Cancel");
+            final Dialog d = new Dialog("Recording");
+
+            media.pause();
+            media.cleanup();
+            d.dispose();
+            if(b) {
+                response.actionPerformed(new ActionEvent(p));
+            } else {
+                FileSystemStorage.getInstance().delete(p + "cn1TempAudioFile");
+                response.actionPerformed(null);
+            }
+        } catch(IOException err) {
+            err.printStackTrace();
+            response.actionPerformed(null);
         }
     }
 
@@ -1251,32 +1306,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
 
             public void setVariable(String key, Object value) {
-                if(key.equals(Media.VARIABLE_BACKGROUND_ALBUM_COVER)) {
-                    NativeImage ni = (NativeImage)((Image)value).getImage();
-                    nativeInstance.setMediaBgAlbumCover(ni.peer);
-                    return;
-                }
-                if(key.equals(Media.VARIABLE_BACKGROUND_ARTIST)) {
-                    nativeInstance.setMediaBgArtist((String)value);
-                    return;
-                }
-                if(key.equals(Media.VARIABLE_BACKGROUND_DURATION)) {
-                    nativeInstance.setMediaBgDuration(((Long)value).longValue());
-                    return;
-                }
-                if(key.equals(Media.VARIABLE_BACKGROUND_POSITION)) {
-                    nativeInstance.setMediaBgPosition(((Long)value).longValue());
-                    return;
-                }
-                if(key.equals(Media.VARIABLE_BACKGROUND_TITLE)) {
-                    nativeInstance.setMediaBgTitle((String)value);
-                }
             }
 
             public Object getVariable(String key) {
-                if(VARIABLE_BACKGROUND_SUPPORTED.equals(key)) {
-                    return Boolean.TRUE;
-                }
                 return null;
             }
         };
@@ -1503,9 +1535,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void setVariable(String key, Object value) {
+            if(key.equals(Media.VARIABLE_BACKGROUND_ALBUM_COVER)) {
+                NativeImage ni = (NativeImage)((Image)value).getImage();
+                nativeInstance.setMediaBgAlbumCover(ni.peer);
+                return;
+            }
+            if(key.equals(Media.VARIABLE_BACKGROUND_ARTIST)) {
+                nativeInstance.setMediaBgArtist((String)value);
+                return;
+            }
+            if(key.equals(Media.VARIABLE_BACKGROUND_DURATION)) {
+                nativeInstance.setMediaBgDuration(((Long)value).longValue());
+                return;
+            }
+            if(key.equals(Media.VARIABLE_BACKGROUND_POSITION)) {
+                nativeInstance.setMediaBgPosition(((Long)value).longValue());
+                return;
+            }
+            if(key.equals(Media.VARIABLE_BACKGROUND_TITLE)) {
+                nativeInstance.setMediaBgTitle((String)value);
+            }
         }
 
         public Object getVariable(String key) {
+            if(Media.VARIABLE_BACKGROUND_SUPPORTED.equals(key)) {
+                return Boolean.TRUE;
+            }
             return null;
         }
     }
@@ -2226,7 +2281,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void fireWebViewDidStartLoad(BrowserComponent bc, String url) {
         bc.fireWebEvent("onStart", new ActionEvent(url));
     }
-    
+
     @Override
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("Platform")) {
@@ -2239,10 +2294,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             return "iOS";
         }
         if(key.equalsIgnoreCase("User-Agent")) {
-            if(isTablet()) {
+            /*if(isTablet()) {
                 return "Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/531.21.10";
             } 
-            return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";
+            return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";*/
+            if(userAgent == null) {
+                userAgent = nativeInstance.getUserAgentString();
+            }
+            return userAgent;
         }
         if(key.equalsIgnoreCase("AppVersion")) {
             // make app version case insensitive
@@ -3387,8 +3446,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    CodenameOneImplementation.registerPushOnServer(deviceKey, getApplicationKey(), (byte)2, "", clsName);
-                    pushCallback.registeredForPush(deviceKey);
+                    if(CodenameOneImplementation.registerServerPush(deviceKey, getApplicationKey(), (byte)2, "", clsName)) {
+                        pushCallback.registeredForPush(deviceKey);
+                    } else {
+                        pushCallback.pushRegistrationError("Server registration error", 1);
+                    }
                 }
             });
         }

@@ -409,8 +409,9 @@ public final class Graphics {
         if(textDecoration != 0) {
             boolean raised = (textDecoration & Style.TEXT_DECORATION_3D)!=0;
             boolean lowerd = (textDecoration & Style.TEXT_DECORATION_3D_LOWERED)!=0;
-            if (raised || lowerd) {
-                textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED);
+            boolean north = (textDecoration & Style.TEXT_DECORATION_3D_SHADOW_NORTH)!=0;
+            if (raised || lowerd || north) {
+                textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED) & (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);
                 int c = getColor();
                 int a = getAlpha();
                 int newColor = 0;
@@ -418,6 +419,10 @@ public final class Graphics {
                 if(lowerd) {
                     offset  = 2;
                     newColor = 0xffffff;
+                } else {
+                    if(north) {
+                        offset  = 2;
+                    }
                 }
                 setColor(newColor);
                 if(a == 0xff) {

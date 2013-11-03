@@ -193,9 +193,10 @@ public class ConnectionRequest implements IOProgressListener {
         if(userHeaders == null) {
             userHeaders = new Hashtable();
         }
-        userHeaders.put(key, value);
         if(key.equalsIgnoreCase("content-type")) {
-            setContentType(contentType);
+            setContentType(value);
+        } else {
+            userHeaders.put(key, value);
         }
     }
 
@@ -634,7 +635,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         if(Display.isInitialized() &&
-                Dialog.show("Exception", err.toString() + ": " + err.getMessage(), "Retry", "Cancel")) {
+                Dialog.show("Exception", err.toString() + ": for URL " + url + "\n" + err.getMessage(), "Retry", "Cancel")) {
             retry();
         }
     }
@@ -716,7 +717,24 @@ public class ConnectionRequest implements IOProgressListener {
             }
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();
-                String value = (String)requestArguments.get(key);
+                Object requestVal = requestArguments.get(key);
+                if(requestVal instanceof String[]) {
+                    String[] val = (String[])requestVal;
+                    for(int iter = 0 ; iter < val.length - 1; iter++) {
+                        b.append(key);
+                        b.append("=");
+                        b.append(val[iter]);
+                        b.append("&");
+                    }
+                    b.append(key);
+                    b.append("=");
+                    b.append(val[val.length - 1]);
+                    if(e.hasMoreElements()) {
+                        b.append("&");
+                    }
+                    continue;
+                }
+                String value = (String)requestVal;
                 b.append(key);
                 b.append("=");
                 b.append(value);
@@ -741,7 +759,24 @@ public class ConnectionRequest implements IOProgressListener {
             Enumeration e = requestArguments.keys();
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();
-                String value = (String)requestArguments.get(key);
+                Object requestVal = requestArguments.get(key);
+                if(requestVal instanceof String[]) {
+                    String[] valArray = (String[])requestVal;
+                    for(int iter = 0 ; iter < valArray.length - 1; iter++) {
+                        val.append(key);
+                        val.append("=");
+                        val.append(valArray[iter]);
+                        val.append("&");
+                    }
+                    val.append(key);
+                    val.append("=");
+                    val.append(valArray[valArray.length - 1]);
+                    if(e.hasMoreElements()) {
+                        val.append("&");
+                    }
+                    continue;
+                }
+                String value = (String)requestVal;
                 val.append(key);
                 val.append("=");
                 val.append(value);
@@ -918,6 +953,29 @@ public class ConnectionRequest implements IOProgressListener {
             addArg(Util.encodeBody(key), Util.encodeBody(value));
         } else {
             addArg(Util.encodeUrl(key), Util.encodeUrl(value));
+        }
+    }
+
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgument(String key, String[] value) {
+        // copying the array to prevent mutation
+        String[] v = new String[value.length];
+        if(post) {
+            for(int iter = 0 ; iter < value.length ; iter++) {
+                v[iter] = Util.encodeBody(value[iter]);
+            }
+            addArg(Util.encodeBody(key), v);
+        } else {
+            for(int iter = 0 ; iter < value.length ; iter++) {
+                v[iter] = Util.encodeUrl(value[iter]);
+            }
+            addArg(Util.encodeUrl(key), v);
         }
     }
 

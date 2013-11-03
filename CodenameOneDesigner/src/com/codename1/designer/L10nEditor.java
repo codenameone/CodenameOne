@@ -25,6 +25,7 @@
 package com.codename1.designer;
 
 import com.codename1.designer.ResourceEditorView;
+import com.codename1.io.CSVParser;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.resource.util.SwingRenderer;
 import com.codename1.ui.util.EditableResources;
@@ -37,6 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -782,7 +784,11 @@ private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                         if(result == 0) {
                             f = new File(f.getAbsolutePath() + ".properties");
                         } else {
-                            f = new File(f.getAbsolutePath() + ".csv");
+                            if(result == 3) {
+                                f = new File(f.getAbsolutePath() + ".xml");
+                            } else {
+                                f = new File(f.getAbsolutePath() + ".csv");
+                            }
                         }
                     }
                 }
@@ -862,7 +868,7 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
         final String locale = (String) locales.getSelectedItem();
         int val = JOptionPane.showConfirmDialog(this, "This will overwrite existing values for " + locale + "\nAre you sure?", "Import", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (val == JOptionPane.YES_OPTION) {
-            File[] files = ResourceEditorView.showOpenFileChooser("Properties Or XML", "prop", "properties", "l10n", "locale", "xml");
+            File[] files = ResourceEditorView.showOpenFileChooser("Properties, XML, CSV", "prop", "properties", "l10n", "locale", "xml", "csv");
             if(files != null) {
                 FileInputStream f = null;
                 try {
@@ -929,13 +935,45 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                         });
                         xmlReader.parse(new InputSource(f));
                     } else {
-                        Properties prop = new Properties();
-                        prop.load(f);
-                        for (Object key : prop.keySet()) {
-                            res.setLocaleProperty(localeName, locale, (String)key, prop.getProperty((String)key));
+                        if(files[0].getName().toLowerCase().endsWith("csv")) {
+                            CSVParserOptions po = new CSVParserOptions(this);
+                            if(po.isCanceled()) {
+                                f.close();
+                                return;
+                            }
+                            CSVParser p = new CSVParser(po.getDelimiter());
+                            String[][] data = p.parse(new InputStreamReader(f, po.getEncoding()));
+                            for(int iter = 1 ; iter < data.length ; iter++) {
+                                if(data[iter].length > 0) {
+                                    String key = data[iter][0];
+                                    for(int col = 1 ; col < data[iter].length ; col++) {
+                                        if(res.getL10N(localeName, data[0][col]) == null) {
+                                            res.addLocale(localeName, data[0][col]);
+                                        }
+                                        res.setLocaleProperty(localeName, data[0][col], key, data[iter][col]);
+                                    }
+                                }
+                            }
+                        } else {
+                            Properties prop = new Properties();
+                            prop.load(f);
+                            for (Object key : prop.keySet()) {
+                                res.setLocaleProperty(localeName, locale, (String)key, prop.getProperty((String)key));
+                            }
                         }
                     }
                     f.close();
+                    initLocaleList();
+                    for(Object localeObj : localeList) {
+                        Hashtable current = res.getL10N(localeName, (String)localeObj);
+                        for(Object key : current.keySet()) {
+                            if(!keys.contains(key)) {
+                                keys.add(key);
+                            }
+                        }
+                    }
+                    Collections.sort(keys);
+                    initTable();             
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(this, "Error: " + ex, "Error Occured", JOptionPane.ERROR_MESSAGE);

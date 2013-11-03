@@ -157,6 +157,17 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Allows implementations to send an error to the push callback
+     * @param message the error message
+     * @param errorCode the error code
+     */
+    protected void sendPushRegistrationError(String message, int errorCode) {
+        if(callback != null) {
+            callback.pushRegistrationError(message, errorCode);
+        }
+    }
+    
+    /**
      * Allows the system to register to receive push callbacks
      * @param push the callback object
      */
@@ -4564,8 +4575,9 @@ public abstract class CodenameOneImplementation {
      * @param applicationKey the unique id of the application
      * @param pushType for server side type
      * @param packageName the application package name used by the push service
+     * @return true for success, false otherwise
      */
-    public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
+    public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
         System.out.println("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey);
         if(Preferences.get("push_id", (long)-1) == -1) {
@@ -4579,6 +4591,7 @@ public abstract class CodenameOneImplementation {
                 }
             };
             r.setPost(false);
+            r.setFailSilently(true);
             r.setUrl("https://codename-one.appspot.com/registerPush");
             long val = Preferences.get("push_id", (long)-1);
             if(val > -1) {
@@ -4591,9 +4604,25 @@ public abstract class CodenameOneImplementation {
             r.addArgument("ud", udid);
             r.addArgument("r", packageName);
             NetworkManager.getInstance().addToQueueAndWait(r);
+            return r.getResponseCode() == 200;
         }
+        return true;
     }
-
+    
+    /**
+     * Sends a server request to register push support. This is a method for use
+     * by implementations.
+     * 
+     * @param id the platform specific push ID
+     * @param applicationKey the unique id of the application
+     * @param pushType for server side type
+     * @param packageName the application package name used by the push service
+     */
+    public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
+            String packageName) {
+        registerServerPush(id, applicationKey, pushType, udid, packageName);
+    }
+    
     /**
      * For use by implementations, stop receiving push notifications from the server
      */
@@ -4643,16 +4672,21 @@ public abstract class CodenameOneImplementation {
                             ConnectionRequest cr = new ConnectionRequest();
                             cr.setUrl("https://codename-one.appspot.com/pollManualPush");
                             cr.setPost(false);
+                            cr.setFailSilently(true);
                             cr.addArgument("i", "" + pushId);
                             cr.addArgument("last", lastReq);
                             NetworkManager.getInstance().addToQueueAndWait(cr);
-                            DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));
-                            if(di.readBoolean()) {
-                                byte type = di.readByte();
-                                String message = di.readUTF();
-                                lastReq = "" + di.readLong();
-                                Preferences.set("last_push_req", lastReq);
-                                callback.push(message);
+                            if(cr.getResponseCode() != 200) {
+                                callback.pushRegistrationError("Server registration error", 1);
+                            } else {
+                                DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));
+                                if(di.readBoolean()) {
+                                    byte type = di.readByte();
+                                    String message = di.readUTF();
+                                    lastReq = "" + di.readLong();
+                                    Preferences.set("last_push_req", lastReq);
+                                    callback.push(message);
+                                }
                             }
                         } catch (IOException ex) {
                             ex.printStackTrace();

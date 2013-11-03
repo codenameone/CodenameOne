@@ -376,4 +376,6 @@ final class IOSNative {
 
     native void addCookie(String key, String value, String domain, String path, boolean secure, boolean httpOnly, long expires);
     native void getCookiesForURL(String url, Vector out);
+
+    native String getUserAgentString();
 }

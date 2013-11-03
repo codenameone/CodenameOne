@@ -53,6 +53,8 @@ public abstract class FullScreenAdService {
     private int timeForNext = -1;
     private boolean scaleMode;
     private boolean allowSkipping;
+    private static Object LOCK = new Object();
+    
     
     /**
      * Creates a new request for an ad
@@ -243,12 +245,20 @@ public abstract class FullScreenAdService {
             addComponent(BorderLayout.CENTER, ad);                
             Command open = new Command("Open") {
                 public void actionPerformed(ActionEvent ev) {
-                    blocked = false;
+                    synchronized(LOCK) {
+                        blocked = false;
+                        LOCK.notify();
+                    }
                     
                     // move to the next screen so the ad will be shown and so we 
                     // can return to the next screen and not this screen
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
+                            // prevent a potential race condition with the locking
+                            if(Display.getInstance().getCurrent() instanceof AdForm) {
+                                Display.getInstance().callSerially(this);
+                                return;
+                            }
                             Display.getInstance().execute(getAdDestination());
                         }
                     });
@@ -256,7 +266,10 @@ public abstract class FullScreenAdService {
             };
             Command skip = new Command("Skip") {
                 public void actionPerformed(ActionEvent ev) {
-                    blocked = false;
+                    synchronized(LOCK) {
+                        blocked = false;
+                        LOCK.notify();
+                    }
                 }
             };
             if(Display.getInstance().isTouchScreenDevice()) {
@@ -284,8 +297,10 @@ public abstract class FullScreenAdService {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     try {
-                        while(blocked) {
-                            Thread.currentThread().sleep(100);
+                        synchronized(LOCK) {
+                            while(blocked) {
+                                LOCK.wait(100);
+                            }
                         }
                     } catch(Exception err) {
                         err.printStackTrace();

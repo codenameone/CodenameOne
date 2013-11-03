@@ -77,6 +77,7 @@ public abstract class LocationManager {
     class LL implements Runnable, LocationListener {
         Location result;
         boolean finished;
+        long timeout;
         
         public void bind() {
             setLocationListener(this);
@@ -105,14 +106,17 @@ public abstract class LocationManager {
         }
         
         public void run() {
+            long start = System.currentTimeMillis();
             while(!finished) {
                 try {
                     Thread.sleep(20);
                 } catch(InterruptedException er) {}
+                if(timeout > -1 && System.currentTimeMillis() - start > timeout) {
+                    break;
+                }
             }
         }
     }
-    
     /**
      * Returns the current location synchronously, this is useful if you just want
      * to know the location NOW and don't care about tracking location. Notice that
@@ -122,9 +126,23 @@ public abstract class LocationManager {
      * @return the current location or null in case of an error
      */
     public Location getCurrentLocationSync() {
+        return getCurrentLocationSync(-1);
+    }
+    
+    /**
+     * Returns the current location synchronously, this is useful if you just want
+     * to know the location NOW and don't care about tracking location. Notice that
+     * this method will block until a result is returned so you might want to use something
+     * like InfiniteProgress while this is running
+     * 
+     * @param timeout timeout in milliseconds or -1 to never timeout
+     * @return the current location or null in case of an error
+     */
+    public Location getCurrentLocationSync(long timeout) {
         try {
             if(getStatus() != AVAILABLE) {
                 LL l = new LL();
+                l.timeout = timeout;
                 l.bind();
                 return l.result;
             }

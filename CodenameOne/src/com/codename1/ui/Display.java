@@ -1097,18 +1097,20 @@ public final class Display {
                     }
                 }
                 // loop over the EDT until the thread completes then return
-                while(!w.isDone() && codenameOneRunning) {
-                    edtLoopImpl();
-                     synchronized(lock){
-                         if(shouldEDTSleep()) {
-                             impl.edtIdle(true);
-                             try {
-                                lock.wait(10);
-                             } catch (InterruptedException ex) {
+                if(isInitialized()) {
+                    while(!w.isDone() && codenameOneRunning) {
+                         edtLoopImpl();
+                         synchronized(lock){
+                             if(shouldEDTSleep()) {
+                                 impl.edtIdle(true);
+                                 try {
+                                    lock.wait(10);
+                                 } catch (InterruptedException ex) {
+                                 }
+                                 impl.edtIdle(false);
                              }
-                             impl.edtIdle(false);
                          }
-                     }
+                    }
                 }
                 // if the thread thew an exception we need to throw it onwards
                 if(w.getErr() != null) {

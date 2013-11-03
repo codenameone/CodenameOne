@@ -259,12 +259,22 @@ public class NetworkManager {
 
                         currentRequest.performOperation();
                     } catch(IOException e) {
-                        if(!handleException(currentRequest, e)) {
-                            currentRequest.handleIOException(e);
+                        if(!currentRequest.isFailSilently()) {
+                            if(!handleException(currentRequest, e)) {
+                                currentRequest.handleIOException(e);
+                            }
+                        } else {
+                            // for the record
+                            e.printStackTrace();
                         }
                     } catch(RuntimeException er) {
-                        if(!handleException(currentRequest, er)) {
-                            currentRequest.handleRuntimeException(er);
+                        if(!currentRequest.isFailSilently()) {
+                            if(!handleException(currentRequest, er)) {
+                                currentRequest.handleRuntimeException(er);
+                            }
+                        } else {
+                            // for the record
+                            er.printStackTrace();
                         }
                     } finally {
                         Thread.currentThread().setPriority(Thread.NORM_PRIORITY);

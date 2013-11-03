@@ -1887,6 +1887,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneCalendar, com.codename1.ui.Calendar.class, "Calendar", null);
         makeDraggable(codenameOneOnOffSwitch, com.codename1.components.OnOffSwitch.class, "OnOffSwitch", null);
         makeDraggable(codenameOneImageViewer, com.codename1.components.ImageViewer.class, "ImageViewer", null);
+        makeDraggable(codenameOneAutoCompleteTextField, com.codename1.ui.AutoCompleteTextField.class, "AutoCompleteTextField", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -4347,6 +4348,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMultiList = new javax.swing.JButton();
         codenameOneTextArea = new javax.swing.JButton();
         codenameOneTextField = new javax.swing.JButton();
+        codenameOneAutoCompleteTextField = new javax.swing.JButton();
         codenameOneSlider = new javax.swing.JButton();
         codenameOneContainer = new javax.swing.JButton();
         codenameOneTabs = new javax.swing.JButton();
@@ -4699,6 +4701,15 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTextField.addActionListener(formListener);
         coreComponents.add(codenameOneTextField);
 
+        codenameOneAutoCompleteTextField.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneAutoCompleteTextField.setText("Auto Complete");
+        codenameOneAutoCompleteTextField.setToolTipText("<html><body><b>Auto Complete TextField</b><br> \n<p>\nA TextField that shows a completion popup as you type into it and allows you to pick from a<br>\nset of entries\n</p> </body> </html>"); // NOI18N
+        codenameOneAutoCompleteTextField.setBorder(null);
+        codenameOneAutoCompleteTextField.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOneAutoCompleteTextField.setName("codenameOneAutoCompleteTextField"); // NOI18N
+        codenameOneAutoCompleteTextField.addActionListener(formListener);
+        coreComponents.add(codenameOneAutoCompleteTextField);
+
         codenameOneSlider.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTitledSeparator32.png"))); // NOI18N
         codenameOneSlider.setText("Slider");
         codenameOneSlider.setToolTipText("<html><body><b>Slider</b><br> \n<p>\nA slider provides a bar that can fill up in a similar way to common UI's used for progress<br>\nindication, volume control etc.<br>\nA slider can be editable (for cases such as volume control) or not and it can render progress<br>\npercentage on top. The slider features two separate styles one for the empty slider and<br>\nanother for the full slider. \n</p> </body> </html>"); // NOI18N
@@ -5011,6 +5022,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneLabel) {
                 UserInterfaceEditor.this.codenameOneLabelActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneSpanLabel) {
+                UserInterfaceEditor.this.codenameOneSpanLabelActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneButton) {
                 UserInterfaceEditor.this.codenameOneButtonActionPerformed(evt);
             }
@@ -5116,8 +5130,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneSpanLabel) {
-                UserInterfaceEditor.this.codenameOneSpanLabelActionPerformed(evt);
+            else if (evt.getSource() == codenameOneAutoCompleteTextField) {
+                UserInterfaceEditor.this.codenameOneAutoCompleteTextFieldActionPerformed(evt);
             }
         }
 
@@ -5817,6 +5831,14 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
         addComponentToContainer(new com.codename1.components.SpanLabel(), "SpanLabel");
     }//GEN-LAST:event_codenameOneSpanLabelActionPerformed
 
+    private void codenameOneAutoCompleteTextFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneAutoCompleteTextFieldActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.AutoCompleteTextField(), "AutoCompleteTextField");
+    }//GEN-LAST:event_codenameOneAutoCompleteTextFieldActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -5914,6 +5936,7 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton bindOnCreate;
     private javax.swing.JButton bindPostShow;
     private javax.swing.JButton codenameOneAds;
+    private javax.swing.JButton codenameOneAutoCompleteTextField;
     private javax.swing.JButton codenameOneButton;
     private javax.swing.JButton codenameOneCalendar;
     private javax.swing.JButton codenameOneCheckBox;

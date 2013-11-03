@@ -62,9 +62,10 @@ public class AutoCompleteTextField extends TextField {
 
     /**
      * The default constructor is useful for cases of filter subclasses overriding the
-     * getSuggestionModel value
+     * getSuggestionModel value as well as for the GUI builder
      */
     public AutoCompleteTextField() {
+        filter = new FilterProxyListModel<String>(new DefaultListModel(new String[]{""}));
         popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         popup.setScrollable(false);
     }
@@ -228,5 +229,51 @@ public class AutoCompleteTextField extends TextField {
             }
 
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"completion"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String[]"};
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("completion")) {
+            String[] r = new String[filter.getUnderlying().getSize()];
+            for(int iter = 0 ; iter < r.length ; iter++) {
+                r[iter] = (String)filter.getUnderlying().getItemAt(iter);
+            }
+            return r;
+        }
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("completion")) {
+            filter = new FilterProxyListModel<String>(new DefaultListModel<String>((String[])value));
+            return null;
+        }
+        return super.setPropertyValue(name, value);
     }
 }

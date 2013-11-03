@@ -1082,10 +1082,10 @@ public class EditableResources extends Resources implements TreeModel {
                             if(key.endsWith("bgGradient")) {
                                 Object[] gradient = (Object[])theme.get(key);
                                 bw.write("        <gradient key=\"" + key + "\" color1=\"" + gradient[0] + "\""
-                                        + "\" color2=\"" + gradient[1] + "\""
-                                        + "\" posX=\"" + gradient[2] + "\""
-                                        + "\" posY=\"" + gradient[3] + "\""
-                                        + "\" radius=\"" + gradient[4] + "\" />\n");
+                                        + " color2=\"" + gradient[1] + "\""
+                                        + " posX=\"" + gradient[2] + "\""
+                                        + " posY=\"" + gradient[3] + "\""
+                                        + " radius=\"" + gradient[4] + "\" />\n");
                                 continue;
                             }
 

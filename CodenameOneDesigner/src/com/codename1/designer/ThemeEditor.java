@@ -388,6 +388,7 @@ public class ThemeEditor extends BaseForm {
             com.codename1.ui.util.UIBuilder.registerCustomComponent("ShareButton", com.codename1.components.ShareButton.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
             com.codename1.ui.util.UIBuilder.registerCustomComponent("ImageViewer", com.codename1.components.ImageViewer.class);
+            com.codename1.ui.util.UIBuilder.registerCustomComponent("AutoCompleteTextField", com.codename1.ui.AutoCompleteTextField.class);
             Display.getInstance().callSerially(new Runnable() {
 
                 @Override

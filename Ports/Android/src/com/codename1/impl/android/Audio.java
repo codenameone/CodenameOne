@@ -33,14 +33,16 @@ import java.io.InputStream;
  *
  * @author Chen
  */
-class Audio implements Runnable, com.codename1.media.Media {
-
+class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
+    private static final int MEDIA_INFO_BUFFERING_START = 701;
+    private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;
     private Runnable onComplete;
     private InputStream stream;
     private int lastTime;
     private int lastDuration;
     private Activity activity;
+    private boolean buffering;
 
     public Audio(Activity activity, MediaPlayer player, InputStream stream, Runnable onComplete) {
         this.activity = activity;
@@ -80,6 +82,9 @@ class Audio implements Runnable, com.codename1.media.Media {
     }
 
     private void bindPlayerCleanupOnComplete() {
+        if(player == null) {
+            return;
+        }
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
             public void onCompletion(MediaPlayer arg0) {
@@ -220,7 +225,11 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public boolean isPlaying() {
-        return player != null && player.isPlaying();
+        try {
+            return player != null && player.isPlaying() && !buffering;
+        } catch(Exception err) {
+            return false;
+        }
     }
 
     public void setVariable(String key, Object value) {
@@ -228,5 +237,21 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     public Object getVariable(String key) {
         return null;
+    }
+
+    /**
+     * Allows us to detect buffering of media to return a better result in playback
+     */
+    @Override
+    public boolean onInfo(MediaPlayer mp, int i, int i1) {
+        switch(i) {
+            case MEDIA_INFO_BUFFERING_START:
+                buffering = true;
+                break;
+            case MEDIA_INFO_BUFFERING_END:
+                buffering = false;
+                break;
+        } 
+        return false;
     }
 }

@@ -719,6 +719,23 @@
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneTextFieldActionPerformed"/>
                                   </Events>
                                 </Component>
+                                <Component class="javax.swing.JButton" name="codenameOneAutoCompleteTextField">
+                                  <Properties>
+                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    </Property>
+                                    <Property name="text" type="java.lang.String" value="Auto Complete"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Auto Complete TextField&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A TextField that shows a completion popup as you type into it and allows you to pick from a&lt;br&gt;&#xa;set of entries&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                      <Border info="null"/>
+                                    </Property>
+                                    <Property name="horizontalAlignment" type="int" value="2"/>
+                                    <Property name="name" type="java.lang.String" value="codenameOneAutoCompleteTextField" noResource="true"/>
+                                  </Properties>
+                                  <Events>
+                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneAutoCompleteTextFieldActionPerformed"/>
+                                  </Events>
+                                </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneSlider">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">

@@ -924,6 +924,9 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 case 4:
                     v = new Integer(com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_LOWERED);
                     break;
+                case 5:
+                    v = new Integer(com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_SHADOW_NORTH);
+                    break;
                 default:
                     v = new Integer(0);
                     break;
@@ -1295,7 +1298,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(gradientY, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
                     .add(deriveBackground))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 205, Short.MAX_VALUE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 230, Short.MAX_VALUE)
                 .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, backgroundHelp)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, deriveHelp))
@@ -1347,7 +1350,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                         .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                             .add(jLabel2)
                             .add(gradientSize, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(198, Short.MAX_VALUE))
+                .addContainerGap(199, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Background", jPanel3);
@@ -1448,7 +1451,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                             .add(deriveBackgroundColor)
                             .add(deriveTransparency)
                             .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 239, Short.MAX_VALUE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 264, Short.MAX_VALUE)
                         .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, deriveHelp1)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, colorHelp))))
@@ -1490,7 +1493,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                         .add(deriveHelp1)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(colorHelp)))
-                .addContainerGap(171, Short.MAX_VALUE))
+                .addContainerGap(181, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Color", jPanel1);
@@ -1533,7 +1536,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel2Layout.createSequentialGroup()
                         .add(jLabel20)
                         .add(9, 9, 9)
-                        .add(alignmentCombo, 0, 632, Short.MAX_VALUE)
+                        .add(alignmentCombo, 0, 657, Short.MAX_VALUE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(alignHelp)))
                 .addContainerGap())
@@ -1553,7 +1556,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     .add(jLabel20)
                     .add(alignmentCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(alignHelp))
-                .addContainerGap(384, Short.MAX_VALUE))
+                .addContainerGap(394, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Alignment", jPanel2);
@@ -1650,7 +1653,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                             .add(jPanel5Layout.createSequentialGroup()
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(paddingLeftUnit, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 347, Short.MAX_VALUE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 376, Short.MAX_VALUE)
                 .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, paddingHelp)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, deriveHelp3))
@@ -1687,7 +1690,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     .add(jLabel11)
                     .add(paddingBottom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(paddingBottomUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(272, Short.MAX_VALUE))
+                .addContainerGap(288, Short.MAX_VALUE))
         );
 
         jPanel5Layout.linkSize(new java.awt.Component[] {paddingBottom, paddingLeft, paddingRight, paddingTop}, org.jdesktop.layout.GroupLayout.VERTICAL);
@@ -1778,7 +1781,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                             .add(marginBottomUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(marginTopUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(marginRightUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .add(454, 492, Short.MAX_VALUE))
+                        .add(454, 511, Short.MAX_VALUE))
                     .add(jPanel6Layout.createSequentialGroup()
                         .add(marginLeftUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 181, Short.MAX_VALUE)
@@ -1824,7 +1827,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     .add(jLabel26)
                     .add(marginBottom, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(marginBottomUnit, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(272, Short.MAX_VALUE))
+                .addContainerGap(292, Short.MAX_VALUE))
         );
 
         jPanel6Layout.linkSize(new java.awt.Component[] {marginBottom, marginLeft, marginRight, marginTop}, org.jdesktop.layout.GroupLayout.VERTICAL);
@@ -1889,7 +1892,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                         .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jPanel8Layout.createSequentialGroup()
                                 .add(deriveBorder)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 497, Short.MAX_VALUE))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 548, Short.MAX_VALUE))
                             .add(jPanel8Layout.createSequentialGroup()
                                 .add(borderLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 569, Short.MAX_VALUE)
                                 .add(23, 23, 23)))
@@ -1920,7 +1923,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(imageBorderWizard)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 324, Short.MAX_VALUE)
+                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 347, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -1958,7 +1961,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 595, Short.MAX_VALUE)
                         .add(deriveHelp6))
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel10Layout.createSequentialGroup()
-                        .add(baseStyle, 0, 714, Short.MAX_VALUE)
+                        .add(baseStyle, 0, 736, Short.MAX_VALUE)
                         .add(18, 18, 18)
                         .add(baseStyleType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap())
@@ -1974,7 +1977,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(baseStyle, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(baseStyleType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(383, Short.MAX_VALUE))
+                .addContainerGap(394, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Derive", jPanel10);
@@ -2025,7 +2028,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         deriveFont.setName("deriveFont"); // NOI18N
         deriveFont.addActionListener(formListener);
 
-        textDecorationCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "None", "Underline", "Strike Through,", "3D Text Raised", "3D Text Lowered" }));
+        textDecorationCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "None", "Underline", "Strike Through,", "3D Text Raised", "3D Text Lowered", "3D Shadow North" }));
         textDecorationCombo.setEnabled(false);
         textDecorationCombo.setName("textDecorationCombo"); // NOI18N
         textDecorationCombo.addActionListener(formListener);
@@ -2087,7 +2090,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                                         .add(jLabel7)
                                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                         .add(textDecorationCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 505, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                                .add(0, 3, Short.MAX_VALUE))
+                                .add(0, 127, Short.MAX_VALUE))
                             .add(jPanel7Layout.createSequentialGroup()
                                 .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                                     .add(jPanel7Layout.createSequentialGroup()
@@ -2177,7 +2180,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
 
         jScrollPane2.setName("jScrollPane2"); // NOI18N
 
-        help.setContentType("text/html");
+        help.setContentType("text/html"); // NOI18N
         help.setEditable(false);
         help.setName("help"); // NOI18N
         jScrollPane2.setViewportView(help);
@@ -2202,12 +2205,12 @@ public class AddThemeEntry extends javax.swing.JPanel {
             .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(org.jdesktop.layout.GroupLayout.LEADING, previewPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 912, Short.MAX_VALUE)
-                    .add(org.jdesktop.layout.GroupLayout.LEADING, addTabs, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 912, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, previewPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, addTabs)
                     .add(org.jdesktop.layout.GroupLayout.LEADING, layout.createSequentialGroup()
                         .add(jLabel1)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                        .add(componentName, 0, 444, Short.MAX_VALUE)
+                        .add(componentName, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .add(18, 18, 18)
                         .add(styleType)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
