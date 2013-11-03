@@ -376,6 +376,7 @@ public class EditableResources extends Resources implements TreeModel {
                 if(xml.exists()) {
                     loadingMode = true;
                     com.codename1.ui.Font.clearBitmapCache();
+                    clear();
                     try {
                         File resDir = new File(res, f.getName().substring(0, f.getName().length() - 4));
                         

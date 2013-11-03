@@ -3753,6 +3753,15 @@ public class UserInterfaceEditor extends BaseForm {
         private Method getSetter(com.codename1.ui.Component[] cmps, String property) {
             Method m = null;
             for(com.codename1.ui.Component c : cmps) {
+                // if a custom property name matches a setter/getter we want to use the custom property not the setter/getter!
+                String[] names = c.getPropertyNames();
+                if(names != null) {
+                    for(String n : names) {
+                        if(n.equalsIgnoreCase(property)) {
+                            return null;
+                        }
+                    }
+                }
                 Method currentMethod = getSetter(c.getClass(), property);
                 if(m == null) {
                     if(currentMethod == null) {
