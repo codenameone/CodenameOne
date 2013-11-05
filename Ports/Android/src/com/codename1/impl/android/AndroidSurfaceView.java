@@ -109,7 +109,7 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
         try {
             c = this.surfaceHolder.lockCanvas(rect);
             if (c != null) {
-                cn1View.d(c);
+                this.onDraw(c);
             }
         } catch (Throwable e) {
             Log.e("Codename One", "paint problem.", e);
@@ -120,6 +120,14 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
         }
     }
 
+    @Override
+    protected void onDraw(Canvas canvas) {
+        cn1View.d(canvas);
+        super.onDraw(canvas);
+    }
+    
+    
+
     public void flushGraphics() {
         if (!created) {
             return;
@@ -128,7 +136,7 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
         try {
             c = this.surfaceHolder.lockCanvas();
             if (c != null) {
-                cn1View.d(c);
+                this.onDraw(c);
             }
         } catch (Throwable e) {
             Log.e("Codename One", "paint problem.", e);
