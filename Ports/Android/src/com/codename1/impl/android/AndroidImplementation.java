@@ -496,7 +496,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 RelativeLayout.LayoutParams.FILL_PARENT));
         relativeLayout.setFocusable(false);
 
-        if (android.os.Build.VERSION.SDK_INT < 14){
+        if (android.os.Build.VERSION.SDK_INT < 18){
             myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
         }else{
             myView = new AndroidTextureView(activity, AndroidImplementation.this);                
