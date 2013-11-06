@@ -110,6 +110,7 @@ static int MAX_CACHE_SIZE = 5;
 }
 
 -(void)dealloc {
+    [lastAccess release];
     glDeleteTextures(1, &textureName);
     GLErrorLog;
     [super dealloc];

@@ -103,6 +103,7 @@ static NSMutableArray* pendingDeleteStrings = nil;
 -(void)dealloc {
     [str release];
     [font release];
+    [lastAccess release];
     glDeleteTextures(1, &textureName);
     GLErrorLog;
     [super dealloc];
