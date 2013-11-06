@@ -65,11 +65,13 @@ public class CodenameOneView {
         androidView.setEnabled(true);
         androidView.setClickable(true);
         androidView.setLongClickable(false);
+        
         /**
          * tell the system that we do our own caching and it does not need to
          * use an extra offscreen bitmap.
          */
         androidView.setWillNotCacheDrawing(false);
+        androidView.setWillNotDraw(true);
 
         this.buffy = new AndroidGraphics(implementation, null);
         this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
