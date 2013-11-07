@@ -4681,7 +4681,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void refreshNativeTitle(){
         Form f = getCurrentForm();
-        if (isNativeTitle() &&  !(f instanceof Dialog)) {
+        if (f != null && isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
         }
     }
@@ -4691,6 +4691,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
         }
+    }
+
+    @Override
+    public void setNativeCommands(Vector commands) {
+        refreshNativeTitle();
     }
     
     @Override
