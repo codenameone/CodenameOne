@@ -47,14 +47,12 @@ AudioPlayer* currentlyPlaying = nil;
                                                      selector:@selector(playerItemDidReachEnd:)
                                                          name:AVPlayerItemDidPlayToEndTimeNotification
                                                        object:[avPlayerInstance currentItem]];
-            [avPlayerInstance retain];
         } else {
             playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
             playerInstance.delegate = self;
             if(volume > -1) {
                 playerInstance.volume = volume;
             }
-            [playerInstance retain];
         }
     }
     
@@ -73,7 +71,6 @@ AudioPlayer* currentlyPlaying = nil;
         if(currentlyPlaying == nil) {
             currentlyPlaying = self;
         }
-        [playerInstance retain];
     }
     
     return self;    
