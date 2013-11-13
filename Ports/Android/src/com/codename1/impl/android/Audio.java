@@ -145,22 +145,27 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public void setTime(int time) {
-        if (player == null) {
-            return;
-        }
-        final boolean[] flag = new boolean[1];
-        player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
-
-            public void onSeekComplete(MediaPlayer arg0) {
-                flag[0] = true;
+        try {
+            if (player == null) {
+                return;
             }
-        });
-        if (player.isPlaying()) {
-            player.seekTo(time);
-        } else {
-            player.start();
-            player.seekTo(time);
-            player.pause();
+            final boolean[] flag = new boolean[1];
+            player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
+
+                public void onSeekComplete(MediaPlayer arg0) {
+                    flag[0] = true;
+                }
+            });
+            if (player.isPlaying()) {
+                player.seekTo(time);
+            } else {
+                player.start();
+                player.seekTo(time);
+                player.pause();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 

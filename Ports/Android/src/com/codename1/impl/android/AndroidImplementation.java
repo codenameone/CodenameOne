@@ -466,6 +466,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    public static void syncDeinitialize() {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Display.deinitialize();
+            }
+        });
+    }
+    
     public void deinitialize() {
         //activity.getWindowManager().removeView(relativeLayout);
         activity.runOnUiThread(new Runnable() {
@@ -1870,6 +1879,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    @Override
     public void execute(String url) {
         execute(url, null);
     }
@@ -3893,6 +3903,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
+        if(editInProgress()) {
+            stopEditing();
+        }
         Intent emailIntent;
         String attachment = msg.getAttachment();
         boolean hasAttachment = (attachment != null && attachment.length() > 0) || msg.getAttachments().size() > 0;
@@ -4870,7 +4883,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(activity);
-            if(!in.initiateScan(in.QR_CODE_TYPES)){
+            if(!in.initiateScan(IntentIntegrator.QR_CODE_TYPES, "QR_CODE_MODE")){
                 // restore old activity handling
                  Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -4895,7 +4908,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(activity);
-            if(!in.initiateScan(in.PRODUCT_CODE_TYPES)){
+            if(!in.initiateScan(IntentIntegrator.PRODUCT_CODE_TYPES, "ONE_D_MODE")){
                 // restore old activity handling
                  Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -5125,4 +5138,110 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     
+    @Override
+    public boolean isNativePickerTypeSupported(int pickerType) {
+        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME;
+    }
+    
+    @Override
+    public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
+        if(type == Display.PICKER_TYPE_TIME) {
+            class TimePick implements TimePickerDialog.OnTimeSetListener, TimePickerDialog.OnCancelListener, Runnable {
+                int result = ((Integer)currentValue).intValue();
+                boolean dismissed;
+                boolean canceled;
+                public void onTimeSet(TimePicker tp, int hour, int minute) {
+                    result = hour * 60 + minute;
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }
+                }
+                
+                public void run() {
+                    while(!dismissed) {
+                        synchronized(this) {
+                            try {
+                                wait(50);
+                            } catch(InterruptedException er) {}
+                        }
+                    }
+                }
+
+                @Override
+                public void onCancel(DialogInterface di) {
+                    canceled = true;
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }
+                }
+            }
+            final TimePick pickInstance = new TimePick();
+            activity.runOnUiThread(new Runnable() {
+                public void run() {
+                    int hour = ((Integer)currentValue).intValue() / 60;
+                    int minute = ((Integer)currentValue).intValue() % 60;
+                    int[] response = new int[] {((Integer)currentValue).intValue()}; 
+                    TimePickerDialog tp = new TimePickerDialog(activity, pickInstance, hour, minute, true);
+                        //DateFormat.is24HourFormat(activity));
+                    tp.show();
+                }
+            });
+            Display.getInstance().invokeAndBlock(pickInstance);
+            if(pickInstance.canceled) {
+                return null;
+            }
+            return new Integer(pickInstance.result);
+        }
+        if(type == Display.PICKER_TYPE_DATE) {
+            final java.util.Calendar cl = java.util.Calendar.getInstance();
+            cl.setTime((Date)currentValue);
+            class DatePick implements DatePickerDialog.OnDateSetListener,DatePickerDialog.OnCancelListener, Runnable {
+                Date result = (Date)currentValue;
+                boolean dismissed;
+                
+                public void onDateSet(DatePicker dp, int year, int month, int day) {
+                    java.util.Calendar c = java.util.Calendar.getInstance();
+                    c.set(java.util.Calendar.YEAR, year);
+                    c.set(java.util.Calendar.MONTH, month - 1);
+                    c.set(java.util.Calendar.DAY_OF_MONTH, day);
+                    result = c.getTime();
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }                    
+                }
+                
+                public void run() {
+                    while(!dismissed) {
+                        synchronized(this) {
+                            try {
+                                wait(50);
+                            } catch(InterruptedException er) {}
+                        }
+                    }
+                }
+
+                public void onCancel(DialogInterface di) {
+                    result = null;
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }
+                }
+            }
+            final DatePick pickInstance = new DatePick();
+            activity.runOnUiThread(new Runnable() {
+                public void run() {
+                    DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH) + 1, cl.get(java.util.Calendar.DAY_OF_MONTH));
+                        //DateFormat.is24HourFormat(activity));
+                    tp.show();
+                }
+            });
+            Display.getInstance().invokeAndBlock(pickInstance);
+            return pickInstance.result;
+        }
+        return null;
+    }
 }

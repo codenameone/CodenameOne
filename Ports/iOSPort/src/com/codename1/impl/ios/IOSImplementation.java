@@ -1182,7 +1182,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             media.cleanup();
             d.dispose();
             if(b) {
-                response.actionPerformed(new ActionEvent(p));
+                response.actionPerformed(new ActionEvent(p + "cn1TempAudioFile"));
             } else {
                 FileSystemStorage.getInstance().delete(p + "cn1TempAudioFile");
                 response.actionPerformed(null);
@@ -2689,8 +2689,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         public void finalize() {
-            if(nativePeer[0] != 0) {
+            if(nativePeer != null && nativePeer[0] != 0) {
                 nativeInstance.releasePeer(nativePeer[0]);            
+                nativePeer = null;
             }
         }
         
@@ -3450,6 +3451,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         pushCallback.registeredForPush(deviceKey);
                     } else {
                         pushCallback.pushRegistrationError("Server registration error", 1);
+                        pushCallback.registeredForPush(deviceKey);
                     }
                 }
             });
@@ -3941,5 +3943,66 @@ public class IOSImplementation extends CodenameOneImplementation {
             this.callback = callback;
             nativeInstance.scanBarCode();
         }
+    }
+
+    @Override
+    public boolean isNativePickerTypeSupported(int pickerType) {
+        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_DATE_AND_TIME;
+    }
+    
+    private static long datePickerResult;
+    private static final Object PICKER_LOCK = new Object();
+    static void datePickerResult(long val) {
+        synchronized(PICKER_LOCK) {
+            datePickerResult = val;
+            PICKER_LOCK.notify();
+        }
+    }
+    
+    @Override
+    public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
+        long time;
+        if(currentValue instanceof Integer) {
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
+            c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
+            time = c.getTime().getTime();
+        } else {
+            time = ((java.util.Date)currentValue).getTime();
+        }
+        datePickerResult = -2;
+        int x = 0, y = 0, w = 20, h = 20;
+        if(source != null) {
+            x = source.getAbsoluteX();
+            y = source.getAbsoluteY();
+            w = source.getWidth();
+            h = source.getHeight();
+        }
+        nativeInstance.openDatePicker(type, time, x, y, w, h);
+        
+        // wait for the native code to complete
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                while(datePickerResult == -2) {
+                    synchronized(PICKER_LOCK) {
+                        try {
+                            PICKER_LOCK.wait(100);
+                        } catch(InterruptedException err) {}
+                    }
+                }
+            }
+        });
+        if(datePickerResult == -1) {
+            return null;
+        }
+        Object result;
+        if(type == Display.PICKER_TYPE_TIME) {
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.setTime(new Date(datePickerResult));
+            result = new Integer(c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE));
+        } else {
+            result = new Date(datePickerResult);
+        }
+        return result;
     }
 }

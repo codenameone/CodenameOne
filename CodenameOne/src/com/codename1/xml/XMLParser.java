@@ -396,10 +396,11 @@ public class XMLParser {
     protected void parseTagContent(Element element,Reader is) throws IOException {
         StringBuilder text=null;
         boolean leadingSpace=false;
-        char c=(char)read(is);
+        int val = read(is);
+        char c=(char)val;
         StringBuilder charEntity = null;
 
-        while((byte)c!=-1) {
+        while(val!=-1) {
             if (c=='<') {
                 if ((includeWhitespacesBetweenTags) && (leadingSpace) && (text==null) && (element!=null) && (element.getNumChildren()>0)) { 
                     leadingSpace=false;
@@ -500,7 +501,8 @@ public class XMLParser {
             } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
                 leadingSpace=true;
             }
-            c=(char)read(is);
+            val = read(is);
+            c=(char)val;
         }
     }
 

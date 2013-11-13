@@ -227,9 +227,9 @@ public class IntentIntegrator {
     /**
      * Initiates a scan for all known barcode types.
      */
-    public boolean initiateScan() {
-        return initiateScan(ALL_CODE_TYPES);
-    }
+    //public boolean initiateScan() {
+    //    return initiateScan(ALL_CODE_TYPES);
+    //}
 
     /**
      * Initiates a scan only for a certain set of barcode types, given as
@@ -239,10 +239,11 @@ public class IntentIntegrator {
      *
      * to download the app if a prompt was needed, or null otherwise
      */
-    public boolean initiateScan(Collection<String> desiredBarcodeFormats) {
+    public boolean initiateScan(Collection<String> desiredBarcodeFormats, String mode) {
         Intent intentScan = new Intent(BS_PACKAGE + ".SCAN");
         intentScan.addCategory(Intent.CATEGORY_DEFAULT);
 
+        intentScan.putExtra("SCAN_MODE", mode);
         // check which types of codes to scan for
         if (desiredBarcodeFormats != null) {
             // set the desired barcode types

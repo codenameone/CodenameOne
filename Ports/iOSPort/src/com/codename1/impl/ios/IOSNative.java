@@ -378,4 +378,6 @@ final class IOSNative {
     native void getCookiesForURL(String url, Vector out);
 
     native String getUserAgentString();
+    
+    native void openDatePicker(int type, long time, int x, int y, int w, int h);
 }

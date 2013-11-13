@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.util.StringUtil;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -38,6 +39,7 @@ import java.io.OutputStream;
 public class Storage {
     private CacheMap cache = new CacheMap();
     private static Storage INSTANCE;
+    private boolean normalizeNames = true;
 
     /**
      * Indicates the caching size, storage can be pretty slow
@@ -48,6 +50,22 @@ public class Storage {
         cache.setCacheSize(size);
     }
 
+    /**
+     * If a file name contains slashes replace them with underscores, same goes for *, %, ? etc.
+     * @param name the file name
+     * @return the fixed filename
+     */
+    private String fixFileName(String name) {
+        if(normalizeNames) {
+            name = StringUtil.replaceAll(name, "/", "_");
+            name = StringUtil.replaceAll(name, "\\", "_");
+            name = StringUtil.replaceAll(name, "%", "_");
+            name = StringUtil.replaceAll(name, "?", "_");
+            name = StringUtil.replaceAll(name, "*", "_");
+        }
+        return name;
+    }
+    
     /**
      * This method must be invoked before using the storage otherwise some platforms
      * might fail without the application data.
@@ -105,6 +123,7 @@ public class Storage {
      * @param name the name of the storage file
      */
     public void deleteStorageFile(String name) {
+        name = fixFileName(name);
         Util.getImplementation().deleteStorageFile(name);
         cache.delete(name);
     }
@@ -124,6 +143,7 @@ public class Storage {
      * @return an output stream of limited capacity
      */
     public OutputStream createOutputStream(String name) throws IOException {
+        name = fixFileName(name);
         return Util.getImplementation().createStorageOutputStream(name);
     }
 
@@ -134,6 +154,7 @@ public class Storage {
      * @return the input stream
      */
     public InputStream createInputStream(String name) throws IOException {
+        name = fixFileName(name);
         return Util.getImplementation().createStorageInputStream(name);
     }
 
@@ -144,6 +165,7 @@ public class Storage {
      * @return true if it exists
      */
     public boolean exists(String name) {
+        name = fixFileName(name);
         return Util.getImplementation().storageFileExists(name);
     }
 
@@ -162,6 +184,7 @@ public class Storage {
      * @return the size in bytes
      */
     public int entrySize(String name) {
+        name = fixFileName(name);
         return Util.getImplementation().getStorageEntrySize(name);
     }
     
@@ -174,6 +197,7 @@ public class Storage {
      * @return true for success, false for failue
      */
     public boolean writeObject(String name, Object o) {
+        name = fixFileName(name);
         cache.put(name, o);
         DataOutputStream d = null;
         try {
@@ -196,6 +220,7 @@ public class Storage {
      * @return object stored under that name
      */
     public Object readObject(String name) {
+        name = fixFileName(name);
         Object o = cache.get(name);
         if(o != null) {
             return o;
@@ -215,5 +240,23 @@ public class Storage {
             Util.getImplementation().cleanup(d);
             return null;
         }
+    }
+
+    /**
+     * Indicates whether characters that are typically illegal in filesystems should
+     * be sanitized and replaced with underscore  
+     * @return the normalizeNames
+     */
+    public boolean isNormalizeNames() {
+        return normalizeNames;
+    }
+
+    /**
+     * Indicates whether characters that are typically illegal in filesystems should
+     * be sanitized and replaced with underscore  
+     * @param normalizeNames the normalizeNames to set
+     */
+    public void setNormalizeNames(boolean normalizeNames) {
+        this.normalizeNames = normalizeNames;
     }
 }

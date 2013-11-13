@@ -655,8 +655,15 @@ public class BlackBerryOS5Implementation extends BlackBerryImplementation {
         switch( bpsStatus ) {
             case PushApplicationStatus.STATUS_ACTIVE:
                 logStatus = "Active";
-                instance.registerPushOnServer(Integer.toHexString(DeviceInfo.getDeviceId()), instance.getApplicationKey(), (byte)3, 
-                        Display.getInstance().getProperty("UDID", ""), Display.getInstance().getProperty("package_name", ""));
+                if(!instance.registerServerPush(Integer.toHexString(DeviceInfo.getDeviceId()), instance.getApplicationKey(), (byte)3, 
+                        Display.getInstance().getProperty("UDID", ""), Display.getInstance().getProperty("package_name", ""))) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            pushCallback.pushRegistrationError("Server registration error", 1);
+                        }
+                    });                
+                    return;
+                }
                 final String str = Integer.toHexString(DeviceInfo.getDeviceId());
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {

@@ -179,6 +179,21 @@ public final class Display {
 
 
     /**
+     * Date native picker type, it returns a java.util.Date result.
+     */
+    public static final int PICKER_TYPE_DATE = 1;
+
+    /**
+     * Time native picker type, it returns an integer with minutes since midnight.
+     */
+    public static final int PICKER_TYPE_TIME = 2;
+
+    /**
+     * Date and time native picker type, it returns a java.util.Date result.
+     */
+    public static final int PICKER_TYPE_DATE_AND_TIME = 3;
+
+    /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
      * or suddenly switches to using a keypad/trackball. This sort of interface
@@ -213,7 +228,7 @@ public final class Display {
      * Notice that when no change is occurring on the screen no frame is drawn and
      * so a high/low FPS will have no effect then.
      */
-    private int framerateLock = 30;
+    private int framerateLock = 15;
 
     /**
      * Game action for fire
@@ -1097,20 +1112,18 @@ public final class Display {
                     }
                 }
                 // loop over the EDT until the thread completes then return
-                if(isInitialized()) {
-                    while(!w.isDone() && codenameOneRunning) {
-                         edtLoopImpl();
-                         synchronized(lock){
-                             if(shouldEDTSleep()) {
-                                 impl.edtIdle(true);
-                                 try {
-                                    lock.wait(10);
-                                 } catch (InterruptedException ex) {
-                                 }
-                                 impl.edtIdle(false);
+                while(!w.isDone() && codenameOneRunning) {
+                     edtLoopImpl();
+                     synchronized(lock){
+                         if(shouldEDTSleep()) {
+                             impl.edtIdle(true);
+                             try {
+                                lock.wait(10);
+                             } catch (InterruptedException ex) {
                              }
+                             impl.edtIdle(false);
                          }
-                    }
+                     }
                 }
                 // if the thread thew an exception we need to throw it onwards
                 if(w.getErr() != null) {
@@ -1215,6 +1228,13 @@ public final class Display {
         if(current != null){
             if(current.isInitialized()) {
                 current.deinitializeImpl();
+            } else {
+                Form fg = getCurrentUpcoming();
+                if(fg != current) {
+                    if(fg.isInitialized()) {
+                        fg.deinitializeImpl();
+                    }
+                }
             }
         }
         if(!newForm.isInitialized()) {
@@ -3231,5 +3251,27 @@ public final class Display {
         return impl.hasCamera();
     }
 
-
+    /**
+     * Indicates whether the native picker dialog is supported for the given type 
+     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     * @param pickerType the picker type constant
+     * @return true if the native platform supports this picker type
+     */
+    public boolean isNativePickerTypeSupported(int pickerType) {
+        return impl.isNativePickerTypeSupported(pickerType);
+    }
+    
+    /**
+     * Shows a native modal dialog allowing us to perform the picking for the given type 
+     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     * @param pickerType the picker type constant
+     * @param source the source component (optional) the native dialog will be placed in relation to this
+     * component if applicable
+     * @param currentValue the currently selected value
+     * @param data additional meta data specific to the picker type when applicable
+     * @return the value from the picker or null if the operation was canceled.
+     */
+    public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
+        return impl.showNativePicker(type, source, currentValue, data);
+    }
 }

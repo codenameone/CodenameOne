@@ -223,6 +223,7 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
+     * Shows AM/PM indication
      * @param showMeridiem the showMeridiem to set
      */
     public void setShowMeridiem(boolean showMeridiem) {

@@ -4237,12 +4237,13 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
-        File[] f = File.listRoots();
+        /*File[] f = File.listRoots();
         String[] roots = new String[f.length];
         for (int iter = 0; iter < f.length; iter++) {
             roots[iter] = f[iter].getAbsolutePath();
         }
-        return roots;
+        return roots;*/
+        return new String[] {getAppHomePath()};
     }
 
     /**
@@ -4274,6 +4275,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private String unfile(String file) {
+        if(file.startsWith("file://home")) {
+            return System.getProperty("user.dir") + File.separator + ".cn1" + file.substring(11).replace('/', File.separatorChar);
+        }
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -4325,7 +4329,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public char getFileSystemSeparator() {
-        return File.separatorChar;
+        return '/';
     }
 
     /**
@@ -5596,7 +5600,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public String getAppHomePath() {
-        return System.getProperty("user.home");
+        new File(System.getProperty("user.home") + File.separator + ".cn1").mkdirs();
+        return "file://home";
     }
 
     public int convertToPixels(int dipCount, boolean horizontal) {

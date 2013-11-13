@@ -63,7 +63,7 @@ public abstract class BaseSpinner extends Container {
         }
         return d;
     }
-
+    
     /**
      * Default constructor
      */

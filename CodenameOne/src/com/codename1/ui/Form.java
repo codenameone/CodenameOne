@@ -181,6 +181,12 @@ public class Form extends Container {
             title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
         }
 
+        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+            Container bar = new Container();
+            bar.setUIID("StatusBar");
+            titleArea.addComponent(BorderLayout.NORTH, bar);
+        }
+        
         // hardcoded, anything else is just pointless...
         formStyle.setBgTransparency(0xFF);
     }

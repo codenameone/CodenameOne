@@ -290,7 +290,17 @@ public class ConnectionRequest implements IOProgressListener {
                         cookieStr.append("=");
                         cookieStr.append(current.getValue());
                     }
-                    impl.setHeader(connection, cookieHeader, cookieStr.toString());
+                    impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
+                } else {
+                    String s = initCookieHeader(null);
+                    if(s != null) {
+                        impl.setHeader(connection, cookieHeader, s);
+                    }
+                }
+            } else {
+                String s = initCookieHeader(null);
+                if(s != null) {
+                    impl.setHeader(connection, cookieHeader, s);
                 }
             }
             if(isWriteRequest()) {
@@ -406,6 +416,15 @@ public class ConnectionRequest implements IOProgressListener {
                 postResponse();
             }
         });
+    }
+    
+    /**
+     * Allows subclasses to inject cookies into the request
+     * @param cookie the cookie that the implementation is about to send or null for no cookie
+     * @return new cookie or the value of cookie
+     */
+    protected String initCookieHeader(String cookie) {
+        return cookie;
     }
 
     /**

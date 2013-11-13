@@ -2940,7 +2940,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         //why on hell?? RIM has 2 different API's one for CDMA and 
         //one for GSM
         if (!isCDMA()) {
-            String address = "sms://" + phoneNumber + ":5000";
+            String address = "sms://" + phoneNumber;
             MessageConnection con = null;
 
             try {
@@ -2966,7 +2966,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
             try {
                 byte[] data = (message).getBytes("UTF-8");
                 connection = (DatagramConnection) Connector.open(
-                        "sms://" + phoneNumber + ":5016");
+                        "sms://" + phoneNumber);
                 Datagram dg = connection.newDatagram(
                         connection.getMaximumLength());
                 dg.setData(data, 0, data.length);

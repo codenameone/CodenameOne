@@ -5010,4 +5010,28 @@ public abstract class CodenameOneImplementation {
      * @param img the image being drawn
      */
     public void drawingEncodedImage(EncodedImage img) {}
+
+    /**
+     * Indicates whether the native picker dialog is supported for the given type 
+     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     * @param pickerType the picker type constant
+     * @return true if the native platform supports this picker type
+     */
+    public boolean isNativePickerTypeSupported(int pickerType) {
+        return false;
+    }
+    
+    /**
+     * Shows a native modal dialog allowing us to perform the picking for the given type 
+     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     * @param pickerType the picker type constant
+     * @param source the source component (optional) the native dialog will be placed in relation to this
+     * component if applicable
+     * @param currentValue the currently selected value
+     * @param data additional meta data specific to the picker type when applicable
+     * @return the value from the picker or null if the operation was canceled.
+     */
+    public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
+        return null;
+    }
 }

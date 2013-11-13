@@ -2363,8 +2363,8 @@ public class UIBuilder { //implements Externalizable {
                                 backCommand.putClientProperty(COMMAND_ACTION, commandAction);
                             }
                             if(backCommand != null) {
-                                f.addCommand(backCommand, f.getCommandCount());
                                 f.setBackCommand(backCommand);
+                                //f.addCommand(backCommand, f.getCommandCount());
                             }
 
                             // trigger listener creation if this is the only command in the form
