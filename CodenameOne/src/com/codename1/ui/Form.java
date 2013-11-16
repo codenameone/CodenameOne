@@ -181,14 +181,21 @@ public class Form extends Container {
             title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
         }
 
+        initTitleBarStatus();
+        
+        // hardcoded, anything else is just pointless...
+        formStyle.setBgTransparency(0xFF);
+    }
+
+    /**
+     * Here so dialogs can disable this
+     */
+    void initTitleBarStatus() {
         if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container bar = new Container();
             bar.setUIID("StatusBar");
             titleArea.addComponent(BorderLayout.NORTH, bar);
         }
-        
-        // hardcoded, anything else is just pointless...
-        formStyle.setBgTransparency(0xFF);
     }
 
     /**

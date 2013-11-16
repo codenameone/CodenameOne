@@ -502,6 +502,12 @@ public class Dialog extends Form {
     }
 
     /**
+     * Disable title bar status for iOS 7 which breaks dialogs
+     */
+    void initTitleBarStatus() {
+    }
+    
+    /**
      * Indicates the time (in milliseconds) afterwhich the dialog will be disposed 
      * implicitly
      * 

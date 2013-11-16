@@ -625,6 +625,11 @@ public class SideMenuBar extends MenuBar {
      */
     protected Container createSideNavigationComponent(Vector commands, String placement) {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+            Container bar = new Container();
+            bar.setUIID("StatusBarSideMenu");
+            menu.addComponent(bar);
+        }
         menu.setUIID("SideNavigationPanel");
         menu.setScrollableY(true);
         if(!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
@@ -1207,7 +1212,15 @@ public class SideMenuBar extends MenuBar {
         public void putClientProperty(String key, Object value) {
             this.cmd.putClientProperty(key, value);
         }
-
+        
+        public boolean isEnabled() {
+            return cmd.isEnabled();
+        }
+        
+        public void setEnabled(boolean b) {
+            cmd.setEnabled(b);
+        }
+        
         public void actionPerformed(final ActionEvent evt) {
             if(transitionRunning) {
                 return;

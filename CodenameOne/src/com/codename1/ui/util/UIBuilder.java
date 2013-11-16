@@ -2364,7 +2364,10 @@ public class UIBuilder { //implements Externalizable {
                             }
                             if(backCommand != null) {
                                 f.setBackCommand(backCommand);
-                                //f.addCommand(backCommand, f.getCommandCount());
+                                if(Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_SOFTKEY ||
+                                        Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_TOUCH_MENU) { 
+                                    f.addCommand(backCommand, f.getCommandCount());
+                                }
                             }
 
                             // trigger listener creation if this is the only command in the form

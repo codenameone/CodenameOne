@@ -132,6 +132,11 @@ public class MultiButton extends Container {
                 emblem.setCommand(old.getCommand());
                 emblem.setText("");
                 emblem.setIcon(img);
+            } else {
+                emblem.setText(old.getText());
+                if(old.getIcon() != null) {
+                    emblem.setIcon(old.getIcon());
+                }
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
