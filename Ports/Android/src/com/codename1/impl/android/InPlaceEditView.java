@@ -548,7 +548,9 @@ public class InPlaceEditView extends FrameLayout {
         private InPlaceEditView mInPlaceEditView;
         private TextArea mTextArea = null;
         private TextWatcher mTextWatcher = new TextWatcher() {
-
+            
+            private boolean started = false;
+            
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
@@ -562,6 +564,14 @@ public class InPlaceEditView extends FrameLayout {
                 if (mInPlaceEditView.mIsEditing && mTextArea != null) {
                     try {
                         final String actualString = s.toString();
+                        //make sure to start send events to the cn1 textfield only 
+                        //when the first string equals to the initial text
+                        if (!started) {
+                            if (mTextArea.getText().equals(actualString)) {
+                                started = true;
+                            }
+                            return;
+                        }
                         Display.getInstance().callSerially(new Runnable() {
 
                             @Override
