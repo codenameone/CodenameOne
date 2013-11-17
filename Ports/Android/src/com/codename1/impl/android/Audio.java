@@ -116,15 +116,25 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public void play() {
-        if (player != null) {
-            player.start();
+        try {
+            if (player != null) {
+                player.start();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 
     @Override
     public void pause() {
-        if (player != null) {
-            player.pause();
+        try {
+            if (player != null) {
+                player.pause();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 
