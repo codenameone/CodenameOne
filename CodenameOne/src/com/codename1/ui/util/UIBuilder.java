@@ -2364,8 +2364,7 @@ public class UIBuilder { //implements Externalizable {
                             }
                             if(backCommand != null) {
                                 f.setBackCommand(backCommand);
-                                if(Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_SOFTKEY ||
-                                        Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_TOUCH_MENU) { 
+                                if(Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) { 
                                     f.addCommand(backCommand, f.getCommandCount());
                                 }
                             }

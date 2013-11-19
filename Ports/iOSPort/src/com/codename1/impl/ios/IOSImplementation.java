@@ -90,7 +90,7 @@ import java.util.logging.Logger;
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
-    static IOSNative nativeInstance = new IOSNative();
+    public static IOSNative nativeInstance = new IOSNative();
     private static PurchaseCallback purchaseCallback;
     private int timeout = 120000;
     private static final Object CONNECTIONS_LOCK = new Object();

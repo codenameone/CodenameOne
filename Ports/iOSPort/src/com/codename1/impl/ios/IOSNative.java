@@ -31,7 +31,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-final class IOSNative {
+public final class IOSNative {
     //native void startMainThread(Runnable r);
     native void initVM();
     static native void deinitializeVM();
@@ -380,4 +380,10 @@ final class IOSNative {
     native String getUserAgentString();
     
     native void openDatePicker(int type, long time, int x, int y, int w, int h);
+
+    // facebook connect
+    public native void facebookLogin(Object callback);
+    public native boolean isFacebookLoggedIn();
+    public native String getFacebookToken();
+    public native void facebookLogout();
 }
