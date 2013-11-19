@@ -30,7 +30,6 @@ import android.media.MediaPlayer;
 import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
-import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import java.io.InputStream;
 import java.util.Vector;
@@ -39,18 +38,20 @@ import java.util.Vector;
  *
  * @author Chen
  */
-class Audio implements Runnable, com.codename1.media.Media {
-
+class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
+    private static final int MEDIA_INFO_BUFFERING_START = 701;
+    private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;
     private Runnable onComplete;
     private InputStream stream;
     private int lastTime;
     private int lastDuration;
     private Activity activity;
+    private boolean buffering;
 
     private static Vector currentPlayingAudio = new Vector();
     private static PhoneStateListener phoneStateListener;
-
+    
     public Audio(Activity activity, MediaPlayer player, InputStream stream, Runnable onComplete) {
         this.activity = activity;
         this.player = player;
@@ -90,6 +91,9 @@ class Audio implements Runnable, com.codename1.media.Media {
     }
 
     private void bindPlayerCleanupOnComplete() {
+        if(player == null) {
+            return;
+        }
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
             public void onCompletion(MediaPlayer arg0) {
@@ -121,17 +125,27 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public void play() {
-        if (player != null) {
-            player.start();
-            addToCurrentPlaying();
+        try {
+            if (player != null) {
+                player.start();
+                addToCurrentPlaying();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 
     @Override
     public void pause() {
-        if (player != null) {
-            player.pause();
-            removeFromCurrentPlaying();
+        try {
+            if (player != null) {
+                player.pause();
+                removeFromCurrentPlaying();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 
@@ -152,22 +166,27 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public void setTime(int time) {
-        if (player == null) {
-            return;
-        }
-        final boolean[] flag = new boolean[1];
-        player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
-
-            public void onSeekComplete(MediaPlayer arg0) {
-                flag[0] = true;
+        try {
+            if (player == null) {
+                return;
             }
-        });
-        if (player.isPlaying()) {
-            player.seekTo(time);
-        } else {
-            player.start();
-            player.seekTo(time);
-            player.pause();
+            final boolean[] flag = new boolean[1];
+            player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
+
+                public void onSeekComplete(MediaPlayer arg0) {
+                    flag[0] = true;
+                }
+            });
+            if (player.isPlaying()) {
+                player.seekTo(time);
+            } else {
+                player.start();
+                player.seekTo(time);
+                player.pause();
+            }
+        } catch(Throwable t) {
+            // some exceptions might occur here, with all the various illegal states they rarely matter
+            t.printStackTrace();
         }
     }
 
@@ -232,7 +251,11 @@ class Audio implements Runnable, com.codename1.media.Media {
 
     @Override
     public boolean isPlaying() {
-        return player != null && player.isPlaying();
+        try {
+            return player != null && player.isPlaying() && !buffering;
+        } catch(Exception err) {
+            return false;
+        }
     }
 
     public void setVariable(String key, Object value) {
@@ -242,6 +265,21 @@ class Audio implements Runnable, com.codename1.media.Media {
         return null;
     }
 
+    /**
+     * Allows us to detect buffering of media to return a better result in playback
+     */
+    @Override
+    public boolean onInfo(MediaPlayer mp, int i, int i1) {
+        switch(i) {
+            case MEDIA_INFO_BUFFERING_START:
+                buffering = true;
+                break;
+            case MEDIA_INFO_BUFFERING_END:
+                buffering = false;
+                break;
+        } 
+        return false;
+    }
     private void addToCurrentPlaying() {
         if (currentPlayingAudio.size() == 0) {
             new Thread(new Runnable() {
@@ -309,5 +347,6 @@ class Audio implements Runnable, com.codename1.media.Media {
             }).start();
         }
     }
-
+    
+    
 }
