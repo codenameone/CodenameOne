@@ -24,25 +24,32 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.content.Context;
+import static android.content.Context.TELEPHONY_SERVICE;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Looper;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
+import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import java.io.InputStream;
+import java.util.Vector;
 
 /**
  *
  * @author Chen
  */
-class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
-    private static final int MEDIA_INFO_BUFFERING_START = 701;
-    private static final int MEDIA_INFO_BUFFERING_END = 702;
+class Audio implements Runnable, com.codename1.media.Media {
+
     private MediaPlayer player;
     private Runnable onComplete;
     private InputStream stream;
     private int lastTime;
     private int lastDuration;
     private Activity activity;
-    private boolean buffering;
+
+    private static Vector currentPlayingAudio = new Vector();
+    private static PhoneStateListener phoneStateListener;
 
     public Audio(Activity activity, MediaPlayer player, InputStream stream, Runnable onComplete) {
         this.activity = activity;
@@ -70,6 +77,7 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
                 onComplete.run();
                 onComplete = null;
             }
+            removeFromCurrentPlaying();
             System.gc();
         }
     }
@@ -82,9 +90,6 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     }
 
     private void bindPlayerCleanupOnComplete() {
-        if(player == null) {
-            return;
-        }
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
             public void onCompletion(MediaPlayer arg0) {
@@ -116,25 +121,17 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public void play() {
-        try {
-            if (player != null) {
-                player.start();
-            }
-        } catch(Throwable t) {
-            // some exceptions might occur here, with all the various illegal states they rarely matter
-            t.printStackTrace();
+        if (player != null) {
+            player.start();
+            addToCurrentPlaying();
         }
     }
 
     @Override
     public void pause() {
-        try {
-            if (player != null) {
-                player.pause();
-            }
-        } catch(Throwable t) {
-            // some exceptions might occur here, with all the various illegal states they rarely matter
-            t.printStackTrace();
+        if (player != null) {
+            player.pause();
+            removeFromCurrentPlaying();
         }
     }
 
@@ -155,27 +152,22 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public void setTime(int time) {
-        try {
-            if (player == null) {
-                return;
-            }
-            final boolean[] flag = new boolean[1];
-            player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
+        if (player == null) {
+            return;
+        }
+        final boolean[] flag = new boolean[1];
+        player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
 
-                public void onSeekComplete(MediaPlayer arg0) {
-                    flag[0] = true;
-                }
-            });
-            if (player.isPlaying()) {
-                player.seekTo(time);
-            } else {
-                player.start();
-                player.seekTo(time);
-                player.pause();
+            public void onSeekComplete(MediaPlayer arg0) {
+                flag[0] = true;
             }
-        } catch(Throwable t) {
-            // some exceptions might occur here, with all the various illegal states they rarely matter
-            t.printStackTrace();
+        });
+        if (player.isPlaying()) {
+            player.seekTo(time);
+        } else {
+            player.start();
+            player.seekTo(time);
+            player.pause();
         }
     }
 
@@ -240,11 +232,7 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public boolean isPlaying() {
-        try {
-            return player != null && player.isPlaying() && !buffering;
-        } catch(Exception err) {
-            return false;
-        }
+        return player != null && player.isPlaying();
     }
 
     public void setVariable(String key, Object value) {
@@ -254,19 +242,72 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
         return null;
     }
 
-    /**
-     * Allows us to detect buffering of media to return a better result in playback
-     */
-    @Override
-    public boolean onInfo(MediaPlayer mp, int i, int i1) {
-        switch(i) {
-            case MEDIA_INFO_BUFFERING_START:
-                buffering = true;
-                break;
-            case MEDIA_INFO_BUFFERING_END:
-                buffering = false;
-                break;
-        } 
-        return false;
+    private void addToCurrentPlaying() {
+        if (currentPlayingAudio.size() == 0) {
+            new Thread(new Runnable() {
+
+                public void run() {
+                    Looper.prepare();
+                    TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
+                    if (mgr != null) {
+                        phoneStateListener = new PhoneStateListener() {
+
+                            @Override
+                            public void onCallStateChanged(int state, String incomingNumber) {
+                                if (state == TelephonyManager.CALL_STATE_RINGING) {
+                                    //Incoming call: Pause music
+                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                        if (m.isPlaying() && m.player != null) {
+                                            m.player.pause();
+                                        }
+                                    }
+                                } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                                    //Not in call: Play music
+                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                        if (!m.isPlaying() && m.player != null) {
+                                            m.player.start();
+                                        }
+                                    }
+                                } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                                    //A call is dialing, active or on hold
+                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                        if (m.isPlaying() && m.player != null) {
+                                            m.player.pause();
+                                        }
+                                    }
+                                }
+                                super.onCallStateChanged(state, incomingNumber);
+                            }
+
+                        };
+                        mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+                    }
+                    Looper.loop();
+                }
+            }).start();
+        }
+        currentPlayingAudio.add(this);
     }
+
+    private void removeFromCurrentPlaying() {
+        currentPlayingAudio.remove(this);
+        if (currentPlayingAudio.size() == 0) {
+            new Thread(new Runnable() {
+
+                public void run() {
+                    Looper.prepare();
+                    TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
+                    if (mgr != null) {
+                        mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+                    }
+                    Looper.loop();
+                }
+
+            }).start();
+        }
+    }
+
 }
