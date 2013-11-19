@@ -137,6 +137,8 @@ import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.JTextComponent;
@@ -475,6 +477,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (g == null) {
                     return;
                 }
+                if(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JTextComponent) {
+                    return;
+                }
                 drawScreenBuffer(g);
                 updateBufferSize();
                 if (window != null) {
@@ -618,7 +623,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private int getCode(java.awt.event.KeyEvent evt) {
-            return getCode(evt.getKeyCode());
+            int code = evt.getKeyCode();
+            if(code >= 'A' && code <= 'Z') {
+                return evt.getKeyChar();
+            }
+            return getCode(code);
         }
 
         private int getCode(int k) {
@@ -2329,11 +2338,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             return ((JTextComponent) c).getCaretPosition();
         }
     }
-
-    /**
-     * @inheritDoc
-     */
-    public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
+    
+    public void editStringLegacy(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
         checkEDT();
         java.awt.Component awtTf;
 
@@ -2400,6 +2406,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void focusGained(FocusEvent e) {
+                setCaretPosition(tf, getText(tf).length());
             }
 
             public void focusLost(FocusEvent e) {
@@ -2452,6 +2459,181 @@ public class JavaSEPort extends CodenameOneImplementation {
             ((java.awt.TextField) tf).addActionListener(l);
         }
         ((TextComponent) tf).addTextListener(l);
+
+
+        tf.addKeyListener(l);
+        tf.addFocusListener(l);
+        if(simulateAndroidKeyboard) {
+            java.util.Timer t = new java.util.Timer();
+            TimerTask tt = new TimerTask() {
+                @Override
+                public void run() {
+                    if(!Display.getInstance().isEdt()) {
+                        Display.getInstance().callSerially(this);
+                        return;
+                    }
+                    if(tf.getParent() != null) {
+                        final int height = getScreenCoordinates().height;
+                        JavaSEPort.this.sizeChanged(getScreenCoordinates().width, height / 2);
+                        new UITimer(new Runnable() {
+                            public void run() {
+                                if(tf.getParent() != null) {
+                                    new UITimer(this).schedule(100, false, Display.getInstance().getCurrent());
+                                } else {
+                                    JavaSEPort.this.sizeChanged(getScreenCoordinates().width, height);
+                                }
+                            }
+                        }).schedule(100, false, Display.getInstance().getCurrent());
+                    }
+                }
+            };
+            t.schedule(tt, 300);
+        }
+        Display.getInstance().invokeAndBlock(l);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
+        if(System.getProperty("TextCompatMode") != null) {
+            editStringLegacy(cmp, maxSize, constraint, text, keyCode);
+            return;
+        }
+        checkEDT();
+        javax.swing.text.JTextComponent swingT;
+
+        if (cmp instanceof com.codename1.ui.TextField) {
+            JTextField t = new JTextField();
+            swingT = t;
+        } else {
+            JTextArea t = new JTextArea();
+            swingT = t;
+        }
+        final javax.swing.text.JTextComponent tf = swingT;
+        if (keyCode > 0) {
+            text += ((char) keyCode);
+            setText(tf, text);
+            setCaretPosition(tf, text.length());
+            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+        } else {
+            setText(tf, text);
+        }
+        canvas.add(tf);
+        if (getSkin() != null) {
+            tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
+                    (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
+                    (int) (cmp.getWidth() * zoomLevel), (int) (cmp.getHeight() * zoomLevel));
+            java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
+            tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
+        } else {
+            tf.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
+        }
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                setCaretPosition(tf, getText(tf).length());
+                tf.requestFocus();
+                tf.setSelectionStart(0);
+                tf.setSelectionEnd(0);
+            }
+        });
+        class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener {
+
+            public synchronized void run() {
+                while (tf.getParent() != null) {
+                    try {
+                        wait(20);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+
+            public void actionPerformed(ActionEvent e) {
+                String txt = getText(tf);
+                if (testRecorder != null) {
+                    testRecorder.editTextFieldCompleted(cmp, txt);
+                }
+                Display.getInstance().onEditingComplete(cmp, txt);
+                if (tf instanceof JTextField) {
+                    ((JTextField) tf).removeActionListener(this);
+                }
+                ((JTextComponent) tf).getDocument().removeDocumentListener(this);
+                
+                tf.removeFocusListener(this);
+                canvas.remove(tf);
+                synchronized (this) {
+                    notify();
+                }
+                canvas.repaint();
+            }
+
+            public void focusGained(FocusEvent e) {
+                setCaretPosition(tf, getText(tf).length());
+            }
+
+            public void focusLost(FocusEvent e) {
+                actionPerformed(null);
+            }
+
+            public void keyTyped(KeyEvent e) {
+                String t = getText(tf);
+
+                if (t.length() >= ((TextArea) cmp).getMaxSize()) {
+                    e.consume();
+                }
+            }
+
+            public void keyPressed(KeyEvent e) {
+            }
+
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    if (tf instanceof JTextField) {
+                        actionPerformed(null);
+                    } else {
+                        if (getCaretPosition(tf) >= getText(tf).length() - 1) {
+                            actionPerformed(null);
+                        }
+                    }
+                    return;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                    if (tf instanceof JTextField) {
+                        actionPerformed(null);
+                    } else {
+                        if (getCaretPosition(tf) <= 2) {
+                            actionPerformed(null);
+                        }
+                    }
+                    return;
+                }
+            }
+
+            public void textValueChanged(TextEvent e) {
+                if (cmp instanceof com.codename1.ui.TextField) {
+                    ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                }
+
+            }
+
+            public void insertUpdate(DocumentEvent e) {
+                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+            }
+        };
+        final Listener l = new Listener();
+        if (tf instanceof JTextField) {
+            ((JTextField) tf).addActionListener(l);
+        }
+        ((JTextComponent) tf).getDocument().addDocumentListener(l);
 
 
         tf.addKeyListener(l);
@@ -3573,6 +3755,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void execute(String url) {
         try {
+            if(url.startsWith("file:")) {
+                url = "file://" + unfile(url);
+            }
             Desktop.getDesktop().browse(new URI(url));
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -3632,13 +3817,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * Plays the sound in the given URI which is partially platform specific.
      *
-     * @param uri the platform specific location for the sound
+     * @param uriAddress the platform specific location for the sound
      * @param onCompletion invoked when the audio file finishes playing, may be
      * null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
      */
-    public Media createMedia(final String uri, final boolean isVideo, final Runnable onCompletion) throws IOException {
+    public Media createMedia(String uriAddress, final boolean isVideo, final Runnable onCompletion) throws IOException {
+        if(uriAddress.startsWith("file:")) {
+            uriAddress = unfile(uriAddress);
+        }
+        final String uri = uriAddress;
         if (!fxExists) {
             String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
             System.out.println(msg);
