@@ -385,7 +385,7 @@ public class Result {
 		if (s == null) {
 			return 0;
 		}
-		return Integer.parseInt(s);
+		return (int)Double.parseDouble(s);
 	}
 
 	/**
