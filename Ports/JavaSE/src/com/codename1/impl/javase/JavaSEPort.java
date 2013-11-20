@@ -541,9 +541,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
             boolean painted = false;
-            java.awt.Component t = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             if (getScreenCoordinates() != null) {
-                if(t instanceof JTextComponent) {
+                if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
                     bg.translate(-getScreenCoordinates().x, -getScreenCoordinates().y);
                     paintChildren(bg);
@@ -569,7 +568,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 updateGraphicsScale(g);
                 g.drawImage(getSkin(), x, y, this);
             } else {
-                if(t instanceof JTextComponent) {
+                if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
                     paintChildren(bg);
                     bg.dispose();
