@@ -472,59 +472,66 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void blit() {
-            if (buffer != null) {
-                java.awt.Graphics g = getGraphics();
-                if (g == null) {
-                    return;
-                }
-                if(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JTextComponent) {
-                    return;
-                }
-                drawScreenBuffer(g);
-                updateBufferSize();
-                if (window != null) {
-
-                    if (zoomLevel != 1) {
-                        Graphics2D g2d = (Graphics2D) g;
-                        g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
-                    }
-
-                    int count = window.getContentPane().getComponentCount();
-                    boolean nativeCmp = false;
-                    if (scrollableSkin) {
-                        if (count > 3) {
-                            nativeCmp = true;
-                        }
-                    } else {
-                        if (count > 1) {
-                            nativeCmp = true;
-                        }
-                    }
-                    if (nativeCmp) {
-                        java.awt.Component c = window.getContentPane().getComponent(0);
-                        if (c.isVisible()) {
-                            g.translate(c.getX(), c.getY());
-                            c.update(g);
-                            g.translate(-c.getX(), -c.getY());
-                        }
-                    }
-
-
-                    if (window.getJMenuBar() != null) {
-                        for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
-                            JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
-                            if (m.isPopupMenuVisible()) {
-                                JPopupMenu pop = m.getPopupMenu();
-                                pop.getInvoker().getX();
-                                g.translate(pop.getInvoker().getX(), 0);
-                                pop.update(g);
-                                g.translate(-pop.getInvoker().getX(), 0);
+            try {
+                SwingUtilities.invokeAndWait(new Runnable() {
+                    public void run() {
+                        if (buffer != null) {
+                            java.awt.Graphics g = getGraphics();
+                            if (g == null) {
+                                return;
                             }
+                            boolean painted = drawScreenBuffer(g);
+                            updateBufferSize();
+                            if (window != null) {
+
+                                if (zoomLevel != 1) {
+                                    Graphics2D g2d = (Graphics2D) g;
+                                    g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
+                                }
+
+                                int count = window.getContentPane().getComponentCount();
+                                boolean nativeCmp = false;
+                                if (scrollableSkin) {
+                                    if (count > 3) {
+                                        nativeCmp = true;
+                                    }
+                                } else {
+                                    if (count > 1) {
+                                        nativeCmp = true;
+                                    }
+                                }
+                                if (nativeCmp) {
+                                    java.awt.Component c = window.getContentPane().getComponent(0);
+                                    if (c.isVisible()) {
+                                        g.translate(c.getX(), c.getY());
+                                        c.update(g);
+                                        g.translate(-c.getX(), -c.getY());
+                                    }
+                                }
+
+
+                                if (window.getJMenuBar() != null) {
+                                    for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
+                                        JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
+                                        if (m.isPopupMenuVisible()) {
+                                            JPopupMenu pop = m.getPopupMenu();
+                                            pop.getInvoker().getX();
+                                            g.translate(pop.getInvoker().getX(), 0);
+                                            pop.update(g);
+                                            g.translate(-pop.getInvoker().getX(), 0);
+                                        }
+                                    }
+                                }
+                            }
+                            if(!painted) {
+                                paintChildren(g);
+                            }
+                            g.dispose();
                         }
                     }
-                }
-                paintChildren(g);
-                g.dispose();
+                });
+            } catch(Exception err) {
+                err.printStackTrace();
             }
         }
 
@@ -532,8 +539,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             blit();
         }
 
-        private void drawScreenBuffer(java.awt.Graphics g) {
+        private boolean drawScreenBuffer(java.awt.Graphics g) {
+            boolean painted = false;
+            java.awt.Component t = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             if (getScreenCoordinates() != null) {
+                if(t instanceof JTextComponent) {
+                    Graphics2D bg = buffer.createGraphics();
+                    bg.translate(-getScreenCoordinates().x, -getScreenCoordinates().y);
+                    paintChildren(bg);
+                    bg.dispose();
+                    painted = true;
+                }
                 g.setColor(Color.WHITE);
                 g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
                 g.fillRect(x, y + (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
@@ -553,8 +569,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 updateGraphicsScale(g);
                 g.drawImage(getSkin(), x, y, this);
             } else {
+                if(t instanceof JTextComponent) {
+                    Graphics2D bg = buffer.createGraphics();
+                    paintChildren(bg);
+                    bg.dispose();
+                    painted = true;
+                }
                 g.drawImage(buffer, x, y, this);
             }
+            return painted;
         }
 
         public void paintComponent(java.awt.Graphics g) {
@@ -2502,14 +2525,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         checkEDT();
         javax.swing.text.JTextComponent swingT;
-
-        if (cmp instanceof com.codename1.ui.TextField) {
+        if (cmp instanceof com.codename1.ui.TextField && ((com.codename1.ui.TextField)cmp).isSingleLineTextArea()) {
             JTextField t = new JTextField();
             swingT = t;
         } else {
-            JTextArea t = new JTextArea();
+            com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
+            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns());
+            t.setWrapStyleWord(true);
+            t.setLineWrap(true);
             swingT = t;
         }
+        swingT.setBorder(null);
+        swingT.setOpaque(false);
         final javax.swing.text.JTextComponent tf = swingT;
         if (keyCode > 0) {
             text += ((char) keyCode);
@@ -2520,24 +2547,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             setText(tf, text);
         }
         canvas.add(tf);
+        int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP) + cmp.getSelectedStyle().getMargin(Component.TOP);
+        int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT) + cmp.getSelectedStyle().getMargin(Component.LEFT);
+        int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT) + cmp.getSelectedStyle().getMargin(Component.RIGHT);
+        int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM) + cmp.getSelectedStyle().getMargin(Component.BOTTOM);
         if (getSkin() != null) {
-            tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
-                    (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
-                    (int) (cmp.getWidth() * zoomLevel), (int) (cmp.getHeight() * zoomLevel));
+            tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                    (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
+                    (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
         } else {
-            tf.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            tf.setBounds(cmp.getAbsoluteX() + marginLeft, cmp.getAbsoluteY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                setCaretPosition(tf, getText(tf).length());
-                tf.requestFocus();
-                tf.setSelectionStart(0);
-                tf.setSelectionEnd(0);
-            }
-        });
+        setCaretPosition(tf, getText(tf).length());
+        tf.requestFocus();
+        tf.setSelectionStart(0);
+        tf.setSelectionEnd(0);
         class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener {
 
             public synchronized void run() {
@@ -2612,21 +2640,31 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             public void textValueChanged(TextEvent e) {
                 if (cmp instanceof com.codename1.ui.TextField) {
-                    ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                    updateText();
                 }
 
             }
 
+            private void updateText() {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if(cmp instanceof com.codename1.ui.TextField) {
+                            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                        }
+                    }
+                });
+            }
+            
             public void insertUpdate(DocumentEvent e) {
-                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                updateText();
             }
 
             public void removeUpdate(DocumentEvent e) {
-                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                updateText();
             }
 
             public void changedUpdate(DocumentEvent e) {
-                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                updateText();
             }
         };
         final Listener l = new Listener();
