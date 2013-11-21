@@ -2536,6 +2536,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         swingT.setBorder(null);
         swingT.setOpaque(false);
+        swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
         final javax.swing.text.JTextComponent tf = swingT;
         if (keyCode > 0) {
             text += ((char) keyCode);
@@ -5481,6 +5482,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (url.startsWith("jar:")) {
             url = url.substring(6);
             url = this.getClass().getResource(url).toExternalForm();
+        }
+        if(url.startsWith("file:")) {
+            if(url.startsWith("file:")) {
+                url = "file://" + unfile(url);
+            }
         }
         final String theUrl = url;
         Platform.runLater(new Runnable() {
