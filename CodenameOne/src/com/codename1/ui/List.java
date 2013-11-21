@@ -1653,6 +1653,9 @@ public class List<T> extends Component {
      * @inheritDoc
      */
     public void longPointerPress(int x, int y) {
+        if(!isEnabled()) {
+            return;
+        }
         if(longPointerPressAction) {
             int s = pointerSelect(x, y);
             if(s > -1) {
@@ -1666,6 +1669,9 @@ public class List<T> extends Component {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
+        if(!isEnabled()) {
+            return;
+        }
         if(fixedSelection > FIXED_NONE_BOUNDRY) {
             // for a fixed list we need to store the initial drag position
             if(isSmoothScrolling()) {
@@ -1719,6 +1725,9 @@ public class List<T> extends Component {
     }
 
     private void pointerDraggedImpl(int x, int y) {
+        if(!isEnabled()) {
+            return;
+        }
         if (isSmoothScrolling()) {
             if(fixedSelection < FIXED_NONE_BOUNDRY) {
                 super.pointerDragged(x, y);
@@ -1871,6 +1880,9 @@ public class List<T> extends Component {
 
     
     private void pointerReleasedImpl(int x, int y, boolean isHover, boolean longPress) {
+        if(!isEnabled()) {
+            return;
+        }
         if (isDragActivated()) {
             if(fixedSelection < FIXED_NONE_BOUNDRY) {
                 super.pointerReleased(x, y);

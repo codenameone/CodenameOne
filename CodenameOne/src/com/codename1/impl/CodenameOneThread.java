@@ -190,6 +190,14 @@ public class CodenameOneThread extends Thread {
             if(r != null) {
                 r.exception(err);
             }
+        } else {
+            Log.p(err.toString());
+            Log.e(err);
+            Preferences.set("$CN1Uncaught", true);
+            CrashReport r = Display.getInstance().getCrashReporter();
+            if(r != null) {
+                r.exception(err);
+            }
         }
     }
 }
