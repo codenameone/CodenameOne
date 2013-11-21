@@ -1113,12 +1113,7 @@ public final class Display {
                 }
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {
-                     try {
-                        edtLoopImpl();
-                     } catch(Exception err) {
-                         // could be a race condition between the port code and background excecution
-                         err.printStackTrace();
-                     }
+                     edtLoopImpl();
                      synchronized(lock){
                          if(shouldEDTSleep()) {
                              impl.edtIdle(true);
