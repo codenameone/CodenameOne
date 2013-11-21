@@ -143,6 +143,26 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    @Override
+    protected void removeAllCommands() {
+        Container t = parent.getTitleArea();
+        int count = t.getComponentCount();
+        for(int iter = 0 ; iter < count ; iter++) {
+            Component current = t.getComponentAt(iter);
+            if("TitleCommand".equals(current.getUIID())) {
+                t.removeComponent(current);
+                t.revalidate();
+            }
+        }
+        super.removeAllCommands();
+    }
+
+    /**
+     * @inheritDoc
+     */
     @Override
     protected void unInstallMenuBar() {
         super.unInstallMenuBar();
