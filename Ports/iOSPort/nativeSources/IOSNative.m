@@ -777,6 +777,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(JAVA_
     NSString* ns = [NSString stringWithUTF8String:chrs];
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
+    } else {
+        if([ns hasPrefix:@"//localhost"]) {
+            ns = [@"file:" stringByAppendingString:ns];
+            NSData* d = [NSData dataWithContentsOfURL:[NSURL URLWithString:ns]];
+            [d retain];
+            [pool release];
+            return d;
+        }
     }
     NSData* d = [NSData dataWithContentsOfFile:ns];
     [d retain];
@@ -2670,18 +2678,42 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(JAVA_
 }
 
 
-AVAudioRecorder* recorder = nil;
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(JAVA_OBJECT instanceObject, 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(JAVA_OBJECT instanceObject,
     JAVA_OBJECT  destinationFile) {
+    __block AVAudioRecorder* recorder = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        NSError *err = nil;
+        [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+        if(err){
+            NSLog(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            return;
+        }
+        err = nil;
+        [audioSession setActive:YES error:&err];
+        if(err){
+            NSLog(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            return;
+        }
         NSString * filePath = toNSString(destinationFile);
+        
+        // cleanup older file if it exists in this location
+        NSFileManager* fm = [[NSFileManager alloc] init];
+        NSString* ns = filePath;
+        if([ns hasPrefix:@"file:"]) {
+            ns = [ns substringFromIndex:5];
+        }
+        if([fm fileExistsAtPath:ns]) {
+            [fm removeItemAtPath:ns error:&err];
+        }
+        
         NSLog(@"Recording audio to: %@", filePath);
         NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
-        [NSNumber numberWithFloat: 44100.0], AVSampleRateKey,
-        [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
-        [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
-        [NSNumber numberWithInt: AVAudioQualityMax], AVEncoderAudioQualityKey,nil];
+                                        [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
+                                        [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
+                                        [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
+                                        nil];
         NSError *error = nil;
         recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:filePath]
              settings: recordSettings
@@ -2692,18 +2724,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         recorder.delegate = [CodenameOne_GLViewController instance];
         [pool release];
     });
-    AVAudioRecorder* r = recorder;
-    recorder = nil;
-    return r;
+    return recorder;
 }
 
 void com_codename1_impl_ios_IOSNative_startAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        [recorder prepareToRecord];
-        [recorder record];
+        if(![recorder prepareToRecord]) {
+            NSLog(@"Error preparing to record");
+        }
+        if(![recorder record]) {
+            NSLog(@"Error in recording record returned false for some reason?");
+        }
         [recorder retain];
         [pool release];
     });
@@ -2712,7 +2746,7 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(JAVA_OBJECT instan
 void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         [recorder pause];
         [pool release];
@@ -2722,7 +2756,7 @@ void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(JAVA_OBJECT instan
 void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(JAVA_OBJECT instanceObject, 
     JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (AVAudioRecorder*)peer;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         [recorder stop];
         [recorder release];
@@ -3050,6 +3084,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(JAVA_OBJECT ins
 }
 
 void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) {
+#if !TARGET_IPHONE_SIMULATOR
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         CVZBarReaderViewController *reader = [CVZBarReaderViewController new];
@@ -3072,6 +3107,7 @@ void com_codename1_impl_ios_IOSNative_scanBarCode__(JAVA_OBJECT instanceObject) 
         [reader release];
         [pool release];
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_scanQRCode__(JAVA_OBJECT instanceObject) {
@@ -3331,4 +3367,108 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long(JAVA_OBJEC
     JAVA_BOOLEAN result = [tzone isDaylightSavingTimeForDate:date];
     [pool release];
     return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(JAVA_OBJECT instanceObject) {
+    __block JAVA_OBJECT c = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIWebView* webView = [[UIWebView alloc] initWithFrame:CGRectZero];
+        NSString* userAgentString = [webView stringByEvaluatingJavaScriptFromString:@"navigator.userAgent"];
+        c = fromNSString(userAgentString);
+        [pool release];
+    });
+
+    return c;
+}
+
+
+NSDate* currentDatePickerDate;
+bool datepickerPopover = NO;
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    currentDatePickerDate = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIDatePicker* datePickerView;
+        if(isIPad() || isIOS7()) {
+            datePickerView = [[UIDatePicker alloc] init];
+        } else {
+            datePickerView = [[UIDatePicker alloc] initWithFrame:CGRectMake(0, 40, 0, 0)];
+        }
+        switch(type) {
+            case 1:
+                datePickerView.datePickerMode = UIDatePickerModeDate;
+                break;
+            case 2:
+                datePickerView.datePickerMode = UIDatePickerModeTime;
+                break;
+            case 3:
+                datePickerView.datePickerMode = UIDatePickerModeDateAndTime;
+                break;
+        }
+        NSDate* date = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
+        datePickerView.tag = 10;
+        datePickerView.date = date;
+        [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
+        if(isIPad()) {
+            datepickerPopover = YES;
+            UIViewController *vc = [[UIViewController alloc] init];
+            [vc setView:datePickerView];
+            [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
+            uip.delegate = [CodenameOne_GLViewController instance];
+            [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+        } else {
+            UIActionSheet* actionSheet;
+            if(isIOS7()) {
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:@"OK" destructiveButtonTitle:nil otherButtonTitles:nil];
+            } else {
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+                UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
+                closeButton.momentary = YES;
+                closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
+                closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
+                closeButton.tintColor = [UIColor blackColor];
+                [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
+                [actionSheet addSubview:closeButton];
+                [closeButton release];
+            }
+            
+            [actionSheet setActionSheetStyle:UIActionSheetStyleBlackTranslucent];
+            
+            datePickerView.frame = CGRectMake(datePickerView.frame.origin.x, datePickerView.frame.origin.y + 10, datePickerView.frame.size.width, datePickerView.frame.size.height);
+            [actionSheet addSubview:datePickerView];
+            
+            
+            //[actionSheet showInView:self.view];
+            [actionSheet showInView:[UIApplication sharedApplication].keyWindow];
+            [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+        }
+        [pool release];
+        repaintUI();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer) {
+    NSString* someText = toNSString(text);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSArray* dataToShare;
+        if(imagePeer != 0) {
+            UIImage* i = [(GLUIImage*)imagePeer getImage];        
+            if(someText != nil) {
+                dataToShare = [NSArray arrayWithObjects:someText, i, nil];
+            } else {
+                dataToShare = [NSArray arrayWithObjects:i, nil];
+            }
+        } else {
+            dataToShare = [NSArray arrayWithObjects:someText, nil];
+        }
+
+        UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare 
+                                      applicationActivities:nil];
+        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [pool release];
+        repaintUI();
+    });
 }

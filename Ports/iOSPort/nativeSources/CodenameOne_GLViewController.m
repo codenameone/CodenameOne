@@ -46,7 +46,8 @@
 #include "com_codename1_impl_CodenameOneImplementation.h"
 
 extern void repaintUI();
-
+extern NSDate* currentDatePickerDate = nil;
+extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 
@@ -253,6 +254,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
         } else {
             UITextView* utv = [[UITextView alloc] initWithFrame:rect];
+            //[utv setBackgroundColor:[UIColor clearColor]];
+            //[utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
+            //[utv.layer setBorderWidth:0];
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((UIFont*)font).pointSize / scale;
@@ -1184,7 +1188,7 @@ int keyboardSlideOffset;
     
     patch = NO;
     keyboardSlideOffset = 0;
-    if(editCompoentY + (editCompoentH / 2) < displayHeight / scaleValue - keyboardSize.height) {
+    if(editCompoentY + editCompoentH < displayHeight / scaleValue - keyboardSize.height) {
         if(!forceSlideUpField) {
             modifiedViewHeight = NO;
             return;
@@ -2036,4 +2040,52 @@ extern SKPayment *paymentInstance;
     });
 }
 #endif
+
+- (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
+    if(datepickerPopover) {
+        if(currentDatePickerDate == nil) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+        } else {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+            [currentDatePickerDate release];
+            currentDatePickerDate = nil;
+        }
+        datepickerPopover = NO;
+    }
+}
+
+- (void)datePickerChangeDate:(UIDatePicker *)sender {
+    if(currentDatePickerDate != nil) {
+        [currentDatePickerDate release];
+    }
+    currentDatePickerDate = sender.date;
+    [currentDatePickerDate retain];
+}
+
+- (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
+    if(currentDatePickerDate == nil) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+    } else {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+        [currentDatePickerDate release];
+        currentDatePickerDate = nil;
+    }
+}
+
+- (void)datePickerDismissActionSheet:(id)sender {
+    UISegmentedControl* s = sender;
+    UIActionSheet* sheet = [s superview];
+    [sheet dismissWithClickedButtonIndex:0 animated:YES];
+    if(currentDatePickerDate == nil) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+    } else {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+        currentDatePickerDate = nil;
+    }
+}
+
+// Doesn't work for some reason
+//-(void)actionSheetCancel:(UIActionSheet *)actionSheet {
+//}
+
 @end

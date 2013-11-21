@@ -50,7 +50,7 @@
 #import "MPAdView.h"
 #endif
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate 
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate 
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif

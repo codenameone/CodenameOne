@@ -2264,8 +2264,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * Callback for the native layer
      */
-    public static void fireWebViewError(BrowserComponent bc) {
-        bc.fireWebEvent("onError", new ActionEvent(new Integer(-1)));
+    public static void fireWebViewError(BrowserComponent bc, int code) {
+        bc.fireWebEvent("onError", new ActionEvent(new Integer(code), code));
     }
 
     /**
@@ -3789,6 +3789,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
+    @Override
+    public boolean isNativeShareSupported(){
+        return true;
+    }
+    
+    @Override
+    public void share(String text, String image, String mimeType){
+        if(image != null && image.length() > 0) {
+            try {
+                Image img = Image.createImage(image);
+                if(img == null) {
+                    nativeInstance.socialShare(text, 0);
+                    return;
+                }
+                NativeImage n = (NativeImage)img.getImage();
+                nativeInstance.socialShare(text, n.peer);
+            } catch(IOException err) {
+                err.printStackTrace();
+                Dialog.show("Error", "Error loading image: " + image, "OK", null);
+            }
+        } else {
+            nativeInstance.socialShare(text, 0);
+        }
+    }
 
     private Purchase pur;
     private Vector purchasedItems;

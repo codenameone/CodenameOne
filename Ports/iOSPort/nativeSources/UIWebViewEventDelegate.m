@@ -40,7 +40,9 @@ extern int connections;
 }
 
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
-     com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent(c);
+     if ([error code] != NSURLErrorCancelled) {
+        com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(c, [error code]);
+     }
      connections--;
      if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];

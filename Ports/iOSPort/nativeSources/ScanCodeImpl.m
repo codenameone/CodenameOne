@@ -10,6 +10,7 @@
 //#import "QRCodeReaderOC.h"
 
 @implementation ScanCodeImpl
+#if !TARGET_IPHONE_SIMULATOR
 - (void) imagePickerController: (UIImagePickerController*) reader didFinishPickingMediaWithInfo: (NSDictionary*) info
 {
         // ADD: get the decode results
@@ -30,6 +31,7 @@
         
         com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(fromNSString(symbol.data), fromNSString(symbol.typeName));        
 }
+#endif
 
 /*- (void)zxingController:(ZXingWidgetController*)controller didScanResult:(NSString *)result {
     com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(fromNSString(result), nil);

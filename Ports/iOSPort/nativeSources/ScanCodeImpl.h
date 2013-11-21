@@ -8,9 +8,14 @@
 
 #import <Foundation/Foundation.h>
 //#import "ZXingWidgetController.h"
+#if !TARGET_IPHONE_SIMULATOR
 #import "ZBarSDK.h"
 #import "CVZBarReaderViewController.h"
+#endif
 
-@interface ScanCodeImpl : UIViewController<ZBarReaderDelegate>//, ZXingDelegate>
+@interface ScanCodeImpl
+#if !TARGET_IPHONE_SIMULATOR
+: UIViewController<ZBarReaderDelegate>//, ZXingDelegate>
+#endif
 
 @end

@@ -381,6 +381,8 @@ public final class IOSNative {
     
     native void openDatePicker(int type, long time, int x, int y, int w, int h);
 
+    native void socialShare(String text, long imagePeer);
+    
     // facebook connect
     public native void facebookLogin(Object callback);
     public native boolean isFacebookLoggedIn();
