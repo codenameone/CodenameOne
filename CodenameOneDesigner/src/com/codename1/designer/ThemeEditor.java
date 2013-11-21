@@ -1901,8 +1901,14 @@ private void borderWizardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
             List<String> actualKeys = new ArrayList<String>();
             for (Object k : themeHash.keySet()) {
                 String currentKey = (String) k;
-                if (currentKey.startsWith(key + ".") || currentKey.equals(key)) {
-                    actualKeys.add(currentKey);
+                if(prefix != null) {
+                    if (currentKey.startsWith(key + "." + prefix) || currentKey.equals(key)) {
+                        actualKeys.add(currentKey);
+                    }
+                } else {
+                    if (currentKey.startsWith(key + ".") || currentKey.equals(key)) {
+                        actualKeys.add(currentKey);
+                    }
                 }
             }
             if (actualKeys.size() > 0) {

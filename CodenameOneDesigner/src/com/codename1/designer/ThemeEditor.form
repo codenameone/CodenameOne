@@ -105,7 +105,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="deviceType" min="-2" pref="125" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="uiPreviewContent" pref="346" max="32767" attributes="0"/>
+                                  <Component id="uiPreviewContent" pref="456" max="32767" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Component id="localePicker" min="-2" max="-2" attributes="0"/>
                               </Group>
@@ -312,7 +312,7 @@
                           <Component id="borderWizard" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="stylesTabbedPane" pref="349" max="32767" attributes="0"/>
+                      <Component id="stylesTabbedPane" pref="344" max="32767" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="addThemeEntry" alignment="3" min="-2" max="-2" attributes="0"/>
