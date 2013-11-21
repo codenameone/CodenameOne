@@ -26,6 +26,8 @@
 #include "com_codename1_ui_events_BrowserNavigationCallback.h"
 #include "xmlvm.h"
 
+extern int connections;
+
 @implementation UIWebViewEventDelegate
 
 - (id)initWithCallback:(void*)callback {
@@ -38,7 +40,16 @@
 }
 
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
-    com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent(c);
+     com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent(c);
+     connections--;
+     if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+     }
+}
+
+- (void)webViewDidStartLoad:(UIWebView *)webView {
+     connections++;
+     [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
 }
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
@@ -56,7 +67,11 @@
 }
 
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
-    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(webView.request.URL.absoluteString.UTF8String));
+     connections--;
+     if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+     }
+     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(webView.request.URL.absoluteString.UTF8String));
 }
 
 @end
