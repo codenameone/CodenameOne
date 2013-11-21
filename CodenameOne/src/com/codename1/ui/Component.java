@@ -2169,7 +2169,7 @@ public class Component implements Animation, StyleListener {
             oldx = x;
             oldy = y;
             p.repaint(draggedx , draggedy, getWidth(), getHeight());
-            getParent().scrollRectToVisible(draggedx, draggedy, getWidth(), getHeight(), getParent());
+            getParent().scrollRectToVisible(draggedx - getParent().getAbsoluteX(), draggedy - getParent().getAbsoluteY(), getWidth() + 40, getHeight() + 40, getParent());
             return;
         }
         boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
