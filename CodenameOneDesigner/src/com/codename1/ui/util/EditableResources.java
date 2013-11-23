@@ -1716,6 +1716,9 @@ public class EditableResources extends Resources implements TreeModel {
             // if this is a background image
             if(key.endsWith("bgImage")) {
                 String imageId = findId(theme.get(key), true);
+                if(imageId == null) {
+                    imageId = "";
+                }
                 output.writeUTF(imageId);
                 continue;
             } 
