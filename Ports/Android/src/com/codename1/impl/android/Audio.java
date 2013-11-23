@@ -285,45 +285,49 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
             new Thread(new Runnable() {
 
                 public void run() {
-                    Looper.prepare();
-                    TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
-                    if (mgr != null) {
-                        phoneStateListener = new PhoneStateListener() {
+                    try {
+                        Looper.prepare();
+                        TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
+                        if (mgr != null) {
+                            phoneStateListener = new PhoneStateListener() {
 
-                            @Override
-                            public void onCallStateChanged(int state, String incomingNumber) {
-                                if (state == TelephonyManager.CALL_STATE_RINGING) {
-                                    //Incoming call: Pause music
-                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                        if (m.isPlaying() && m.player != null) {
-                                            m.player.pause();
+                                @Override
+                                public void onCallStateChanged(int state, String incomingNumber) {
+                                    if (state == TelephonyManager.CALL_STATE_RINGING) {
+                                        //Incoming call: Pause music
+                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                            if (m.isPlaying() && m.player != null) {
+                                                m.player.pause();
+                                            }
+                                        }
+                                    } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                                        //Not in call: Play music
+                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                            if (!m.isPlaying() && m.player != null) {
+                                                m.player.start();
+                                            }
+                                        }
+                                    } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                                        //A call is dialing, active or on hold
+                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                            if (m.isPlaying() && m.player != null) {
+                                                m.player.pause();
+                                            }
                                         }
                                     }
-                                } else if (state == TelephonyManager.CALL_STATE_IDLE) {
-                                    //Not in call: Play music
-                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                        if (!m.isPlaying() && m.player != null) {
-                                            m.player.start();
-                                        }
-                                    }
-                                } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                                    //A call is dialing, active or on hold
-                                    for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                        Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                        if (m.isPlaying() && m.player != null) {
-                                            m.player.pause();
-                                        }
-                                    }
+                                    super.onCallStateChanged(state, incomingNumber);
                                 }
-                                super.onCallStateChanged(state, incomingNumber);
-                            }
 
-                        };
-                        mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+                            };
+                            mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+                        }
+                        Looper.loop();
+                    } catch(Throwable t) {
+                        t.printStackTrace();
                     }
-                    Looper.loop();
                 }
             }).start();
         }
