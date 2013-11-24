@@ -27,6 +27,7 @@ import android.content.Context;
 import static android.content.Context.TELEPHONY_SERVICE;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Handler;
 import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
@@ -282,12 +283,12 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     }
     private void addToCurrentPlaying() {
         if (currentPlayingAudio.size() == 0) {
-            new Thread(new Runnable() {
+            Handler mHandler = new Handler(Looper.getMainLooper());
+            mHandler.post(new Runnable() {
 
                 public void run() {
                     try {
-                        Looper.prepare();
-                        TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
+                        TelephonyManager mgr = (TelephonyManager) activity.getSystemService(TELEPHONY_SERVICE);
                         if (mgr != null) {
                             phoneStateListener = new PhoneStateListener() {
 
@@ -324,12 +325,11 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
                             };
                             mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
                         }
-                        Looper.loop();
-                    } catch(Throwable t) {
+                    } catch (Throwable t) {
                         t.printStackTrace();
                     }
                 }
-            }).start();
+            });
         }
         currentPlayingAudio.add(this);
     }
@@ -337,20 +337,17 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     private void removeFromCurrentPlaying() {
         currentPlayingAudio.remove(this);
         if (currentPlayingAudio.size() == 0) {
-            new Thread(new Runnable() {
+            Handler mHandler = new Handler(Looper.getMainLooper());
+            mHandler.post(new Runnable() {
 
                 public void run() {
-                    Looper.prepare();
-                    TelephonyManager mgr = (TelephonyManager)activity.getSystemService(TELEPHONY_SERVICE);
+                    TelephonyManager mgr = (TelephonyManager) activity.getSystemService(TELEPHONY_SERVICE);
                     if (mgr != null) {
                         mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
                     }
-                    Looper.loop();
                 }
-
-            }).start();
+            });
         }
     }
-    
-    
+
 }
