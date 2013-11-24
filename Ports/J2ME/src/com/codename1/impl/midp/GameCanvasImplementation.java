@@ -1491,6 +1491,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         
         public MIDPVideoComponent(MMAPIPlayer player, Object canvas) {            
             this.player = player;
+            this.canvas = canvas;
             putClientProperty("nativePlayer", player.nativePlayer);
         }
 
