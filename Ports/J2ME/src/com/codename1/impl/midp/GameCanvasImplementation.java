@@ -28,6 +28,7 @@ import com.codename1.codescan.CodeScanner;
 import com.codename1.components.MediaPlayer;
 import com.codename1.contacts.Contact;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.midp.codescan.ScannerHider;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -1476,7 +1477,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     }
 
     
-    class MIDPVideoComponent extends Component implements Media{
+    public static class MIDPVideoComponent extends Component implements Media{
 
         private boolean fullscreen;
         
@@ -1486,8 +1487,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         private boolean nativePlayer;
         
         private Form curentForm;
+        private Object canvas;
         
-        MIDPVideoComponent(MMAPIPlayer player) {            
+        public MIDPVideoComponent(MMAPIPlayer player, Object canvas) {            
             this.player = player;
             putClientProperty("nativePlayer", player.nativePlayer);
         }
@@ -1917,7 +1919,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         
         MMAPIPlayer player = MMAPIPlayer.createPlayer(uri, onCompletion);
         if(isVideo){
-            return new MIDPVideoComponent(player);
+            return new MIDPVideoComponent(player, canvas);
         }
         return player;
     }
@@ -1935,7 +1937,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         
         MMAPIPlayer player = MMAPIPlayer.createPlayer(stream, mimeType, onCompletion);
         if(mimeType.indexOf("video") > -1){
-            return new MIDPVideoComponent(player);
+            return new MIDPVideoComponent(player, canvas);
         }
         return player;
     }
@@ -2822,7 +2824,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         }
 
         final MMAPIPlayer player = p;
-        MIDPVideoComponent video = new MIDPVideoComponent(player);
+        MIDPVideoComponent video = new MIDPVideoComponent(player, canvas);
         video.play();
         video.setVisible(true);
         
@@ -2908,7 +2910,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             cam.setLayout(new BorderLayout());
             cam.show();
             
-            MIDPVideoComponent video = new MIDPVideoComponent(player);
+            MIDPVideoComponent video = new MIDPVideoComponent(player, canvas);
             video.play();
             video.setVisible(true);
             cam.addComponent(BorderLayout.CENTER, video);
@@ -3232,29 +3234,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
      * @return code scanner instance
      */
     public CodeScanner getCodeScanner() {
-        
-        MMAPIPlayer player = null;
-        
-        String platform = System.getProperty("microedition.platform");
-        if (platform != null && platform.indexOf("Nokia") >= 0) {
-            try {
-                player = MMAPIPlayer.createPlayer("capture://image", null);                
-            } catch (Throwable e) {
-            	// Ignore all exceptions for image capture, continue with video capture...
-            }
+        try {
+            return new ScannerHider().getCodeScanner(canvas);
+        } catch(Throwable t) {
+            return null;
         }
-        if (player == null) {
-            try {
-                player = MMAPIPlayer.createPlayer("capture://video", null);                
-            } catch (Exception e) {
-                // The Nokia 2630 throws this if image/video capture is not supported
-                throw new RuntimeException("Image/video capture not supported on this phone");
-            }
-        }
-        
-        MIDPVideoComponent video = new MIDPVideoComponent(player);
-        video.setFocusable(false);
-        return new CodeScannerImpl(video);
     }
     
     public boolean hasCamera() {
