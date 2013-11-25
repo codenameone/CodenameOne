@@ -30,7 +30,12 @@ import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import com.codename1.location.Location;
+import static com.codename1.location.LocationManager.AVAILABLE;
+import static com.codename1.location.LocationManager.OUT_OF_SERVICE;
+import static com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,53 +44,64 @@ import java.util.logging.Logger;
  *
  * @author Chen
  */
-public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener {
+public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener, GpsStatus.Listener {
 
     private LocationManager locationManager;
     private String bestProvider;
     private Context context;
     private boolean searchForProvider = false;
     private static AndroidLocationManager instance;
+    private long lastLocationMillis;
+    private Location lastLocation;
+
     private AndroidLocationManager(Context ctx) {
         this.context = ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
     }
-    
-    static AndroidLocationManager getInstance(Context context){
-        if(instance == null){
+
+    static AndroidLocationManager getInstance(Context context) {
+        if (instance == null) {
             instance = new AndroidLocationManager(context);
         }
         return instance;
     }
-    
-    private void findBestProvider(boolean includeNetwork){
+
+    private String findProvider(boolean includeNetwork) {
+        String providerName = null;
         Criteria criteria = new Criteria();
         criteria.setSpeedRequired(true);
         criteria.setAltitudeRequired(true);
-        
-        // If GPS provider, then create and start GPS listener
-        LocationProvider provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
-        boolean enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-        if (provider != null && enabled) {
-            bestProvider = provider.getName();
 
-        } else {
-            if(includeNetwork){
-                provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
-                enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-                if (provider != null && enabled) {
-                    bestProvider = provider.getName();
-                } else {
-                    bestProvider = locationManager.getBestProvider(criteria, true);
-                }
+        LocationProvider provider;
+        boolean enabled;
+
+        if (includeNetwork) {
+            provider = locationManager.getProvider(LocationManager.NETWORK_PROVIDER);
+            enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+            if (provider != null && enabled) {
+                providerName = provider.getName();
+            }else {
+                providerName = locationManager.getBestProvider(criteria, true);
             }
         }
-        System.out.println("bestProvider " + bestProvider);    
+        
+        if (providerName == null) {
+            // If GPS provider, then create and start GPS listener
+            provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
+            enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            if (provider != null && enabled) {
+                providerName = provider.getName();
+            } 
+        }
+        return providerName;
     }
-    
+
     public Location getCurrentLocation() throws IOException {
-        findBestProvider(true);
-        android.location.Location location = locationManager.getLastKnownLocation(bestProvider);
+        if(lastLocation != null){
+            return lastLocation;
+        }
+        String provider = findProvider(true);
+        android.location.Location location = locationManager.getLastKnownLocation(provider);
         if (location != null) {
             return convert(location);
         }
@@ -93,33 +109,33 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     }
 
     public void bindListener() {
-        findBestProvider(false);
-        if(bestProvider != null){
+        bestProvider = findProvider(false);
+        if (bestProvider != null) {
             startListenToGPS();
-        }else{
+        } else {
             searchForProvider = true;
-            setStatus(OUT_OF_SERVICE);
-            new Thread(){
+            setLocationManagerStatus(OUT_OF_SERVICE);
+            new Thread() {
                 public void run() {
-                    while(searchForProvider){
+                    while (searchForProvider) {
                         try {
                             Thread.sleep(500);
-                        } catch (InterruptedException ex) {                            
+                        } catch (InterruptedException ex) {
                         }
                         //keep try to get the gps provider, it is very likely
                         //that the app is requesting the user to turn on the gps
-                        findBestProvider(false);
-                        if(bestProvider != null){
-                            setStatus(AVAILABLE);
+                        bestProvider = findProvider(false);
+                        if (bestProvider != null) {
+                            setLocationManagerStatus(AVAILABLE);
                             startListenToGPS();
                             return;
                         }
-                    }                    
-                }                
+                    }
+                }
             }.start();
         }
     }
-    
+
     private void startListenToGPS() {
         Handler mHandler = new Handler(Looper.getMainLooper());
         mHandler.post(new Runnable() {
@@ -129,7 +145,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             }
         });
     }
-    
+
     public void clearListener() {
         searchForProvider = false;
         Handler mHandler = new Handler(Looper.getMainLooper());
@@ -153,24 +169,45 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         return retVal;
     }
 
-    public void onLocationChanged(android.location.Location loc) {
-        synchronized(this){
-            com.codename1.location.LocationListener l = getLocationListener();
-            if(l != null){
-                l.locationUpdated(convert(loc));
+    public void onLocationChanged(final android.location.Location loc) {
+        synchronized (this) {
+            final com.codename1.location.LocationListener l = getLocationListener();
+            if (l != null) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        lastLocation = convert(loc);
+                        l.locationUpdated(lastLocation);
+                        lastLocationMillis = SystemClock.elapsedRealtime();
+                    }
+                });
             }
         }
     }
 
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-        synchronized (this) {
-            com.codename1.location.LocationListener l = getLocationListener();
-            if (l != null) {
-                int s = convertStatus(status);
-                setStatus(s);
-                l.providerStateChanged(s);
-            }
+    public void onGpsStatusChanged(int event) {
+        boolean isGPSFix = false;
+        switch (event) {
+            case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+                if (lastLocation != null) {
+                    isGPSFix = (SystemClock.elapsedRealtime() - lastLocationMillis) < 10000;
+                }
+                if (isGPSFix) { // A fix has been acquired.
+                    setLocationManagerStatus(AVAILABLE);
+                } else { // The fix has been lost.
+                    setLocationManagerStatus(TEMPORARILY_UNAVAILABLE);
+                }
+                break;
+            case GpsStatus.GPS_EVENT_FIRST_FIX:
+                setLocationManagerStatus(AVAILABLE);
+                break;
         }
+    }
+
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+        int s = convertStatus(status);
+        setLocationManagerStatus(s);
     }
 
     private int convertStatus(int status) {
@@ -205,5 +242,26 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         } catch (Exception e) {
         }
         return null;
+    }
+
+    private void setLocationManagerStatus(final int status) {
+        
+        int current = getStatus();
+        if (current != status) {
+            setStatus(status);
+            synchronized (this) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        com.codename1.location.LocationListener l = getLocationListener();
+                        if (l != null) {
+                            l.providerStateChanged(status);
+                        }
+                    }
+                });
+            }
+
+        }
     }
 }
