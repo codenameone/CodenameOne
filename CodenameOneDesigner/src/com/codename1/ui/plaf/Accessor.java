@@ -25,6 +25,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.ui.Image;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
@@ -151,7 +152,7 @@ public class Accessor {
         UIManager.instance = u;
     }
 
-    public static Hashtable getThemeProps() {
+    public static HashMap<String, Object> getThemeProps() {
         return UIManager.instance.getThemeProps();
     }
 }

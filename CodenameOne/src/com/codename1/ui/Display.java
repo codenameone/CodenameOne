@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -208,7 +209,7 @@ public final class Display {
      */
     private boolean touchScreen;
 
-    private Hashtable localProperties;
+    private HashMap<String, String> localProperties;
 
     /**
      * Indicates whether the edt should sleep between each loop
@@ -2455,7 +2456,7 @@ public final class Display {
      */
     public void setProperty(String key, String value) {
         if(localProperties == null) {
-            localProperties = new Hashtable();
+            localProperties = new HashMap<String, String>();
         }
         if(value == null) {
             localProperties.remove(key);

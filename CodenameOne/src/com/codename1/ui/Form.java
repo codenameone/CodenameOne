@@ -40,8 +40,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Vector;
 
 /**
  * Top level component that serves as the root for the UI, this {@link Container}

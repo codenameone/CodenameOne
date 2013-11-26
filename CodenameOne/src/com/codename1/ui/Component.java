@@ -38,6 +38,7 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
@@ -218,7 +219,7 @@ public class Component implements Animation, StyleListener {
      * Box-orientation constant used to specify the right side of a box.
      */
     public static final int RIGHT = 3;
-    private Hashtable clientProperties;
+    private HashMap<String, Object> clientProperties;
     private Rectangle dirtyRegion = null;
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
@@ -383,7 +384,7 @@ public class Component implements Animation, StyleListener {
             if (value == null) {
                 return;
             }
-            clientProperties = new Hashtable();
+            clientProperties = new HashMap<String, Object>();
         }
         if (value == null) {
             clientProperties.remove(key);
@@ -1004,6 +1005,8 @@ public class Component implements Animation, StyleListener {
             }
 
             g.setClip(oX, oY, oWidth, oHeight);
+        } else {
+            Display.getInstance().getImplementation().nothingWithinComponentPaint(this);
         }
     }
 

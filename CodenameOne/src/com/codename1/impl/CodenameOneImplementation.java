@@ -4476,6 +4476,14 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Indicates to the port that the component won't be painted due to clipping
+     * 
+     * @param c the component that won't be painted
+     */
+    public void nothingWithinComponentPaint(Component c) {
+    }
+    
+    /**
      * Indicates to the port that the component was removed from the view and its
      * UI should be removed in the next flush operation. 
      * 

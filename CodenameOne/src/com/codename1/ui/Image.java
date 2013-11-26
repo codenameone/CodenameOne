@@ -30,6 +30,7 @@ import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
@@ -69,15 +70,15 @@ public class Image {
     }
 
     
-    private Hashtable getScaleCache() {
+    private HashMap<Dimension, Object> getScaleCache() {
         if(scaleCache == null) {
-            Hashtable h = new Hashtable();
+            HashMap<Dimension, Object> h = new HashMap<Dimension, Object>();
             scaleCache = Display.getInstance().createSoftWeakRef(h);
             return h;
         }
-        Hashtable h = (Hashtable)Display.getInstance().extractHardRef(scaleCache);
+        HashMap<Dimension, Object> h = (HashMap<Dimension, Object>)Display.getInstance().extractHardRef(scaleCache);
         if(h == null) {
-            h = new Hashtable();
+            h = new HashMap<Dimension, Object>();
             scaleCache = Display.getInstance().createSoftWeakRef(h);
         }
         return h;

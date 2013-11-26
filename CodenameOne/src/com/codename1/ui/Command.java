@@ -26,7 +26,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import java.util.Hashtable;
+import java.util.HashMap;
 
 /**
  * The action placed on the soft buttons and in the Menu on devices, similar to the
@@ -49,7 +49,7 @@ public class Command implements ActionListener{
      */
     private int commandId;
 
-    private Hashtable clientProperties;
+    private HashMap<String, Object> clientProperties;
 
     /**
      * Creates a new instance of Command
@@ -302,7 +302,7 @@ public class Command implements ActionListener{
      */
     public void putClientProperty(String key, Object value) {
         if(clientProperties == null) {
-            clientProperties = new Hashtable();
+            clientProperties = new HashMap<String, Object>();
         }
         if(value == null) {
             clientProperties.remove(key);

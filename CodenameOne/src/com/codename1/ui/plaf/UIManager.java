@@ -31,6 +31,7 @@ import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -43,10 +44,10 @@ import java.util.Vector;
 public class UIManager {
 
     private LookAndFeel current;
-    private Hashtable styles = new Hashtable();
-    private Hashtable selectedStyles = new Hashtable();
-    private Hashtable themeProps;
-    private Hashtable themeConstants = new Hashtable();
+    private HashMap<String, Style> styles = new HashMap<String, Style>();
+    private HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
+    private HashMap<String, Object> themeProps;
+    private HashMap<String, Object> themeConstants = new HashMap<String, Object>();
     static UIManager instance = new UIManager();
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
@@ -65,7 +66,7 @@ public class UIManager {
      * an image reference is used it two places in the theme (e.g. same background
      * to title and menu bar).
      */
-    private Hashtable imageCache = new Hashtable();
+    private HashMap<String, Image> imageCache = new HashMap<String, Image>();
     /**
      * The resource bundle allows us to implicitly localize the UI on the fly, once its
      * installed all internal application strings query the resource bundle and extract
@@ -283,7 +284,7 @@ public class UIManager {
     }
 
     // for internal use by the resource editor
-    Hashtable getThemeProps() {
+    HashMap<String, Object> getThemeProps() {
         return themeProps;
     }
 
@@ -295,7 +296,7 @@ public class UIManager {
      * style defaults for that particular component
      */
     private void resetThemeProps(Hashtable installedTheme) {
-        themeProps = new Hashtable();
+        themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
         Integer centerAlign = new Integer(Component.CENTER);
