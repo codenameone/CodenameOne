@@ -36,6 +36,7 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.Hashtable;
+import java.util.Map;
 
 /**
  * A dialog is a form that occupies a part of the screen and appears as a modal
@@ -760,7 +761,7 @@ public class Dialog extends Form {
      * @return the command pressed by the user
      */
     public static Command show(String title, String text, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
-        Hashtable h =  UIManager.getInstance().getResourceBundle();
+        Map<String, String> h =  UIManager.getInstance().getBundle();
         if(h != null && text != null) {
             Object o = h.get(text);
             if(o != null) {

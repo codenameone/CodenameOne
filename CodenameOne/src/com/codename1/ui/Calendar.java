@@ -39,6 +39,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Date;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.Vector;
 
@@ -218,7 +219,7 @@ public class Calendar extends Container {
     }
 
     private String getLocalizedMonth(int i) {
-        Hashtable t = getUIManager().getResourceBundle();
+        Map<String, String> t = getUIManager().getBundle();
         String text = MONTHS[i];
         if (t != null) {
             Object o = t.get("Calendar." + text);

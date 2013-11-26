@@ -30,7 +30,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import java.util.Hashtable;
+import java.util.Map;
 
 /**
  * Default implementation of the renderer based on a label see the {@link ListCellRenderer}
@@ -101,7 +101,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         setFocus(isSelected);
         if(showNumbers) {
             String text = "" + value;
-            Hashtable t =  list.getUIManager().getResourceBundle();
+            Map<String, String> t =  UIManager.getInstance().getBundle();
             if(t != null && value != null) {
                 Object o = t.get(value.toString());
                 if(o != null) {

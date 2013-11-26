@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -73,6 +74,7 @@ public class UIManager {
      * their values from this table if applicable.
      */
     private Hashtable resourceBundle;
+    private Map<String, String> bundle;
     
     private boolean wasThemeInstalled;
     
@@ -1198,8 +1200,12 @@ public class UIManager {
      * their values from this table if applicable.
      * 
      * @return the localization bundle
+     * @deprecated this method uses the old resource bundle hashtable, use the new getBundle() method
      */
     public Hashtable getResourceBundle() {
+        if(resourceBundle == null && bundle != null) {
+            resourceBundle = new Hashtable(bundle);
+        }
         return resourceBundle;
     }
 
@@ -1208,7 +1214,54 @@ public class UIManager {
      * installed all internal application strings query the resource bundle and extract
      * their values from this table if applicable.
      * 
+     * @return the localization bundle
+     */
+    public Map<String, String> getBundle() {
+        return bundle;
+    }
+
+    /**
+     * The resource bundle allows us to implicitly localize the UI on the fly, once its
+     * installed all internal application strings query the resource bundle and extract
+     * their values from this table if applicable.
+     * 
      * @param resourceBundle the localization bundle
+     */
+    public void setBundle(Map<String, String> bundle) {
+        if(localeAccessible) {
+            this.bundle = bundle;
+            if(bundle != null) {
+                String v = (String)bundle.get("@rtl");
+                if(v != null) {
+                    getLookAndFeel().setRTL(v.equalsIgnoreCase("true"));
+                    
+                    // update some "bidi sensitive" variables in the LaF
+                    current.refreshTheme(false);
+                }
+                String textFieldInputMode = (String)bundle.get("@im");
+                if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
+                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
+                    TextField.setDefaultInputModeOrder(tokenized);
+                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                        String val = tokenized[iter];
+                        String actual = (String)bundle.get("@im-" + val);
+                        // val can be null for builtin input mode types...
+                        if(actual != null) {
+                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * The resource bundle allows us to implicitly localize the UI on the fly, once its
+     * installed all internal application strings query the resource bundle and extract
+     * their values from this table if applicable.
+     * 
+     * @param resourceBundle the localization bundle
+     * @deprecated this method uses the old resource bundle hashtable, use the new setBundle() method
      */
     public void setResourceBundle(Hashtable resourceBundle) {
         if(localeAccessible) {
@@ -1247,6 +1300,7 @@ public class UIManager {
                     }
                 }
             }
+            bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
         }
     }
 
@@ -1300,8 +1354,8 @@ public class UIManager {
      * @return either default value or the appropriate value
      */
     public String localize(String key, String defaultValue) {
-        if (resourceBundle != null && key != null) {
-            Object o = resourceBundle.get(key);
+        if(bundle != null && key != null) {
+            Object o = bundle.get(key);
             if (o != null) {
                 return (String) o;
             }

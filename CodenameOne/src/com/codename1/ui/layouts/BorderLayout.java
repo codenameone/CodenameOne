@@ -28,7 +28,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.Style;
-import java.util.Hashtable;
+import java.util.HashMap;
 
 /**
  * A border layout lays out a container, arranging and resizing its 
@@ -81,7 +81,7 @@ public class BorderLayout extends Layout {
     private Component portraitWest;
     private Component portraitEast;
 
-    private Hashtable landscapeSwap;
+    private HashMap<String, String> landscapeSwap;
 
     /**
      * Defines the behavior of the center component to one of the constants defined in this class
@@ -478,7 +478,7 @@ public class BorderLayout extends Layout {
      */
     public void defineLandscapeSwap(String portraitPosition, String landscapePosition) {
         if(landscapeSwap == null) {
-            landscapeSwap = new Hashtable();
+            landscapeSwap = new HashMap<String, String>();
         }
         landscapeSwap.put(portraitPosition, landscapePosition);
         landscapeSwap.put(landscapePosition, portraitPosition);
