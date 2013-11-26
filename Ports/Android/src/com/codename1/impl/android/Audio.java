@@ -294,32 +294,38 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
                                 @Override
                                 public void onCallStateChanged(int state, String incomingNumber) {
-                                    if (state == TelephonyManager.CALL_STATE_RINGING) {
-                                        //Incoming call: Pause music
-                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                            if (m.isPlaying() && m.player != null) {
-                                                m.player.pause();
+                                    try {
+                                        if (state == TelephonyManager.CALL_STATE_RINGING) {
+                                            //Incoming call: Pause music
+                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                                if (m.isPlaying() && m.player != null) {
+                                                    m.player.pause();
+                                                }
+                                            }
+                                        } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                                            //Not in call: Play music
+                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                                if (!m.isPlaying() && m.player != null) {
+                                                    m.player.start();
+                                                }
+                                            }
+                                        } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                                            //A call is dialing, active or on hold
+                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
+                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
+                                                if (m.isPlaying() && m.player != null) {
+                                                    m.player.pause();
+                                                }
                                             }
                                         }
-                                    } else if (state == TelephonyManager.CALL_STATE_IDLE) {
-                                        //Not in call: Play music
-                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                            if (!m.isPlaying() && m.player != null) {
-                                                m.player.start();
-                                            }
-                                        }
-                                    } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                                        //A call is dialing, active or on hold
-                                        for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                            Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                            if (m.isPlaying() && m.player != null) {
-                                                m.player.pause();
-                                            }
-                                        }
+                                        super.onCallStateChanged(state, incomingNumber);
+
+                                    } catch (Throwable t) {
+                                        // some exceptions might occur here, with all the various illegal states they rarely matter
+                                        t.printStackTrace();
                                     }
-                                    super.onCallStateChanged(state, incomingNumber);
                                 }
 
                             };
