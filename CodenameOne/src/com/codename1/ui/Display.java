@@ -147,7 +147,10 @@ public final class Display {
     private static final int SIZE_CHANGED = 7;
     private static final int HIDE_NOTIFY = 9;
     private static final int SHOW_NOTIFY = 10;
-
+    private static final int POINTER_PRESSED_MULTI = 21;
+    private static final int POINTER_RELEASED_MULTI = 22;
+    private static final int POINTER_DRAGGED_MULTI = 23;
+    
     /**
      * Very Low Density 176x220 And Smaller
      */
@@ -366,9 +369,15 @@ public final class Display {
     static final Object lock = new Object();
 
     /**
-     * Events to broadcast on the EDT
+     * Events to broadcast on the EDT, we are using a handcoded stack for maximum
+     * performance and minimal synchronization. We are using the switching algorithm
+     * where we only synchronize on the very minimal point of switching between the stacks
+     * and adding to the active stack.
      */
-    private ArrayList inputEvents = new ArrayList();
+    private int[] inputEventStack = new int[1000];
+    private int inputEventStackPointer;
+    private int[] inputEventStackTmp = new int[1000];
+    private int inputEventStackPointerTmp;
 
     private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
@@ -959,27 +968,22 @@ public final class Display {
             ignor.printStackTrace();
         }
         long currentTime = System.currentTimeMillis();
-
-        // this code looks a bit weird so we won't synchronize on a lock within the loop all the time
-        // and so that the handle event method will not hold the lock during its entire execution 
-        // effectively preventing further input!
-        int i_size;
+        
+        // minimal amount of sync, just flipping the stack pointers
         synchronized(lock) {
-            i_size = inputEvents.size();
+            inputEventStackPointerTmp = inputEventStackPointer;
+            inputEventStackPointer = 0;
+            int[] qt = inputEventStackTmp;
+            inputEventStackTmp = inputEventStack;
+            inputEventStack = qt;
         }
-        while(i_size > 0) {
-            int[] i;
-            synchronized(lock) {
-                i_size = inputEvents.size();
-                if(i_size == 0) {
-                    // race condition due to double locking on a multi-core device (ugh)
-                    // this happens on Android devices
-                    break;
-                }
-                i = (int[])inputEvents.get(0);
-                inputEvents.remove(0);
+        
+        int offset = 0;
+        while(offset < inputEventStackPointerTmp) {            
+            if(offset == inputEventStackPointer) {
+                inputEventStackPointer = 0;
             }
-            handleEvent(i);
+            offset = handleEvent(offset);
         }
 
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
@@ -1459,54 +1463,22 @@ public final class Display {
         getImplementation().restoreMinimizedApplication();
     }
 
-    private void addInputEvent(int[] ev) {
-        synchronized(lock) {
-            if (this.dropEvents && (ev[0] == KEY_PRESSED || ev[0] == KEY_RELEASED
-                    || ev[0] == POINTER_PRESSED || ev[0] == POINTER_RELEASED
-                    || ev[0] == POINTER_DRAGGED || ev[0] == POINTER_HOVER)) {
-                return;
-            }
-            inputEvents.add(ev);
-            lock.notify();
-        }
-    }
-
-    /**
-     * Creates a pointer event with the following properties
-     */
-    private int[] createPointerEvent(int[] x, int[] y, int eventType) {
-        // apply timestamp early to ensure the timing happens on the native UI
-        // thread and not later on the EDT.
-        final int stamp = (int) (System.currentTimeMillis() - displayInitTime);
-        if (x.length == 1) {
-            return new int[]{eventType, x[0], y[0], stamp};
-         }
-        int[] arr = new int[2 + x.length * 2];
-
-        arr[0] = eventType;
-        int arrayOffset = 1;
-        for(int iter = 0 ; iter < x.length ; iter++) {
-            arr[arrayOffset] = x[iter];
-            arrayOffset++;
-            arr[arrayOffset] = y[iter];
-            arrayOffset++;
-        }
-        arr[arrayOffset] = stamp;
-        return arr;
-    }
-
-
-    private int[] createKeyEvent(int keyCode, boolean pressed) {
-        if(pressed) {
-            return new int[] {KEY_PRESSED, keyCode};
-        } else {
-            return new int[] {KEY_RELEASED, keyCode};
-        }
-    }
-
     private int previousKeyPressed;
     private int lastKeyPressed;
 
+    private void addSingleArgumentEvent(int type, int code) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = code;
+            inputEventStackPointer++;
+            lock.notify();
+        }        
+    }
+    
     /**
      * Pushes a key press event with the given keycode into Codename One
      *
@@ -1516,7 +1488,7 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        addInputEvent(createKeyEvent(keyCode, true));
+        addSingleArgumentEvent(KEY_PRESSED, keyCode);
 
         lastInteractionWasKeypad = lastInteractionWasKeypad || (keyCode != MenuBar.leftSK && keyCode != MenuBar.clearSK && keyCode != MenuBar.backSK);
 
@@ -1558,10 +1530,65 @@ public final class Display {
         } else {
             lastKeyPressed = 0;
         }
-        addInputEvent(createKeyEvent(keyCode, false));
+        addSingleArgumentEvent(KEY_RELEASED, keyCode);
     }
 
     void keyRepeatedInternal(final int keyCode){
+    }
+
+    private void addPointerEvent(int type, int x, int y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = x;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = y;
+            inputEventStackPointer++;
+            lock.notify();
+        }        
+    }
+    
+    private void addPointerEvent(int type, int[] x, int[] y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = x.length;
+            inputEventStackPointer++;
+            for(int iter = 0 ; iter < x.length ; iter++) {
+                inputEventStack[inputEventStackPointer] = x[iter];
+                inputEventStackPointer++;
+            }
+            inputEventStack[inputEventStackPointer] = y.length;
+            inputEventStackPointer++;
+            for(int iter = 0 ; iter < y.length ; iter++) {
+                inputEventStack[inputEventStackPointer] = y[iter];
+                inputEventStackPointer++;
+            }
+            lock.notify();
+        }        
+    }
+
+    private void addPointerEventWithTimestamp(int type, int x, int y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = x;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = y;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+            inputEventStackPointer++;
+            lock.notify();
+        }        
     }
 
     /**
@@ -1575,7 +1602,11 @@ public final class Display {
             return;
         }
         longPointerCharged = false;
-        addInputEvent(createPointerEvent(x, y, POINTER_DRAGGED));
+        if(x.length == 1) {
+            addPointerEventWithTimestamp(POINTER_DRAGGED, x[0], y[0]);
+        } else {
+            addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
+        }
     }
 
     /**
@@ -1588,7 +1619,11 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        addInputEvent(createPointerEvent(x, y, POINTER_HOVER));
+        if(x.length == 1) {
+            addPointerEventWithTimestamp(POINTER_HOVER, x[0], y[0]);
+        } else {
+            addPointerEvent(POINTER_HOVER, x, y);
+        }
     }
 
 
@@ -1602,7 +1637,7 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        addInputEvent(createPointerEvent(x, y, POINTER_HOVER_PRESSED));
+        addPointerEvent(POINTER_HOVER_PRESSED, x[0], y[0]);
     }
 
     /**
@@ -1615,7 +1650,7 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        addInputEvent(createPointerEvent(x, y, POINTER_HOVER_RELEASED));
+        addPointerEvent(POINTER_HOVER_RELEASED, x[0], y[0]);
     }
 
     /**
@@ -1634,7 +1669,11 @@ public final class Display {
         longKeyPressTime = System.currentTimeMillis();
         pointerX = x[0];
         pointerY = y[0];
-        addInputEvent(createPointerEvent(x, y, POINTER_PRESSED));
+        if(x.length == 1) {
+            addPointerEvent(POINTER_PRESSED, x[0], y[0]);
+        } else {
+            addPointerEvent(POINTER_PRESSED_MULTI, x, y);
+        }
     }
 
     /**
@@ -1648,9 +1687,25 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        addInputEvent(createPointerEvent(x, y, POINTER_RELEASED));
+        if(x.length == 1) {
+            addPointerEvent(POINTER_RELEASED, x[0], y[0]);
+        } else {
+            addPointerEvent(POINTER_RELEASED_MULTI, x, y);
+        }
     }
 
+    private void addSizeChangeEvent(int type, int w, int h) {
+        synchronized(lock) {
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = w;
+            inputEventStackPointer++;
+            inputEventStack[inputEventStackPointer] = h;
+            inputEventStackPointer++;
+            lock.notify();
+        }        
+    }
+    
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -1667,13 +1722,16 @@ public final class Display {
             return;
         }
 
-        addInputEvent(createSizeChangedEvent(w, h));
+        addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
-    private int[] createSizeChangedEvent(int w, int h) {
-        return new int[] {SIZE_CHANGED, w, h};
+    private void addNotifyEvent(int type) {
+        synchronized(lock) {
+            inputEventStack[inputEventStackPointer] = type;
+            inputEventStackPointer++;
+            lock.notify();
+        }        
     }
-
 
     /**
      * Broadcasts hide notify into Codename One, this method is invoked by the Codename One implementation
@@ -1684,7 +1742,7 @@ public final class Display {
         longPressCharged = false;
         longPointerCharged = false;
         pointerPressedAndNotReleasedOrDragged = false;
-        addInputEvent(new int[]{HIDE_NOTIFY});
+        addNotifyEvent(HIDE_NOTIFY);
     }
 
     /**
@@ -1692,7 +1750,7 @@ public final class Display {
      * to notify Codename One of showNotify events
      */
     public void showNotify(){
-        addInputEvent(new int[]{SHOW_NOTIFY});
+        addNotifyEvent(SHOW_NOTIFY);
     }
 
 
@@ -1703,18 +1761,18 @@ public final class Display {
     boolean shouldEDTSleepNoFormAnimation() {
         boolean b;
         synchronized(lock){
-            b = inputEvents.size() == 0 &&
+            b = inputEventStackPointer == 0 &&
                     hasNoSerialCallsPending() &&
                     (!keyRepeatCharged || !longPressCharged);
         }
         return b;
     }
 
-    private void updateDragSpeedStatus(int[] ev) {
+    private void updateDragSpeedStatus(int x, int y, int timestamp) {
             //save dragging input to calculate the dragging speed later
-            dragPathX[dragPathOffset] = pointerEvent(1, ev)[0];
-            dragPathY[dragPathOffset] = pointerEvent(2, ev)[0];
-            dragPathTime[dragPathOffset] = displayInitTime + (long) ev[ev.length - 1];
+            dragPathX[dragPathOffset] = x;
+            dragPathY[dragPathOffset] = y;
+            dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
             if (dragPathLength < PATHLENGTH) {
                 dragPathLength++;
             }
@@ -1730,20 +1788,37 @@ public final class Display {
         return recursivePointerReleaseB;
     }
     
+    private int[] readArrayStackArgument(int offset) {
+        int[] a = new int[inputEventStackTmp[offset]];
+        offset++;
+        for(int iter = 0 ; iter < a.length ; iter++) {
+            a[iter] = inputEventStackTmp[offset + iter];
+        }
+        return a;
+    }
+    
+    private static final int[] xArray1 = new int[1];
+    private static final int[] yArray1 = new int[1];
+    
     /**
      * Invoked on the EDT to propagate the event
      */
-    private void handleEvent(int[] ev) {
+    private int handleEvent(int offset) {
         Form f = getCurrentUpcomingForm(true);
 
         // might happen when returning from a deinitialized version of Codename One
         if(f == null) {
-            return;
+            return offset;
         }
 
-        switch(ev[0]) {
+        // no need to synchronize since we are reading only and modifying the stack frame offset
+        int type = inputEventStackTmp[offset]; 
+        offset++;
+        
+        switch(type) {
         case KEY_PRESSED:
-            f.keyPressed(ev[1]);
+            f.keyPressed(inputEventStackTmp[offset]);
+            offset++;
             eventForm = f;
             break;
         case KEY_RELEASED:
@@ -1756,7 +1831,8 @@ public final class Display {
             //make sure the released event is sent to the same Form who got a
             //pressed event
             if(xf == f){
-                f.keyReleased(ev[1]);                
+                f.keyReleased(inputEventStackTmp[offset]);                
+                offset++;
             }
             break;
         case POINTER_PRESSED:
@@ -1766,9 +1842,28 @@ public final class Display {
             dragOccured = false;
             dragPathLength = 0;
             pointerPressedAndNotReleasedOrDragged = true;
-            f.pointerPressed(pointerEvent(1, ev), pointerEvent(2, ev));
+            xArray1[0] = inputEventStackTmp[offset];
+            offset++;
+            yArray1[0] = inputEventStackTmp[offset];
+            offset++;
+            f.pointerPressed(xArray1, yArray1);
             eventForm = f;
             break;
+        case POINTER_PRESSED_MULTI: {
+            if(recursivePointerReleaseA) {
+                recursivePointerReleaseB = true;
+            } 
+            dragOccured = false;
+            dragPathLength = 0;
+            pointerPressedAndNotReleasedOrDragged = true;
+            int[] array1 = readArrayStackArgument(offset);
+            offset += array1.length + 1;
+            int[] array2 = readArrayStackArgument(offset);
+            offset += array2.length + 1;
+            f.pointerPressed(array1, array2);
+            eventForm = f;
+            break;
+        }
         case POINTER_RELEASED:
             recursivePointerReleaseA = true;            
             pointerPressedAndNotReleasedOrDragged = false;
@@ -1782,29 +1877,101 @@ public final class Display {
             // make sure the released event is sent to the same Form that got a
             // pressed event
             if(x == f || (f != null && f.shouldSendPointerReleaseToOtherForm())){
-                f.pointerReleased(pointerEvent(1, ev), pointerEvent(2, ev));
+                xArray1[0] = inputEventStackTmp[offset];
+                offset++;
+                yArray1[0] = inputEventStackTmp[offset];
+                offset++;
+                f.pointerReleased(xArray1, yArray1);
             }
             recursivePointerReleaseA = false;
             recursivePointerReleaseB = false;
             break;
-        case POINTER_DRAGGED:
-            dragOccured = true;
-            updateDragSpeedStatus(ev);
+        case POINTER_RELEASED_MULTI:
+            recursivePointerReleaseA = true;            
             pointerPressedAndNotReleasedOrDragged = false;
-            f.pointerDragged(pointerEvent(1, ev), pointerEvent(2, ev));
+            
+            // pointer release can cycle into invoke and block which will cause this method 
+            // to recurse if a pointer will be released while we are in an invoke and block state
+            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+            Form xy = eventForm;
+            eventForm = null;
+
+            // make sure the released event is sent to the same Form that got a
+            // pressed event
+            if(xy == f || (f != null && f.shouldSendPointerReleaseToOtherForm())){
+                int[] array1 = readArrayStackArgument(offset);
+                offset += array1.length + 1;
+                int[] array2 = readArrayStackArgument(offset);
+                offset += array2.length + 1;
+                f.pointerReleased(array1, array1);
+            }
+            recursivePointerReleaseA = false;
+            recursivePointerReleaseB = false;
             break;
-        case POINTER_HOVER:
-            updateDragSpeedStatus(ev);
-            f.pointerHover(pointerEvent(1, ev), pointerEvent(2, ev));
+        case POINTER_DRAGGED: {
+            dragOccured = true;
+            int arg1 = inputEventStackTmp[offset];
+            offset++;
+            int arg2 = inputEventStackTmp[offset];
+            offset++;
+            int timestamp = inputEventStackTmp[offset];
+            offset++;
+            updateDragSpeedStatus(arg1, arg2, timestamp);
+            pointerPressedAndNotReleasedOrDragged = false;
+            xArray1[0] = arg1;
+            yArray1[0] = arg2;
+            f.pointerDragged(xArray1, yArray1);
             break;
-        case POINTER_HOVER_RELEASED:
-            f.pointerHoverReleased(pointerEvent(1, ev), pointerEvent(2, ev));
+        }
+        case POINTER_DRAGGED_MULTI: {
+            dragOccured = true;
+            pointerPressedAndNotReleasedOrDragged = false;
+            int[] array1 = readArrayStackArgument(offset);
+            offset += array1.length + 1;
+            int[] array2 = readArrayStackArgument(offset);
+            offset += array2.length + 1;
+            f.pointerDragged(array1, array2);
             break;
-        case POINTER_HOVER_PRESSED:
-            f.pointerHoverPressed(pointerEvent(1, ev), pointerEvent(2, ev));
+        }
+        case POINTER_HOVER: {
+            int arg1 = inputEventStackTmp[offset];
+            offset++;
+            int arg2 = inputEventStackTmp[offset];
+            offset++;
+            int timestamp = inputEventStackTmp[offset];
+            offset++;
+            updateDragSpeedStatus(arg1, arg2, timestamp);
+            xArray1[0] = arg1;
+            yArray1[0] = arg2;
+            f.pointerHover(xArray1, yArray1);
             break;
+        }
+        case POINTER_HOVER_RELEASED: {
+            int arg1 = inputEventStackTmp[offset];
+            offset++;
+            int arg2 = inputEventStackTmp[offset];
+            offset++;
+            xArray1[0] = arg1;
+            yArray1[0] = arg2;
+            f.pointerHoverReleased(xArray1, yArray1);
+            break;
+        }
+        case POINTER_HOVER_PRESSED: {
+            int arg1 = inputEventStackTmp[offset];
+            offset++;
+            int arg2 = inputEventStackTmp[offset];
+            offset++;
+            xArray1[0] = arg1;
+            yArray1[0] = arg2;
+            f.pointerHoverPressed(xArray1, yArray1);
+            break;
+        }
         case SIZE_CHANGED:
-            f.sizeChangedInternal(ev[1], ev[2]);
+            int w = inputEventStackTmp[offset];
+            offset++;
+            int h = inputEventStackTmp[offset];
+            offset++;
+            f.sizeChangedInternal(w, h);
             break;
         case HIDE_NOTIFY:
             f.hideNotify();
@@ -1813,6 +1980,7 @@ public final class Display {
             f.showNotify();
             break;
         }
+        return offset;
     }
 
     /**
@@ -1843,7 +2011,7 @@ public final class Display {
         Form current = impl.getCurrentForm();
         return ((current == null || (!current.hasAnimations())) &&
                 (animationQueue == null || animationQueue.size() == 0) &&
-                inputEvents.size() == 0 &&
+                inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
                 && !longPointerCharged ) || (isMinimized() && !hasNoSerialCallsPending());
