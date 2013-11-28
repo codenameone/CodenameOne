@@ -169,6 +169,24 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+
+    /**
+     * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
+     * used, this is important when running a real application rather than just a simulator skin
+     * @return the exposeFilesystem
+     */
+    public static boolean isExposeFilesystem() {
+        return exposeFilesystem;
+    }
+
+    /**
+     * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
+     * used, this is important when running a real application rather than just a simulator skin
+     * @param aExposeFilesystem the exposeFilesystem to set
+     */
+    public static void setExposeFilesystem(boolean aExposeFilesystem) {
+        exposeFilesystem = aExposeFilesystem;
+    }
     private TestRecorder testRecorder;
     private Hashtable contacts;
 
@@ -262,6 +280,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private boolean slowConnectionMode;
     private boolean disconnectedMode;
+
+    private static boolean exposeFilesystem;
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -1278,51 +1298,63 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    float zoom = zoomLevel;
+                    final float zoom = zoomLevel;
                     zoomLevel = 1;
-                    OutputStream out = null;
-                    Form frm = Display.getInstance().getCurrent();
-                    try {
-                        BufferedImage headerImage;
-                        if (isPortrait()) {
-                            headerImage = header;
-                        } else {
-                            headerImage = headerLandscape;
-                        }
-                        if (!includeHeaderInScreenshot) {
-                            headerImage = null;
-                        }
-                        int headerHeight = 0;
-                        if (headerImage != null) {
-                            headerHeight = headerImage.getHeight();
-                        }
-                        com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
-                        com.codename1.ui.Graphics gr = img.getGraphics();
-                        //gr.translate(0, statusBarHeight);
-                        frm.paint(gr);
-                        BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
-                        bi.setRGB(0, headerHeight, img.getWidth(), img.getHeight(), img.getRGB(), 0, img.getWidth());
-                        if (headerImage != null) {
-                            Graphics2D g2d = bi.createGraphics();
-                            g2d.drawImage(headerImage, 0, 0, null);
-                            g2d.dispose();
-                        }
-
-                        out = new FileOutputStream(findScreenshotFile());
-                        ImageIO.write(bi, "png", out);
-                        out.close();
-                    } catch (Throwable ex) {
-                        ex.printStackTrace();
-                        System.exit(1);
-                    } finally {
-                        zoomLevel = zoom;
-                        try {
-                            out.close();
-                        } catch (Throwable ex) {
-                        }
-                        frm.repaint();
-                        canvas.repaint();
+                    final Form frm = Display.getInstance().getCurrent();
+                    BufferedImage headerImageTmp;
+                    if (isPortrait()) {
+                        headerImageTmp = header;
+                    } else {
+                        headerImageTmp = headerLandscape;
                     }
+                    if (!includeHeaderInScreenshot) {
+                        headerImageTmp = null;
+                    }
+                    int headerHeightTmp = 0;
+                    if (headerImageTmp != null) {
+                        headerHeightTmp = headerImageTmp.getHeight();
+                    }
+                    final int headerHeight = headerHeightTmp;
+                    final BufferedImage headerImage = headerImageTmp;
+                    //gr.translate(0, statusBarHeight);
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                            com.codename1.ui.Graphics gr = img.getGraphics();
+                            frm.paint(gr);
+                            final int imageWidth = img.getWidth();
+                            final int imageHeight = img.getHeight();
+                            final int[] imageRGB = img.getRGB();
+                            SwingUtilities.invokeLater(new Runnable() {
+                                public void run() {
+                                    BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                                    bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                                    if (headerImage != null) {
+                                        Graphics2D g2d = bi.createGraphics();
+                                        g2d.drawImage(headerImage, 0, 0, null);
+                                        g2d.dispose();
+                                    }
+                                    OutputStream out = null;
+                                    try {
+                                        out = new FileOutputStream(findScreenshotFile());
+                                        ImageIO.write(bi, "png", out);
+                                        out.close();
+                                    } catch (Throwable ex) {
+                                        ex.printStackTrace();
+                                        System.exit(1);
+                                    } finally {
+                                        zoomLevel = zoom;
+                                        try {
+                                            out.close();
+                                        } catch (Throwable ex) {
+                                        }
+                                        frm.repaint();
+                                        canvas.repaint();
+                                    }
+                                }
+                            });
+                        }
+                    });
                 }
             });
 
@@ -4464,12 +4496,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
-        /*File[] f = File.listRoots();
-        String[] roots = new String[f.length];
-        for (int iter = 0; iter < f.length; iter++) {
-            roots[iter] = f[iter].getAbsolutePath();
+        if(exposeFilesystem) {
+            File[] f = File.listRoots();
+            String[] roots = new String[f.length];
+            for (int iter = 0; iter < f.length; iter++) {
+                roots[iter] = f[iter].getAbsolutePath();
+            }
+            return roots;
         }
-        return roots;*/
         return new String[] {getAppHomePath()};
     }
 
@@ -4556,6 +4590,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public char getFileSystemSeparator() {
+        if(exposeFilesystem) {
+            return File.separatorChar;
+        }
         return '/';
     }
 
@@ -4815,35 +4852,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         //return currentAp;
     }
 
-    /**
-     * Returns the id of the current access point
-     *
-     * @param id id of the current access point
-     */
+    @Override
     public void setCurrentAccessPoint(String id) {
         //this.currentAp = id;
         super.setCurrentAccessPoint(id);
     }
 
+    @Override
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
         capturePhoto(response);
     }
 
-    /**
-     * Captures a photo and notifies with the image data when available
-     *
-     * @param response callback for the resulting image
-     */
+    @Override
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
+        capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+    }
+    
+    private void capture(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {
 
             public void run() {
-                File selected = pickImage();
+                File selected = pickFile(imageTypes, desc);
 
                 com.codename1.ui.events.ActionEvent result = null;
                 if (selected != null) {
                     try {
-                        File tmp = File.createTempFile("temp", ".jpg");
+                        File tmp = File.createTempFile("temp", imageTypes[0]);
                         tmp.deleteOnExit();
                         FileOutputStream fos = new FileOutputStream(tmp);
                         FileInputStream fis = new FileInputStream(selected);
@@ -4865,7 +4899,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
     }
+    
+    @Override
+    public void captureAudio(com.codename1.ui.events.ActionListener response) {
+        capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
+    }
 
+    @Override
+    public void captureVideo(com.codename1.ui.events.ActionListener response) {
+        capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
+    }
+
+    
     class CodenameOneMediaPlayer implements Media {
 
         private Runnable onCompletion;
@@ -4883,7 +4928,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     @Override
                     public void run() {
-                        Display.getInstance().scheduleBackgroundTask(onCompletion);
+                        Display.getInstance().callSerially(onCompletion);
                     }
                 };
             }
@@ -4940,7 +4985,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     @Override
                     public void run() {
-                        Display.getInstance().scheduleBackgroundTask(onCompletion);
+                        Display.getInstance().callSerially(onCompletion);
                     }
                 };
             }
@@ -5804,28 +5849,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private File pickImage() {
+        return pickFile(new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+    }
+
+    private File pickFile(final String[] types, String name) {
         FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
         fd.setFilenameFilter(new FilenameFilter() {
 
             public boolean accept(File dir, String name) {
                 name = name.toLowerCase();
-                return name.endsWith("png")
-                        || name.endsWith("jpg")
-                        || name.endsWith("jpeg");
-
+                for(String t : types) {
+                    if(name.endsWith(t)) {
+                        return true;
+                    }
+                }
+                return false;
             }
         });
-        fd.setFile("*.png;*.jpg;*.jpeg");
+        fd.setFile(name);
         fd.pack();
         fd.setLocationByPlatform(true);
         fd.setVisible(true);
 
         if (fd.getFile() != null) {
-            if (fd.getFile().toLowerCase().endsWith("png") || fd.getFile().toLowerCase().endsWith("jpg")
-                    || fd.getFile().toLowerCase().endsWith("jpeg")) {
-                return new File(fd.getDirectory(), fd.getFile());
-            } else {
-                System.out.println("Please choose an image");
+            name = fd.getFile().toLowerCase();
+            for(String t : types) {
+                if(name.endsWith(t)) {
+                    return new File(fd.getDirectory(), fd.getFile());
+                }
             }
         }
         return null;
