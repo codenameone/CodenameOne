@@ -23,6 +23,7 @@
 package com.codename1.impl.midp;
 
 import com.codename1.ui.Image;
+import com.codename1.util.Base64;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -318,6 +319,7 @@ public class MIDPContactsManager {
                     if (includesPicture) {
                         if (clist.isSupportedField(Contact.PHOTO) && c.countValues(Contact.PHOTO) > 0) {
                             byte[] photo = c.getBinary(Contact.PHOTO, 0);
+                            photo = Base64.decode(photo);
                             contact.setPhoto(Image.createImage(photo, 0, photo.length));
                         }
                     }
