@@ -38,6 +38,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -139,9 +140,18 @@ public class OnOffSwitch extends Container {
     /**
      * Returns a vector containing the action listeners for this button
      * @return the action listeners
+     * @deprecated use the version that returns a collection
      */
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
+    }
+
+    /**
+     * Returns a collection containing the action listeners for this button
+     * @return the action listeners
+     */
+    public Collection getListeners() {
+        return dispatcher.getListenerCollection();
     }
     
     private void fireActionEvent(){

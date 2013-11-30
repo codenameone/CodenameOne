@@ -31,10 +31,14 @@ import com.codename1.ui.List;
  * component instance for all invocations) that is initialized to the value 
  * of the current item extracted from the model, this component is drawn on the
  * list and discarded. No state of the component is kept and the component is
- * essentially discarded.
+ * essentially discarded.<br>
+ * <b>This is a very advanced interface</b> it is recommended that you use either
+ * the DefaultListCellRenderer or GenericListCellRenderer whenever possible
+ * to avoid mistakes.<br>
  * <p>An instance of a renderer can be developed as such:
  * <pre>
 <strong>public</strong> <strong>class</strong> <font color="#2040a0">MyYesNoRenderer</font> <strong>extends</strong> <font color="#2040a0">Label</font> <strong>implements</strong> <font color="#2040a0">ListCellRenderer</font> <font color="4444FF"><strong>{</strong></font>
+        <font color="#2040a0">Label label = new label</font><strong>(&quot;&quot;);</strong>
     <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListCellRendererComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font>, <font color="#2040a0">Object</font> <font color="#2040a0">value</font>, <strong>int</strong> <font color="#2040a0">index</font>, <strong>boolean</strong> <font color="#2040a0">isSelected</font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
         <strong>if</strong><font color="4444FF"><strong>(</strong></font> <font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Boolean</font><font color="4444FF"><strong>)</strong></font><font color="#2040a0">value</font><font color="4444FF"><strong>)</strong></font>.<font color="#2040a0">booleanValue</font><font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
             <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;Yes&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
@@ -44,7 +48,6 @@ import com.codename1.ui.List;
         <strong>return</strong> <strong>this</strong><font color="4444FF">;</font>
     <font color="4444FF"><strong>}</strong></font>
     <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListFocusComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
-        <font color="#2040a0">Label label = new label</font><strong>(&quot;&quot;);</strong>
         <font color="#2040a0">label.getStyle().setBgTransparency(</font><font color="#008000">100</font>);
      </strong>
         <strong>return</strong> <font color="#2040a0">label</font><font color="4444FF">;</font>

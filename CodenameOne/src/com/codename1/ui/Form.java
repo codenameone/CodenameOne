@@ -262,7 +262,7 @@ public class Form extends Container {
      */ 
     public void removeAllShowListeners(){
         if(showListener != null){
-            showListener.getListenerVector().removeAllElements();
+            showListener.getListenerCollection().clear();
             showListener = null;
         }
     }
@@ -1841,7 +1841,7 @@ public class Form extends Container {
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
-        if (pointerPressedListeners != null) {
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
         //check if the click is relevant to the menu bar.
@@ -2057,7 +2057,7 @@ public class Form extends Container {
             pointerPressed(x, y);
         }
         autoRelease(x[0], y[0]);
-        if (pointerDraggedListeners != null) {
+        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
         }
 
@@ -2203,7 +2203,7 @@ public class Form extends Container {
                 }
             }
         }
-        if (pointerReleasedListeners != null) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             pointerReleasedListeners.fireActionEvent(new ActionEvent(this, x, y));
         }
         if(dragStopFlag) {

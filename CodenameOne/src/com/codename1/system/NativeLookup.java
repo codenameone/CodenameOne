@@ -22,7 +22,7 @@
  */
 package com.codename1.system;
 
-import java.util.Hashtable;
+import java.util.HashMap;
 
 /**
  * Creates an instance of the native interface which will call the underlying
@@ -31,7 +31,7 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class NativeLookup {
-    private static Hashtable interfaceToClassLookup; 
+    private static HashMap<Class, Class> interfaceToClassLookup; 
     private NativeLookup() {}
     
     /**
@@ -45,7 +45,7 @@ public class NativeLookup {
     public static NativeInterface create(Class c) {
         try {
             if(interfaceToClassLookup != null) {
-                Class cls = (Class)interfaceToClassLookup.get(c);
+                Class cls = interfaceToClassLookup.get(c);
                 if(cls == null) {
                     return null;
                 }
@@ -66,7 +66,7 @@ public class NativeLookup {
      */
     public static void register(Class ni, Class cls) {
         if(interfaceToClassLookup == null) {
-            interfaceToClassLookup = new Hashtable();
+            interfaceToClassLookup = new HashMap<Class, Class>();
         }
         interfaceToClassLookup.put(ni, cls);
     }

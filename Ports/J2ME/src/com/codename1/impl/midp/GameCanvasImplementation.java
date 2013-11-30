@@ -125,6 +125,8 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
     
     // if JSR 179 isn't supported then null already is the initialized state
     private boolean locationInitialized = System.getProperty("microedition.location.version") == null;
+
+    static final javax.microedition.lcdui.Command MIDP_BACK_COMMAND = new javax.microedition.lcdui.Command("Back", Command.BACK, 1);
     
     private class C extends GameCanvas implements CommandListener, Runnable {
         private boolean done;
@@ -200,6 +202,11 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
                 currentTextBox = null;
                 ((C)canvas).setDone(true);
             } else {
+                if(c == MIDP_BACK_COMMAND) {
+                    GameCanvasImplementation.this.keyPressed(backSK);
+                    GameCanvasImplementation.this.keyReleased(backSK);
+                    return;
+                }
                 if(c instanceof MIDP2CodenameOneCommand) {
                     final com.codename1.ui.Command cmd = ((MIDP2CodenameOneCommand)c).internal;
                     Display.getInstance().callSerially(new Runnable() {
@@ -395,6 +402,10 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         mid = (MIDlet)m;
         display = javax.microedition.lcdui.Display.getDisplay(mid);
         setSoftKeyCodes(mid);
+
+        if(mid.getAppProperty("forceBackCommand") != null) {
+            canvas.addCommand(MIDP_BACK_COMMAND);
+        }
         
         RecordEnumeration e = null;
         RecordStore r = null;
@@ -421,11 +432,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             r.closeRecordStore();
             r = null;
         } catch (Exception ex) {
-            //#ifndef RIM
             ex.printStackTrace();
-            //#else
-//#             System.out.println("Exception in object store constructor " + ex);
-            //#endif
             cleanup(r);
             cleanup(e);
         }        
@@ -666,6 +673,9 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         UIManager m = UIManager.getInstance();
         CONFIRM_COMMAND = new Command(m.localize("ok", "OK"), Command.OK, 1);
         CANCEL_COMMAND = new Command(m.localize("cancel", "Cancel"), Command.CANCEL, 2);
+        if(mid.getAppProperty("forceBackCommand") != null) {
+            canvas.addCommand(MIDP_BACK_COMMAND);
+        }
         currentTextBox = new TextBox("", "", maxSize, TextArea.ANY);
         currentTextBox.setCommandListener((CommandListener)canvas);
         currentTextBox.addCommand(CONFIRM_COMMAND);

@@ -34,6 +34,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -121,10 +122,10 @@ public class MultiButton extends Container {
             }
             emblem.setUIID(old.getUIID());
             emblem.setName(old.getName());
-            Vector actionListeners = old.getActionListeners();
+            java.util.List actionListeners = (java.util.List)old.getListeners();
             if(actionListeners != null) {
                 for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                    emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+                    emblem.addActionListener((ActionListener)actionListeners.get(iter));
                 }
             }
             if(old.getCommand() != null) {
@@ -210,10 +211,10 @@ public class MultiButton extends Container {
             }
             emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
-            Vector actionListeners = old.getActionListeners();
+            java.util.List actionListeners = (java.util.List)old.getListeners();
             if(actionListeners != null) {
                 for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                    emblem.addActionListener((ActionListener)actionListeners.elementAt(iter));
+                    emblem.addActionListener((ActionListener)actionListeners.get(iter));
                 }
             }
             if(old.getCommand() != null) {

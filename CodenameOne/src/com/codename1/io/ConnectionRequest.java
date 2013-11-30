@@ -1229,7 +1229,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         actionListeners.removeListener(a);
-        if(actionListeners.getListenerVector() == null || actionListeners.getListenerVector().size() == 0) {
+        if(actionListeners.getListenerCollection()== null || actionListeners.getListenerCollection().size() == 0) {
             actionListeners = null;
         }
     }
@@ -1258,7 +1258,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         responseCodeListeners.removeListener(a);
-        if(responseCodeListeners.getListenerVector() == null || responseCodeListeners.getListenerVector().size() == 0) {
+        if(responseCodeListeners.getListenerCollection()== null || responseCodeListeners.getListenerCollection().size() == 0) {
             responseCodeListeners = null;
         }
     }

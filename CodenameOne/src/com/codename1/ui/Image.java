@@ -31,7 +31,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
-import java.util.Hashtable;
 
 /**
  * Abstracts the underlying platform images allowing us to treat them as a uniform

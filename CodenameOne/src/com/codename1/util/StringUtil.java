@@ -22,11 +22,13 @@
  */
 package com.codename1.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
 
 /**
- * This is a String Utility class
- * @author Chen
+ * Various utility methods for manipulating strings
+ * @author Chen Fishbein
  */
 public class StringUtil {
 
@@ -38,7 +40,7 @@ public class StringUtil {
      * @param source the String source
      * @param pattern String to replace in the source
      * @param replace replacement String
-     * @return 
+     * @return string with replaced elements
      */
     public static String replaceAll(String source, String pattern, String replace) {
         StringBuilder sb = new StringBuilder();
@@ -66,6 +68,7 @@ public class StringUtil {
      * @param source the String to break
      * @param separator the pattern to search and break.
      * @return a Vector of Strings
+     * @deprecated use the tokenize() method instead
      */
     public static Vector tokenizeString(String source, char separator) {
         Vector tokenized = new Vector();
@@ -103,6 +106,7 @@ public class StringUtil {
      * @param source the String to break
      * @param separator the characters that can be used to search and break.
      * @return a Vector of Strings
+     * @deprecated use the tokenize() method instead
      */
     public static Vector tokenizeString(String source, String separator) {
         if(separator.length() == 1) {
@@ -125,6 +129,76 @@ public class StringUtil {
         }
         if(buf.length() > 0) {
             tokenized.addElement(buf.toString());
+        }
+        return tokenized;
+    }
+
+
+    /**
+     * Breaks a String to multiple strings.
+     * 
+     * @param source the String to break
+     * @param separator the pattern to search and break.
+     * @return a Vector of Strings
+     */
+    public static List<String> tokenize(String source, char separator) {
+        ArrayList<String> tokenized = new ArrayList<String>();
+        int len = source.length();
+        boolean lastSeparator = false;
+        StringBuilder buf = new StringBuilder();
+        for(int iter = 0 ; iter < len ; iter++) {
+            char current = source.charAt(iter);
+            if(current == separator) {
+                if(lastSeparator) {
+                    buf.append(separator);
+                    lastSeparator = false;
+                    continue;
+                }
+                lastSeparator = true;
+                if(buf.length() > 0) {
+                    tokenized.add(buf.toString());
+                    buf = new StringBuilder();
+                }
+            } else {
+                lastSeparator = false;
+                buf.append(current);
+            }
+        }
+        if(buf.length() > 0) {
+            tokenized.add(buf.toString());
+        }
+        return tokenized;
+    }
+    
+
+    /**
+     * Breaks a String to multiple strings (similar to string tokenizer)
+     * 
+     * @param source the String to break
+     * @param separator the characters that can be used to search and break.
+     * @return a Vector of Strings
+     */
+    public static List<String> tokenize(String source, String separator) {
+        if(separator.length() == 1) {
+            // slightly faster
+            return tokenizeString(source, separator.charAt(0));
+        }
+        ArrayList<String> tokenized = new ArrayList<String>();
+        int len = source.length();
+        StringBuilder buf = new StringBuilder();
+        for(int iter = 0 ; iter < len ; iter++) {
+            char current = source.charAt(iter);
+            if(separator.indexOf(current) > -1) {
+                if(buf.length() > 0) {
+                    tokenized.add(buf.toString());
+                    buf = new StringBuilder();
+                }
+            } else {
+                buf.append(current);
+            }
+        }
+        if(buf.length() > 0) {
+            tokenized.add(buf.toString());
         }
         return tokenized;
     }

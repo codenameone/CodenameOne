@@ -39,6 +39,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -1433,9 +1434,19 @@ public class List<T> extends Component {
      * This method allows extracting the action listeners from the current list
      * 
      * @return vector containing the action listeners on the list
+     * @deprecated use getListeners instead
      */
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
+    }
+
+    /**
+     * This method allows extracting the action listeners from the current list
+     * 
+     * @return Collection containing the action listeners on the list
+     */
+    public Collection getListeners() {
+        return dispatcher.getListenerCollection();
     }
 
     /**

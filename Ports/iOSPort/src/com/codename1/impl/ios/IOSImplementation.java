@@ -361,14 +361,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         }*/
     }
 
+    private final static int[] singleDimensionX = new int[1];
+    private final static int[] singleDimensionY = new int[1];
     public static void pointerPressedCallback(int x, int y) {
-        instance.pointerPressed(new int[] {x}, new int[] {y});
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerPressed(singleDimensionX, singleDimensionY);
     }
     public static void pointerReleasedCallback(int x, int y) {
-        instance.pointerReleased(new int[] {x}, new int[] {y});
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerReleased(singleDimensionX, singleDimensionY);
     }
     public static void pointerDraggedCallback(int x, int y) {
-        instance.pointerDragged(new int[] {x}, new int[] {y});
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
     
     protected void pointerPressed(final int[] x, final int[] y) {
@@ -673,6 +678,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
 
+    private Rectangle reusableRect = new Rectangle();
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng.clipH == 0 || ng.clipW == 0) {
@@ -682,14 +688,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipW = ng.associatedImage.width;
             ng.clipH = ng.associatedImage.height;
         }
-        Rectangle r = new Rectangle(ng.clipX, ng.clipY, ng.clipW, ng.clipH).intersection(x, y, width, height);
-        Dimension d = r.getSize();
+        Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, reusableRect);
+        Dimension d = reusableRect.getSize();
         if(d.getWidth() <= 0 || d.getHeight() <= 0) {
             ng.clipW = 0;
             ng.clipH = 0;
         } else {
-            ng.clipX = r.getX();
-            ng.clipY = r.getY();
+            ng.clipX = reusableRect.getX();
+            ng.clipY = reusableRect.getY();
             ng.clipW = d.getWidth();
             ng.clipH = d.getHeight();
             setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
@@ -710,15 +716,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.nativeDrawLine(ng.color, ng.alpha, x1, y1, x2, y2);
     }
 
-    private static void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height) {
+    static void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectMutable(color, alpha, x, y, width, height);
     }
-    private static void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height) {
+    
+    static void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectGlobal(color, alpha, x, y, width, height);
     }
 
     public void fillRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
+        if(ng.alpha == 0) {
+            return;
+        }
         ng.checkControl();
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
@@ -906,14 +916,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     private Map<FontStringCache, Integer> stringWidthCache = new HashMap<FontStringCache, Integer>();
+    private FontStringCache recycle = new FontStringCache("", 1);
     private int stringWidthNative(long peer, String str) {
         if(str.length() < 50) {
-            FontStringCache c = new FontStringCache(str, peer);
-            Integer i = stringWidthCache.get(c);
+            // we don't need to allocate for the case of a cache hit
+            recycle.peer = peer;
+            recycle.txt = str;
+            Integer i = stringWidthCache.get(recycle);
             if(i != null) {
                 return i.intValue();
             }
             int val = nativeInstance.stringWidthNative(peer, str);
+            FontStringCache c = new FontStringCache(str, peer);
             stringWidthCache.put(c, new Integer(val));
             return val;
         }

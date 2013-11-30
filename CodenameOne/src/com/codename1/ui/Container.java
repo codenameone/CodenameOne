@@ -263,7 +263,9 @@ public class Container extends Component {
             shouldLayout = layout;
             shouldCalcPreferredSize = layout;
             shouldCalcScrollSize = layout;
-            for(Component cmp : components) {
+            int componentCount = components.size();
+            for(int iter = 0 ; iter < componentCount ; iter++) {
+                Component cmp = components.get(iter);
                 if(cmp instanceof Container){
                     cmp.setShouldCalcPreferredSize(shouldCalcPreferredSize);
                 }
@@ -288,7 +290,9 @@ public class Container extends Component {
         super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
         shouldLayout = shouldCalcPreferredSize;
         if (shouldLayout) {
-            for(Component cmp : components) {
+            int componentCount = components.size();
+            for(int iter = 0 ; iter < componentCount ; iter++) {
+                Component cmp = components.get(iter);
                 if (cmp instanceof Container) {
                     ((Container) cmp).setShouldCalcPreferredSize(shouldCalcPreferredSize);
                 }
@@ -671,7 +675,9 @@ public class Container extends Component {
         if (!isInitialized()) {
             super.initComponentImpl();
         }
-        for(Component cmp : components) {
+        int componentCount = components.size();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component cmp = components.get(iter);
             cmp.initComponentImpl();
         }
         if(leadComponent != null) {
@@ -744,7 +750,9 @@ public class Container extends Component {
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
-        for(Component cmp : components) {
+        int componentCount = components.size();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component cmp = components.get(iter);
             cmp.deinitializeImpl();
         }
         flushReplace();
@@ -783,7 +791,9 @@ public class Container extends Component {
         Component[] arr = new Component[components.size()];
         components.toArray(arr);
 
-        for(Component cmp : arr) {
+        int componentCount = arr.length;
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component cmp = arr[iter];
             removeComponent(cmp);
         }
     }
@@ -1386,7 +1396,9 @@ public class Container extends Component {
      */
     private String getComponentsNames() {
         String ret = "[";
-        for(Component cmp : components) {
+        int componentCount = components.size();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component cmp = components.get(iter);
             String className = cmp.getClass().getName();
             ret += className.substring(className.lastIndexOf('.') + 1) + ", ";
         }
@@ -1402,7 +1414,9 @@ public class Container extends Component {
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        for(Component cmp : components) {
+        int componentCount = components.size();
+        for(int iter = 0 ; iter < componentCount ; iter++) {
+            Component cmp = components.get(iter);
             cmp.refreshTheme(merge);
         }
     }

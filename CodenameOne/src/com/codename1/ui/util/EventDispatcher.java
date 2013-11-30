@@ -27,6 +27,8 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.ui.*;
 import com.codename1.ui.events.*;
 import com.codename1.ui.plaf.Style;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -39,7 +41,7 @@ import java.util.Vector;
 public class EventDispatcher {
 
     private boolean blocking = false;
-    private Vector listeners;
+    private ArrayList<Object> listeners;
     private Object[] pending;
     private Object pendingEvent;
     boolean actionListenerArray;
@@ -50,9 +52,6 @@ public class EventDispatcher {
     boolean selectionListenerArray;
 
     private static boolean fireStyleEventsOnNonEDT = false;
-
-    private static boolean xmlVMTested;
-    private static boolean xmlVMWorkaround;
     
     /**
      * When set to true, style events will be dispatched even from non-EDT threads.
@@ -136,10 +135,10 @@ public class EventDispatcher {
     public synchronized void addListener(Object listener) {
         if(listener != null) {
             if(listeners == null) {
-                listeners = new Vector();
+                listeners = new ArrayList<Object>();
             }
             if(!listeners.contains(listener)){
-                listeners.addElement(listener);
+                listeners.add(listener);
             }        
         }
     }
@@ -148,11 +147,21 @@ public class EventDispatcher {
      * Returns the vector of the listeners
      * 
      * @return the vector of listeners attached to the event dispatcher
+     * @deprecated use getListenerCollection instead, this method will now be VERY SLOW
      */
     public Vector getListenerVector() {
-        return listeners;
+        return new Vector(listeners);
     }
 
+    /**
+     * Returns the collection of the listeners
+     * 
+     * @return the collection of listeners attached to the event dispatcher
+     */
+    public Collection getListenerCollection() {
+        return listeners;
+    }
+    
     /**
      * Remove the listener from the dispatcher
      *
@@ -160,7 +169,7 @@ public class EventDispatcher {
      */
     public synchronized void removeListener(Object listener) {
         if(listeners != null) {
-            listeners.removeElement(listener);
+            listeners.remove(listener);
         }
     }
 
@@ -174,15 +183,22 @@ public class EventDispatcher {
         if(listeners == null || listeners.size() == 0) {
             return;
         }
+        boolean isEdt = Display.getInstance().isEdt();
+        // minor optimization for a common use case to avoid allocation costs
+        if(isEdt && listeners.size() == 1) {
+            DataChangedListener a = (DataChangedListener)listeners.get(0);
+            a.dataChanged(type, index);
+            return;
+        }
         DataChangedListener[] array;
         synchronized(this) {
             array = new DataChangedListener[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (DataChangedListener)listeners.elementAt(iter);
+                array[iter] = (DataChangedListener)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
-        if(Display.getInstance().isEdt()) {
+        if(isEdt) {
             fireDataChangeSync(array, type, index);
         } else {
             dataChangeListenerArray = true;
@@ -214,7 +230,7 @@ public class EventDispatcher {
         synchronized(this) {
             array = new BindTarget[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (BindTarget)listeners.elementAt(iter);
+                array[iter] = (BindTarget)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
@@ -258,15 +274,22 @@ public class EventDispatcher {
         if(listeners == null || listeners.size() == 0) {
             return;
         }
+        // minor optimization for a common use case to avoid allocation costs
+        boolean isEdt = Display.getInstance().isEdt();
+        if(isEdt && listeners.size() == 1) {
+            StyleListener a = (StyleListener)listeners.get(0);
+            a.styleChanged(property, source);
+            return;
+        }
         StyleListener[] array;
         synchronized(this) {
             array = new StyleListener[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (StyleListener)listeners.elementAt(iter);
+                array[iter] = (StyleListener)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
-        if(Display.getInstance().isEdt()) {
+        if(isEdt) {
             fireStyleChangeSync(array, property, source);
         } else if (fireStyleEventsOnNonEDT) {
             styleListenerArray = true;
@@ -314,15 +337,23 @@ public class EventDispatcher {
         if(listeners == null || listeners.size() == 0) {
             return;
         }
+        
+        // minor optimization for a common use case to avoid allocation costs
+        boolean isEdt = Display.getInstance().isEdt();
+        if(isEdt && listeners.size() == 1) {
+            ActionListener a = (ActionListener)listeners.get(0);
+            a.actionPerformed(ev);
+            return;
+        }
         ActionListener[] array;
         synchronized(this) {
             array = new ActionListener[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (ActionListener)listeners.elementAt(iter);
+                array[iter] = (ActionListener)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
-        if(Display.getInstance().isEdt()) {
+        if(isEdt) {
             fireActionSync(array, ev);
         } else {
             actionListenerArray = true;
@@ -350,15 +381,22 @@ public class EventDispatcher {
         if(listeners == null || listeners.size() == 0) {
             return;
         }
+        // minor optimization for a common use case to avoid allocation costs
+        boolean isEdt = Display.getInstance().isEdt();
+        if(isEdt && listeners.size() == 1) {
+            SelectionListener a = (SelectionListener)listeners.get(0);
+            a.selectionChanged(oldSelection, newSelection);
+            return;
+        }
         SelectionListener[] array;
         synchronized(this) {
             array = new SelectionListener[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (SelectionListener)listeners.elementAt(iter);
+                array[iter] = (SelectionListener)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
-        if(Display.getInstance().isEdt()) {
+        if(isEdt) {
             fireSelectionSync(array, oldSelection, newSelection);
         } else {
             selectionListenerArray = true;
@@ -394,15 +432,26 @@ public class EventDispatcher {
         if(listeners == null || listeners.size() == 0) {
             return;
         }
+        // minor optimization for a common use case to avoid allocation costs
+        boolean isEdt = Display.getInstance().isEdt();
+        if(isEdt && listeners.size() == 1) {
+            FocusListener a = (FocusListener)listeners.get(0);
+            if(c.hasFocus()) {
+                a.focusGained(c);
+            } else {
+                a.focusLost(c);
+            }
+            return;
+        }
         FocusListener[] array;
         synchronized(this) {
             array = new FocusListener[listeners.size()];
             for(int iter = 0 ; iter < array.length ; iter++) {
-                array[iter] = (FocusListener)listeners.elementAt(iter);
+                array[iter] = (FocusListener)listeners.get(iter);
             }
         }
         // if we already are on the EDT just fire the event
-        if(Display.getInstance().isEdt()) {
+        if(isEdt) {
             fireFocusSync(array, c);
         } else {
             focusListenerArray = true;
@@ -419,7 +468,7 @@ public class EventDispatcher {
     }
     
     /**
-     * Synchronious internal call for common code
+     * Synchronous internal call for common code
      */
     private void fireFocusSync(FocusListener[] array, Component c) {
         if(c.hasFocus()) {
@@ -444,7 +493,7 @@ public class EventDispatcher {
 
     /**
      * Indicates whether this dispatcher blocks when firing events or not, normally
-     * a dispatcher uses callSeriallyAndWait() to be 100% synchronos with event delivery
+     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
      * however this method is very slow. By setting blocking to false the callSerially
      * method is used which allows much faster execution for IO heavy operations.
      *
@@ -456,7 +505,7 @@ public class EventDispatcher {
 
     /**
      * Indicates whether this dispatcher blocks when firing events or not, normally
-     * a dispatcher uses callSeriallyAndWait() to be 100% synchronos with event delivery
+     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
      * however this method is very slow. By setting blocking to false the callSerially
      * method is used which allows much faster execution for IO heavy operations.
      * 

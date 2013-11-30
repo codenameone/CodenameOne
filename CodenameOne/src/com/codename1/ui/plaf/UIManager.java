@@ -1299,8 +1299,10 @@ public class UIManager {
                         }
                     }
                 }
+                bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
+            } else {
+                bundle = null;
             }
-            bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
         }
     }
 

@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Vector;
 
 
@@ -312,9 +313,18 @@ public class Button extends Label {
     /**
      * Returns a vector containing the action listeners for this button
      * @return the action listeners
+     * @deprecated use getListeners instead
      */
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
+    }
+    
+    /**
+     * Returns a collection containing the action listeners for this button
+     * @return the action listeners
+     */
+    public Collection getListeners() {
+        return dispatcher.getListenerCollection();
     }
     
     /**

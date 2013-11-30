@@ -187,9 +187,24 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static void setExposeFilesystem(boolean aExposeFilesystem) {
         exposeFilesystem = aExposeFilesystem;
     }
+
+    /**
+     * @return the designMode
+     */
+    public static boolean isDesignMode() {
+        return designMode;
+    }
+
+    /**
+     * @param aDesignMode the designMode to set
+     */
+    public static void setDesignMode(boolean aDesignMode) {
+        designMode = aDesignMode;
+    }
     private TestRecorder testRecorder;
     private Hashtable contacts;
-
+    private static boolean designMode;
+    
     /**
      * @return the showEDTWarnings
      */
@@ -493,7 +508,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void blit() {
             try {
-                SwingUtilities.invokeAndWait(new Runnable() {
+                Runnable r = new Runnable() {
                     public void run() {
                         if (buffer != null) {
                             java.awt.Graphics g = getGraphics();
@@ -549,7 +564,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                             g.dispose();
                         }
                     }
-                });
+                };
+                if(isDesignMode()) {
+                    SwingUtilities.invokeLater(r);
+                } else {
+                    SwingUtilities.invokeAndWait(r);
+                }
             } catch(Exception err) {
                 err.printStackTrace();
             }

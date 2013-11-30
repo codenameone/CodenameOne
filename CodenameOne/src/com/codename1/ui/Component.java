@@ -39,7 +39,6 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import java.util.HashMap;
-import java.util.Hashtable;
 
 /**
  * Base class for all the widgets in the toolkit using the composite pattern in 

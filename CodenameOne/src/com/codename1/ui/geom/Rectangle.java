@@ -252,10 +252,10 @@ public class Rectangle {
         int ty1 = this.y;
         int rx1 = rX;
         int ry1 = rY;
-        long tx2 = tx1; tx2 += this.size.getWidth();
-        long ty2 = ty1; ty2 += this.size.getHeight();
-        long rx2 = rx1; rx2 += rW;
-        long ry2 = ry1; ry2 += rH;
+        int tx2 = tx1; tx2 += this.size.getWidth();
+        int ty2 = ty1; ty2 += this.size.getHeight();
+        int rx2 = rx1; rx2 += rW;
+        int ry2 = ry1; ry2 += rH;
         if (tx1 < rx1) {
             tx1 = rx1;
         }
@@ -279,7 +279,53 @@ public class Rectangle {
         if (ty2 < Integer.MIN_VALUE) {
             ty2 = Integer.MIN_VALUE;
         }
-        return new Rectangle(tx1, ty1, (int) tx2, (int) ty2);
+        return new Rectangle(tx1, ty1, tx2, ty2);
+    }
+
+    /**
+     * Returns a rectangle that intersects the given rectangle with this rectangle
+     *
+     * @param rX rectangle to intersect with this rectangle
+     * @param rY rectangle to intersect with this rectangle
+     * @param rW rectangle to intersect with this rectangle
+     * @param rH rectangle to intersect with this rectangle
+     * @param dest result of the intersection are stored here
+     */
+    public static void intersection(int rX, int rY, int rW, int rH, int tx1, int ty1, int tw2, int th2, Rectangle dest) {
+        int rx1 = rX;
+        int ry1 = rY;
+        int rx2 = rx1; rx2 += rW;
+        int ry2 = ry1; ry2 += rH;
+        if (tx1 < rx1) {
+            tx1 = rx1;
+        }
+        if (ty1 < ry1) {
+            ty1 = ry1;
+        }
+        int tx2 = tx1; tx2 += tw2;
+        int ty2 = ty1; ty2 += th2;
+        if (tx2 > rx2) {
+            tx2 = rx2;
+        }
+        if (ty2 > ry2) {
+            ty2 = ry2;
+        }
+        tx2 -= tx1;
+        ty2 -= ty1;
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+        if (tx2 < Integer.MIN_VALUE) {
+            tx2 = Integer.MIN_VALUE;
+        }
+        if (ty2 < Integer.MIN_VALUE) {
+            ty2 = Integer.MIN_VALUE;
+        }
+        
+        dest.x = tx1;
+        dest.y = ty1;
+        dest.size.setWidth(tx2);
+        dest.size.setHeight(ty2);
     }
 
     /**

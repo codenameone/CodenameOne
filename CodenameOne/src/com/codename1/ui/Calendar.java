@@ -38,7 +38,6 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Date;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Vector;

@@ -47,7 +47,7 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Hashtable;
+import java.util.Map;
 
 /**
  * Simplifies the process of implementing an image link for labels and lists by
@@ -137,7 +137,7 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param img the image
      */
     protected void setEntryInListModel(int offset, Image img) {
-        Hashtable h;
+        Map h;
         ListModel model;
         if(targetModel != null) {
             model = targetModel;
@@ -148,7 +148,7 @@ public class ImageDownloadService extends ConnectionRequest {
                 model = ((ContainerList)targetList).getModel();
             }
         }
-        h = (Hashtable)model.getItemAt(targetOffset);
+        h = (Map)model.getItemAt(targetOffset);
         if(!fastScale && toScale != null){
             img = scaleImage(img, toScale, maintainAspectRatio);
         }
@@ -186,12 +186,12 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives. This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      */
     public ImageDownloadService(String url, Component targetList, int targetOffset, String targetKey) {
         this.targetList = targetList;
@@ -204,12 +204,12 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives. This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a Map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      */
     public ImageDownloadService(String url, List targetList, int targetOffset, String targetKey) {
         this.targetList = targetList;
@@ -237,12 +237,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param destFile local file to store the data into the given path
      */
     public static void createImageToFileSystem(String url, List targetList, int targetOffset, 
@@ -255,12 +255,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param destFile local file to store the data into the given path
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
@@ -273,12 +273,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param destFile local file to store the data into the given path
      */
     public static void createImageToFileSystem(String url, Component targetList, int targetOffset, 
@@ -291,13 +291,13 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param model the list model
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param destFile local file to store the data into the given path
      */
     public static void createImageToFileSystem(String url, Component targetList, ListModel model, int targetOffset, 
@@ -310,12 +310,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param destFile local file to store the data into the given path
      */
     private static void createImageToFileSystem(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
@@ -357,12 +357,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param scale the scale of the image to put in the List or null
      */
@@ -376,12 +376,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param scale the scale of the image to put in the List or null
      */
@@ -395,12 +395,12 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param placeholderImage the image placeholder
      */
@@ -414,13 +414,13 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param model the model destination
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param placeholderImage the image placeholder
      */
@@ -434,13 +434,13 @@ public class ImageDownloadService extends ConnectionRequest {
      * when the response arrives, it will cache the file locally as a file
      * in the file storage.
      * This assumes the GenericListCellRenderer style of
-     * list which relies on a hashtable based model approach.
+     * list which relies on a map based model approach.
      *
      * @param url the image URL
      * @param targetList the list that should be updated when the data arrives
      * @param targetModel the model
      * @param targetOffset the offset within the list to insert the image
-     * @param targetKey the key for the hashtable in the target offset
+     * @param targetKey the key for the map in the target offset
      * @param cacheId a unique identifier to be used to store the image into storage
      * @param keep if set to true keeps the file in RAM once loaded
      * @param scale the scale of the image to put in the List or null

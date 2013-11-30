@@ -1668,7 +1668,6 @@ public class Style {
      */
     public void removeListeners(){
         if (listeners != null) {
-            listeners.getListenerVector().removeAllElements();
             listeners = null;
         }
     }

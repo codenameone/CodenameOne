@@ -30,6 +30,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -762,7 +763,7 @@ public class NetworkManager {
             return;
         }
         progressListeners.removeListener(al);
-        Vector v = progressListeners.getListenerVector();
+        Collection v = progressListeners.getListenerCollection();
         if(v == null || v.size() == 0) {
             progressListeners = null;
         }

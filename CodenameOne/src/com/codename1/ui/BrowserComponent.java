@@ -28,7 +28,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
-import java.util.Vector;
 import java.util.Hashtable;
 
 /**

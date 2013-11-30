@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import java.util.ArrayList;
 import java.util.Vector;
 
 /**
@@ -32,7 +33,7 @@ import java.util.Vector;
  */
 class RunnableWrapper implements Runnable {
     private static final Object THREADPOOL_LOCK = new Object();
-    private static Vector threadPool = new Vector();
+    private static ArrayList<Runnable> threadPool = new ArrayList<Runnable>();
 
     private static int threadCount = 0;
     private static int maxThreadCount = 5;
@@ -123,8 +124,8 @@ class RunnableWrapper implements Runnable {
                         Runnable r = null;
                         synchronized(THREADPOOL_LOCK) {
                             if(threadPool.size() > 0) {
-                                r = (Runnable)threadPool.elementAt(0);
-                                threadPool.removeElementAt(0);
+                                r = threadPool.get(0);
+                                threadPool.remove(0);
                             } else {
                                 try {
                                     availableThreads++;
@@ -151,7 +152,7 @@ class RunnableWrapper implements Runnable {
             poolThread.start();
         }
         synchronized(THREADPOOL_LOCK) {
-            threadPool.addElement(r);
+            threadPool.add(r);
             THREADPOOL_LOCK.notify();
         }
     }

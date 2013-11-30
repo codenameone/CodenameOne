@@ -50,10 +50,10 @@ import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.Vector;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
@@ -2039,7 +2039,9 @@ public final class Display {
 
         // we are in the middle of a transition so we should extract the next form
         if(animationQueue != null) {
-            for(Animation o : animationQueue) {
+            int size = animationQueue.size();
+            for(int iter = 0 ; iter < size ; iter++) {
+                Animation o = animationQueue.get(iter);
                 if(o instanceof Transition) {
                     upcoming = (Form)((Transition)o).getDestination();
                 }
@@ -2079,7 +2081,9 @@ public final class Display {
 
                 // we are in the middle of a transition so we should extract the next form
                 if(animationQueue != null) {
-                    for(Animation o : animationQueue) {
+                    int size = animationQueue.size();
+                    for(int iter = 0 ; iter < size ; iter++) {
+                        Animation o = animationQueue.get(iter);
                         if(o instanceof Transition) {
                             return (Form)((Transition)o).getDestination();
                         }
@@ -2431,7 +2435,7 @@ public final class Display {
     public void removeEdtErrorHandler(ActionListener e) {
         if(errorHandler != null) {
             errorHandler.removeListener(e);
-            Vector v = errorHandler.getListenerVector();
+            Collection v = errorHandler.getListenerCollection();
             if(v == null || v.size() == 0) {
                 errorHandler = null;
             }
