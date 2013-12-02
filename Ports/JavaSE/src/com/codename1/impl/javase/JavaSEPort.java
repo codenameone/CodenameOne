@@ -4557,7 +4557,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private String unfile(String file) {
         if(file.startsWith("file://home")) {
-            return System.getProperty("user.dir") + File.separator + ".cn1" + file.substring(11).replace('/', File.separatorChar);
+            return System.getProperty("user.home") + File.separator + ".cn1" + file.substring(11).replace('/', File.separatorChar);
         }
         if (file.startsWith("file://")) {
             return file.substring(7);
