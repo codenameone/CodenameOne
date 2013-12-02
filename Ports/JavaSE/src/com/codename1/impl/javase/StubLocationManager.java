@@ -67,6 +67,7 @@ class StubLocationManager extends LocationManager {
 
     @Override
     protected void bindListener() {
+        setStatus(AVAILABLE);
         final LocationListener l =  getLocationListener();
         task = new TimerTask() {
 

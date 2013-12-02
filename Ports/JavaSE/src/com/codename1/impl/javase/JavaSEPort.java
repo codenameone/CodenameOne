@@ -4897,7 +4897,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 com.codename1.ui.events.ActionEvent result = null;
                 if (selected != null) {
                     try {
-                        File tmp = File.createTempFile("temp", imageTypes[0]);
+                        File tmp = File.createTempFile("temp", "." + imageTypes[0]);
                         tmp.deleteOnExit();
                         FileOutputStream fos = new FileOutputStream(tmp);
                         FileInputStream fis = new FileInputStream(selected);
