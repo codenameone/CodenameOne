@@ -1103,7 +1103,7 @@ public class Tabs extends Container {
                     if (initialX != -1) {
                         int diff = x - initialX;
                         if (diff != 0 && dragStarted) {
-                            if (Math.abs(diff) > contentPane.getWidth() / 2) {
+                            if (Math.abs(diff) > contentPane.getWidth() / 6) {
                                 if(isRTL()) {
                                     diff *= -1;
                                 }

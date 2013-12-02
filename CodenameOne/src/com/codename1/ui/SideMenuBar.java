@@ -668,7 +668,9 @@ public class SideMenuBar extends MenuBar {
                 if (c.getClientProperty("Actionable") != null) {
                     Container cnt = new Container(new BorderLayout());
                     cnt.addComponent(BorderLayout.CENTER, cmp);
-                    cnt.setLeadComponent(createTouchCommandButton(c));
+                    Button btn = createTouchCommandButton(c);
+                    btn.setParent(cnt);
+                    cnt.setLeadComponent(btn);
                     menu.addComponent(cnt);
                 } else {
                     menu.addComponent(cmp);
