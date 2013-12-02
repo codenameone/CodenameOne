@@ -289,6 +289,10 @@ public class Rectangle {
      * @param rY rectangle to intersect with this rectangle
      * @param rW rectangle to intersect with this rectangle
      * @param rH rectangle to intersect with this rectangle
+     * @param tx1 rectangle to intersect with this rectangle
+     * @param ty1 rectangle to intersect with this rectangle
+     * @param tw2 rectangle to intersect with this rectangle
+     * @param th2 rectangle to intersect with this rectangle
      * @param dest result of the intersection are stored here
      */
     public static void intersection(int rX, int rY, int rW, int rH, int tx1, int ty1, int tw2, int th2, Rectangle dest) {

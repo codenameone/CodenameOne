@@ -69,6 +69,38 @@ public class SpanButton extends Container {
         setLeadComponent(actualButton);
     }
     
+    /**
+     * Sets the UIID for the actual text
+     * @param uiid the uiid
+     */
+    public void setTextUIID(String uiid) {
+        text.setUIID(uiid);
+    }
+    
+    /**
+     * Returns the uiid of the actual text
+     * @return the uiid
+     */
+    public String getTextUIID() {
+        return text.getUIID();
+    }
+    
+    /**
+     * Sets the uiid for the icon if present
+     * @param uiid the uiid for the icon
+     */
+    public void setIconUIID(String uiid) {
+        actualButton.setUIID(uiid);
+    }
+    
+    /**
+     * Returns the UIID for the icon
+     * @return the uiid
+     */
+    public String getIconUIID() {
+        return actualButton.getUIID();
+    }
+        
     private void removeBackground(Style s) {
         s.setBackgroundType(Style.BACKGROUND_NONE);
         s.setBgImage(null);
@@ -151,7 +183,7 @@ public class SpanButton extends Container {
      */
     public String[] getPropertyNames() {
         return new String[] {
-            "text", "icon", "iconPosition"
+            "text", "icon", "iconPosition", "textUiid", "iconUiid"
         };
     }
 
@@ -162,7 +194,9 @@ public class SpanButton extends Container {
        return new Class[] {
            String.class, // text
            Image.class, // icon
-           String.class // iconPosition
+           String.class, // iconPosition
+           String.class,
+           String.class
        };
     }
 
@@ -170,7 +204,7 @@ public class SpanButton extends Container {
      * @inheritDoc
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String", "Image", "String"};
+        return new String[] {"String", "Image", "String", "String", "String"};
     }
 
     /**
@@ -185,6 +219,12 @@ public class SpanButton extends Container {
         }
         if(name.equals("iconPosition")) {
             return getIconPosition();
+        }
+        if(name.equals("textUiid")) {
+            return getTextUIID();
+        }
+        if(name.equals("iconUiid")) {
+            return getIconUIID();
         }
         return null;
     }
@@ -203,6 +243,14 @@ public class SpanButton extends Container {
         }
         if(name.equals("iconPosition")) {
             setIconPosition((String)value);
+            return null;
+        }
+        if(name.equals("textUiid")) {
+            setTextUIID((String)value);
+            return null;
+        }
+        if(name.equals("iconUiid")) {
+            setIconUIID((String)value);
             return null;
         }
         return super.setPropertyValue(name, value);

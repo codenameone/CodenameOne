@@ -520,6 +520,9 @@ public class Image {
      *
      * @param nativeImage
      * @return newly created Codename One image object
+     * @deprecated this method is deprecated as a warning! Don't use this method unless you actually
+     * know what you are doing, if you are invoking this method without understanding the distinction
+     * between native image and Codename One image then you are using the wrong method.
      */
     public static Image createImage(Object nativeImage) {
         return new Image(nativeImage);

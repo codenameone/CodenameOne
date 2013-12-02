@@ -32,6 +32,7 @@ import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import java.io.InputStream;
 import java.util.Vector;
 
@@ -76,7 +77,7 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
                 stream = null;
             }
             if (onComplete != null) {
-                onComplete.run();
+                Display.getInstance().callSerially(onComplete);
                 onComplete = null;
             }
             removeFromCurrentPlaying();

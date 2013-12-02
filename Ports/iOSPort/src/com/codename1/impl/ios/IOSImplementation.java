@@ -678,7 +678,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
 
-    private Rectangle reusableRect = new Rectangle();
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng.clipH == 0 || ng.clipW == 0) {
@@ -688,14 +687,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipW = ng.associatedImage.width;
             ng.clipH = ng.associatedImage.height;
         }
-        Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, reusableRect);
-        Dimension d = reusableRect.getSize();
+        Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, ng.reusableRect);
+        Dimension d = ng.reusableRect.getSize();
         if(d.getWidth() <= 0 || d.getHeight() <= 0) {
             ng.clipW = 0;
             ng.clipH = 0;
         } else {
-            ng.clipX = reusableRect.getX();
-            ng.clipY = reusableRect.getY();
+            ng.clipX = ng.reusableRect.getX();
+            ng.clipY = ng.reusableRect.getY();
             ng.clipW = d.getWidth();
             ng.clipH = d.getHeight();
             setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
@@ -1626,6 +1625,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
 
     class NativeGraphics {
+        Rectangle reusableRect = new Rectangle();
         NativeImage associatedImage;
         int color;
         int alpha = 255;
@@ -3831,6 +3831,24 @@ public class IOSImplementation extends CodenameOneImplementation {
     private Purchase pur;
     private Vector purchasedItems;
 
+    /**
+     * Call serially will fail if Display isn't initialized yet this will not
+     */
+    private static void safeCallSerially(final Runnable r) {
+        if(Display.isInitialized()) {
+            Display.getInstance().callSerially(r);
+            return;
+        }
+        new Thread() {
+            public void run() {
+                try {
+                    Thread.sleep(2000);
+                } catch(Throwable t) {}
+                safeCallSerially(r);
+            }
+        }.start();
+    }
+    
     Vector getPurchased() {
         if(purchasedItems == null) {
             purchasedItems = (Vector)Storage.getInstance().readObject("CN1PurchasedItemList.dat");
@@ -3843,7 +3861,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void itemPurchased(final String sku) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.itemPurchased(sku);
@@ -3854,7 +3872,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void itemPurchaseError(final String sku, final String errorMessage) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.itemPurchaseError(sku, errorMessage);
@@ -3865,7 +3883,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     static void itemRefunded(final String sku) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.itemRefunded(sku);
@@ -3877,7 +3895,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     static void subscriptionStarted(final String sku) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.subscriptionStarted(sku);
@@ -3888,7 +3906,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     static void subscriptionCanceled(final String sku) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.subscriptionCanceled(sku);
@@ -3899,7 +3917,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void paymentFailed(final String paymentCode, final String failureReason) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.paymentFailed(paymentCode, failureReason);
@@ -3910,7 +3928,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void paymentSucceeded(final String paymentCode, final double amount, final String currency) {
         if(purchaseCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
+            safeCallSerially(new Runnable() {
                 @Override
                 public void run() {
                     purchaseCallback.paymentSucceeded(paymentCode, amount, currency);

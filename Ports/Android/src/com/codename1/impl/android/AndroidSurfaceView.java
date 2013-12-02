@@ -46,7 +46,7 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
     
     public AndroidSurfaceView(Activity activity, AndroidImplementation implementation) {
         super(activity);
-
+        setId(2001);
         cn1View = new CodenameOneView(activity, this, implementation);
         surfaceHolder = getHolder();
         surfaceHolder.addCallback(new SurfaceHolder.Callback() {

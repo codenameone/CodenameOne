@@ -3494,6 +3494,12 @@ private void showPasswordDialog(String password) {
     EditableResources.setCurrentPassword(ptext);
 }
 
+public boolean isNetBeans() {
+    File nbProject = new File(loadedFile.getParentFile().getParentFile(), "nbproject");
+    File idea = new File(loadedFile.getParentFile().getParentFile(), ".idea");
+    return nbProject.exists() && !idea.exists();
+}
+
 /**
  * Opens the given file in an IDE (currently netbeans) on the given line number unless the line number is
  * less than 0
@@ -3501,9 +3507,10 @@ private void showPasswordDialog(String password) {
 public static void openInIDE(File f, int lineNumber) {
     // Check if this is a NetBeans project
     File nbProject = new File(loadedFile.getParentFile().getParentFile(), "nbproject");
+    File idea = new File(loadedFile.getParentFile().getParentFile(), ".idea");
     
     // this is an eclipse project
-    if(!nbProject.exists()) {
+    if(!nbProject.exists() || idea.exists()) {
         FileOutputStream fs = null;
         try {
             String userDir = System.getProperty("user.home");

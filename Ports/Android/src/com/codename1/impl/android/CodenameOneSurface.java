@@ -24,6 +24,7 @@ package com.codename1.impl.android;
 
 import android.graphics.Rect;
 import android.view.View;
+import android.view.ViewGroup;
 
 /**
  *
@@ -42,4 +43,8 @@ public interface CodenameOneSurface {
     public View getAndroidView();
     
     public Object getGraphics();
+    
+    public int getId();
+    
+    public void setLayoutParams(ViewGroup.LayoutParams lp);
 }

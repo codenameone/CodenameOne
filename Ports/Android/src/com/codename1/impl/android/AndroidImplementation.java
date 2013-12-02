@@ -198,7 +198,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int timeout = -1;
     private CodeScannerImpl scannerInstance;
     private HashMap apIds;
-
+    private static View viewBelow;
+    private static View viewAbove;
+    private static int aboveSpacing;
+    private static int belowSpacing;
+    
+    /**
+     * This method in used internally for ads
+     * @param above shown above the view
+     * @param below shown below the view
+     */
+    public static void setViewAboveBelow(View above, View below, int spacingAbove, int spacingBelow) {
+        viewBelow = below;
+        viewAbove = above;
+        aboveSpacing = spacingAbove;
+        belowSpacing = spacingBelow;
+    }
+    
     /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
@@ -499,7 +515,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private void initSurface() {
         
-        relativeLayout = new RelativeLayout(activity);
+        relativeLayout=  new RelativeLayout(activity);
         relativeLayout.setLayoutParams(new RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.FILL_PARENT,
                 RelativeLayout.LayoutParams.FILL_PARENT));
@@ -516,8 +532,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         myView.getAndroidView().setVisibility(View.VISIBLE);
         
         int id = activity.getResources().getIdentifier("main", "layout", activity.getApplicationInfo().packageName);
-        LinearLayout root = (LinearLayout) LayoutInflater.from(activity).inflate(id, null);
+        RelativeLayout root = (RelativeLayout) LayoutInflater.from(activity).inflate(id, null);
+        if(viewAbove != null) {
+            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            
+            final int dps = aboveSpacing;
+            final float scale = getContext().getResources().getDisplayMetrics().density;
+            final int pixels = (int) (dps * scale + 0.5f);
+            
+            RelativeLayout.LayoutParams lp2 = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
+            lp2.setMargins(0, 0, pixels, 0);
+            relativeLayout.setLayoutParams(lp2);
+            root.addView(viewAbove, lp);
+        }
         root.addView(relativeLayout);
+        if(viewBelow != null) {
+            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            
+            final int dps = belowSpacing;
+            final float scale = getContext().getResources().getDisplayMetrics().density;
+            final int pixels = (int) (dps * scale + 0.5f);
+            
+            RelativeLayout.LayoutParams lp2 = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
+            lp2.setMargins(0, 0, 0, pixels);
+            relativeLayout.setLayoutParams(lp2);
+            root.addView(viewBelow, lp);
+        }
         activity.setContentView(root);
         myView.getAndroidView().requestFocus();
     }
@@ -2007,7 +2051,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 if(onCompletion != null){
-                    onCompletion.run();
+                    Display.getInstance().callSerially(onCompletion);
+                    
+                    // makes sure the file is only deleted after the onCompletion was invoked
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            temp.delete();                
+                        }
+                    });
+                    return;
                 }
                 temp.delete();                
             }

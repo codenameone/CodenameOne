@@ -602,7 +602,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     java.awt.Font f = new java.awt.Font("Arial", Font.STYLE_BOLD, 20);
                     g1.setFont(f);
-                    g1.drawString("Paused", buffer.getWidth() / 2 - stringWidth(f, "Paused") / 2, buffer.getHeight() / 2 - f.getSize() / 2);
+                    int sw = (int) Math.ceil(f.getStringBounds("Paused", canvas.getFRC()).getWidth());
+                    g1.drawString("Paused", buffer.getWidth() / 2 - sw / 2, buffer.getHeight() / 2 - f.getSize() / 2);
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 }
                 updateGraphicsScale(g);
