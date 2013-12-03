@@ -158,8 +158,9 @@ public class Form extends Container {
         // forms/dialogs are not visible by default
         setVisible(false);
         Style formStyle = getStyle();
-        int w = Display.getInstance().getDisplayWidth() - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        int h = Display.getInstance().getDisplayHeight() - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        Display d = Display.getInstance();
+        int w = d.getDisplayWidth() - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
+        int h = d.getDisplayHeight() - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
 
         setWidth(w);
         setHeight(h);
@@ -172,6 +173,16 @@ public class Form extends Container {
         addComponentToForm(BorderLayout.NORTH, titleArea);
         addComponentToForm(BorderLayout.CENTER, contentPane);
 
+        // this is injected automatically by the implementation in case of ads
+        String adPaddingBottom = d.getProperty("adPaddingBottom", null);
+        if(adPaddingBottom != null && adPaddingBottom.length() > 0) {
+            Container pad = new Container();
+            int dim = Integer.parseInt(adPaddingBottom);
+            dim = d.convertToPixels(dim, true);
+            pad.setPreferredSize(new Dimension(dim, dim));
+            addComponentToForm(BorderLayout.SOUTH, pad);
+        }
+        
         contentPane.setUIID("ContentPane");
         contentPane.setScrollableY(true);
 
