@@ -294,6 +294,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         });
+        if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
+            cmp.getComponentForm().revalidate();
+        }
         if(editNext) {
             editNext = false;
             TextEditUtil.editNextTextArea();
@@ -687,6 +690,28 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipW = ng.associatedImage.width;
             ng.clipH = ng.associatedImage.height;
         }
+        Rectangle r = new Rectangle(ng.clipX, ng.clipY, ng.clipW, ng.clipH).intersection(x, y, width, height);
+        Dimension d = r.getSize();
+        if(d.getWidth() <= 0 || d.getHeight() <= 0) {
+            ng.clipW = 0;
+            ng.clipH = 0;
+        } else {
+            ng.clipX = r.getX();
+            ng.clipY = r.getY();
+            ng.clipW = d.getWidth();
+            ng.clipH = d.getHeight();
+            setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
+        }
+    }
+    /*public void clipRect(Object graphics, int x, int y, int width, int height) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        if(ng.clipH == 0 || ng.clipW == 0) {
+            return;
+        }
+        if(ng.clipW == -1 || ng.clipH == -1) {
+            ng.clipW = ng.associatedImage.width;
+            ng.clipH = ng.associatedImage.height;
+        }
         Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, ng.reusableRect);
         Dimension d = ng.reusableRect.getSize();
         if(d.getWidth() <= 0 || d.getHeight() <= 0) {
@@ -699,7 +724,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipH = d.getHeight();
             setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
         }
-    }
+    }*/
 
     private static void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2) {
         nativeInstance.nativeDrawLineMutable(color, alpha, x1, y1, x2, y2);
@@ -3380,6 +3405,16 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void rename(String file, String newName) {
+        if(newName.indexOf('/') < 0) {
+            // good this is a relative filename, prepend file
+            if(file.endsWith("/")) {
+                file = file.substring(0, file.length() - 1);
+            }
+            int pos = file.lastIndexOf('/');
+            if(pos > -1) {
+                newName = file.substring(0, pos) + "/" + newName;
+            }
+        }
         nativeInstance.moveFile(file, newName);
     }
 

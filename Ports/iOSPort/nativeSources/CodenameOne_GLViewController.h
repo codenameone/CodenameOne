@@ -50,6 +50,8 @@
 #import "MPAdView.h"
 #endif
 
+//ADD_INCLUDE
+
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate 
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
@@ -73,6 +75,8 @@
     BOOL drawTextureSupported;
     BOOL keyboardIsShown;
     BOOL modifiedViewHeight;
+
+    //ADD_VARIABLES
 }
 
 #ifdef INCLUDE_MOPUB
@@ -94,7 +98,7 @@
 -(BOOL)isPaintFinished;
 -(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
 
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font text:(const char*)text  length:(int)length x:(int)x y:(int)y;
+-(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
 

@@ -112,11 +112,10 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalIm
 (int color, int alpha, int x, int y, int width, int height);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
-(int color, int alpha, void* fontPeer, const char* str, int strLen, int x, int y);
+(int color, int alpha, void* fontPeer, NSString* str, int x, int y);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
-(int color, int alpha, void* fontPeer, const char* str, int strLen, int x, int y);
-
+(int color, int alpha, void* fontPeer, NSString* str, int x, int y);
 
 extern void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
 (int width, int height, int argb);
@@ -293,8 +292,22 @@ NSString* toNSString(JAVA_OBJECT str) {
     if(str == 0) {
         return 0;
     }
-    const char* chrs = stringToUTF8(str);
-    return [NSString stringWithUTF8String:chrs];
+    
+    // accessing internal state since toCharArray performs an allocation which can be REALLY expensive
+    int offset = ((java_lang_String*) str)->fields.java_lang_String.offset_;
+    org_xmlvm_runtime_XMLVMArray* cArr = ((java_lang_String*) str)->fields.java_lang_String.value_;
+    JAVA_ARRAY_CHAR* chrArr = (JAVA_ARRAY_CHAR*)cArr->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int length = ((java_lang_String*) str)->fields.java_lang_String.count_;
+    
+    for(int iter = offset ; iter < length ; iter++) {
+        if(chrArr[iter] > 127) {
+            const char* chrs = stringToUTF8(str);
+            NSString* st = [NSString stringWithUTF8String:chrs];
+            NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
+            return st;
+        }
+    }
+    return [[NSString stringWithCharacters:chrArr length:length] substringFromIndex:offset];
 }
 
 void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String(
@@ -531,8 +544,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_jav
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chr = stringToUTF8(n4);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, n3, chr, strlen(chr), n5, n6);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, n3, toNSString(n4), n5, n6);
     [pool release];
     //XMLVM_END_WRAPPER
 }
@@ -541,8 +553,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int]
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    const char* chr = stringToUTF8(n4);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, n3, chr, strlen(chr), n5, n6);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, n3, toNSString(n4), n5, n6);
     [pool release];
     //XMLVM_END_WRAPPER
 }

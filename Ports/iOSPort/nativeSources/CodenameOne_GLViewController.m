@@ -254,9 +254,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
         } else {
             UITextView* utv = [[UITextView alloc] initWithFrame:rect];
-            //[utv setBackgroundColor:[UIColor clearColor]];
-            //[utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
-            //[utv.layer setBorderWidth:0];
+            [utv setBackgroundColor:[UIColor clearColor]];
+            [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
+            [utv.layer setBorderWidth:0];
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((UIFont*)font).pointSize / scale;
@@ -266,6 +266,34 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
+
+            //add navigation toolbar to the top of the keyboard
+            UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+            [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+            [toolbar sizeToFit];
+
+            //add a space filler to the left:
+            UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                                           UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+            
+            NSString* buttonTitle;
+            
+            JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
+            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+            JAVA_OBJECT str;
+            if (isLastEdit) {
+                str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
+            } else {
+                str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
+            }
+            buttonTitle = toNSString(str);
+            UIBarButtonItem *doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneNextClicked)];
+            NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
+            
+            [flexButton release];
+            [doneButton release];
+            [toolbar setItems:itemsArray];
+            [utv setInputAccessoryView:toolbar];
         }
         editingComponent.opaque = NO;
         [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
@@ -624,6 +652,8 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
  */
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
+    //GET_DIPLAY_HEIGHT_MARKER
+
     //if(displayHeight <= 0) {
     displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     //}
@@ -655,7 +685,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied) {
     //    NSLog(@"Native global clipping applied: %i x: %i y: %i width: %i height: %i", clipApplied, x, y, width, height);
     ClipRect* f = [[ClipRect alloc] initWithArgs:x ypos:y w:width h:height f:clipApplied];
-    [CodenameOne_GLViewController upcoming:f];
+    [[CodenameOne_GLViewController instance] upcomingAddClip:f];
     [f release];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl finished");
 }
@@ -726,16 +756,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
-(int color, int alpha, void* fontPeer, const char* str, int strLen, int x, int y) {
+(int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
-    [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(UIFont*)fontPeer text:str length:strLen x:x y:y];
+    [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(UIFont*)fontPeer str:str x:x y:y];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
-(int color, int alpha, void* fontPeer, const char* str, int strLen, int x, int y) {
+(int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl started");
-    DrawString* f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:[NSString stringWithUTF8String:str] f:(UIFont*)fontPeer];
+    DrawString* f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(UIFont*)fontPeer];
     [CodenameOne_GLViewController upcoming:f];
     [f release];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl finished");
@@ -1338,6 +1368,7 @@ bool lockDrawing;
     if(firstTime) {
         return;
     }
+    //WILL_ROTATE_TO_INTERFACE_MARKER
     if(editingComponent != nil) {
         if([editingComponent isKindOfClass:[UITextView class]]) {
             UITextView* v = (UITextView*)editingComponent;
@@ -1440,7 +1471,11 @@ bool lockDrawing;
     CGFloat bottomAlignedY = self.view.bounds.size.height - size.height;
     self.adView.frame = CGRectMake(centeredX, bottomAlignedY, size.width, size.height);
 #endif    
+
+    //DID_ROTATE_FROM_INTERFACE_MARKER
 }
+
+//INJECT_METHODS_MARKER
 
 //static UIImage *img = nil;
 //static GLUIImage* glut = nil;
@@ -1694,11 +1729,10 @@ bool lockDrawing;
      }*/
 }
 
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font text:(const char*)text  length:(int)length x:(int)x y:(int)y {
+-(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UIColor* col = UIColorFromRGB(color,alpha);
     [col set];
-	NSString* str = [NSString stringWithUTF8String:text];
 	[str drawAtPoint:CGPointMake(x, y) withFont:font];
     //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
 	[pool release];
@@ -1732,6 +1766,17 @@ bool lockDrawing;
 -(void)upcomingAdd:(ExecutableOp*)op {
     @synchronized([CodenameOne_GLViewController instance]) {
         [upcomingTarget addObject:op];
+    }
+}
+
+-(void)upcomingAddClip:(ExecutableOp*)op {
+    @synchronized([CodenameOne_GLViewController instance]) {
+        int count = upcomingTarget.count;
+        if(count > 0 && [[upcomingTarget lastObject] isKindOfClass:[ClipRect class]]) {
+            [upcomingTarget replaceObjectAtIndex:count-1 withObject:op];
+        } else {
+            [upcomingTarget addObject:op];
+        }
     }
 }
 

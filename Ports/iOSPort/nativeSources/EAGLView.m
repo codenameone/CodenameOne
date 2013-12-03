@@ -193,6 +193,8 @@ extern BOOL isRetina();
         GLErrorLog;
         glEnable(GL_BLEND);
         GLErrorLog;
+        glDisable(GL_ALPHA_TEST);
+        GLErrorLog;
     }
 }
 
