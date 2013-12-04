@@ -65,7 +65,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(JAVA_OBJECT me) 
     __block JAVA_OBJECT str = JAVA_NULL;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSString *accessToken = [[FBSession.activeSession accessTokenData] accessToken];;
+        NSString *accessToken = [[[FBSession activeSession] accessTokenData] accessToken];
         str = fromNSString(accessToken);
         [pool release];
     });
