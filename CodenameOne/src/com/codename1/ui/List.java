@@ -1902,10 +1902,10 @@ public class List<T> extends Component {
                 float speed = getDragSpeed(vertical);
                 if (vertical) {
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           Integer.MAX_VALUE, speed, 0.0004f);
+                           Integer.MAX_VALUE, speed, 0.0007f);
                 }else{
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           Integer.MAX_VALUE , speed, 0.0004f);
+                           Integer.MAX_VALUE , speed, 0.0007f);
                 }
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
                 Form p = getComponentForm();

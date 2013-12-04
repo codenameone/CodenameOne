@@ -2542,17 +2542,17 @@ public class Component implements Animation, StyleListener {
             }
             if(!shouldScrollX) {
                 if(speed < 0) {
-                    draggedMotionY = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
+                    draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
                 } else {
                     draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                            getHeight() + tl, speed, 0.0004f);
+                            getHeight() + tl/2, speed, 0.0007f);
                 }
             } else {
                 if(speed < 0) {
-                    draggedMotionX = Motion.createFrictionMotion(scroll, -tl, speed, 0.0004f);
+                    draggedMotionX = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
                 } else {
                     draggedMotionX = Motion.createFrictionMotion(scroll, getScrollDimension().getWidth() -
-                            getWidth() + tl, speed, 0.0004f);
+                            getWidth() + tl/2, speed, 0.0007f);
                 }
             }
             if(draggedMotionX != null){
