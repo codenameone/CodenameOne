@@ -626,7 +626,7 @@ public class EditableResources extends Resources implements TreeModel {
                                     for(com.codename1.ui.util.xml.Font b : d.getFont()) {
                                         if("ttf".equals(b.getType())) {
                                             com.codename1.ui.Font system = com.codename1.ui.Font.createSystemFont(b.getFace().intValue(), b.getStyle().intValue(), b.getSize().intValue());
-                                            EditorTTFFont t = new EditorTTFFont(new File(f.getParentFile(), b.getName()), b.getSize().intValue(), b.getActualSize().floatValue(), system);
+                                            EditorTTFFont t = new EditorTTFFont(new File(f.getParentFile(), b.getName()), b.getSizeSettings().intValue(), b.getActualSize().floatValue(), system);
                                             theme.put(b.getKey(), t);
                                             continue;
                                         }

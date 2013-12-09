@@ -3508,9 +3508,10 @@ public static void openInIDE(File f, int lineNumber) {
     // Check if this is a NetBeans project
     File nbProject = new File(loadedFile.getParentFile().getParentFile(), "nbproject");
     File idea = new File(loadedFile.getParentFile().getParentFile(), ".idea");
+    boolean isIdea = idea.exists();
     
     // this is an eclipse project
-    if(!nbProject.exists() || idea.exists()) {
+    if(!nbProject.exists() || isIdea) {
         FileOutputStream fs = null;
         try {
             String userDir = System.getProperty("user.home");
@@ -3525,6 +3526,9 @@ public static void openInIDE(File f, int lineNumber) {
                 fs.close();
             } catch (IOException ex) {
             }
+        }
+        if(isIdea) {
+            f.setLastModified(System.currentTimeMillis());
         }
         return;
     }
