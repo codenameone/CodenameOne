@@ -1727,7 +1727,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             return defaultValue;
                         }
                     } else {
-                        return u.getEncodedPath();
+                        String encodedPath = u.getEncodedPath();
+                        if(encodedPath != null && encodedPath.length() > 0){
+                            return encodedPath;
+                        }
+                        return u.toString();
                     }
                 }
             }
