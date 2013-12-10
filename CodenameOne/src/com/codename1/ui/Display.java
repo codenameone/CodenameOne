@@ -3437,7 +3437,7 @@ public final class Display {
     /**
      * Shows a native modal dialog allowing us to perform the picking for the given type 
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     * @param pickerType the picker type constant
+     * @param type the picker type constant
      * @param source the source component (optional) the native dialog will be placed in relation to this
      * component if applicable
      * @param currentValue the currently selected value

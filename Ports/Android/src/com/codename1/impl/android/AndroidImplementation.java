@@ -5239,7 +5239,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     int hour = ((Integer)currentValue).intValue() / 60;
                     int minute = ((Integer)currentValue).intValue() % 60;
-                    int[] response = new int[] {((Integer)currentValue).intValue()}; 
                     TimePickerDialog tp = new TimePickerDialog(activity, pickInstance, hour, minute, true);
                         //DateFormat.is24HourFormat(activity));
                     tp.show();
@@ -5261,7 +5260,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void onDateSet(DatePicker dp, int year, int month, int day) {
                     java.util.Calendar c = java.util.Calendar.getInstance();
                     c.set(java.util.Calendar.YEAR, year);
-                    c.set(java.util.Calendar.MONTH, month - 1);
+                    c.set(java.util.Calendar.MONTH, month);
                     c.set(java.util.Calendar.DAY_OF_MONTH, day);
                     result = c.getTime();
                     dismissed = true;
@@ -5291,8 +5290,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final DatePick pickInstance = new DatePick();
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH) + 1, cl.get(java.util.Calendar.DAY_OF_MONTH));
-                        //DateFormat.is24HourFormat(activity));
+                    DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH));
                     tp.show();
                 }
             });

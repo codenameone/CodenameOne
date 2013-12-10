@@ -413,7 +413,9 @@ public class NetworkManager {
     }
     
     /**
-     * Invoked to initialize the network thread and start executing elements on the queue
+     * There is no need to invoke this method since the network manager is started 
+     * implicitly. It is useful only if you explicitly stop the network manager.
+     * Invoking this method otherwise will just do nothing.
      */
     public void start() {
         if(networkThreads != null) {

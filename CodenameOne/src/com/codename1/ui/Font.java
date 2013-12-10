@@ -190,8 +190,8 @@ public class Font {
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
      * to use the font name matching the weight, so the weight argument to derive will be ignored!
      *
-     * @param the name of the font
-     * @param the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
+     * @param fontName the name of the font
+     * @param fileName the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {

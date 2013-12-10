@@ -163,15 +163,15 @@ public abstract class LocationManager {
     /**
      * Sets a LocationListener on the device, use this method if you need to be
      * updated on the device Locations rather then calling getCurrentLocation.
-     * @param listener a LocationListener or null to stop the current listener 
+     * @param l a LocationListener or null to stop the current listener 
      * from getting updates
      */
     public void setLocationListener(final LocationListener l) {
         synchronized (this) {
-            if (this.listener != null) {
+            if (listener != null) {
                 clearListener();
             }
-            this.listener = l;
+            listener = l;
             if (l == null) {
                 return;
             }
