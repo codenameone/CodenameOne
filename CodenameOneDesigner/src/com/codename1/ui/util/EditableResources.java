@@ -1050,7 +1050,7 @@ public class EditableResources extends Resources implements TreeModel {
                                                 + "style=\"" + f.getStyle() + "\" "
                                                 + "size=\"" + f.getSize() + "\" "
                                                 + "name=\"" + ed.getFontFile().getName() + "\" "
-                                                + "family=\"" + ((java.awt.Font)ed.getNativeFont()).getFamily() + "\" "
+                                                + "family=\"" + ((java.awt.Font)ed.getNativeFont()).getPSName()+ "\" "
                                                 + "sizeSettings=\"" + ed.getSizeSetting() + "\" "
                                                 + "actualSize=\"" + ed.getActualSize() + "\" />\n");
                                     } else {
@@ -1703,7 +1703,7 @@ public class EditableResources extends Resources implements TreeModel {
                         output.writeBoolean(true);
                         EditorTTFFont ed = (EditorTTFFont)f;
                         output.writeUTF(ed.getFontFile().getName());
-                        output.writeUTF(((java.awt.Font)ed.getNativeFont()).getFamily());
+                        output.writeUTF(((java.awt.Font)ed.getNativeFont()).getPSName());
                         output.writeInt(ed.getSizeSetting());
                         output.writeFloat(ed.getActualSize());
                     } else {
