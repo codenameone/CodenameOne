@@ -103,7 +103,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 5;
+    private static final short MINOR_VERSION = 6;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -360,7 +360,11 @@ public class EditableResources extends Resources implements TreeModel {
         updateModified();
     }
     
-    private byte[] readFile(File f) throws IOException {
+    private byte[] readFile(File parent, String name, boolean normalize) throws IOException {
+        if(normalize) {
+            name = normalizeFileName(name);
+        }
+        File f = new File(parent, name);
         byte[] data = new byte[(int)f.length()];
         DataInputStream fi = new DataInputStream(new FileInputStream(f));
         fi.readFully(data);
@@ -368,6 +372,21 @@ public class EditableResources extends Resources implements TreeModel {
         return data;
     }
 
+    private byte[] readFileNoNormal(File f) throws IOException {
+        byte[] data = new byte[(int)f.length()];
+        DataInputStream fi = new DataInputStream(new FileInputStream(f));
+        fi.readFully(data);
+        fi.close();
+        return data;
+    }
+
+    /**
+     * Converts a file name to a normalized name so it can be saved on a windows filesystem
+     */
+    private String normalizeFileName(String fName) {
+        return fName.replace("*", "_").replace("?", "_").replace(":", "_");
+    }
+    
     public void openFileWithXMLSupport(File f) throws IOException {
         if(xmlEnabled && f.getParentFile().getName().equals("src")) {
             File res = new File(f.getParentFile().getParentFile(), "res");
@@ -383,22 +402,27 @@ public class EditableResources extends Resources implements TreeModel {
                         // open the XML file...
                         JAXBContext ctx = JAXBContext.newInstance(ResourceFileXML.class);
                         ResourceFileXML xmlData = (ResourceFileXML)ctx.createUnmarshaller().unmarshal(xml);
+                        boolean normalize = xmlData.getMajorVersion() > 1 || xmlData.getMinorVersion() > 5;
                         
                         if(xmlData.getData() != null) {
                             for(Data d : xmlData.getData()) {
-                                setResource(d.getName(), MAGIC_DATA, readFile(new File(resDir, d.getName())));
+                                setResource(d.getName(), MAGIC_DATA, readFile(resDir, d.getName(), normalize));
                             }
                         }
                         
                         if(xmlData.getUi() != null) {
                             for(Ui d : xmlData.getUi()) {
-                                setResource(d.getName(), MAGIC_UI, readFile(new File(resDir, d.getName())));
+                                setResource(d.getName(), MAGIC_UI, readFile(resDir, d.getName(), normalize));
                             }
                         }
                         
                         if(xmlData.getLegacyFont() != null) {
                             for(LegacyFont d : xmlData.getLegacyFont()) {
-                                DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, d.getName())));
+                                String name = d.getName();
+                                if(normalize) {
+                                    name = normalizeFileName(name);
+                                }
+                                DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, name)));
                                 setResource(d.getName(), MAGIC_FONT, loadFont(fi, d.getName(), false));
                                 fi.close();
                             }
@@ -408,7 +432,11 @@ public class EditableResources extends Resources implements TreeModel {
                             for(com.codename1.ui.util.xml.Image d : xmlData.getImage()) {
                                 if(d.getType() == null) {
                                     // standara JPG or PNG
-                                    FileInputStream fi = new FileInputStream(new File(resDir, d.getName()));
+                                    String name = d.getName();
+                                    if(normalize) {
+                                        name = normalizeFileName(name);
+                                    }
+                                    FileInputStream fi = new FileInputStream(new File(resDir, name));
                                     EncodedImage e = EncodedImage.create(fi);
                                     fi.close();
                                     setResource(d.getName(), MAGIC_IMAGE, e);
@@ -416,19 +444,27 @@ public class EditableResources extends Resources implements TreeModel {
                                 }
 
                                 if("svg".equals(d.getType())) {
-                                    setResource(d.getName(), MAGIC_IMAGE, Image.createSVG(d.getType(), false, readFile(new File(resDir, d.getName()))));
+                                    setResource(d.getName(), MAGIC_IMAGE, Image.createSVG(d.getType(), false, readFile(resDir, d.getName(), normalize)));
                                     continue;
                                 }
 
                                 if("timeline".equals(d.getType())) {
-                                    DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, d.getName())));
+                                    String name = d.getName();
+                                    if(normalize) {
+                                        name = normalizeFileName(name);
+                                    }
+                                    DataInputStream fi = new DataInputStream(new FileInputStream(new File(resDir, name)));
                                     setResource(d.getName(), MAGIC_IMAGE, readTimeline(fi));
                                     fi.close();
                                     continue;
                                 }
                                 
                                 if("multi".equals(d.getType())) {
-                                    File multiImageDir = new File(resDir, d.getName());
+                                    String name = d.getName();
+                                    if(normalize) {
+                                        name = normalizeFileName(name);
+                                    }
+                                    File multiImageDir = new File(resDir, name);
                                     File hd = new File(multiImageDir, "hd.png");
                                     File veryhigh = new File(multiImageDir, "veryhigh.png");
                                     File high = new File(multiImageDir, "high.png");
@@ -438,22 +474,22 @@ public class EditableResources extends Resources implements TreeModel {
                                     
                                     Map<Integer, EncodedImage> images = new HashMap<Integer, EncodedImage>();
                                     if(hd.exists()) {
-                                        images.put(new Integer(Display.DENSITY_HD), EncodedImage.create(readFile(hd)));
+                                        images.put(new Integer(Display.DENSITY_HD), EncodedImage.create(readFileNoNormal(hd)));
                                     }
                                     if(veryhigh.exists()) {
-                                        images.put(new Integer(Display.DENSITY_VERY_HIGH), EncodedImage.create(readFile(veryhigh)));
+                                        images.put(new Integer(Display.DENSITY_VERY_HIGH), EncodedImage.create(readFileNoNormal(veryhigh)));
                                     }
                                     if(high.exists()) {
-                                        images.put(new Integer(Display.DENSITY_HIGH), EncodedImage.create(readFile(high)));
+                                        images.put(new Integer(Display.DENSITY_HIGH), EncodedImage.create(readFileNoNormal(high)));
                                     }
                                     if(medium.exists()) {
-                                        images.put(new Integer(Display.DENSITY_MEDIUM), EncodedImage.create(readFile(medium)));
+                                        images.put(new Integer(Display.DENSITY_MEDIUM), EncodedImage.create(readFileNoNormal(medium)));
                                     }
                                     if(low.exists()) {
-                                        images.put(new Integer(Display.DENSITY_LOW), EncodedImage.create(readFile(low)));
+                                        images.put(new Integer(Display.DENSITY_LOW), EncodedImage.create(readFileNoNormal(low)));
                                     }
                                     if(veryLow.exists()) {
-                                        images.put(new Integer(Display.DENSITY_VERY_LOW), EncodedImage.create(readFile(veryLow)));
+                                        images.put(new Integer(Display.DENSITY_VERY_LOW), EncodedImage.create(readFileNoNormal(veryLow)));
                                     }
                                     
                                     int[] dpis = new int[images.size()];
@@ -762,9 +798,9 @@ public class EditableResources extends Resources implements TreeModel {
                             case 0xf2:
                                 if(image instanceof EncodedImage) {
                                     byte[] data = ((EncodedImage)image).getImageData();
-                                    writeToFile(data, new File(resourcesDir, resourceNames[iter]));
+                                    writeToFile(data, new File(resourcesDir, normalizeFileName(resourceNames[iter])));
                                 } else {
-                                    FileOutputStream fo = new FileOutputStream(new File(resourcesDir, resourceNames[iter]));
+                                    FileOutputStream fo = new FileOutputStream(new File(resourcesDir, normalizeFileName(resourceNames[iter])));
                                     BufferedImage buffer = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
                                     buffer.setRGB(0, 0, image.getWidth(), image.getHeight(), image.getRGB(), 0, image.getWidth());
                                     ImageIO.write(buffer, "png", fo);
@@ -777,7 +813,7 @@ public class EditableResources extends Resources implements TreeModel {
                             // multiimage with SVG
                             case 0xf7:
                                 SVG s = (SVG)image.getSVGDocument();
-                                writeToFile(s.getSvgData(), new File(resourcesDir, resourceNames[iter]));
+                                writeToFile(s.getSvgData(), new File(resourcesDir, normalizeFileName(resourceNames[iter])));
 
                                 if(s.getBaseURL() != null && s.getBaseURL().length() > 0) {
                                     bw.write("baseUrl=\"" + s.getBaseURL() + "\" ");
@@ -786,7 +822,7 @@ public class EditableResources extends Resources implements TreeModel {
                                 break;
 
                             case 0xF6:
-                                File multiImageDir = new File(resourcesDir, resourceNames[iter]);
+                                File multiImageDir = new File(resourcesDir, normalizeFileName(resourceNames[iter]));
                                 multiImageDir.mkdirs();
                                 for(int imageIter = 0 ; imageIter < mi.getDpi().length ; imageIter++) {
                                     File f = null;
@@ -817,7 +853,7 @@ public class EditableResources extends Resources implements TreeModel {
 
                             // Timeline
                             case MAGIC_TIMELINE:
-                                File timeline = new File(resourcesDir, resourceNames[iter]);
+                                File timeline = new File(resourcesDir, normalizeFileName(resourceNames[iter]));
                                 DataOutputStream timelineOut = new DataOutputStream(new FileOutputStream(timeline));
                                 writeTimeline(timelineOut, (Timeline)image);
                                 timelineOut.close();
@@ -1103,14 +1139,14 @@ public class EditableResources extends Resources implements TreeModel {
                         bw.write("    </theme>\n");
                         continue;
                     case MAGIC_FONT:
-                        File legacyFont = new File(resourcesDir, resourceNames[iter]);
+                        File legacyFont = new File(resourcesDir, normalizeFileName(resourceNames[iter]));
                         DataOutputStream legacyFontOut = new DataOutputStream(new FileOutputStream(legacyFont));
                         saveFont(legacyFontOut, false, resourceNames[iter]);
                         legacyFontOut.close();
                         bw.write("    <legacyFont name=\"" + xResourceName + "\" />\n");
                         continue;
                     case MAGIC_DATA: {
-                        File dataFile = new File(resourcesDir, resourceNames[iter]);
+                        File dataFile = new File(resourcesDir, normalizeFileName(resourceNames[iter]));
                         DataOutputStream dataFileOut = new DataOutputStream(new FileOutputStream(dataFile));
                         InputStream i = getData(resourceNames[iter]);
                         ByteArrayOutputStream outArray = new ByteArrayOutputStream();

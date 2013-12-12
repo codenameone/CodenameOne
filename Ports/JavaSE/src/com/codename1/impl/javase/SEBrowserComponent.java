@@ -54,7 +54,7 @@ public class SEBrowserComponent extends PeerComponent {
     private JavaSEPort instance;
     private String currentURL;
     private boolean init = false;
-    private JPanel cnt = new JPanel();
+    private JPanel cnt;
     private boolean lightweightMode;
     private boolean lightweightModeSet;
     public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
@@ -64,9 +64,14 @@ public class SEBrowserComponent extends PeerComponent {
         this.frm = f;
         this.panel = fx;
 
-        cnt.setLayout(new BorderLayout());
-        cnt.add(BorderLayout.CENTER, panel);
-        cnt.setVisible(false);
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                cnt = new JPanel();
+                cnt.setLayout(new BorderLayout());
+                cnt.add(BorderLayout.CENTER, panel);
+                cnt.setVisible(false);
+            }
+        });
 
         web.getEngine().getLoadWorker().messageProperty().addListener(new ChangeListener<String>() {
             @Override
@@ -258,6 +263,9 @@ public class SEBrowserComponent extends PeerComponent {
     
     @Override
     protected void onPositionSizeChange() {
+        if(cnt == null) {
+            return;
+        }
         Form f = getComponentForm();
         if(cnt.getParent() == null && 
                 f != null && 

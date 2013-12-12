@@ -75,6 +75,20 @@ public class Resources {
     static final byte MAGIC_HEADER = (byte)0xFF;
     static final byte MAGIC_PASSWORD = (byte)0xFE;
 
+    /**
+     * @return the failOnMissingTruetype
+     */
+    public static boolean isFailOnMissingTruetype() {
+        return failOnMissingTruetype;
+    }
+
+    /**
+     * @param aFailOnMissingTruetype the failOnMissingTruetype to set
+     */
+    public static void setFailOnMissingTruetype(boolean aFailOnMissingTruetype) {
+        failOnMissingTruetype = aFailOnMissingTruetype;
+    }
+
     private short majorVersion;
     private short minorVersion;
     private static byte[] key;
@@ -119,6 +133,8 @@ public class Resources {
     private static boolean runtimeMultiImages;
     
     private static final String systemResourceLocation = "/CN1Resource.res";
+
+    private static boolean failOnMissingTruetype = true;
     
     /**
      * This flag should be off and it is off by default, some special case implementations for development
@@ -1197,6 +1213,14 @@ public class Resources {
             case 3:
                 fontSize = Display.getInstance().convertToPixels((int)(fontSize * 10), true) / 10.0f;
                 break;
+        }
+        if(!failOnMissingTruetype) {
+            try {
+                return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
+            } catch(Exception err) {
+                err.printStackTrace();
+                return f;
+            }
         }
         return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }

@@ -37,10 +37,10 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ResourceFileXML {
     @XmlAttribute
-    private String majorVersion;
+    private int majorVersion;
 
     @XmlAttribute
-    private String minorVersion;
+    private int minorVersion;
     
     @XmlElement
     private Theme[] theme;
@@ -63,14 +63,14 @@ public class ResourceFileXML {
     /**
      * @return the majorVersion
      */
-    public String getMajorVersion() {
+    public int getMajorVersion() {
         return majorVersion;
     }
 
     /**
      * @return the minorVersion
      */
-    public String getMinorVersion() {
+    public int getMinorVersion() {
         return minorVersion;
     }
 

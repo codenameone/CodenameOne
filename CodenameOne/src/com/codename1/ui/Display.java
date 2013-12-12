@@ -919,6 +919,9 @@ public final class Display {
 
                 edtLoopImpl();
             } catch(Throwable err) {
+                if(!codenameOneRunning) {
+                    return;
+                }
                 err.printStackTrace();
                 if(crashReporter != null) {
                     CodenameOneThread.handleException(err);

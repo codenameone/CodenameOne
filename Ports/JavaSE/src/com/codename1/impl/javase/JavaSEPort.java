@@ -584,8 +584,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
-                    bg.translate(-getScreenCoordinates().x, -getScreenCoordinates().y);
-                    paintChildren(bg);
+                    if(zoomLevel != 1) {
+                        AffineTransform af = bg.getTransform();
+                        bg.setTransform(AffineTransform.getScaleInstance(1, 1));
+                        bg.translate(-(getScreenCoordinates().x * zoomLevel) - x, -(getScreenCoordinates().y * zoomLevel) - y);
+                        paintChildren(bg);
+                        bg.setTransform(af);
+                    } else {
+                        bg.translate(-getScreenCoordinates().x - x, -getScreenCoordinates().y - y);
+                        paintChildren(bg);
+                    }
                     bg.dispose();
                     painted = true;
                 }
@@ -611,7 +619,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
-                    paintChildren(bg);
+                    if(zoomLevel != 1) {
+                        AffineTransform af = bg.getTransform();
+                        bg.setTransform(AffineTransform.getScaleInstance(1, 1));
+                        paintChildren(bg);
+                        bg.setTransform(af);
+                    } else {
+                        paintChildren(bg);
+                    }
                     bg.dispose();
                     painted = true;
                 }
@@ -5500,10 +5515,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 final WebView webView = new WebView();
                 root.getChildren().add(webView);
                 webContainer.setScene(new Scene(root));
-                bc[0] = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent);
-                synchronized (bc) {
-                    bc.notify();
-                }
+                
+                // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
+                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent);
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        bc[0] = bcc;
+                        synchronized (bc) {
+                            bc.notify();
+                        }
+                    }
+                });
+                
             }
         });
         Display.getInstance().invokeAndBlock(new Runnable() {

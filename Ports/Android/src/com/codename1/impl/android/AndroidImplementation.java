@@ -5021,8 +5021,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public boolean hasCamera() {
-        int numCameras = Camera.getNumberOfCameras();
-        return numCameras > 0;
+        try {
+            int numCameras = Camera.getNumberOfCameras();
+            return numCameras > 0;
+        } catch(Throwable t) {
+            return true;
+        }
     }
 
     public String getCurrentAccessPoint() {
