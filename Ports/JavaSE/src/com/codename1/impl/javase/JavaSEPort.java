@@ -4578,6 +4578,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
+        if (file.startsWith("file:/")) {
+            return file.substring(6);
+        }
         return file;
     }
 
@@ -5573,9 +5576,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             url = this.getClass().getResource(url).toExternalForm();
         }
         if(url.startsWith("file:")) {
-            if(url.startsWith("file:")) {
-                url = "file://" + unfile(url);
-            }
+            url = "file:/" + unfile(url);
         }
         final String theUrl = url;
         Platform.runLater(new Runnable() {
