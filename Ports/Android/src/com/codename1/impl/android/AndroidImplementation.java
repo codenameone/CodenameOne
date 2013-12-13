@@ -1574,8 +1574,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isTouchDevice() {
-        Configuration c = this.myView.getAndroidView().getResources().getConfiguration();
-        return c.touchscreen != Configuration.TOUCHSCREEN_NOTOUCH;
+        return activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
     }
 
     @Override
