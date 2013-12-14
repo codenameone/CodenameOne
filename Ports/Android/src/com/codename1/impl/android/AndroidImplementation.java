@@ -3158,17 +3158,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return true;
                 }
 
-                @Override
-                public void onProgressChanged(WebView view, int newProgress) {
+               @Override
+               public void onProgressChanged(WebView view, int newProgress) {
                     if(!hideProgress && isNativeTitle() && getCurrentForm().getTitle().length() > 0 ){
-                        activity.setProgressBarVisibility(true);
-                        activity.setProgress(newProgress * 100);
-                        if(newProgress == 100){
-                            activity.setProgressBarVisibility(false);
+                        if(activity != null){
+                            try{
+                                activity.setProgressBarVisibility(true);
+                                activity.setProgress(newProgress * 100);
+                                if(newProgress == 100){
+                                    activity.setProgressBarVisibility(false);
+                                }                            
+                            }catch(Throwable t){
+                            }
                         }
                     }
                 }
-                
+                 
                 @Override
                 public void onGeolocationPermissionsShowPrompt(String origin,
                         GeolocationPermissions.Callback callback) {
