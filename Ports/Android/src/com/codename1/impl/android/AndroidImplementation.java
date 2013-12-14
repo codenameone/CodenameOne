@@ -357,14 +357,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
         } else {
-            activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));            
+            activity.invalidateOptionsMenu();
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
                 activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
-            activity.runOnUiThread(new NotifyActionBar(activity, false));
+            NotifyActionBar notify = new NotifyActionBar(activity, false);
+            notify.run();
         }
         if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -398,12 +399,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         this.defaultFont = (Paint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         Display.getInstance().setTransitionYield(-1);
-        activity.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                initSurface();
-            }
-        });
+        
+        initSurface();
         /**
          * devices are extemely sensitive so dragging should start a little
          * later than suggested by default implementation.
@@ -413,7 +410,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Display.getInstance().registerVirtualKeyboard(vkb);
         Display.getInstance().setDefaultVirtualKeyboard(vkb);
 
-        saveTextEditingState();
+        InPlaceEditView.endEdit();
 
         activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
@@ -573,14 +570,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void hideNotifyPublic() {
         super.hideNotify();
-        //make sure the inline edit is cleaned
-//        activity.runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() {
-//                // Must be called from the UI thread
-//                InPlaceEditView.endEdit();
-//            }
-//        });
         saveTextEditingState();
     }
 
