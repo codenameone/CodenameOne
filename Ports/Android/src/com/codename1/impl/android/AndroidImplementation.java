@@ -3147,9 +3147,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return true;
                 }
 
-               @Override
+               @Override 
                public void onProgressChanged(WebView view, int newProgress) {
-                    if(!hideProgress && isNativeTitle() && getCurrentForm().getTitle().length() > 0 ){
+                    if(!hideProgress && isNativeTitle() && getCurrentForm() != null && getCurrentForm().getTitle() != null && getCurrentForm().getTitle().length() > 0 ){
                         if(activity != null){
                             try{
                                 activity.setProgressBarVisibility(true);
