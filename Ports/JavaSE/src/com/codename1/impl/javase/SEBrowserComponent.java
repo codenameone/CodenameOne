@@ -168,6 +168,8 @@ public class SEBrowserComponent extends PeerComponent {
         });
     }
         
+    
+    private static final Object DEINIT_LOCK = new Object();
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -178,11 +180,27 @@ public class SEBrowserComponent extends PeerComponent {
                 frm.remove(cnt);
                 frm.repaint();
                 init = false;
+                synchronized(DEINIT_LOCK) {
+                    DEINIT_LOCK.notify();
+                }
+            }
+        });
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                while(init && cnt.getParent() != null) {
+                    synchronized(DEINIT_LOCK) {
+                        try {
+                            DEINIT_LOCK.wait(20);
+                        } catch(InterruptedException er) {}
+                    }
+                }
             }
         });
     }
     
+    private static final Object INIT_LOCK = new Object();
     private void init() {
+        final boolean[] completed = new boolean[1];
         SwingUtilities.invokeLater(new Runnable() {
 
             public void run() {
@@ -201,9 +219,23 @@ public class SEBrowserComponent extends PeerComponent {
                         cnt.setVisible(false);
                     }
                 }
+                completed[0] = true;
+                synchronized(INIT_LOCK) {
+                    INIT_LOCK.notify();
+                }
             }
         });
-
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                while(!completed[0]) {
+                    synchronized(INIT_LOCK) {
+                        try {
+                            INIT_LOCK.wait(20);
+                        } catch(InterruptedException er) {}
+                    }
+                }
+            }
+        });
     }
     
     protected void setLightweightMode(final boolean l) {
