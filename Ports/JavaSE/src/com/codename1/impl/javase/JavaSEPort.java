@@ -589,7 +589,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if(zoomLevel != 1) {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
-                        bg.translate(-(getScreenCoordinates().x * zoomLevel) - x, -(getScreenCoordinates().y * zoomLevel) - y);
+                        bg.translate(-(getScreenCoordinates().x + x )* zoomLevel, -(getScreenCoordinates().y + y ) * zoomLevel);
                         super.paintChildren(bg);
                         bg.setTransform(af);
                     } else {
