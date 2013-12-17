@@ -515,7 +515,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             if (g == null) {
                                 return;
                             }
-                            boolean painted = drawScreenBuffer(g);
+                            drawScreenBuffer(g);
                             updateBufferSize();
                             if (window != null) {
 
@@ -558,9 +558,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     }
                                 }
                             }
-                            if(!painted) {
-                                paintChildren(g);
-                            }
                             g.dispose();
                         }
                     }
@@ -578,31 +575,36 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void blit(int x, int y, int w, int h) {
             blit();
         }
+        
+        @Override
+        protected void paintChildren(java.awt.Graphics g) {
+        }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
             boolean painted = false;
-            if (getScreenCoordinates() != null) {
+            Rectangle screenCoord = getScreenCoordinates();
+            if (screenCoord != null) {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
                     if(zoomLevel != 1) {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
                         bg.translate(-(getScreenCoordinates().x * zoomLevel) - x, -(getScreenCoordinates().y * zoomLevel) - y);
-                        paintChildren(bg);
+                        super.paintChildren(bg);
                         bg.setTransform(af);
                     } else {
                         bg.translate(-getScreenCoordinates().x - x, -getScreenCoordinates().y - y);
-                        paintChildren(bg);
+                        super.paintChildren(bg);
                     }
                     bg.dispose();
                     painted = true;
                 }
-                g.setColor(Color.WHITE);
-                g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
-                g.fillRect(x, y + (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
                 if (isEnabled()) {
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 } else {
+                    g.setColor(Color.WHITE);
+                    g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
+                    g.fillRect(x, y + (int) (getSkin().getHeight() * zoomLevel), getWidth(), getHeight());
                     java.awt.Graphics g1 = buffer.getGraphics();
                     g1.setColor(Color.WHITE);
                     g1.fillRect(0, 0, buffer.getWidth(), buffer.getHeight());
@@ -622,10 +624,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if(zoomLevel != 1) {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
-                        paintChildren(bg);
+                        super.paintChildren(bg);
                         bg.setTransform(af);
                     } else {
-                        paintChildren(bg);
+                        super.paintChildren(bg);
                     }
                     bg.dispose();
                     painted = true;
@@ -636,11 +638,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void paintComponent(java.awt.Graphics g) {
-            super.paintComponent(g);
             if (buffer != null) {
                 drawScreenBuffer(g);
                 updateBufferSize();
-                if (Display.getInstance().isInitialized()) {
+                if (Display.isInitialized()) {
                     Form f = getCurrentForm();
                     if (f != null) {
                         f.repaint();
@@ -2593,11 +2594,27 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         javax.swing.text.JTextComponent swingT;
         if (cmp instanceof com.codename1.ui.TextField && ((com.codename1.ui.TextField)cmp).isSingleLineTextArea()) {
-            JTextField t = new JTextField();
+            JTextField t = new JTextField() {
+                public void repaint(long tm, int x, int y, int width, int height) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            cmp.repaint();
+                        }
+                    });
+                }
+            };
             swingT = t;
         } else {
             com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns());
+            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
+                public void repaint(long tm, int x, int y, int width, int height) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            cmp.repaint();
+                        }
+                    });
+                }
+            };
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
@@ -3583,7 +3600,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 err.printStackTrace();
                 throw new RuntimeException(err);
             }
-        }
+        } 
         throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
     }
 
