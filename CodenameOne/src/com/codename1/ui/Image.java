@@ -286,12 +286,17 @@ public class Image {
      * @return image masked based on the given object
      */
     public Image applyMaskAutoScale(Object mask) {
-        int mWidth = ((IndexedImage)mask).getWidth();
-        int mHeight = ((IndexedImage)mask).getHeight();
-        if(mWidth != getWidth() || mHeight != getHeight()) {
-            return scaled(mWidth, mHeight).applyMask(mask);
+        try {
+            int mWidth = ((IndexedImage)mask).getWidth();
+            int mHeight = ((IndexedImage)mask).getHeight();
+            if(mWidth != getWidth() || mHeight != getHeight()) {
+                return scaled(mWidth, mHeight).applyMask(mask);
+            }
+            return applyMask(mask);
+        } catch(Throwable t) {
+            t.printStackTrace();
         }
-        return applyMask(mask);
+        return this;
     }
 
     /**
