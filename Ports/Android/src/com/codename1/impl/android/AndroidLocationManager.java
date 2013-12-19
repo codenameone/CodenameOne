@@ -154,7 +154,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
             public void run() {
                 locationManager.removeUpdates(AndroidLocationManager.this);
-                locationManager.addGpsStatusListener(AndroidLocationManager.this);
+                locationManager.removeGpsStatusListener(AndroidLocationManager.this);
             }
         });
     }
