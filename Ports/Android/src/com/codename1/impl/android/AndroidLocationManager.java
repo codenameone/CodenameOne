@@ -142,6 +142,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
             public void run() {
                 locationManager.requestLocationUpdates(bestProvider, 0, 0, AndroidLocationManager.this);
+                locationManager.addGpsStatusListener(AndroidLocationManager.this);
             }
         });
     }
@@ -153,6 +154,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
             public void run() {
                 locationManager.removeUpdates(AndroidLocationManager.this);
+                locationManager.addGpsStatusListener(AndroidLocationManager.this);
             }
         });
     }
