@@ -289,25 +289,37 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(JAVA_OBJECT instanc
 }
 
 NSString* toNSString(JAVA_OBJECT str) {
-    if(str == 0) {
+    if(str == JAVA_NULL) {
         return 0;
     }
-    
     // accessing internal state since toCharArray performs an allocation which can be REALLY expensive
     int offset = ((java_lang_String*) str)->fields.java_lang_String.offset_;
     org_xmlvm_runtime_XMLVMArray* cArr = ((java_lang_String*) str)->fields.java_lang_String.value_;
+    //NSLog(@"cArr pointer is: %i", cArr);
+    if(cArr == JAVA_NULL) {
+        const char* chrs = stringToUTF8(str);
+        NSString* st = [NSString stringWithUTF8String:chrs];
+        //NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
+        return st;
+    }
+    
     JAVA_ARRAY_CHAR* chrArr = (JAVA_ARRAY_CHAR*)cArr->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    //NSLog(@"chrArr pointer is: %i", chrArr);
+    
     int length = ((java_lang_String*) str)->fields.java_lang_String.count_;
     
     for(int iter = offset ; iter < length ; iter++) {
         if(chrArr[iter] > 127) {
             const char* chrs = stringToUTF8(str);
             NSString* st = [NSString stringWithUTF8String:chrs];
-            NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
+            //NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
             return st;
         }
     }
-    return [[NSString stringWithCharacters:chrArr length:length] substringFromIndex:offset];
+    if(offset > 0) {
+        return [[NSString stringWithCharacters:chrArr length:length+offset] substringFromIndex:offset];
+    }
+    return [NSString stringWithCharacters:chrArr length:length];
 }
 
 void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String(

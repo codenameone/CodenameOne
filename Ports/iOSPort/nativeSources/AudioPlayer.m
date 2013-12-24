@@ -49,9 +49,12 @@ AudioPlayer* currentlyPlaying = nil;
                                                        object:[avPlayerInstance currentItem]];
         } else {
             playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
-            playerInstance.delegate = self;
-            if(volume > -1) {
-                playerInstance.volume = volume;
+            if(playerInstance != nil)
+            {
+                playerInstance.delegate = self;
+                if(volume > -1) {
+                    playerInstance.volume = volume;
+                }
             }
         }
     }
@@ -64,9 +67,12 @@ AudioPlayer* currentlyPlaying = nil;
     if (self) {
         runnableCallback = callback;
         playerInstance = [[AVAudioPlayer alloc] initWithData:data error:&errorInfo];
-        playerInstance.delegate = self;
-        if(volume > -1) {
-            playerInstance.volume = volume;
+        if(playerInstance != nil)
+        {
+            playerInstance.delegate = self;
+            if(volume > -1) {
+                playerInstance.volume = volume;
+            }
         }
         if(currentlyPlaying == nil) {
             currentlyPlaying = self;
@@ -86,6 +92,9 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
+    if(playerInstance != nil) {
+        [self release];
+    }
     if(runnableCallback != 0) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         com_codename1_ui_Display_callSerially___java_lang_Runnable(o, runnableCallback);
@@ -126,9 +135,13 @@ AudioPlayer* currentlyPlaying = nil;
 - (void)playAudio {
     currentlyPlaying = self;
     if(playerInstance != nil) {
+        [self retain];
         [playerInstance play];
-    } else {
+    } else if(avPlayerInstance != nil){
         [avPlayerInstance play];
+    } else if(runnableCallback != 0) {
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
+        com_codename1_ui_Display_callSerially___java_lang_Runnable(o, runnableCallback);
     }
 }
 
@@ -136,7 +149,9 @@ AudioPlayer* currentlyPlaying = nil;
     if(playerInstance != nil) {
         [playerInstance pause];
     } else {
-        [avPlayerInstance pause];
+        if(avPlayerInstance != nil){
+            [avPlayerInstance pause];
+        }
     }
 }
 
@@ -144,7 +159,9 @@ AudioPlayer* currentlyPlaying = nil;
     if(playerInstance != nil) {
         playerInstance.currentTime = ((float)time) / 1000.0;
     } else {
-        [avPlayerInstance seekToTime:CMTimeMakeWithSeconds(((float)time) / 1000.0, avPlayerInstance.currentItem.currentTime.timescale)];
+        if(avPlayerInstance != nil){
+            [avPlayerInstance seekToTime:CMTimeMakeWithSeconds(((float)time) / 1000.0, avPlayerInstance.currentItem.currentTime.timescale)];
+        }
     }
 }
 
@@ -169,7 +186,10 @@ AudioPlayer* currentlyPlaying = nil;
     if(playerInstance != nil) {
         return playerInstance.isPlaying;
     }
-    return [avPlayerInstance rate] != 0.0;
+    if(avPlayerInstance != nil) {
+        return [avPlayerInstance rate] != 0.0;
+    }
+    return false;
 }
 
 -(void)dealloc {
@@ -180,10 +200,12 @@ AudioPlayer* currentlyPlaying = nil;
         [playerInstance release];
         playerInstance = nil;
     } else {
-        [avPlayerInstance release];
-        avPlayerInstance = nil;
+        if(avPlayerInstance != nil){
+            [avPlayerInstance release];
+            avPlayerInstance = nil;
+        }
     }
-	[super dealloc];
+    [super dealloc];
 }
 
 @end
