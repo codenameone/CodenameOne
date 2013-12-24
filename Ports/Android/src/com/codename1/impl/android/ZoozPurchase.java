@@ -139,6 +139,9 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
                 Log.d("Codename One", data.getStringExtra(CheckoutActivity.ZOOZ_ERROR_MSG));
                 purchaseId = data.getStringExtra(CheckoutActivity.ZOOZ_TRANSACTION_ID);
                 failMessage = data.getStringExtra(CheckoutActivity.ZOOZ_ERROR_MSG);
+                if(failMessage == null) {
+                    failMessage = "";
+                }
             }
         }
         completed = true;
