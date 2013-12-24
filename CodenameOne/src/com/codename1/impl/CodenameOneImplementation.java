@@ -4935,7 +4935,10 @@ public abstract class CodenameOneImplementation {
     public String getAppHomePath() {
         String home = listFilesystemRoots()[0];
         String name = getProperty("AppName", packageName);
-        home = home + getFileSystemSeparator() + name + getFileSystemSeparator();
+        if(!home.endsWith("" + getFileSystemSeparator())) {
+            home += getFileSystemSeparator();
+        }
+        home = home + name + getFileSystemSeparator();
         if(!exists(home)){
             mkdir(home);
         }

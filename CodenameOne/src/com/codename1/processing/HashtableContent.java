@@ -190,9 +190,6 @@ class HashtableContent implements StructuredContent {
 			array.addElement(new HashtableContent((Hashtable) node, this));
 			return array;
 		} else {
-			if ((node instanceof String) == false) {
-				System.err.println("Warning - handled child type as string: " + node.getClass().getName());
-			}
 			Vector array = new Vector();
 			array.addElement(new HashtableContent(node.toString(), this));
 			return array;
