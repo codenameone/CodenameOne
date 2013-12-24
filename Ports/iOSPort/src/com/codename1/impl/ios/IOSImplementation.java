@@ -1014,6 +1014,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int cnt = t.countTokens();
         while(cnt > 2) {
             t.nextToken();
+            cnt--;
         }
         String name = t.nextToken();
         String type = t.nextToken();
