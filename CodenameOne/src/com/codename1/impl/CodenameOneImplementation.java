@@ -101,6 +101,7 @@ public abstract class CodenameOneImplementation {
     private static boolean bidi;
     private String packageName;
     private static int pollingMillis = 3 * 60 * 60000;
+    private Component editingText;
     
     /**
      * Useful since the content of a single element touch event is often recycled
@@ -270,6 +271,23 @@ public abstract class CodenameOneImplementation {
     public boolean handleEDTException(Throwable err) {
         return false;
     }
+    /**
+     * Encapsulates the editing code which is specific to the platform, some platforms
+     * would allow "in place editing" MIDP does not.
+     * 
+     * @param cmp the {@link TextArea} component
+     * @param maxSize the maximum size from the text area
+     * @param constraint the constraints of the text area
+     * @param text the string to edit
+     * @param initiatingKeycode the keycode used to initiate the edit.
+     */
+    public final void editStringImpl(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        editingText = cmp;
+        editString(cmp, maxSize, constraint, text, initiatingKeycode);
+        if(!isAsyncEditMode()) {
+            editingText = null;
+        }
+    }
 
     /**
      * Encapsulates the editing code which is specific to the platform, some platforms
@@ -283,6 +301,62 @@ public abstract class CodenameOneImplementation {
      */
     public abstract void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode);
 
+    /**
+     * Returns true if we are currently editing a component
+     * @return whether a component is being edited
+     */
+    public boolean isEditingText() {
+        return editingText != null;
+    }
+    
+    /**
+     * In case of scrolling we can hide the text editor unless the user starts typing again,
+     * this is only relevant for the async mode...
+     */
+    public void hideTextEditor() {
+        Component c = editingText;
+        editingText = null;
+        c.repaint();
+    }
+    
+    /**
+     * Allows the implementation to refresh the text field
+     */
+    protected final void repaintTextEditor() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if(editingText != null) {
+                    editingText.repaint();
+                }
+            }
+        });
+    }
+    
+    /**
+     * Returns true if we are currently editing this component
+     * @return whether a component is being edited
+     */
+    public boolean isEditingText(Component c) {
+        return editingText == c;
+    }
+
+    /**
+     * Returns true if edit string will return immediately and broadcast editing events directly to the text field
+     * @return false by default
+     */
+    public boolean isAsyncEditMode() {
+        return false;
+    }
+    
+    /**
+     * Returns the height of the VKB when it is open for an implementation that requires
+     * us to allow scrolling further
+     * @return height in pixels
+     */
+    public int getInvisibleAreaUnderVKB() {
+        return 0;
+    }
+    
     /**
      * Invoked if Codename One needs to dispose the native text editing but would like the editor
      * to store its state.
@@ -1655,7 +1729,7 @@ public abstract class CodenameOneImplementation {
      *
      * @param x the position of the current drag event
      * @param y the position of the current drag event
-     * @return true if the drag should propogate into Codename One
+     * @return true if the drag should propagate into Codename One
      */
     protected boolean hasDragStarted(final int[] x, final int[] y) {
         return hasDragStarted(x[0], y[0]);
@@ -1664,12 +1738,12 @@ public abstract class CodenameOneImplementation {
     /**
      * This method can be overriden by subclasses to indicate whether a drag
      * event has started or whether the device is just sending out "noise".
-     * This method is invoked by pointer dragged to determine whether to propogate
+     * This method is invoked by pointer dragged to determine whether to propagate
      * the actual pointer drag event to Codename One.
      * 
      * @param x the position of the current drag event
      * @param y the position of the current drag event
-     * @return true if the drag should propogate into Codename One
+     * @return true if the drag should propagate into Codename One
      */
     protected boolean hasDragStarted(final int x, final int y) {
 

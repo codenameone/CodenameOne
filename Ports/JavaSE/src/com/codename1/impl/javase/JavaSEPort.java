@@ -3585,8 +3585,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             fontFile = new File("src", fileName);
         }
-        if (fontFile.exists()) {
-            try {
+        try {
+            if (fontFile.exists()) {
                 FileInputStream fs = new FileInputStream(fontFile);
                 java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
                 fs.close();
@@ -3596,11 +3596,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 return fnt;
-            } catch (Exception err) {
-                err.printStackTrace();
-                throw new RuntimeException(err);
+            } else {
+                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
+                if(is != null) {
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    is.close();
+                    if (fnt != null) {
+                        if (!fontName.startsWith(fnt.getFamily())) {
+                            System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
+                        }
+                    }
+                    return fnt;
+                }
             }
-        } 
+        } catch (Exception err) {
+            err.printStackTrace();
+            throw new RuntimeException(err);
+        }
         throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
     }
 
@@ -4479,9 +4491,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
-        List<String> headers = c.getHeaderFields().get(name);
-        if (headers != null && headers.size() > 0) {
-            Vector v = new Vector<String>();
+        List<String> headers = new ArrayList<String>();
+        
+        // we need to merge headers with differing case since this should be case insensitive
+        for(String key : c.getHeaderFields().keySet()) {
+            if(key != null && key.equalsIgnoreCase(name)) {
+                headers.addAll(c.getHeaderFields().get(key));
+            }
+        }
+        if (headers.size() > 0) {
+            List<String> v = new ArrayList<String>();
             v.addAll(headers);
             Collections.reverse(v);
             String[] s = new String[v.size()];

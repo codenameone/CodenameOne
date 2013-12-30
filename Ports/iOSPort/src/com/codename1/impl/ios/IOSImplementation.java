@@ -209,9 +209,77 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getCookiesForURL(url);
     }    
     
+    private boolean textEditorHidden;
+    
+    @Override
+    public boolean isAsyncEditMode() {
+        return nativeInstance.isAsyncEditMode();
+    }
+    
+    @Override
+    public void hideTextEditor() {
+        nativeInstance.hideTextEditing();
+        textEditorHidden = true;
+        repaintTextEditor();
+    }
+
+    @Override
+    public boolean isEditingText(Component c) {
+        if(textEditorHidden) {
+            return false;
+        }
+        return super.isEditingText(c);
+    }
+
+    @Override
+    public boolean isEditingText() {
+        /*if(textEditorHidden) {
+            return false;
+        }*/
+        return super.isEditingText();
+    }
+
+    public static void foldKeyboard() {
+        instance.callHideTextEditor();
+        nativeInstance.foldVKB();
+        Display.getInstance().getCurrent().repaint();
+    }
+    
+    private void callHideTextEditor() {
+        super.hideTextEditor();
+    }
+    
+    /**
+     * Invoked from native do not remove
+     */
+    static void showTextEditorAgain() {
+        instance.textEditorHidden = false;
+        instance.repaintTextEditor();
+    }
+    
+    @Override
+    public int getInvisibleAreaUnderVKB() {
+        if(isAsyncEditMode() && isEditingText()) {
+            if(isTablet()) {
+                return getDisplayHeight() / 5;
+            } else {
+                return getDisplayHeight() / 5 * 3;
+            }
+        }
+        return 0;
+    }
+    
+    public void setCurrentForm(Form f) {
+        super.setCurrentForm(f);
+        if(isAsyncEditMode()) {
+            nativeInstance.foldVKB();
+        }
+    }
+    
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
+        textEditorHidden = false;
         currentEditing = (TextArea)cmp;
         
         //register the edited TextArea to support moving to the next field
@@ -233,7 +301,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         final boolean forceSlideUp = forceSlideUpTmp;
 
-        cmp.repaint();
+        if(isAsyncEditMode()) {
+            // revalidate the parent since the size of form is now larger due to the vkb
+            current.revalidate();
+        } else {
+            cmp.repaint();
+        }
         
         // give the repaint one cycle to "do its magic...
         final Style stl = currentEditing.getStyle();
@@ -267,6 +340,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(currentEditing.getUIManager().isThemeConstant("nativeHintBool", false) && currentEditing.getHint() != null) {
                     hint = currentEditing.getHint();
                 }
+                if(isAsyncEditMode()) {
+                    // request focus triggers a scroll which flicks the textEditorHidden flag
+                    cmp.requestFocus();
+                    textEditorHidden = false;
+                }
                 nativeInstance.editStringAt(x,
                         y,
                         w,
@@ -280,6 +358,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         pr, hint);
             }
         });
+        if(isAsyncEditMode()) {
+            return;
+        }
         editNext = false;
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
@@ -3754,7 +3835,33 @@ public class IOSImplementation extends CodenameOneImplementation {
             instance.life.applicationWillResignActive();
         }
     }
+    
+    /**
+     * Headphones connected callback
+     */
+    public static void headphonesConnected() {
+        if(instance.life != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    instance.life.headphonesConnected();
+                }
+            });
+        }        
+    }
 
+    /**
+     * Headphones disconnected callback
+     */
+    public static void headphonesDisconnected() {
+        if(instance.life != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    instance.life.headphonesDisconnected();
+                }
+            });
+        }        
+    }
+    
     /**
      * Use this method to release shared resources, save user data, invalidate 
      * timers, and store enough application state information to restore your 

@@ -51,6 +51,8 @@ public class NativeLookup {
                 }
                 return (NativeInterface)cls.newInstance();
             }
+            // special case for JavaSE native interfaces
+            return (NativeInterface)Class.forName(c.getName() + "Impl").newInstance();
         } catch (Throwable ex) {
             ex.printStackTrace();
         } 

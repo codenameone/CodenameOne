@@ -3590,9 +3590,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String[] getHeaderFields(String name, Object connection) throws IOException {
         HttpURLConnection c = (HttpURLConnection) connection;
-        List<String> headers = c.getHeaderFields().get(name);
-        if (headers != null && headers.size() > 0) {
-            Vector v = new Vector<String>();
+        List<String> headers = new ArrayList<String>();
+        
+        // we need to merge headers with differing case since this should be case insensitive
+        for(String key : c.getHeaderFields().keySet()) {
+            if(key != null && key.equalsIgnoreCase(name)) {
+                headers.addAll(c.getHeaderFields().get(key));
+            }
+        }
+        if (headers.size() > 0) {
+            List<String> v = new ArrayList<String>();
             v.addAll(headers);
             Collections.reverse(v);
             String[] s = new String[v.size()];

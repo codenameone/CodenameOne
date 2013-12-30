@@ -82,4 +82,16 @@ public class Lifecycle {
     public boolean shouldApplicationHandleURL(String url, String caller) {
         return true;
     }
+    
+    /**
+     * Headphones connected callback
+     */
+    public void headphonesConnected() {
+    }
+
+    /**
+     * Headphones disconnected callback
+     */
+    public void headphonesDisconnected() {
+    }
 }

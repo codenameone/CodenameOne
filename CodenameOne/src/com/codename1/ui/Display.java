@@ -336,8 +336,6 @@ public final class Display {
      */
     private boolean thirdSoftButton = false;
 
-    private Component editingText;
-
     /**
      * Ignore all calls to show occurring during edit, they are discarded immediately
      */
@@ -1211,7 +1209,7 @@ public final class Display {
             return;
         }
         
-        if(editingText != null) {
+        if(impl.isEditingText()) {
             switch(showDuringEdit) {
                 case SHOW_DURING_EDIT_ALLOW_DISCARD:
                     break;
@@ -1427,17 +1425,15 @@ public final class Display {
         Component.setDisableSmoothScrolling(true);
         f.scrollComponentToVisible(cmp);
         Component.setDisableSmoothScrolling(false);
-        editingText = cmp;
         keyRepeatCharged = false;
         longPressCharged = false;
         lastKeyPressed = 0;
         previousKeyPressed = 0;
-        impl.editString(cmp, maxSize, constraint, text, initiatingKeycode);
-        editingText = null;
+        impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
     }
     
     boolean isTextEditing(Component c) {
-        return editingText == c;
+        return impl.isEditingText(c);
     }
 
     /**

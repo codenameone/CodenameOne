@@ -388,4 +388,8 @@ public final class IOSNative {
     public native boolean isFacebookLoggedIn();
     public native String getFacebookToken();
     public native void facebookLogout();
+    
+    public native boolean isAsyncEditMode();
+    public native void foldVKB();
+    public native void hideTextEditing();
 }

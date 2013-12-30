@@ -28,38 +28,41 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
 
 /**
  * Helper method for textfield onscreen keyboard (editStringAt)
+ *
  * @author jaanus.hansen@nowinnovations.com
  */
 public class TextEditUtil {
-   
+
     /**
      * The currently edited TextArea
      */
     public static Component curEditedComponent;
-   
+
     /**
      * Sets currently edited textarea.
+     *
      * @param current the textarea
      */
     public static void setCurrentEditComponent(Component current) {
         curEditedComponent = current;
     }
-   
+
     /**
-     * @return if teh currently edited textarea is the last component
-     * on the form
+     * @return if the currently edited textarea is the last component on the
+     * form
      */
     public static boolean isLastEditComponent() {
         return getNextEditComponent() == null;
     }
-           
+
     /**
-     * Opens onscreenkeyboard for the next textfield.
-     * The method works in EDT if needed.
+     * Opens onscreenkeyboard for the next textfield. The method works in EDT if
+     * needed.
      */
     public static void editNextTextArea() {
         Runnable task = new Runnable() {
@@ -71,61 +74,37 @@ public class TextEditUtil {
                         TextArea text = (TextArea) next;
                         text.requestFocus();
                         Display.getInstance().editString(next,
-                            text.getMaxSize(), text.getConstraint(), text.getText(), 0);
+                                text.getMaxSize(), text.getConstraint(), text.getText(), 0);
                     }
+                } else {
+                    IOSImplementation.foldKeyboard();
                 }
             }
         };
         Display.getInstance().callSerially(task);
     }
-           
+
     /**
      *
      * @return the next editable TextArea after the currently edited component.
-     * CONSIDER: JaanusH: not toally sure if the approach to find the next
-     * TextArea by components order
-     * is correct, but it has worked for my apps
      */
     private static Component getNextEditComponent() {
-        Form currentForm = Display.getInstance().getCurrent();
-        return getNextEditComponent(currentForm, new BooleanContainer());
-    }
-   
-    /**
-     * Recursive function to find the next editable TextArea.
-     * @param container Container which components are iterated to find the
-     * next textfield.
-     * @param hasFoundActive if false then the method iterates so long as it finds
-     *          currently active textfield.
-     *              if true then returns as soon as it as iterated to an TextArea.
-     * @return
-     */
-    private static Component getNextEditComponent(Container container, BooleanContainer hasFoundActive) {
-        int c = container.getComponentCount();
-        for (int i = 0; i < c; i++) {
-            Component component = container.getComponentAt(i);
-            if (component == curEditedComponent) {
-                hasFoundActive.setOn();
+        Component nextTextArea = null;
+        if (curEditedComponent != null) {
+            Component next = curEditedComponent.getNextFocusDown();
+            if (next == null) {
+                next = curEditedComponent.getComponentForm().findNextFocusVertical(true);
             }
-            else {
-                if (component instanceof Container) {
-                    Component result = getNextEditComponent((Container)component, hasFoundActive);
-                    if (result != null) {
-                        return result;
-                    }
-                }
-                else if (hasFoundActive.isOn() && component instanceof TextArea) {
-                    TextArea result = (TextArea) component;
-                    if (result.isEditable()) {
-                        return result;
-                    }
-                }
+
+            if (next != null && next instanceof TextArea && ((TextArea) next).isEditable() && ((TextArea) next).isEnabled()) {
+                nextTextArea = (TextArea) next;
             }
         }
-        return null;
-    }  
-   
+        return nextTextArea;
+    }
+
 }
+
 /**
  * Helper container for mutabale boolean.
  */
@@ -154,5 +133,5 @@ class BooleanContainer {
     public boolean isOn() {
         return on;
     }
-   
+
 }

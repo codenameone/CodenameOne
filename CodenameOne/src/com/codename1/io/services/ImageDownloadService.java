@@ -110,6 +110,22 @@ public class ImageDownloadService extends ConnectionRequest {
     public static void setDefaultMaintainAspectRatio(boolean aDefaultMaintainAspectRatio) {
         defaultMaintainAspectRatio = aDefaultMaintainAspectRatio;
     }
+
+    /**
+     * Indicates the default timeout to use for image download service, -1 indicates no default is set.
+     * @return the defaultTimeout
+     */
+    public static int getDefaultTimeout() {
+        return defaultTimeout;
+    }
+
+    /**
+     * Indicates the default timeout to use for image download service, -1 indicates no default is set.
+     * @param aDefaultTimeout the defaultTimeout to set
+     */
+    public static void setDefaultTimeout(int aDefaultTimeout) {
+        defaultTimeout = aDefaultTimeout;
+    }
      
     private boolean downloadToStyles;
     private Label parentLabel;
@@ -123,7 +139,8 @@ public class ImageDownloadService extends ConnectionRequest {
     private String cacheId;
     private boolean keep;
     private ListModel targetModel;
-    
+
+    private static int defaultTimeout = -1;
     private static boolean fastScale = true;
     private Image placeholder;
     private static boolean defaultMaintainAspectRatio;
@@ -178,11 +195,18 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param l an action listener callback
      */
     public ImageDownloadService(String url, ActionListener l) {
-        setUrl(url);
+        init(url);
         addResponseListener(l);
-        setPost(false);
     }
 
+    private void init(String url) {
+        setUrl(url);
+        setPost(false);
+        if(defaultTimeout > -1) {
+            setTimeout(defaultTimeout);
+        }
+    }
+    
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives. This assumes the GenericListCellRenderer style of
@@ -197,8 +221,7 @@ public class ImageDownloadService extends ConnectionRequest {
         this.targetList = targetList;
         this.targetKey = targetKey;
         this.targetOffset = targetOffset;
-        setUrl(url);
-        setPost(false);
+        init(url);
     }
 
     /**
@@ -215,8 +238,7 @@ public class ImageDownloadService extends ConnectionRequest {
         this.targetList = targetList;
         this.targetKey = targetKey;
         this.targetOffset = targetOffset;
-        setUrl(url);
-        setPost(false);
+        init(url);
     }
 
     /**
@@ -227,9 +249,8 @@ public class ImageDownloadService extends ConnectionRequest {
      * @param parentLabel the label to update
      */
     public ImageDownloadService(String url, Label parentLabel) {
-        setUrl(url);
+        init(url);
         this.parentLabel = parentLabel;
-        setPost(false);
     }
 
     /**

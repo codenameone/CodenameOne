@@ -178,6 +178,8 @@ public class TextArea extends Component {
     
     private int columns = 3;
     
+    private int growLimit = -1;
+    
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     
     private ArrayList rowStrings;
@@ -628,6 +630,9 @@ public class TextArea extends Component {
      */
     public int getActualRows() {
         if(growByContent) {
+            if(growLimit > -1) {
+                return Math.min(Math.max(rows, getLines()), growLimit);
+            }
             return Math.max(rows, getLines());
         }
         return rows;
@@ -1557,6 +1562,22 @@ public class TextArea extends Component {
             return;
         }
         super.setBoundPropertyValue(prop, value);
+    }
+
+    /**
+     * Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+     * @return the growLimit
+     */
+    public int getGrowLimit() {
+        return growLimit;
+    }
+
+    /**
+     * Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+     * @param growLimit the growLimit to set
+     */
+    public void setGrowLimit(int growLimit) {
+        this.growLimit = growLimit;
     }
     
 }
