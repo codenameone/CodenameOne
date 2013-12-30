@@ -44,12 +44,14 @@
 #include "com_codename1_payment_Product.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
+#include "com_codename1_ui_Component.h"
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate = nil;
 extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
+BOOL vkbAlwaysOpen = NO;
 
 int nextPowerOf2(int val) {
     int i;
@@ -61,6 +63,7 @@ int displayWidth = -1;
 int displayHeight = -1;
 UIView *editingComponent;
 float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
+int editComponentPadTop, editComponentPadLeft;
 BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
@@ -139,10 +142,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [editingComponent removeFromSuperview];
             [editingComponent release];
             editingComponent = nil;
+            if(vkbAlwaysOpen) {
+                repaintUI();
+            }
         }
         float scale = scaleValue;
         editCompoentX = (x + padLeft) / scale;
         editCompoentY = (y + padTop) / scale;
+        editComponentPadTop = padTop;
+        editComponentPadLeft = padLeft;
         if (scale > 1) {
             editCompoentY -= 1.5;
         } else {
@@ -1154,6 +1162,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 BOOL patch = NO;
 int keyboardSlideOffset;
+int keyboardHeight;
 - (void)keyboardWillHide:(NSNotification *)n
 {
     @synchronized([CodenameOne_GLViewController instance]) {
@@ -1161,7 +1170,7 @@ int keyboardSlideOffset;
     }
     com_codename1_impl_ios_IOSImplementation_paintNow__();
     keyboardIsShown = NO;
-    if(!modifiedViewHeight) {
+    if(!modifiedViewHeight || vkbAlwaysOpen) {
         return;
     }
     NSDictionary* userInfo = [n userInfo];
@@ -1202,15 +1211,17 @@ int keyboardSlideOffset;
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
-    // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
-    if (keyboardIsShown) {
-        return;
-    }
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
     NSValue* boundsValue = [userInfo objectForKey:UIKeyboardBoundsUserInfoKey];
     CGSize keyboardSize = [boundsValue CGRectValue].size;
+    keyboardHeight = keyboardSize.height;
+    
+    // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
+    if (keyboardIsShown || vkbAlwaysOpen) {
+        return;
+    }
     
     // resize the noteView
     CGRect viewFrame = self.view.frame;
@@ -1374,7 +1385,7 @@ bool lockDrawing;
             UITextView* v = (UITextView*)editingComponent;
             stringEdit(YES, -1, v.text);
         } else {
-            UITextField* v = (UITextView*)editingComponent;
+            UITextField* v = (UITextField*)editingComponent;
             stringEdit(YES, -1, v.text);
         }
         [editingComponent resignFirstResponder];
@@ -1529,11 +1540,59 @@ bool lockDrawing;
                 firstTime = NO;
             }
         }
+        
+        // update the position of the edit component during drag events, we have to do this here
+        // since the animation might run for a while
+        if(vkbAlwaysOpen && editingComponent != nil) {
+            com_codename1_impl_ios_IOSImplementation* impl = (com_codename1_impl_ios_IOSImplementation*)com_codename1_impl_ios_IOSImplementation_GET_instance();
+            com_codename1_ui_Component* comp = (com_codename1_ui_Component*)impl->fields.com_codename1_impl_ios_IOSImplementation.currentEditing_;
+            if(comp != NULL) {
+                float newEditCompoentX = com_codename1_ui_Component_getAbsoluteX__(comp) / scaleValue;
+                float newEditCompoentY = com_codename1_ui_Component_getAbsoluteY__(comp) / scaleValue;
+                if(newEditCompoentX != editCompoentX || newEditCompoentY != editCompoentY) {
+                    for (UIWindow *window in [[UIApplication sharedApplication] windows])
+                    {
+                        NSString* windowDescription = [[window class] description];
+                        if([windowDescription isEqualToString:@"UITextEffectsWindow"]) {
+                            for(UIView *v in window.subviews) {
+                                if([[[v class] description] isEqualToString:@"UIAutocorrectInlinePrompt"]) {
+                                    v.frame = CGRectMake(newEditCompoentX + editComponentPadLeft / scaleValue,
+                                                         newEditCompoentY  + editComponentPadTop / scaleValue,
+                                                         v.frame.size.width, v.frame.size.height);
+                                    
+                                    float vkbPos = displayHeight / scaleValue - keyboardHeight;
+                                    if(newEditCompoentY  > vkbPos) {
+                                        v.hidden = YES;
+                                    } else {
+                                        v.hidden = NO;
+                                    }
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    editCompoentX = newEditCompoentX;
+                    editCompoentY = newEditCompoentY;
+                    editingComponent.frame = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
+                }
+            }
+        }
     }
     GLErrorLog;
     
     [(EAGLView *)self.view presentFramebuffer];
     GLErrorLog;
+}
+
+
+-(void)searchHierarchy:(UIView*)view {
+    if(view.subviews != nil) {
+        for(UIView *v in view.subviews) {
+            NSLog(@"Found entry: %@", [[v class] description]);
+            [self searchHierarchy:v];
+        }
+    }
 }
 
 - (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file
@@ -1851,7 +1910,9 @@ static BOOL skipNextTouch = NO;
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
     }
-    [self foldKeyboard:point];
+    if(!vkbAlwaysOpen) {
+        [self foldKeyboard:point];
+    }
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
@@ -1878,13 +1939,15 @@ static BOOL skipNextTouch = NO;
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
     }
-    [self foldKeyboard:point];
+    if(!vkbAlwaysOpen) {
+        [self foldKeyboard:point];
+    }
     pointerReleasedC(xArray, yArray, [touches count]);
     [pool release];
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-    if(skipNextTouch || editingComponent != nil) {
+    if(skipNextTouch || (editingComponent != nil && !vkbAlwaysOpen)) {
         return;
     }
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2052,8 +2115,7 @@ extern SKPayment *paymentInstance;
 }
 
 #ifdef INCLUDE_ZOOZ
--(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ /* CALLED BEFORE THE ZOOZ DIALOG IS CLOSED BY THE USER
-                                                                     the payment finished successfully call back to dialog is on background thread, no need to auto release pool, as this been taken care of. You shouldn√t update your UI on this, just process the payment data */
+-(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ 
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
     com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(fromNSString(tid), amount);
@@ -2064,7 +2126,6 @@ extern SKPayment *paymentInstance;
 
 // Zooz callback methods
 -(void)paymentSuccessDialogClosed{
-    /* Dialog is closed by the user after payment finished successfully (see paymentSuccessWithResponse: ì this is where you should update your UI on success transaction */
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();
     });

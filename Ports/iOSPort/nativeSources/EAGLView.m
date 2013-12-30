@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 #import <QuartzCore/QuartzCore.h>
@@ -25,10 +25,12 @@
 #import "EAGLView.h"
 #import "ExecutableOp.h"
 #import "CodenameOne_GLViewController.h"
+#include "com_codename1_impl_ios_IOSImplementation.h"
 
 
 extern void stringEdit(int finished, int cursorPos, const char* text);
-extern UITextView *editingComponent;
+extern UIView *editingComponent;
+extern BOOL vkbAlwaysOpen;
 
 @interface EAGLView (PrivateMethods)
 - (void)createFramebuffer;
@@ -74,7 +76,7 @@ extern BOOL isRetina();
 
 - (void)dealloc
 {
-    [self deleteFramebuffer];    
+    [self deleteFramebuffer];
     [context release];
     
     [super dealloc];
@@ -153,11 +155,11 @@ extern BOOL isRetina();
 
 -(void)updateFrameBufferSize:(int)w h:(int)h {
     /*[self deleteFramebuffer];
-    framebufferWidth = w;
-    framebufferHeight = h;
-    //[self.layer setBounds:CGRectMake(0, 0, w, h)];
-    //[self setBounds:CGRectMake(0, 0, w, h)];
-    NSLog(@"Deleted framebuffer: %i %i", w, h);*/
+     framebufferWidth = w;
+     framebufferHeight = h;
+     //[self.layer setBounds:CGRectMake(0, 0, w, h)];
+     //[self setBounds:CGRectMake(0, 0, w, h)];
+     NSLog(@"Deleted framebuffer: %i %i", w, h);*/
 }
 
 - (void)setFramebuffer
@@ -177,7 +179,7 @@ extern BOOL isRetina();
         GLErrorLog;
         glDisable(GL_DEPTH_TEST);
         GLErrorLog;
-
+        
         glViewport(0, 0, framebufferWidth, framebufferHeight);
         GLErrorLog;
         glMatrixMode(GL_PROJECTION);
@@ -203,24 +205,44 @@ extern BOOL isRetina();
  */
 -(void) keyboardDoneNextClicked {
     if(editingComponent != nil) {
-        stringEdit(YES, -2, editingComponent.text);
-        [editingComponent resignFirstResponder];
-        [editingComponent removeFromSuperview];
-        [editingComponent release];
-        editingComponent = nil;
-        
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            stringEdit(YES, -2, ((UITextView*)editingComponent).text);
+        } else {
+            stringEdit(YES, -2, ((UITextField*)editingComponent).text);
+        }
+        if(vkbAlwaysOpen) {
+            com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+        } else {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+        }
         repaintUI();
-        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+        
     }
 }
 
 
 -(void)textViewDidChange:(UITextView *)textView {
-    stringEdit(NO, -1, editingComponent.text);    
+    editingComponent.hidden = NO;
+    if([editingComponent isKindOfClass:[UITextView class]]) {
+        stringEdit(NO, -1, ((UITextView*)editingComponent).text);
+    } else {
+        stringEdit(NO, -1, ((UITextField*)editingComponent).text);
+    }
 }
 
 -(void)textFieldDidChange {
-    stringEdit(NO, -1, editingComponent.text);
+    if(editingComponent.hidden) {
+        editingComponent.hidden = NO;
+        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__();
+    }
+    if([editingComponent isKindOfClass:[UITextView class]]) {
+        stringEdit(NO, -1, ((UITextView*)editingComponent).text);
+    } else {
+        stringEdit(NO, -1, ((UITextField*)editingComponent).text);
+    }
 }
 
 extern int currentlyEditingMaxLength;
@@ -237,15 +259,22 @@ extern int currentlyEditingMaxLength;
 
 - (BOOL)textFieldShouldReturn:(UITextField *)theTextField {
     if(editingComponent != nil) {
-        stringEdit(YES, -2, editingComponent.text);
-        [editingComponent resignFirstResponder];
-        [editingComponent removeFromSuperview];
-        [editingComponent release];
-        editingComponent = nil;
-        repaintUI();
-        
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            stringEdit(YES, -2, ((UITextView*)editingComponent).text);
+        } else {
+            stringEdit(YES, -2, ((UITextField*)editingComponent).text);
+        }
         //if there is one then goto the edit next textarea
-        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();        
+        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+        if(vkbAlwaysOpen) {
+            com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+        } else {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+        }
+        repaintUI();
     }
     return YES;
 }
@@ -279,8 +308,8 @@ extern int currentlyEditingMaxLength;
 }
 
 /*-(void)drawRect:(CGRect)rect {
-    [[CodenameOne_GLViewController instance] drawFrame:rect];
-}*/
+ [[CodenameOne_GLViewController instance] drawFrame:rect];
+ }*/
 
 
 @end

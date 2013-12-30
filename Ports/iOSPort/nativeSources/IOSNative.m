@@ -75,6 +75,7 @@ JAVA_OBJECT fromNSString(NSString* str)
     return s;
 }*/
 
+extern UIView *editingComponent;
 
 extern void initVMImpl();
 
@@ -3491,6 +3492,35 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(JAVA_O
         UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare 
                                       applicationActivities:nil];
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [pool release];
+        repaintUI();
+    });
+}
+
+extern BOOL vkbAlwaysOpen;
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(JAVA_OBJECT instanceObject) {
+    return vkbAlwaysOpen;
+}
+
+void com_codename1_impl_ios_IOSNative_foldVKB__(JAVA_OBJECT instanceObject) {
+     dispatch_async(dispatch_get_main_queue(), ^{
+       if(editingComponent != nil) {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+        }
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_hideTextEditing__(JAVA_OBJECT instanceObject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        if(editingComponent != nil) {
+            [editingComponent resignFirstResponder];
+            [editingComponent becomeFirstResponder];
+            editingComponent.hidden = YES;
+        }
         [pool release];
         repaintUI();
     });
