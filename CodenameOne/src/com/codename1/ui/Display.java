@@ -481,6 +481,8 @@ public final class Display {
     
     private ArrayList<Runnable> backgroundTasks;
     private Thread backgroundThread;
+
+    private boolean multiKeyMode;
     
     /**
      * Private constructor to prevent instanciation
@@ -1518,21 +1520,23 @@ public final class Display {
         if(impl.getCurrentForm() == null){
             return;
         }
-        // this can happen when traversing from the native form to the current form
-        // caused by a keypress
-        // We need the previous key press for Codename One issue 108 which can occur when typing into
-        // text field rapidly and pressing two buttons at once. Originally I had a patch
-        // here specifically to the native edit but that patch doesn't work properly for
-        // all native phone bugs (e.g. incoming phone call rejected and the key release is
-        // sent to the java application).
-        if(keyCode != lastKeyPressed) {
-            if(keyCode != previousKeyPressed) {
-                return;
+        if(!multiKeyMode) {
+            // this can happen when traversing from the native form to the current form
+            // caused by a keypress
+            // We need the previous key press for Codename One issue 108 which can occur when typing into
+            // text field rapidly and pressing two buttons at once. Originally I had a patch
+            // here specifically to the native edit but that patch doesn't work properly for
+            // all native phone bugs (e.g. incoming phone call rejected and the key release is
+            // sent to the java application).
+            if(keyCode != lastKeyPressed) {
+                if(keyCode != previousKeyPressed) {
+                    return;
+                } else {
+                    previousKeyPressed = 0;
+                }
             } else {
-                previousKeyPressed = 0;
+                lastKeyPressed = 0;
             }
-        } else {
-            lastKeyPressed = 0;
         }
         addSingleArgumentEvent(KEY_RELEASED, keyCode);
     }
@@ -3450,5 +3454,25 @@ public final class Display {
      */
     public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
         return impl.showNativePicker(type, source, currentValue, data);
+    }
+
+    /**
+     * When set to true Codename One allows multiple hardware keys to be pressed at once,
+     * this isn't on by default since it can trigger some complexities with UI navigation to/from
+     * native code
+     * @return the multiKeyMode
+     */
+    public boolean isMultiKeyMode() {
+        return multiKeyMode;
+    }
+
+    /**
+     * When set to true Codename One allows multiple hardware keys to be pressed at once,
+     * this isn't on by default since it can trigger some complexities with UI navigation to/from
+     * native code
+     * @param multiKeyMode the multiKeyMode to set
+     */
+    public void setMultiKeyMode(boolean multiKeyMode) {
+        this.multiKeyMode = multiKeyMode;
     }
 }
