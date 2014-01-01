@@ -32,12 +32,13 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.DefaultListModel;
 import java.util.Calendar;
 import java.util.Date;
 
 /**
  * The picker is a component and API that allows either poping up a spinner or
- * using the native picekr API when applicable. This is quite important for some
+ * using the native picker API when applicable. This is quite important for some
  * platforms where the native spinner behavior is very hard to replicate.
  *
  * @author Shai Almog
@@ -46,6 +47,7 @@ public class Picker extends Button {
     private int type = Display.PICKER_TYPE_DATE;
     private Object value = new Date();
     private boolean showMeridiem;
+    private Object metaData;
     
     /**
      * Default constructor
@@ -55,7 +57,7 @@ public class Picker extends Button {
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 if(Display.getInstance().isNativePickerTypeSupported(type)) {
-                    Object val = Display.getInstance().showNativePicker(type, Picker.this, value, null);
+                    Object val = Display.getInstance().showNativePicker(type, Picker.this, value, metaData);
                     if(val != null) {
                         value = val;
                         updateValue();
@@ -66,6 +68,21 @@ public class Picker extends Button {
                     pickerDlg.setLayout(new BorderLayout());
                     Calendar cld = Calendar.getInstance();
                     switch(type) {
+                        case Display.PICKER_TYPE_STRINGS:
+                            GenericSpinner gs = new GenericSpinner();
+                            String[] strArr = (String[])metaData;
+                            gs.setModel(new DefaultListModel(strArr));
+                            if(value != null) {
+                                for(int iter = 0 ; iter < strArr.length ; iter++) {
+                                    if(strArr[iter].equals(value)) {
+                                        gs.getModel().setSelectedIndex(iter);
+                                        break;
+                                    }
+                                }
+                            }
+                            showDialog(pickerDlg, gs);
+                            value = gs.getValue();
+                            break;
                         case Display.PICKER_TYPE_DATE:
                             DateSpinner ds = new DateSpinner();
                             cld.setTime((Date)value);
@@ -141,7 +158,7 @@ public class Picker extends Button {
     }
     
     /**
-     * Sets the type of the picker to one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME or
+     * Sets the type of the picker to one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME, Display.PICKER_TYPE_STRINGS or
      * Display.PICKER_TYPE_TIME
      * @param type the type
      */
@@ -151,7 +168,7 @@ public class Picker extends Button {
 
     /**
      * Returns the type of the picker
-     * @return one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME or
+     * @return one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME, Display.PICKER_TYPE_STRINGS or
      * Display.PICKER_TYPE_TIME
      */
     public int getType() {
@@ -186,11 +203,52 @@ public class Picker extends Button {
         return "" + i;
     }
     
+    /**
+     * Sets the string entries for the string picker
+     * @param strs string array
+     */
+    public void setStrings(String[] strs) {
+        metaData = strs;
+        if(!(value instanceof String)) {
+            value = null;
+        }
+        updateValue();
+    }
+    
+    /**
+     * Returns the String array matching the metadata
+     * @return a string array
+     */
+    public String[] getStrings() {
+        return (String[])metaData;
+    }
+    
+    /**
+     * Sets the current value in a string array picker
+     * @param str the current value
+     */
+    public void setSelectedString(String str) {
+        value = str;
+        updateValue();
+    }
+    
+    /**
+     * Returns the current string
+     * @return the selected string
+     */
+    public String getSelectedString() {
+        return (String) value;
+    }
+    
     void updateValue() {
         if(value == null) {
             setText("...");
+            return;
         }
         switch(type) {
+            case Display.PICKER_TYPE_STRINGS:
+                setText(value.toString());
+                break;
             case Display.PICKER_TYPE_DATE:
                 setText(L10NManager.getInstance().formatDateShortStyle((Date)value));
                 break;

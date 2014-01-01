@@ -4146,7 +4146,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativePickerTypeSupported(int pickerType) {
-        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_DATE_AND_TIME;
+        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_DATE_AND_TIME || pickerType == Display.PICKER_TYPE_STRINGS;
     }
     
     private static long datePickerResult;
@@ -4160,15 +4160,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
-        long time;
-        if(currentValue instanceof Integer) {
-            java.util.Calendar c = java.util.Calendar.getInstance();
-            c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
-            c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
-            time = c.getTime().getTime();
-        } else {
-            time = ((java.util.Date)currentValue).getTime();
-        }
         datePickerResult = -2;
         int x = 0, y = 0, w = 20, h = 20;
         if(source != null) {
@@ -4177,7 +4168,30 @@ public class IOSImplementation extends CodenameOneImplementation {
             w = source.getWidth();
             h = source.getHeight();
         }
-        nativeInstance.openDatePicker(type, time, x, y, w, h);
+        if(type == Display.PICKER_TYPE_STRINGS) {
+            String[] strs = (String[])data;
+            int offset = -1;
+            if(currentValue != null) {
+                for(int iter = 0 ; iter < strs.length ; iter++) {
+                    if(strs[iter].equals(currentValue)) {
+                        offset = iter;
+                        break;
+                    }
+                }
+            }
+            nativeInstance.openStringPicker(strs, offset, x, y, w, h);
+        } else {
+            long time;
+            if(currentValue instanceof Integer) {
+                java.util.Calendar c = java.util.Calendar.getInstance();
+                c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
+                c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
+                time = c.getTime().getTime();
+            } else {
+                time = ((java.util.Date)currentValue).getTime();
+            }
+            nativeInstance.openDatePicker(type, time, x, y, w, h);
+        }
         
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
@@ -4193,6 +4207,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
         if(datePickerResult == -1) {
             return null;
+        }
+        if(type == Display.PICKER_TYPE_STRINGS) {
+            if(datePickerResult < 0) {
+                return null;
+            }
+            return ((String[])data)[(int)datePickerResult];
         }
         Object result;
         if(type == Display.PICKER_TYPE_TIME) {

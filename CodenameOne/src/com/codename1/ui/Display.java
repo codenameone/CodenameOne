@@ -198,6 +198,11 @@ public final class Display {
     public static final int PICKER_TYPE_DATE_AND_TIME = 3;
 
     /**
+     * Strings native picker type, it returns a String result and accepts a String array.
+     */
+    public static final int PICKER_TYPE_STRINGS = 4;
+
+    /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
      * or suddenly switches to using a keypad/trackball. This sort of interface
