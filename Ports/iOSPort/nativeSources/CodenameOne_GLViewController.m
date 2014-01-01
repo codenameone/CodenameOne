@@ -2168,9 +2168,15 @@ extern SKPayment *paymentInstance;
     [currentDatePickerDate retain];
 }
 
+extern int stringPickerSelection;
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
     if(currentDatePickerDate == nil) {
-        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+        if(pickerStringArray == nil) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+        } else {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(stringPickerSelection);
+            pickerStringArray = nil;
+        }
     } else {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
         [currentDatePickerDate release];
@@ -2183,7 +2189,12 @@ extern SKPayment *paymentInstance;
     UIActionSheet* sheet = [s superview];
     [sheet dismissWithClickedButtonIndex:0 animated:YES];
     if(currentDatePickerDate == nil) {
-        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+        if(pickerStringArray == nil) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+        } else {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(stringPickerSelection);
+            pickerStringArray = nil;
+        }
     } else {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
         currentDatePickerDate = nil;
@@ -2194,4 +2205,31 @@ extern SKPayment *paymentInstance;
 //-(void)actionSheetCancel:(UIActionSheet *)actionSheet {
 //}
 
+extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
+- (void)pickerView:(UIPickerView *)pickerView didSelectRow: (NSInteger)row inComponent:(NSInteger)component {
+    stringPickerSelection = row;
+}
+ 
+// tell the picker how many rows are available for a given component
+- (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    return pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+}
+ 
+// tell the picker how many components it will have
+- (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
+    return 1;
+}
+ 
+// tell the picker the title for a given component
+- (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    return toNSString(data[row]);
+}
+ 
+// tell the picker the width of each row for a given component
+- (CGFloat)pickerView:(UIPickerView *)pickerView widthForComponent:(NSInteger)component {
+    int sectionWidth = 300;
+    return sectionWidth;
+}
 @end

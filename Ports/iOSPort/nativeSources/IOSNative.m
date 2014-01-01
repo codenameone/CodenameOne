@@ -3407,9 +3407,68 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(JAVA_OBJECT in
 }
 
 
-NSDate* currentDatePickerDate;
 bool datepickerPopover = NO;
+org_xmlvm_runtime_XMLVMArray* pickerStringArray = nil;
+int stringPickerSelection;
+NSDate* currentDatePickerDate;
+
+void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
+    currentDatePickerDate = nil;
+    stringPickerSelection = selection;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        UIPickerView* pickerView;
+        if(isIPad() || isIOS7()) {
+            pickerView = [[UIPickerView alloc] init];
+        } else {
+            pickerView = [[UIPickerView alloc] initWithFrame:CGRectMake(0, 40, 0, 0)];
+        }
+        if(selection > -1) {
+            [pickerView selectRow:selection inComponent:0 animated:NO];
+        }
+        pickerView.delegate = [CodenameOne_GLViewController instance];
+        if(isIPad()) {
+            datepickerPopover = YES;
+            UIViewController *vc = [[UIViewController alloc] init];
+            [vc setView:pickerView];
+            [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
+            uip.delegate = [CodenameOne_GLViewController instance];
+            [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+        } else {
+            UIActionSheet* actionSheet;
+            if(isIOS7()) {
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:@"OK" destructiveButtonTitle:nil otherButtonTitles:nil];
+            } else {
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+                UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
+                closeButton.momentary = YES;
+                closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
+                closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
+                closeButton.tintColor = [UIColor blackColor];
+                [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
+                [actionSheet addSubview:closeButton];
+                [closeButton release];
+            }
+            
+            [actionSheet setActionSheetStyle:UIActionSheetStyleBlackTranslucent];
+            
+            pickerView.frame = CGRectMake(pickerView.frame.origin.x, pickerView.frame.origin.y + 10, pickerView.frame.size.width, pickerView.frame.size.height);
+            [actionSheet addSubview:pickerView];
+            
+            
+            //[actionSheet showInView:self.view];
+            [actionSheet showInView:[UIApplication sharedApplication].keyWindow];
+            [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+        }
+        [pool release];
+        repaintUI();
+    });    
+}
+
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    pickerStringArray = nil;
     currentDatePickerDate = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
