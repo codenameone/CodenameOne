@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JFrameFormInfo">
   <Properties>
@@ -7,6 +7,7 @@
   </Properties>
   <SyntheticProperties>
     <SyntheticProperty name="formSizePolicy" type="int" value="1"/>
+    <SyntheticProperty name="generateCenter" type="boolean" value="false"/>
   </SyntheticProperties>
   <Events>
     <EventHandler event="windowClosing" listener="java.awt.event.WindowListener" parameters="java.awt.event.WindowEvent" handler="windowClosing"/>
@@ -89,12 +90,17 @@
                           </Group>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="responseLength" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="responseCode" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="requestType" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="url" alignment="0" min="-2" max="-2" attributes="0"/>
+                              <Component id="url" alignment="0" max="32767" attributes="0"/>
+                              <Group type="102" attributes="0">
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Component id="responseLength" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="responseCode" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="requestType" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <EmptySpace min="0" pref="312" max="32767" attributes="0"/>
+                              </Group>
                           </Group>
-                          <EmptySpace pref="278" max="32767" attributes="0"/>
+                          <EmptySpace max="-2" attributes="0"/>
                       </Group>
                   </Group>
                 </DimensionLayout>
@@ -121,7 +127,7 @@
                               <Component id="jLabel8" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="responseLength" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <EmptySpace pref="265" max="32767" attributes="0"/>
+                          <EmptySpace pref="273" max="32767" attributes="0"/>
                       </Group>
                   </Group>
                 </DimensionLayout>
@@ -135,11 +141,6 @@
                 <Component class="javax.swing.JLabel" name="jLabel2">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Type"/>
-                  </Properties>
-                </Component>
-                <Component class="javax.swing.JLabel" name="url">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="http://..."/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JLabel" name="requestType">
@@ -165,6 +166,11 @@
                 <Component class="javax.swing.JLabel" name="responseLength">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="-1"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="url">
+                  <Properties>
+                    <Property name="editable" type="boolean" value="false"/>
                   </Properties>
                 </Component>
               </SubComponents>

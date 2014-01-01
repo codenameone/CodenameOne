@@ -101,12 +101,12 @@ public class NetworkMonitor extends javax.swing.JFrame {
         jPanel1 = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
-        url = new javax.swing.JLabel();
         requestType = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         responseCode = new javax.swing.JLabel();
         jLabel8 = new javax.swing.JLabel();
         responseLength = new javax.swing.JLabel();
+        url = new javax.swing.JTextField();
         jPanel2 = new javax.swing.JPanel();
         jLabel6 = new javax.swing.JLabel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -140,8 +140,6 @@ public class NetworkMonitor extends javax.swing.JFrame {
 
         jLabel2.setText("Type");
 
-        url.setText("http://...");
-
         requestType.setText("POST");
 
         jLabel5.setText("Response Code");
@@ -151,6 +149,8 @@ public class NetworkMonitor extends javax.swing.JFrame {
         jLabel8.setText("Response Length");
 
         responseLength.setText("-1");
+
+        url.setEditable(false);
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -165,11 +165,14 @@ public class NetworkMonitor extends javax.swing.JFrame {
                     .addComponent(jLabel8))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(responseLength)
-                    .addComponent(responseCode)
-                    .addComponent(requestType)
-                    .addComponent(url))
-                .addContainerGap(278, Short.MAX_VALUE))
+                    .addComponent(url)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(responseLength)
+                            .addComponent(responseCode)
+                            .addComponent(requestType))
+                        .addGap(0, 312, Short.MAX_VALUE)))
+                .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -177,7 +180,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel1)
-                    .addComponent(url))
+                    .addComponent(url, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel2)
@@ -190,7 +193,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel8)
                     .addComponent(responseLength))
-                .addContainerGap(265, Short.MAX_VALUE))
+                .addContainerGap(273, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Basics", jPanel1);
@@ -368,6 +371,6 @@ public class NetworkMonitor extends javax.swing.JFrame {
     private javax.swing.JLabel responseCode;
     private javax.swing.JTextArea responseHeaders;
     private javax.swing.JLabel responseLength;
-    private javax.swing.JLabel url;
+    private javax.swing.JTextField url;
     // End of variables declaration//GEN-END:variables
 }
