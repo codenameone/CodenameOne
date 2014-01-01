@@ -1207,11 +1207,18 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(JAVA_OBJECT instanc
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_execute___java_lang_String]
-    const char* chrs = stringToUTF8(n1);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
-    //XMLVM_END_WRAPPER
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSString* ns = toNSString(n1);
+        if([ns hasPrefix:@"file:"]) {
+            ns = [ns substringFromIndex:5];
+            UIDocumentInteractionController* preview = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:ns]];
+            [preview presentPreviewAnimated:YES];
+        } else {
+            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
+        }
+        [pool release];
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_flashBacklight___int(JAVA_OBJECT instanceObject, JAVA_INT n1)
