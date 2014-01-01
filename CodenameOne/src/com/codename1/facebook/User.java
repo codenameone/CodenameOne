@@ -33,6 +33,7 @@ import java.util.Hashtable;
  */
 public class User extends FBObject {
 
+    private String username;
     private String first_name;
     private String last_name;
     private String link;
@@ -163,6 +164,13 @@ public class User extends FBObject {
     }
 
     /**
+     *  Returns the username
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    /**
      * Gets the user City if available
      * 
      * @return 
@@ -191,6 +199,7 @@ public class User extends FBObject {
 
     private void init(Hashtable toCopy) {
         super.copy(toCopy);
+        username = (String) toCopy.get("username");
         first_name = (String) toCopy.get("first_name");
         last_name = (String) toCopy.get("last_name");
         link = (String) toCopy.get("link");
