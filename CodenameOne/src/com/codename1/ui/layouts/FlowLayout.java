@@ -62,7 +62,7 @@ public class FlowLayout extends Layout{
      * @inheritDoc
      */
     public void layoutContainer(Container parent) {
-        int x = 0;//parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
+        int x = parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
         int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(parent.isRTL(), Component.RIGHT) - x;
         
         boolean rtl = parent.isRTL();
