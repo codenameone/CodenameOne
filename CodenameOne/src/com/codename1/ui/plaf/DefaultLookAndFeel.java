@@ -1567,7 +1567,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         pull.setWidth(cmp.getWidth());
         pull.setX(cmp.getAbsoluteX());
-        pull.setY(-scrollY - getPullToRefreshHeight());
+        pull.setY(cmp.getY() -scrollY - getPullToRefreshHeight());
         pull.layoutContainer();
         pull.paintComponent(g);
 
