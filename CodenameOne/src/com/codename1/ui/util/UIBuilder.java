@@ -2117,7 +2117,9 @@ public class UIBuilder { //implements Externalizable {
                 String commandAction = (String)previous.get(FORM_STATE_KEY_NAME);
                 Command backCommand = createCommandImpl(getBackCommandText((String)previous.get(FORM_STATE_KEY_TITLE)), null,
                         BACK_COMMAND_ID, commandAction, true, "");
-                f.addCommand(backCommand, f.getCommandCount());
+                if(shouldAddBackCommandToMenu()) {
+                    f.addCommand(backCommand, f.getCommandCount());
+                }
                 f.setBackCommand(backCommand);
                 
                 // trigger listener creation if this is the only command in the form
@@ -2364,7 +2366,7 @@ public class UIBuilder { //implements Externalizable {
                             }
                             if(backCommand != null) {
                                 f.setBackCommand(backCommand);
-                                if(Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) { 
+                                if(shouldAddBackCommandToMenu() && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) { 
                                     f.addCommand(backCommand, f.getCommandCount());
                                 }
                             }
@@ -2480,6 +2482,15 @@ public class UIBuilder { //implements Externalizable {
         analyticsCallback(f.getName(), previousFormName(f));
     }
 
+    /**
+     * Back commands are set implicitly (see allowBackTo to disable that), this method allows subclasses
+     * to disable the behavior where the back command is also added to the menu (not just set to the back button).
+     * @return 
+     */
+    protected boolean shouldAddBackCommandToMenu() {
+        return true;
+    }
+    
     /**
      * This method allows binding an action that should occur immediately after showing the given
      * form
