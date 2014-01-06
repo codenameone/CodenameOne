@@ -79,6 +79,7 @@ import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.media.MediaManager;
+import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayOutputStream;
@@ -240,9 +241,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void foldKeyboard() {
-        instance.callHideTextEditor();
-        nativeInstance.foldVKB();
-        Display.getInstance().getCurrent().repaint();
+        if(instance.isAsyncEditMode()) {
+            final Component cmp = Display.getInstance().getCurrent().getFocused();
+            instance.callHideTextEditor();
+            nativeInstance.foldVKB();
+
+            // after folding the keyboard the screen layout might shift
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    if(cmp != null) {
+                        cmp.requestFocus();
+                    }
+                }
+            });
+        }
     }
     
     private void callHideTextEditor() {
@@ -279,6 +291,32 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
+        Boolean b = (Boolean)cmp.getClientProperty("ios.async");
+        if(isAsyncEditMode() && b == null) {
+            // check whether the parent has a scrollable parent
+            Container p = cmp.getParent();
+            while(p != null) {
+                if(p.isScrollableY()) {
+                    break;
+                }
+            }
+            // no scrollabel parent automatically configure the text field for legacy mode
+            if(p == null) {
+                Display.getInstance().getProperty("ios.async", "true");
+                b = Boolean.TRUE;
+                cmp.putClientProperty("ios.async", b);
+                Display.getInstance().setProperty("ios.async", "true");
+            }
+        }
+        if(b != null) {
+            nativeInstance.setAsyncEditMode(b);
+        } else {
+            String a = Display.getInstance().getProperty("ios.async", null);
+            if(a != null) {
+                nativeInstance.setAsyncEditMode(a.equals("true"));
+            }
+        }
+        
         textEditorHidden = false;
         currentEditing = (TextArea)cmp;
         
@@ -4223,5 +4261,69 @@ public class IOSImplementation extends CodenameOneImplementation {
             result = new Date(datePickerResult);
         }
         return result;
+    }
+
+    @Override
+    public Object connectSocket(String host, int port) {
+        long i = nativeInstance.connectSocket(host, port);
+        if(i != 0) {
+            return new Long(i);
+        }
+        return null;
+    }
+    
+    @Override
+    public Object listenSocket(int port) {
+        return null;
+    }
+    
+    @Override
+    public String getHostOrIP() {
+        return nativeInstance.getHostOrIP();
+    }
+
+    @Override
+    public void disconnectSocket(Object socket) {
+        nativeInstance.disconnectSocket(((Long)socket).longValue());
+    }    
+    
+    @Override
+    public boolean isSocketConnected(Object socket) {
+        return nativeInstance.isSocketConnected(((Long)socket).longValue());
+    }
+    
+    @Override
+    public boolean isServerSocketAvailable() {
+        return false;
+    }
+
+    @Override
+    public boolean isSocketAvailable() {
+        return true;
+    }
+    
+    @Override
+    public String getSocketErrorMessage(Object socket) {
+        return nativeInstance.getSocketErrorMessage(((Long)socket).longValue());
+    }
+    
+    @Override
+    public int getSocketErrorCode(Object socket) {
+        return nativeInstance.getSocketErrorCode(((Long)socket).longValue());
+    }
+    
+    @Override
+    public int getSocketAvailableInput(Object socket) {
+        return nativeInstance.getSocketAvailableInput(((Long)socket).longValue());
+    }
+    
+    @Override
+    public byte[] readFromSocketStream(Object socket) {
+        return nativeInstance.readFromSocketStream(((Long)socket).longValue());
+    }
+    
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data) {
+        nativeInstance.writeToSocketStream(((Long)socket).longValue(), data);
     }
 }

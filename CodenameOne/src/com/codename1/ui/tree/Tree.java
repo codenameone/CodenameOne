@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.tree;
 
+import com.codename1.components.SpanButton;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -61,6 +62,7 @@ public class Tree extends Container {
     private static Image openFolder;
     private static Image nodeImage;
     private int depthIndent = 15;
+    private boolean multilineMode;
     
     /**
      * Constructor for usage by GUI builder and automated tools, normally one
@@ -73,6 +75,24 @@ public class Tree extends Container {
             {"A", "B", "C"},
             {"1", "2", "3"}
         }));
+    }
+
+    /**
+     * Toggles a mode where rows in the tree can be broken since span buttons will
+     * be used instead of plain buttons.
+     * @return the multilineMode
+     */
+    public boolean isMultilineMode() {
+        return multilineMode;
+    }
+
+    /**
+     * Toggles a mode where rows in the tree can be broken since span buttons will
+     * be used instead of plain buttons.
+     * @param multilineMode the multilineMode to set
+     */
+    public void setMultilineMode(boolean multilineMode) {
+        this.multilineMode = multilineMode;
     }
 
     static class StringArrayTreeModel implements TreeModel {
@@ -219,7 +239,7 @@ public class Tree extends Container {
 
     private void expandNode(Component c) {
         c.putClientProperty(KEY_EXPANDED, "true");
-        ((Button)c).setIcon(openFolder);
+        setNodeIcon(openFolder, c);
         int depth = ((Integer)c.getClientProperty(KEY_DEPTH)).intValue();
         Container parent = c.getParent();
         Object o = c.getClientProperty(KEY_OBJECT);
@@ -235,7 +255,7 @@ public class Tree extends Container {
 
     private void collapseNode(Component c) {
         c.putClientProperty(KEY_EXPANDED, null);
-        ((Button)c).setIcon(folder);
+        setNodeIcon(folder, c);
         Container p = c.getParent();
         for(int iter = 0 ; iter < p.getComponentCount() ; iter++) {
             if(p.getComponentAt(iter) != c) {
@@ -268,22 +288,22 @@ public class Tree extends Container {
         Integer depthVal = new Integer(depth + 1);
         for(int iter = 0 ; iter < size ; iter++) {
             final Object current = children.elementAt(iter);
-            Button nodeComponent = createNodeComponent(current, depth);
+            Component nodeComponent = createNode(current, depth);
             if(model.isLeaf(current)) {
                 destination.addComponent(nodeComponent);
-                nodeComponent.addActionListener(new Handler(current));
+                bindNodeListener(new Handler(current), nodeComponent);
             } else {
                 Container componentArea = new Container(new BorderLayout());
                 componentArea.addComponent(BorderLayout.NORTH, nodeComponent);
                 destination.addComponent(componentArea);
-                nodeComponent.addActionListener(expansionListener);
+                bindNodeListener(expansionListener, nodeComponent);
             }
             nodeComponent.putClientProperty(KEY_OBJECT, current);
             nodeComponent.putClientProperty(KEY_PARENT, parent);
             nodeComponent.putClientProperty(KEY_DEPTH, depthVal);
         }
     }
-
+    
     /**
      * Creates a node within the tree, this method is protected allowing tree to be
      * subclassed to replace the rendering logic of individual tree buttons.
@@ -291,6 +311,7 @@ public class Tree extends Container {
      * @param node the node object from the model to display on the button
      * @param depth the depth within the tree (normally represented by indenting the entry)
      * @return a button representing the node within the tree
+     * @deprecated replaced with createNode, bindNodeListener and setNodeIcon
      */
     protected Button createNodeComponent(Object node, int depth) {
         Button cmp = new Button(childToDisplayLabel(node));
@@ -304,6 +325,59 @@ public class Tree extends Container {
         updateNodeComponentStyle(cmp.getUnselectedStyle(), depth);
         updateNodeComponentStyle(cmp.getPressedStyle(), depth);
         return cmp;
+    }
+
+    /**
+     * Since a node may be any component type developers should override this method to
+     * add support for binding the click listener to the given component.
+     * @param l listener interface
+     * @param node node component returned by createNode
+     */
+    protected void bindNodeListener(ActionListener l, Component node) {
+        if(node instanceof Button) {
+            ((Button)node).addActionListener(l);
+            return;
+        }
+        ((SpanButton)node).addActionListener(l);
+    }
+    
+    /**
+     * Sets the icon for the given node similar in scope to bindNodeListener
+     * @param icon the icon for the node
+     * @param node the node instance
+     */
+    protected void setNodeIcon(Image icon, Component node) {
+        if(node instanceof Button) {
+            ((Button)node).setIcon(icon);
+            return;
+        }
+        ((SpanButton)node).setIcon(icon);
+    }
+    
+    /**
+     * Creates a node within the tree, this method is protected allowing tree to be
+     * subclassed to replace the rendering logic of individual tree buttons.
+     *
+     * @param node the node object from the model to display on the button
+     * @param depth the depth within the tree (normally represented by indenting the entry)
+     * @return a button representing the node within the tree
+     */
+    protected Component createNode(Object node, int depth) {
+        if(multilineMode) {
+            SpanButton cmp = new SpanButton(childToDisplayLabel(node));
+            cmp.setUIID("TreeNode");
+            cmp.setTextUIID("TreeNode");
+            if(model.isLeaf(node)) {
+                cmp.setIcon(nodeImage);
+            } else {
+                cmp.setIcon(folder);
+            }
+            updateNodeComponentStyle(cmp.getSelectedStyle(), depth);
+            updateNodeComponentStyle(cmp.getUnselectedStyle(), depth);
+            updateNodeComponentStyle(cmp.getPressedStyle(), depth);
+            return cmp;            
+        }
+        return createNodeComponent(node, depth);
     }
 
     private void updateNodeComponentStyle(Style s, int depth) {

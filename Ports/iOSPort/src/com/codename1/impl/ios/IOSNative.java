@@ -391,6 +391,17 @@ public final class IOSNative {
     public native void facebookLogout();
     
     public native boolean isAsyncEditMode();
+    public native void setAsyncEditMode(boolean b);
     public native void foldVKB();
     public native void hideTextEditing();
+
+    public native long connectSocket(String host, int port);    
+    public native String getHostOrIP();
+    public native void disconnectSocket(long socket);
+    public native boolean isSocketConnected(long socket);
+    public native String getSocketErrorMessage(long socket);
+    public native int getSocketErrorCode(long socket);
+    public native int getSocketAvailableInput(long socket);
+    public native byte[] readFromSocketStream(long socket);
+    public native void writeToSocketStream(long socket, byte[] data);
 }

@@ -391,6 +391,9 @@ public class ImageViewer extends Component {
     }
     
     private void imageAspectCalc(Image img) {
+        if(img == null) {
+            return;
+        }
         int iW = img.getWidth();
         int iH = img.getHeight();
         Style s = getStyle();

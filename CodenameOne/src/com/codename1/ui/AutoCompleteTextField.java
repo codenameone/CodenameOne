@@ -146,7 +146,33 @@ public class AutoCompleteTextField extends TextField {
         this.completionRenderer = completionRenderer;
     }
     
-    
+    /**
+     * @inheritDoc
+     */
+    public void keyPressed(int k) {
+        if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
+            int game = Display.getInstance().getGameAction(k);
+            if(game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_FIRE) {
+                popup.getComponentAt(0).keyPressed(k);
+                return;
+            }
+        }
+        super.keyPressed(k);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void keyReleased(int k) {
+        if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
+            int game = Display.getInstance().getGameAction(k);
+            if(game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_FIRE) {
+                popup.getComponentAt(0).keyReleased(k);
+                return;
+            }
+        }
+        super.keyReleased(k);
+    }
 
     private void removePopup() {
         Form f = getComponentForm();

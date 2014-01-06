@@ -5109,7 +5109,7 @@ public abstract class CodenameOneImplementation {
     /**
      * Shows a native modal dialog allowing us to perform the picking for the given type 
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     * @param pickerType the picker type constant
+     * @param type the picker type constant
      * @param source the source component (optional) the native dialog will be placed in relation to this
      * component if applicable
      * @param currentValue the currently selected value
@@ -5118,5 +5118,110 @@ public abstract class CodenameOneImplementation {
      */
     public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
         return null;
+    }
+    
+    /**
+     * Creates a socket to connect to the given host on the given port
+     * @param host the host
+     * @param port the port
+     * @return the socket object to use
+     */
+    public Object connectSocket(String host, int port) {
+        throw new RuntimeException("Not supported");
+    }
+    
+    /**
+     * Listens on the given port similar to the accept method of server socket in Java. This method
+     * will only work if isServerSocketAvailable() is true.
+     * @param port the port to listen on
+     * @return server socket instance
+     */
+    public Object listenSocket(int port) {
+        throw new RuntimeException("Not supported");
+    }
+    
+    /**
+     * Returns the device host or ip address if available
+     * @return device host or ip
+     */
+    public String getHostOrIP() {
+        return null;
+    }
+
+    /**
+     * Disconnects the current socket from the server/client on the other side
+     * @param socket the socket instance
+     */
+    public void disconnectSocket(Object socket) {
+    }
+    
+    
+    /**
+     * Indicates whether the socket is currently connected
+     * @param socket is the socket we are connected to
+     * @return true if the socket is connected
+     */
+    public boolean isSocketConnected(Object socket) {
+        return false;
+    }
+    
+    /**
+     * Indicates whether the underlying implementation supports server sockets
+     * @return false by default
+     */
+    public boolean isServerSocketAvailable() {
+        return false;
+    }
+
+    /**
+     * Indicates whether the underlying implementation supports sockets
+     * @return false by default
+     */
+    public boolean isSocketAvailable() {
+        return false;
+    }
+    
+    /**
+     * Return the pending error message on the given socket
+     * @param socket the socket instance
+     * @return the error message if available
+     */
+    public String getSocketErrorMessage(Object socket) {
+        return null;
+    }
+    
+    /**
+     * Returns the pending error code on the given socket
+     * @param socket the socket instance
+     * @return the error code
+     */
+    public int getSocketErrorCode(Object socket) {
+        return -1;
+    }
+    
+    /**
+     * Returns whether data is available for input on the socket
+     * @param socket the socket instance
+     * @return a none zero value if data is available for input
+     */
+    public int getSocketAvailableInput(Object socket) {
+        return 0;
+    }
+    
+    /**
+     * Read pending bytes from the socket
+     * @param socket the socket object
+     * @return byte array with data read from the socket
+     */
+    public byte[] readFromSocketStream(Object socket) {
+        return null;
+    }
+    
+    /**
+     * Write the following byte array to the socket
+     * @param socket the socket instance
+     * @param data the data written
+     */
+    public void writeToSocketStream(Object socket, byte[] data) {
     }
 }

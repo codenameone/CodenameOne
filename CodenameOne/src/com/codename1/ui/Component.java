@@ -3336,10 +3336,10 @@ public class Component implements Animation, StyleListener {
      */
     protected void laidOut() {
         if(!isCellRenderer()) {
+            int ivk = Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
-                    getScrollDimension().getHeight()) {
-                setScrollY(getScrollDimension().getHeight() - getHeight() + 
-                        Display.getInstance().getImplementation().getInvisibleAreaUnderVKB());
+                    getScrollDimension().getHeight() + ivk) {
+                setScrollY(getScrollDimension().getHeight() - getHeight() + ivk);
             }
             if (isScrollableX() && getScrollX() > 0 && getScrollX() + getWidth() >
                     getScrollDimension().getWidth()) {

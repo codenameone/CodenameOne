@@ -6146,4 +6146,217 @@ public class JavaSEPort extends CodenameOneImplementation {
         return retVal;
 
     }
+
+    class SocketImpl {
+        java.net.Socket socketInstance;
+        int errorCode = -1;
+        String errorMessage = null;
+        InputStream is;
+        OutputStream os;
+
+        public boolean connect(String param, int param1) {
+            try {
+                socketInstance = new java.net.Socket(param, param1);
+                return true;
+            } catch(Exception err) {
+                err.printStackTrace();
+                errorMessage = err.toString();
+                return false;
+            }
+        }
+
+        private InputStream getInput() throws IOException {
+            if(is == null) {
+                if(socketInstance != null) {
+                    is = socketInstance.getInputStream();
+                } else {
+
+                }
+            }
+            return is;
+        }
+
+        private OutputStream getOutput() throws IOException {
+            if(os == null) {
+                os = socketInstance.getOutputStream();
+            }
+            return os;
+        }
+
+        public int getAvailableInput() {
+            try {
+                return getInput().available();
+            } catch(IOException err) {
+                errorMessage = err.toString();
+                err.printStackTrace();
+            }
+            return 0;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public String getIP() {
+            try {
+                return java.net.InetAddress.getLocalHost().getHostAddress();
+            } catch(Throwable t) {
+                t.printStackTrace();
+                errorMessage = t.toString();
+                return t.getMessage();
+            }
+        }
+
+        public byte[] readFromStream() {
+            try {
+                int av = getAvailableInput();
+                if(av > 0) {
+                    byte[] arr = new byte[av];
+                    int size = getInput().read(arr);
+                    if(size == arr.length) {
+                        return arr;
+                    }
+                    return shrink(arr, size);
+                }
+                byte[] arr = new byte[8192];
+                int size = getInput().read(arr);
+                if(size == arr.length) {
+                    return arr;
+                }
+                return shrink(arr, size);
+            } catch(IOException err) {
+                err.printStackTrace();
+                errorMessage = err.toString();
+                return null;
+            }
+        }
+
+        private byte[] shrink(byte[] arr, int size) {
+            byte[] n = new byte[size];
+            System.arraycopy(arr, 0, n, 0, size);
+            return n;
+        }
+
+        public void writeToStream(byte[] param) {
+            try {
+                OutputStream os = getOutput();
+                os.write(param);
+                os.flush();
+            } catch(IOException err) {
+                errorMessage = err.toString();
+                err.printStackTrace();
+            }
+        }
+
+        public void disconnect() {
+            try {
+                if(socketInstance != null) {
+                    if(is != null) {
+                        try {
+                            is.close();
+                        } catch(IOException err) {}
+                    }
+                    if(os != null) {
+                        try {
+                            os.close();
+                        } catch(IOException err) {}
+                    }
+                    socketInstance.close();
+                    socketInstance = null;
+                }
+            } catch(IOException err) {
+                errorMessage = err.toString();
+                err.printStackTrace();
+            }
+        }
+
+        public Object listen(int param) {
+            try {
+                ServerSocket serverSocketInstance = new ServerSocket(param);
+                socketInstance = serverSocketInstance.accept();
+                return socketInstance;
+            } catch(Exception err) {
+                errorMessage = err.toString();
+                err.printStackTrace();
+                return null;
+            }
+        }
+
+        public boolean isConnected() {
+            return socketInstance != null;
+        }
+
+        public int getErrorCode() {
+            return errorCode;
+        }
+    }
+    
+    @Override
+    public Object connectSocket(String host, int port) {
+        SocketImpl i = new SocketImpl();
+        if(i.connect(host, port)) {
+            return i;
+        }
+        return null;
+    }
+    
+    @Override
+    public Object listenSocket(int port) {
+        return new SocketImpl().listen(port);
+    }
+    
+    @Override
+    public String getHostOrIP() {
+        try {
+            return java.net.InetAddress.getLocalHost().getHostName();
+        } catch(Throwable t) {
+            t.printStackTrace();
+            return t.getMessage();
+        }
+    }
+
+    @Override
+    public void disconnectSocket(Object socket) {
+        ((SocketImpl)socket).disconnect();
+    }    
+    
+    @Override
+    public boolean isSocketConnected(Object socket) {
+        return ((SocketImpl)socket).isConnected();
+    }
+    
+    @Override
+    public boolean isServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public boolean isSocketAvailable() {
+        return true;
+    }
+    
+    @Override
+    public String getSocketErrorMessage(Object socket) {
+        return ((SocketImpl)socket).getErrorMessage();
+    }
+    
+    @Override
+    public int getSocketErrorCode(Object socket) {
+        return ((SocketImpl)socket).getErrorCode();
+    }
+    
+    @Override
+    public int getSocketAvailableInput(Object socket) {
+        return ((SocketImpl)socket).getAvailableInput();
+    }
+    
+    @Override
+    public byte[] readFromSocketStream(Object socket) {
+        return ((SocketImpl)socket).readFromStream();
+    }
+    
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data) {
+        ((SocketImpl)socket).writeToStream(data);
+    }
 }

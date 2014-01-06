@@ -94,7 +94,14 @@ public class OnOffSwitch extends Container {
             switchOffImage = UIManager.getInstance().getThemeImageConstant("switchOffImage");
         } else {
             setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-            button = new CheckBox(off);
+            button = new CheckBox(on);
+            Dimension d = button.getPreferredSize();
+            button.setText(off);
+            int pw = button.getPreferredW();
+            d.setWidth(Math.max(pw, d.getWidth()));
+            
+            // prevents the button from growing/shrinking as its states flip
+            button.setPreferredSize(d);
             button.setToggle(true);
             button.setUIID("Button");
             button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());

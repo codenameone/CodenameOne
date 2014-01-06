@@ -1059,7 +1059,8 @@ public class Container extends Component {
                     // special case for the first component to allow the user to scroll all the 
                     // way to the top
                     Form f = getComponentForm();
-                    if (f != null && f.findFirstFocusable() == c) {
+                    if (f != null && Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() == 0 && 
+                            f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
                         if (r == c.getBounds()) {
                             scrollRectToVisible(new Rectangle(0, 0,
