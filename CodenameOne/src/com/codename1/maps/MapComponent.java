@@ -275,6 +275,13 @@ public class MapComponent extends Container {
         translateY += (draggedy - y);
         draggedx = x;
         draggedy = y;
+        if ( Math.abs(translateX)>10 || Math.abs(translateY)>10){
+            Coord scale = _map.scale(_zoom);
+            _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
+            _needTiles = true;
+            translateX = 0;
+            translateY = 0;
+        }
         super.repaint();
     }
 
