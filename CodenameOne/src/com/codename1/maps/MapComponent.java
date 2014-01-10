@@ -73,6 +73,8 @@ public class MapComponent extends Container {
     private int scaleY = 0;
     private int translateX;
     private int translateY;
+    private int zoomCenterX = 0;
+    private int zoomCenterY = 0;
     private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
     
     /**
@@ -200,7 +202,11 @@ public class MapComponent extends Container {
             }
             g.translate(-translateX, -translateY);
             if (scaleX > 0) {
-                g.drawImage(buffer, (getWidth() - scaleX) / 2, (getHeight() - scaleY) / 2, scaleX, scaleY);
+                float tx = (float)zoomCenterX / (float)getWidth();
+                tx = tx * (float)(scaleX - getWidth());
+                float ty = (float)zoomCenterY / (float)getHeight();
+                ty = ty * (float)(scaleY - getHeight());
+                g.drawImage(buffer, -(int)tx, -(int)ty, scaleX, scaleY);
             } else {
                 g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);
             }
@@ -214,13 +220,15 @@ public class MapComponent extends Container {
             if (scaleX > 0) {
                 float sx = (float) scaleX / (float) getWidth();
                 float sy = (float) scaleY / (float) getHeight();
-                int tx = (int) (((getWidth() - scaleX) / 2) / sx);
-                int ty = (int) (((getHeight() - scaleY) / 2) / sy);
-                g.translate(tx, ty);
+                float tx = (float)zoomCenterX / (float)getWidth();
+                tx = -tx * (float)(scaleX - getWidth())/sx;
+                float ty = (float)zoomCenterY / (float)getHeight();
+                ty = -ty * (float)(scaleY - getHeight())/sy;
+                g.translate((int)tx, (int)ty);
                 g.scale(sx, sy);
                 paintmap(g);
                 g.resetAffine();
-                g.translate(-tx, -ty);
+                g.translate(-(int)tx, -(int)ty);
             } else {
                 g.translate(-translateX, -translateY);
                 paintmap(g);
@@ -270,17 +278,18 @@ public class MapComponent extends Container {
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
-
-        translateX += (draggedx - x);
-        translateY += (draggedy - y);
-        draggedx = x;
-        draggedy = y;
-        if ( Math.abs(translateX)>10 || Math.abs(translateY)>10){
-            Coord scale = _map.scale(_zoom);
-            _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
-            _needTiles = true;
-            translateX = 0;
-            translateY = 0;
+        if ( oldDistance ==  -1 ){
+            translateX += (draggedx - x);
+            translateY += (draggedy - y);
+            draggedx = x;
+            draggedy = y;
+            if ( oldDistance == -1 && (Math.abs(translateX)>10 || Math.abs(translateY)>10)){
+                Coord scale = _map.scale(_zoom);
+                _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
+                _needTiles = true;
+                translateX = 0;
+                translateY = 0;
+            }
         }
         super.repaint();
     }
@@ -305,6 +314,8 @@ public class MapComponent extends Container {
             double currentDis = distance(x, y);
             if (oldDistance == -1) {
                 oldDistance = currentDis;
+                zoomCenterX = (x[0]+x[1])/2 - getAbsoluteX();
+                zoomCenterY = (y[0]+y[1])/2 - getAbsoluteY();
                 scaleX = getWidth();
                 scaleY = getHeight();
             }
@@ -349,6 +360,7 @@ public class MapComponent extends Container {
 
         if (oldDistance != -1) {
             double scale = (double) scaleX / (double) getWidth();
+            Coord refCoord = this.getCoordFromPosition(zoomCenterX+getAbsoluteX(), zoomCenterY+getAbsoluteY());
             if (scale > 1) {
                 if (scale < 1.2) {
                     //do nothing
@@ -381,6 +393,12 @@ public class MapComponent extends Container {
                     zoomOut();
                 }
             }
+            Coord c1 = this.getCoordFromPosition(0, 0);
+            Coord c2 = this.getCoordFromPosition(getWidth(), getHeight());
+            Coord pixelToCoord = new Coord((c2.getLatitude()-c1.getLatitude())/(float)getHeight(), (c2.getLongitude()-c1.getLongitude())/(float)getWidth());
+            float offX = (getWidth()/2) - zoomCenterX;
+            float offY = (getHeight()/2) - zoomCenterY;
+            _center = _map.projection().fromWGS84(refCoord.translate(offY*pixelToCoord.getLatitude(), offX*pixelToCoord.getLongitude()));
             translateX = 0;
             translateY = 0;
             scaleX = 0;
