@@ -42,6 +42,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
 import com.codename1.util.MathUtil;
 
 
@@ -75,6 +76,10 @@ public class MapComponent extends Container {
     private int translateY;
     private int zoomCenterX = 0;
     private int zoomCenterY = 0;
+    private long lastPressed = -1;
+    private int tapCount = 0;
+    private int singleTapThreshold = 200;
+    private int doubleTapThreshold = 200;
     private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
     
     /**
@@ -283,7 +288,7 @@ public class MapComponent extends Container {
             translateY += (draggedy - y);
             draggedx = x;
             draggedy = y;
-            if ( oldDistance == -1 && (Math.abs(translateX)>10 || Math.abs(translateY)>10)){
+            if ( Math.abs(translateX)>10 || Math.abs(translateY)>10){
                 Coord scale = _map.scale(_zoom);
                 _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
                 _needTiles = true;
@@ -299,6 +304,7 @@ public class MapComponent extends Container {
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
+        lastPressed = System.currentTimeMillis();
         pressedx = x;
         pressedy = y;
         draggedx = x;
@@ -352,15 +358,46 @@ public class MapComponent extends Container {
         return Math.sqrt(disx * disx + disy * disy);
     }
 
+    protected void pointerTapped(int x, int y, int tapCount){
+        if ( tapCount == 2 ){
+            Coord c = this.getCoordFromPosition(x, y);
+            _center = _map.projection().fromWGS84(c);
+            zoomIn();
+            super.repaint();
+        }
+    }
+    
     /**
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
 
+        final long currTime = System.currentTimeMillis();
+        if ( currTime - lastPressed < singleTapThreshold ){
+            tapCount++;
+            final int tapX = x;
+            final int tapY = y;
+            final int currTapCount = tapCount;
+            UITimer timer = new UITimer(new Runnable(){
+
+                public void run() {
+                    if ( currTapCount == tapCount ){
+                        pointerTapped(tapX, tapY, tapCount);
+                        tapCount = 0;
+                    }
+                }
+                
+            });
+            timer.schedule(doubleTapThreshold, false, this.getComponentForm());
+        } else {
+            tapCount = 0;
+        }
+        
         if (oldDistance != -1) {
             double scale = (double) scaleX / (double) getWidth();
             Coord refCoord = this.getCoordFromPosition(zoomCenterX+getAbsoluteX(), zoomCenterY+getAbsoluteY());
+            int oldZoom = _zoom;
             if (scale > 1) {
                 if (scale < 1.2) {
                     //do nothing
@@ -393,12 +430,14 @@ public class MapComponent extends Container {
                     zoomOut();
                 }
             }
-            Coord c1 = this.getCoordFromPosition(0, 0);
-            Coord c2 = this.getCoordFromPosition(getWidth(), getHeight());
-            Coord pixelToCoord = new Coord((c2.getLatitude()-c1.getLatitude())/(float)getHeight(), (c2.getLongitude()-c1.getLongitude())/(float)getWidth());
-            float offX = (getWidth()/2) - zoomCenterX;
-            float offY = (getHeight()/2) - zoomCenterY;
-            _center = _map.projection().fromWGS84(refCoord.translate(offY*pixelToCoord.getLatitude(), offX*pixelToCoord.getLongitude()));
+            if ( oldZoom != _zoom ){
+                Coord c1 = this.getCoordFromPosition(0, 0);
+                Coord c2 = this.getCoordFromPosition(getWidth(), getHeight());
+                Coord pixelToCoord = new Coord((c2.getLatitude()-c1.getLatitude())/(float)getHeight(), (c2.getLongitude()-c1.getLongitude())/(float)getWidth());
+                float offX = (getWidth()/2) - zoomCenterX;
+                float offY = (getHeight()/2) - zoomCenterY;
+                _center = _map.projection().fromWGS84(refCoord.translate(offY*pixelToCoord.getLatitude(), offX*pixelToCoord.getLongitude()));
+            }
             translateX = 0;
             translateY = 0;
             scaleX = 0;
@@ -407,6 +446,7 @@ public class MapComponent extends Container {
             if (buffer != null) {
                 buffer.dispose();
                 buffer = null;
+                refreshLayers = true;
             }
             if(Display.getInstance().areMutableImagesFast()) {
                 super.repaint();
