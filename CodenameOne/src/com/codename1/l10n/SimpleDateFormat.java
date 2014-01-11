@@ -909,7 +909,7 @@ public class SimpleDateFormat extends DateFormat {
         }
         // handle zulu
         if (len == 1) {
-            if (fragment.toLowerCase().equals('z')) {
+            if (fragment.toLowerCase().equals("z")) {
                 return readSubstring(source, ofs, 1);
             }
             return null;
