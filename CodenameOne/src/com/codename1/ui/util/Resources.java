@@ -716,6 +716,12 @@ public class Resources {
             }
             Resources r = new Resources(is, dpi);
             is.close();
+            //no need to cache the system resource it is very small and we rather 
+            //keep the app resource in the cache 
+            if(resource.equals(Resources.systemResourceLocation)){
+                return r;
+            }
+            
             lastLoadedName = resource;
             cachedResource = Display.getInstance().createSoftWeakRef(r);
             return r;
