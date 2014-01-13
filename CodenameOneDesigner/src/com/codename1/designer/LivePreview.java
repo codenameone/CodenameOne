@@ -309,7 +309,7 @@ public static void updateServer(final java.awt.Component parent) {
                     EditableResources res = view.getLoadedResources();
                     ByteArrayOutputStream bo = new ByteArrayOutputStream();
                     DataOutputStream out = new DataOutputStream(bo);
-                    out.writeUTF(user);
+                    out.writeUTF(user.toLowerCase());
                     out.writeUTF(password);
                     out.writeUTF(getMainFormSelection());
                     if(getThemeSelection() == null) {

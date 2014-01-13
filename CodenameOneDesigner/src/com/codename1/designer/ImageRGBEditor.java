@@ -383,7 +383,7 @@ public class ImageRGBEditor extends BaseForm {
         }
 
         // check if a UI resource is making use of the image
-        UIBuilderOverride builder = new UIBuilderOverride(null);
+        UIBuilderOverride builder = new UIBuilderOverride();
         for(String uiResource : res.getUIResourceNames()) {
             com.codename1.ui.Container c = builder.createContainer(res, uiResource);
             if(ResourceEditorView.findImageInContainer(c, resourceValue)) {

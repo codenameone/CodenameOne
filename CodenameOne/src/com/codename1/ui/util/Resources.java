@@ -89,8 +89,8 @@ public class Resources {
         failOnMissingTruetype = aFailOnMissingTruetype;
     }
 
-    private short majorVersion;
-    private short minorVersion;
+    short majorVersion;
+    short minorVersion;
     private static byte[] key;
 
     /**

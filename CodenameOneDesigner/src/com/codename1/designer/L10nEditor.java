@@ -1018,7 +1018,7 @@ private void syncWithUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
             return super.localize(key, defaultValue);
         }
     });
-    UIBuilderOverride o = new UIBuilderOverride(null);
+    UIBuilderOverride o = new UIBuilderOverride();
     for(String resources : res.getUIResourceNames()) {
         o.createContainer(res, resources);
     }

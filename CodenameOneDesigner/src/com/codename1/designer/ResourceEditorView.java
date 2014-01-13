@@ -232,7 +232,7 @@ public class ResourceEditorView extends FrameView {
         initComponents();
         
         livePreviewUI.setSelected(Preferences.userNodeForPackage(getClass()).getBoolean("LivePreview", false));
-        boolean isXMLEnabled = Preferences.userNodeForPackage(getClass()).getBoolean("XMLFileMode", false);
+        boolean isXMLEnabled = Preferences.userNodeForPackage(getClass()).getBoolean("XMLFileMode", true);
         EditableResources.setXMLEnabled(isXMLEnabled);
         enableXMLTeamMode.setSelected(isXMLEnabled);
         
@@ -3725,7 +3725,7 @@ public static void openInIDE(File f, int lineNumber) {
         }
 
         // check if a UI resource is making use of the image
-        UIBuilderOverride builder = new UIBuilderOverride(null);
+        UIBuilderOverride builder = new UIBuilderOverride();
         for(String uiResource : loadedResources.getUIResourceNames()) {
             com.codename1.ui.Container c = builder.createContainer(loadedResources, uiResource);
             if(findImageInContainer(c, resourceValue)) {

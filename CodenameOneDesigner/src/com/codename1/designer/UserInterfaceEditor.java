@@ -72,6 +72,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -422,7 +423,7 @@ public class UserInterfaceEditor extends BaseForm {
     private long lastModifiedStateMachineCode;
     private File userStateMachineFile;
 
-    private boolean isActualContainer(Object cmp) {
+    private static boolean isActualContainer(Object cmp) {
         return cmp instanceof com.codename1.ui.Container &&
                 (cmp.getClass() == com.codename1.ui.Container.class || 
                 cmp instanceof com.codename1.ui.Form ||
@@ -481,7 +482,7 @@ public class UserInterfaceEditor extends BaseForm {
                 new ThemeEditor(res, "", new Hashtable(), view);
             }
         }
-        builder = new UIBuilderOverride(this);
+        builder = new UIBuilderOverride();
         UIBuilderOverride.setIgnorBaseForm(true);
         com.codename1.ui.plaf.Accessor.setResourceBundle(null);
         this.res = res;
@@ -1075,7 +1076,7 @@ public class UserInterfaceEditor extends BaseForm {
                             if(current.equals(UserInterfaceEditor.this.name)) {
                                 continue;
                             }
-                            UIBuilderOverride tempBuilder = new UIBuilderOverride(null);
+                            UIBuilderOverride tempBuilder = new UIBuilderOverride();
                             if(tempBuilder.createContainer(UserInterfaceEditor.this.res, (String)current) instanceof com.codename1.ui.Form) {
                                 continue;
                             }
@@ -1132,7 +1133,7 @@ public class UserInterfaceEditor extends BaseForm {
                         public Object getCellEditorValue() {
                             Object o = super.getCellEditorValue();
                             if(o != null && o instanceof String) {
-                                UIBuilderOverride tempBuilder = new UIBuilderOverride(null);
+                                UIBuilderOverride tempBuilder = new UIBuilderOverride();
                                 o = tempBuilder.createContainer(UserInterfaceEditor.this.res, (String)o);
                             }
                             return o;
@@ -1897,7 +1898,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         // add a custom component for every GUI element that is not a form
         UIBuilderOverride.setIgnorBaseForm(false);
-        UIBuilderOverride tempBuilder = new UIBuilderOverride(null);
+        UIBuilderOverride tempBuilder = new UIBuilderOverride();
         for(String uiResourceName : res.getUIResourceNames()) {
             if(uiResourceName.equals(name)) {
                 continue;
@@ -1935,7 +1936,7 @@ public class UserInterfaceEditor extends BaseForm {
                 userComponents.getPreferredSize().height));
 
         if(res.getResourceObject(name) == null) {
-            res.setUi(name, persistContainer(containerInstance));
+            res.setUi(name, persistContainer(containerInstance, res));
         }
 
         repainter = new javax.swing.Timer(1500, new ActionListener() {
@@ -1980,7 +1981,7 @@ public class UserInterfaceEditor extends BaseForm {
 
     private void saveUI() {
         try {
-            res.setUi(UserInterfaceEditor.this.name, persistContainer(containerInstance));
+            res.setUi(UserInterfaceEditor.this.name, persistContainer(containerInstance, res));
             if(builder.createContainer(res, name) == null) {
                 JOptionPane.showMessageDialog(this, "GUI Builder Error, undoing...");
                 res.undo();
@@ -2057,7 +2058,7 @@ public class UserInterfaceEditor extends BaseForm {
                 try {
                     com.codename1.ui.Component cmp;
                     if(custom != null && custom.isUiResource()) {
-                        UIBuilderOverride u = new UIBuilderOverride(UserInterfaceEditor.this);
+                        UIBuilderOverride u = new UIBuilderOverride();
                         cmp = u.createContainer(res, custom.getType());
                         if(b.getIcon() != null) {
                             DragSource.getDefaultDragSource().startDrag(dge, DragSource.DefaultMoveDrop,
@@ -2104,7 +2105,7 @@ public class UserInterfaceEditor extends BaseForm {
 
     private static List<com.codename1.ui.Command> getListOfAllCommands(EditableResources res) {
         final List<com.codename1.ui.Command> response = new ArrayList<com.codename1.ui.Command>();
-        UIBuilderOverride tempBuilder = new UIBuilderOverride(null) {
+        UIBuilderOverride tempBuilder = new UIBuilderOverride() {
             public com.codename1.ui.Command createCommandImpl(String commandName, com.codename1.ui.Image icon, int commandId, String action, boolean isBack, String arg) {
                 com.codename1.ui.Command c = super.createCommandImpl(commandName, icon, commandId, action, isBack, arg);
                 if(!response.contains(c)) {
@@ -2591,7 +2592,7 @@ public class UserInterfaceEditor extends BaseForm {
                     }
                     try {
                         if(c.isUiResource()) {
-                            UIBuilderOverride u = new UIBuilderOverride(UserInterfaceEditor.this);
+                            UIBuilderOverride u = new UIBuilderOverride();
                             com.codename1.ui.Component cmp = u.createContainer(res, c.getType());
                             String t = (String)cmp.getClientProperty(TYPE_KEY);
                             if(t == null) {
@@ -2635,7 +2636,7 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
-    public byte[] persistContainer(com.codename1.ui.Container c) {
+    public static byte[] persistContainer(com.codename1.ui.Container c, EditableResources res) {
         try {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
             DataOutputStream d = new DataOutputStream(b);
@@ -2647,9 +2648,9 @@ public class UserInterfaceEditor extends BaseForm {
                 d.writeUTF(current.getCodenameOneBaseClass());
             }*/
 
-            persistComponent(c, d);
+            persistComponent(c, c, d, res);
 
-            postCreateComponent(c, d);
+            postCreateComponent(c, d, res);
 
             // end of post create
             d.writeUTF("");
@@ -2662,7 +2663,7 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
-    private int getInt(String fieldName, Class c, Object o) {
+    private static int getInt(String fieldName, Class c, Object o) {
         try {
             Field m = c.getDeclaredField(fieldName);
             m.setAccessible(true);
@@ -2673,7 +2674,7 @@ public class UserInterfaceEditor extends BaseForm {
         return -1;
     }
 
-    public void postCreateComponent(com.codename1.ui.Component cmp, DataOutputStream out) throws IOException {
+    public static void postCreateComponent(com.codename1.ui.Component cmp, DataOutputStream out, EditableResources res) throws IOException {
         if(isPropertyModified(cmp, PROPERTY_COMMAND) || isPropertyModified(cmp, PROPERTY_COMMAND_LEGACY)) {
             out.writeUTF(cmp.getName());
             out.writeInt(PROPERTY_COMMAND);
@@ -2750,12 +2751,12 @@ public class UserInterfaceEditor extends BaseForm {
         if(isActualContainer(cmp)) {
             com.codename1.ui.Container c = (com.codename1.ui.Container)cmp;
             for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
-                postCreateComponent(c.getComponentAt(iter), out);
+                postCreateComponent(c.getComponentAt(iter), out, res);
             }
         }
     }
     
-    private boolean hasBackCommand(com.codename1.ui.Form frm, com.codename1.ui.Command cmd) {
+    private static boolean hasBackCommand(com.codename1.ui.Form frm, com.codename1.ui.Command cmd) {
         if(frm.getBackCommand() != null) {
             for(int iter = frm.getCommandCount() - 1 ; iter >= 0 ; iter--) {
                 if(frm.getCommand(iter) == frm.getBackCommand()) {
@@ -2767,6 +2768,1011 @@ public class UserInterfaceEditor extends BaseForm {
     }
 
     public void persistComponent(com.codename1.ui.Component cmp, DataOutputStream out) throws IOException {
+        persistComponent(containerInstance, cmp, out, res);
+    }
+    
+    private static String xmlize(String s) {    
+        return EditableResources.xmlize(s);
+    }
+    
+    private static void appendComponentXMLBody(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, StringBuilder build, EditableResources res, String indent) {
+        if(isPropertyModified(cmp, PROPERTY_LAYOUT_CONSTRAINT) || 
+                (cmp.getParent() != null && cmp.getParent().getLayout() instanceof com.codename1.ui.layouts.BorderLayout)) {
+            if(cmp.getParent() != null && cmp != containerInstance && cmp.getClientProperty("%base_form%") == null) {
+                com.codename1.ui.layouts.Layout l = cmp.getParent().getLayout();
+                if(l instanceof com.codename1.ui.layouts.BorderLayout) {
+                    build.append(indent);
+                    build.append("<layoutConstraint value=\"");
+                    build.append((String)l.getComponentConstraint(cmp));
+                    build.append("\" />\n");
+                } else {
+                    if(l instanceof com.codename1.ui.table.TableLayout) {
+                        build.append(indent);
+                        com.codename1.ui.table.TableLayout.Constraint con = (com.codename1.ui.table.TableLayout.Constraint)l.getComponentConstraint(cmp);
+                        build.append("<layoutConstraint row=\"");
+                        build.append(getInt("row", con.getClass(), con));
+                        build.append("\" column=\"");
+                        build.append(getInt("column", con.getClass(), con));
+                        build.append("\" height=\"");
+                        build.append(getInt("height", con.getClass(), con));
+                        build.append("\" width=\"");
+                        build.append(getInt("width", con.getClass(), con));
+                        build.append("\" align=\"");
+                        build.append(getInt("align", con.getClass(), con));
+                        build.append("\" spanHorizontal=\"");
+                        build.append(getInt("spanHorizontal", con.getClass(), con));
+                        build.append("\" valign=\"");
+                        build.append(getInt("valign", con.getClass(), con));
+                        build.append("\" spanVertical=\"");
+                        build.append(getInt("spanVertical", con.getClass(), con));
+                        build.append("\" />\n");
+                    }
+                }
+            }
+        }
+
+        // don't persist children of subclasses like Table etc.
+        if(cmp.getClass() == com.codename1.ui.Container.class || cmp instanceof com.codename1.ui.Form) {
+            com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
+            if(cnt instanceof com.codename1.ui.Form) {
+                cnt = ((com.codename1.ui.Form)cnt).getContentPane();
+            }
+            for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                persistToXML(containerInstance, cnt.getComponentAt(iter), build, res, indent);
+            }
+        }
+        
+        if(cmp instanceof com.codename1.ui.List && !(cmp instanceof com.codename1.components.RSSReader)) {
+            com.codename1.ui.List lst = (com.codename1.ui.List)cmp;
+            for(int iter = 0 ; iter < lst.getModel().getSize() ; iter++) {
+                Object o = lst.getModel().getItemAt(iter);
+                appendMapOrString(o, build, indent, res);
+            }
+        }
+        
+        if(isPropertyModified(cmp, PROPERTY_CUSTOM)) {
+            for(String propName : cmp.getPropertyNames()) {
+                if(isCustomPropertyModified(cmp, propName) && !propName.startsWith("$")) {
+                    build.append(indent);
+                    build.append("<custom name=\"");
+                    build.append(propName);
+                    Class type = getPropertyCustomType(cmp, propName);
+                    Object value = cmp.getPropertyValue(propName);
+                    if(value == null) {
+                        build.append("\" />\n");
+                        continue;
+                    }
+                    if(type.isArray()) {
+                        // 2d array
+                        if(type.getComponentType().isArray()) {
+                            build.append("\" type=\"");
+                            build.append(type.getComponentType().getComponentType().getName());
+                            build.append("\" array=\"true\" dimensions=\"2");
+                        } else {
+                            build.append("\" type=\"");
+                            build.append(type.getComponentType().getName());
+                            build.append("\" array=\"true\" dimensions=\"1");
+                        }
+                    } else {
+                        build.append("\" type=\"");
+                        build.append(type.getName());
+                    }
+                    build.append("\" ");
+                    if(type == String.class) {
+                        build.append("value=\"");
+                        build.append(xmlize((String)value));
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == String[].class) {
+                        build.append(">\n");
+                        
+                        String[] result = (String[])value;
+                        for(int i = 0 ; i < result.length ; i++) {
+                            build.append(indent);
+                            build.append("  ");
+                            build.append("<str>");
+                            build.append(xmlize(result[i]));
+                            build.append("</str>\n");
+                        }
+                        build.append(indent);
+                        build.append("</custom>\n");
+                        continue;
+                    }
+
+                    if(type == String[][].class) {
+                        String[][] result = (String[][])value;
+                        build.append(">\n");
+                        for(int i = 0 ; i < result.length ; i++) {
+                            build.append(indent);
+                            build.append("  ");
+                            build.append("<arr>");
+                            for(int j = 0 ; j < result[i].length ; j++) {
+                                build.append(indent);
+                                build.append("    ");
+                                build.append("<str>");
+                                build.append(xmlize(result[i][j]));
+                                build.append("</str>\n");
+                            }
+                            build.append(indent);
+                            build.append("  ");
+                            build.append("</arr>\n");
+                        }
+                        build.append(indent);
+                        build.append("</custom>\n");
+                        continue;
+                    }
+
+                    if(type == Integer.class) {
+                        build.append("value=\"");
+                        build.append(((Number)value).intValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Long.class) {
+                        build.append("value=\"");
+                        build.append(((Number)value).longValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Double.class) {
+                        build.append("value=\"");
+                        build.append(((Number)value).doubleValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Date.class) {
+                        build.append("value=\"");
+                        build.append(((Date)value).getTime());
+                        build.append("\" />\n");
+                        continue;
+                    }
+                    
+                    if(type == Float.class) {
+                        build.append("value=\"");
+                        build.append(((Number)value).floatValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Byte.class) {
+                        build.append("value=\"");
+                        build.append(((Number)value).byteValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Boolean.class) {
+                        build.append("value=\"");
+                        build.append(((Boolean)value).booleanValue());
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == com.codename1.ui.Image[].class) {
+                        com.codename1.ui.Image[] result = (com.codename1.ui.Image[])value;
+                        build.append(">\n");
+                        for(int i = 0 ; i < result.length ; i++) {
+                            build.append(indent);
+                            build.append("  ");
+                            if(result[i] == null) {
+                                build.append("<str/>\n");
+                            } else {
+                                String id = res.findId(result[i]);
+                                if(id == null) {
+                                    build.append("<str/>\n");
+                                } else {
+                                    build.append("<str>");
+                                    build.append(xmlize(id));
+                                    build.append("</str>\n");
+                                }
+                            }
+                        }
+                        build.append(indent);
+                        build.append("</custom>\n");
+                        continue;
+                    }
+
+                    if(type == com.codename1.ui.Image.class) {
+                        com.codename1.ui.Image result = (com.codename1.ui.Image)value;
+                        String id = res.findId(result);
+                        if(id != null) {
+                            build.append("value=\"");
+                            build.append(xmlize(id));
+                        }
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == com.codename1.ui.Container.class) {
+                        build.append("value=\"");
+                        build.append(xmlize(((com.codename1.ui.Container)value).getName()));
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == com.codename1.ui.list.CellRenderer.class) {
+                        com.codename1.ui.list.GenericListCellRenderer g = (com.codename1.ui.list.GenericListCellRenderer)value;
+                        if(g.getSelectedEven() == null) {
+                            build.append(" selectedRenderer=\"");
+                            build.append(xmlize(g.getSelected().getName()));
+                            build.append("\" unselectedRenderer=\"");
+                            build.append(xmlize(g.getUnselected().getName()));
+                            build.append("\" ");
+                        } else {
+                            build.append(" selectedRenderer=\"");
+                            build.append(xmlize(g.getSelected().getName()));
+                            build.append("\" unselectedRenderer=\"");
+                            build.append(xmlize(g.getUnselected().getName()));
+                            build.append(" selectedRendererEven=\"");
+                            build.append(xmlize(g.getSelectedEven().getName()));
+                            build.append("\" unselectedRendererEven=\"");
+                            build.append(xmlize(g.getUnselectedEven().getName()));
+                            build.append("\" ");
+                        }
+                        build.append("\" />\n");
+                        continue;
+                    }
+
+                    if(type == Object[].class) {
+                        build.append(">\n");
+                        Object[] arr = (Object[])value;
+                        for(int iter = 0 ; iter < arr.length ; iter++) {
+                            Object o = arr[iter];
+                            appendMapOrString(o, build, indent, res);
+                        }
+                        build.append(indent);
+                        build.append("</custom>\n");
+                        continue;
+                    }
+                    
+                    // none of the above then its a char
+                    build.append("value=\"");
+                    build.append(xmlize("" + ((Character)value).charValue()));
+                    build.append("\" />\n");
+                }
+            }
+        }
+    }
+
+    private static void appendMapOrString(Object o, StringBuilder build, String indent, EditableResources res) {
+        if(o instanceof String) {
+            build.append(indent);
+            build.append("<stringItem value=\"");
+            build.append(xmlize((String)o));
+            build.append("\" />\n");
+        } else {
+            build.append(indent);
+            build.append("<mapItems>\n");
+            Hashtable h = (Hashtable)o;
+            for(Object key : h.keySet()) {
+                Object val = h.get(key);
+                build.append(indent);
+                if(val instanceof com.codename1.ui.Image) {
+                    build.append("  <imageItem key=\"");
+                    build.append(xmlize((String)key));
+                    build.append("\" value=\"");
+                    build.append(xmlize(res.findId(val)));
+                    build.append("\" />\n");
+                } else {
+                    if(val instanceof ActionCommand) {
+                        build.append("  <actionItem key=\"");
+                        build.append(xmlize((String)key));
+                        build.append("\" value=\"");
+                        build.append(xmlize(((ActionCommand)val).getAction()));
+                        build.append("\" />\n");
+                    } else {
+                        build.append("  <stringItem key=\"");
+                        build.append(xmlize((String)key));
+                        build.append("\" value=\"");
+                        build.append(xmlize((String)val));
+                        build.append("\" />\n");
+                    }
+                }
+            }
+            build.append(indent);
+            build.append("</mapItems>\n");
+        }
+    }
+    
+    public static void persistToXML(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, StringBuilder build, EditableResources res, String indent) {
+        persistToXML(containerInstance, cmp, build, res, indent, null);
+    }
+    
+    private static void persistToXML(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, StringBuilder build, EditableResources res, String indent, String tabTitle) {
+        build.append(indent);
+        build.append("<component type=\"");
+        build.append((String)cmp.getClientProperty(TYPE_KEY));
+        build.append("\" name=\"");
+        if(cmp.getName() != null) {
+            build.append(xmlize(cmp.getName()));
+        } 
+        build.append("\" ");
+        if(tabTitle != null) {
+            build.append("tabTitle=\"");
+            build.append(xmlize(tabTitle));
+            build.append("\" ");
+        }
+        if(cmp.getClientProperty("%base_form%") != null) {
+            build.append("baseForm=\"");
+            build.append(xmlize((String)cmp.getClientProperty("%base_form%")));
+            build.append("\" ");
+        }
+        if(cmp.getCloudBoundProperty() != null) {
+            build.append("cloudBoundProperty=\"");
+            build.append(xmlize(cmp.getCloudBoundProperty()));
+            build.append("\" ");
+        }
+        if(cmp.getCloudDestinationProperty() != null) {
+            build.append("cloudDestinationProperty=\"");
+            build.append(xmlize(cmp.getCloudDestinationProperty()));
+            build.append("\" ");
+        }
+        
+        if(isPropertyModified(cmp, PROPERTY_COMMAND) || isPropertyModified(cmp, PROPERTY_COMMAND_LEGACY)) {
+            ActionCommand cmd;
+            if(cmp instanceof com.codename1.ui.Container) {
+                cmd = (ActionCommand)((com.codename1.ui.Button) ((com.codename1.ui.Container)cmp).getLeadComponent()).getCommand();
+            } else {
+                cmd = (ActionCommand)((com.codename1.ui.Button)cmp).getCommand();
+            }
+            build.append("commandName=\"");
+            build.append(xmlize(cmd.getCommandName()));
+            build.append("\" ");
+
+            if(cmd.getIcon() != null) {
+                build.append("commandIcon=\"");
+                build.append(xmlize(res.findId(cmd.getIcon())));
+                build.append("\" ");
+            } 
+            if(cmd.getRolloverIcon() != null) {
+                build.append("commandRolloverIcon=\"");
+                build.append(xmlize(res.findId(cmd.getRolloverIcon())));
+                build.append("\" ");
+            } 
+            if(cmd.getPressedIcon() != null) {
+                build.append("commandPressedIcon=\"");
+                build.append(xmlize(res.findId(cmd.getPressedIcon())));
+                build.append("\" ");
+            } 
+            if(cmd.getDisabledIcon() != null) {
+                build.append("commandDisabledIcon=\"");
+                build.append(xmlize(res.findId(cmd.getDisabledIcon())));
+                build.append("\" ");
+            }                                 
+            build.append("commandId=\"");
+            build.append(cmd.getId());
+            build.append("\" ");
+            if(cmd.getAction() != null) {
+                build.append("commandAction=\"");
+                build.append(xmlize(cmd.getAction()));
+                build.append("\" ");
+                if(cmd.getAction().equals("$Execute")) {
+                    build.append("commandArgument=\"");
+                    build.append(xmlize(cmd.getArgument()));
+                    build.append("\" ");
+                }
+            } 
+            build.append("commandBack=\"");
+            build.append(cmp.getComponentForm().getBackCommand() == cmd);
+            build.append("\" ");
+        }
+        
+        if(isPropertyModified(cmp, PROPERTY_LABEL_FOR)) {
+            if(cmp.getLabelForComponent() != null) {
+                build.append("labelFor=\"");
+                build.append(xmlize(cmp.getLabelForComponent().getName()));
+                build.append("\" ");
+            }
+        }
+        if(isPropertyModified(cmp, PROPERTY_LEAD_COMPONENT) && ((com.codename1.ui.Container)cmp).getLeadComponent() != null) {
+            build.append("leadComponent=\"");
+            build.append(xmlize(((com.codename1.ui.Container)cmp).getLeadComponent().getName()));
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_NEXT_FOCUS_DOWN) && cmp.getNextFocusDown() != null) {
+            build.append("nextFocusDown=\"");
+            build.append(xmlize(cmp.getNextFocusDown().getName()));
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_NEXT_FOCUS_UP) && cmp.getNextFocusUp() != null) {
+            build.append("nextFocusUp=\"");
+            build.append(xmlize(cmp.getNextFocusUp().getName()));
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_NEXT_FOCUS_LEFT) && cmp.getNextFocusLeft() != null) {
+            build.append("nextFocusLeft=\"");
+            build.append(xmlize(cmp.getNextFocusLeft().getName()));
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_NEXT_FOCUS_RIGHT) && cmp.getNextFocusRight() != null) {
+            build.append("nextFocusRight=\"");
+            build.append(xmlize(cmp.getNextFocusRight().getName()));
+            build.append("\" ");
+        }
+        
+        if(isPropertyModified(cmp, PROPERTY_EMBED)) {
+            build.append("embed=\"");
+            build.append(xmlize(((EmbeddedContainer)cmp).getEmbed()));
+            build.append("\" ");
+        }
+
+        if(isPropertyModified(cmp, PROPERTY_UIID)) {
+            build.append("uiid=\"");
+            build.append(cmp.getUIID());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_FOCUSABLE)) {
+            build.append("focusable=\"");
+            build.append(cmp.isFocusable());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_ENABLED)) {
+            build.append("enabled=\"");
+            build.append(cmp.isEnabled());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_RTL)) {
+            build.append("rtl=\"");
+            build.append(cmp.isRTL());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_SCROLL_VISIBLE)) {
+            build.append("scrollVisible=\"");
+            build.append(cmp.isScrollVisible());
+            build.append("\" ");
+        }
+        
+        /*if(isPropertyModified(cmp, PROPERTY_PREFERRED_WIDTH)) {
+            out.writeInt(PROPERTY_PREFERRED_WIDTH);
+            out.writeInt(cmp.getPreferredW());
+        }
+
+        if(isPropertyModified(cmp, PROPERTY_PREFERRED_HEIGHT)) {
+            out.writeInt(PROPERTY_PREFERRED_HEIGHT);
+            out.writeInt(cmp.getPreferredH());
+        }*/
+        if(isPropertyModified(cmp, PROPERTY_TENSILE_DRAG_ENABLED)) {
+            build.append("tensileDragEnabled=\"");
+            build.append(cmp.isTensileDragEnabled());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_TACTILE_TOUCH)) {
+            build.append("tactileTouch=\"");
+            build.append(cmp.isTactileTouch());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_SNAP_TO_GRID)) {
+            build.append("snapToGrid=\"");
+            build.append(cmp.isSnapToGrid());
+            build.append("\" ");
+        }
+        if(isPropertyModified(cmp, PROPERTY_FLATTEN)) {
+            build.append("flatten=\"");
+            build.append(cmp.isFlatten());
+            build.append("\" ");
+        }
+        
+        if(isActualContainer(cmp) || cmp instanceof com.codename1.ui.list.ContainerList) {
+            com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
+            if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_X)) {
+                build.append("scrollableX=\"");
+                build.append(CodenameOneAccessor.isScrollableX(cnt));
+                build.append("\" ");
+            }
+            if(isPropertyModified(cnt, PROPERTY_SCROLLABLE_Y)) {
+                build.append("scrollableY=\"");
+                build.append(CodenameOneAccessor.isScrollableY(cnt));
+                build.append("\" ");
+            }
+            if(cmp instanceof com.codename1.ui.Tabs) {
+                com.codename1.ui.Tabs tab = (com.codename1.ui.Tabs)cmp;
+                
+                if(isPropertyModified(cmp, PROPERTY_TAB_PLACEMENT)) {
+                    build.append("tabPlacement=\"");
+                    build.append(((com.codename1.ui.Tabs)cmp).getTabPlacement());
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_TAB_TEXT_POSITION)) {
+                    build.append("tabTextPosition=\"");
+                    build.append(((com.codename1.ui.Tabs)cmp).getTabTextPosition());
+                    build.append("\" ");
+                }
+
+                build.append(">\n");
+                appendComponentXMLBody(containerInstance, cmp, build, res, indent + "  ");
+                for(int iter = 0 ; iter < tab.getTabCount() ; iter++) {
+                    persistToXML(containerInstance, tab.getTabComponentAt(iter), build, res, indent + "  ", tab.getTabTitle(iter));
+                }
+                build.append(indent);
+                build.append("</component>\n");
+            } else {
+                if(isPropertyModified(cmp, PROPERTY_LAYOUT)) {
+                    com.codename1.ui.layouts.Layout l = cnt.getLayout();
+                    build.append("layout=\"");
+                    if(l instanceof com.codename1.ui.layouts.FlowLayout) {
+                        com.codename1.ui.layouts.FlowLayout f = (com.codename1.ui.layouts.FlowLayout)l;
+                        build.append("FlowLayout\" flowLayoutFillRows=\"");
+                        build.append(f.isFillRows());
+                        build.append("\" flowLayoutAlign=\"");
+                        build.append(f.getAlign());
+                        build.append("\" flowLayoutValign=\"");
+                        build.append(f.getValign());
+                        build.append("\" ");
+                    } else {
+                        if(l instanceof com.codename1.ui.layouts.BorderLayout) {
+                            com.codename1.ui.layouts.BorderLayout b = (com.codename1.ui.layouts.BorderLayout)l;
+                            build.append("BorderLayout\" borderLayoutAbsoluteCenter=\"");
+                            build.append(b.isAbsoluteCenter());
+                            build.append("\" ");
+                            String north = b.getLandscapeSwap(com.codename1.ui.layouts.BorderLayout.NORTH);
+                            String east = b.getLandscapeSwap(com.codename1.ui.layouts.BorderLayout.EAST);
+                            String west = b.getLandscapeSwap(com.codename1.ui.layouts.BorderLayout.WEST);
+                            String south = b.getLandscapeSwap(com.codename1.ui.layouts.BorderLayout.SOUTH);
+                            String center = b.getLandscapeSwap(com.codename1.ui.layouts.BorderLayout.CENTER);
+                            if(north != null) {
+                                build.append("borderLayoutSwapNorth=\"");
+                                build.append(north);
+                                build.append("\" ");
+                            }
+                            if(east != null) {
+                                build.append("borderLayoutSwapEast=\"");
+                                build.append(east);
+                                build.append("\" ");
+                            }
+                            if(west != null) {
+                                build.append("borderLayoutSwapWest=\"");
+                                build.append(west);
+                                build.append("\" ");
+                            }
+                            if(south != null) {
+                                build.append("borderLayoutSwapSouth=\"");
+                                build.append(south);
+                                build.append("\" ");
+                            }
+                            if(center != null) {
+                                build.append("borderLayoutSwapCenter=\"");
+                                build.append(center);
+                                build.append("\" ");
+                            }
+                        } else {
+                            if(l instanceof com.codename1.ui.layouts.GridLayout) {
+                                build.append("GridLayout\" gridLayoutRows=\"");
+                                build.append(((com.codename1.ui.layouts.GridLayout)l).getRows());
+                                build.append("\" gridLayoutColumns=\"");
+                                build.append(((com.codename1.ui.layouts.GridLayout)l).getColumns());
+                                build.append("\" ");
+                            } else {
+                                if(l instanceof com.codename1.ui.layouts.BoxLayout) {
+                                    if(getInt("axis", l.getClass(), l) == com.codename1.ui.layouts.BoxLayout.X_AXIS) {
+                                        build.append("BoxLayout\" boxLayoutAxis=\"X\" ");
+                                    } else {
+                                        build.append("BoxLayout\" boxLayoutAxis=\"Y\" ");
+                                    }
+                                } else {
+                                    if(l instanceof com.codename1.ui.table.TableLayout) {
+                                        build.append("TableLayout\" tableLayoutRows=\"");
+                                        build.append(((com.codename1.ui.table.TableLayout)l).getRows());
+                                        build.append("\" tableLayoutColumns=\"");
+                                        build.append(((com.codename1.ui.table.TableLayout)l).getColumns());
+                                        build.append("\" ");
+                                    } else {
+                                        if(l instanceof com.codename1.ui.layouts.LayeredLayout) {
+                                            build.append("LayeredLayout\" ");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if(cmp instanceof com.codename1.ui.Form) {
+                    com.codename1.ui.Form frm = (com.codename1.ui.Form)cmp;
+
+                    if(isPropertyModified(cmp, PROPERTY_NEXT_FORM) && frm.getClientProperty("%next_form%") != null) {
+                        build.append("nextForm=\"");
+                        build.append(xmlize((String)frm.getClientProperty("%next_form%")));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TITLE)) {
+                        build.append("title=\"");
+                        build.append(xmlize(frm.getTitle()));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_CYCLIC_FOCUS)) {
+                        build.append("cyclicFocus=\"");
+                        build.append(frm.isCyclicFocus());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_DIALOG_UIID) && cmp instanceof com.codename1.ui.Dialog) {
+                        com.codename1.ui.Dialog dlg = (com.codename1.ui.Dialog)cmp;
+                        build.append("dialogUIID=\"");
+                        build.append(dlg.getDialogUIID());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_DISPOSE_WHEN_POINTER_OUT) && cmp instanceof com.codename1.ui.Dialog) {
+                        com.codename1.ui.Dialog dlg = (com.codename1.ui.Dialog)cmp;
+                        build.append("disposeWhenPointerOutOfBounds=\"");
+                        build.append(dlg.isDisposeWhenPointerOutOfBounds());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_DIALOG_POSITION) && cmp instanceof com.codename1.ui.Dialog) {
+                        com.codename1.ui.Dialog dlg = (com.codename1.ui.Dialog)cmp;
+                        if(dlg.getDialogPosition() != null) {
+                            build.append("dialogPosition=\"");
+                            build.append(dlg.getDialogPosition());
+                            build.append("\" ");
+                        }
+                    }
+                    build.append(">\n");
+                    
+                    appendComponentXMLBody(containerInstance, cmp, build, res, indent + "  ");
+                    if(frm.getCommandCount() > 0 || frm.getBackCommand() != null) {
+                        if(isPropertyModified(cmp, PROPERTY_COMMANDS) || isPropertyModified(cmp, PROPERTY_COMMANDS_LEGACY)) {
+                            
+                            if(frm.getBackCommand() != null && !hasBackCommand(frm, frm.getBackCommand())) {
+                                build.append("<command name=\"");
+                                ActionCommand cmd = (ActionCommand)frm.getBackCommand();
+                                build.append(xmlize(cmd.getCommandName()));
+                                build.append("\" ");
+                                if(cmd.getIcon() != null) {
+                                    build.append("icon=\"");
+                                    build.append(xmlize(res.findId(cmd.getIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getRolloverIcon() != null) {
+                                    build.append("rolloverIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getRolloverIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getPressedIcon() != null) {
+                                    build.append("pressedIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getPressedIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getDisabledIcon() != null) {
+                                    build.append("disabledIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getDisabledIcon())));
+                                    build.append("\" ");
+                                }                                 
+                                build.append("id=\"");
+                                build.append(cmd.getId());
+                                build.append("\" ");
+                                if(cmd.getAction() != null) {
+                                    build.append("action=\"");
+                                    build.append(xmlize(cmd.getAction()));
+                                    build.append("\" ");
+                                    if(cmd.getAction().equals("$Execute")) {
+                                        build.append("argument=\"");
+                                        build.append(xmlize(cmd.getArgument()));
+                                        build.append("\" ");
+                                    }
+                                } 
+                                build.append("backCommand=\"");
+                                build.append(frm.getBackCommand() == cmd);
+                                build.append("\" />");
+                            } 
+                            for(int iter = frm.getCommandCount() - 1 ; iter >= 0 ; iter--) {
+                                ActionCommand cmd = (ActionCommand)frm.getCommand(iter);
+                                build.append("<command name=\"");
+                                build.append(xmlize(cmd.getCommandName()));
+                                build.append("\" ");
+                                
+                                if(cmd.getIcon() != null) {
+                                    build.append("icon=\"");
+                                    build.append(xmlize(res.findId(cmd.getIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getRolloverIcon() != null) {
+                                    build.append("rolloverIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getRolloverIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getPressedIcon() != null) {
+                                    build.append("pressedIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getPressedIcon())));
+                                    build.append("\" ");
+                                } 
+                                if(cmd.getDisabledIcon() != null) {
+                                    build.append("disabledIcon=\"");
+                                    build.append(xmlize(res.findId(cmd.getDisabledIcon())));
+                                    build.append("\" ");
+                                }                                 
+                                build.append("id=\"");
+                                build.append(cmd.getId());
+                                build.append("\" ");
+                                if(cmd.getAction() != null) {
+                                    build.append("action=\"");
+                                    build.append(xmlize(cmd.getAction()));
+                                    build.append("\" ");
+                                    if(cmd.getAction().equals("$Execute")) {
+                                        build.append("argument=\"");
+                                        build.append(xmlize(cmd.getArgument()));
+                                        build.append("\" ");
+                                    }
+                                } 
+                                build.append("backCommand=\"");
+                                build.append(frm.getBackCommand() == cmd);
+                                build.append("\" />");
+                            }
+                        }
+                    }
+                    build.append(indent);
+                    build.append("</component>\n");
+                } else {
+                    if(!(cmp instanceof com.codename1.ui.list.ContainerList)) {
+                        build.append(">\n");                    
+                        appendComponentXMLBody(containerInstance, cmp, build, res, indent + "  ");
+                        build.append(indent);
+                        build.append("</component>\n");
+                    } else {
+                        com.codename1.ui.list.ContainerList lst = ((com.codename1.ui.list.ContainerList)cmp);
+                        if(isPropertyModified(cmp, PROPERTY_LIST_RENDERER) && lst.getRenderer() instanceof com.codename1.ui.list.GenericListCellRenderer) {
+                            com.codename1.ui.list.GenericListCellRenderer g = (com.codename1.ui.list.GenericListCellRenderer)lst.getRenderer();
+                            if(g.getSelectedEven() == null) {
+                                build.append(" selectedRenderer=\"");
+                                build.append(xmlize(g.getSelected().getName()));
+                                build.append("\" unselectedRenderer=\"");
+                                build.append(xmlize(g.getUnselected().getName()));
+                                build.append("\" ");
+                            } else {
+                                build.append(" selectedRenderer=\"");
+                                build.append(xmlize(g.getSelected().getName()));
+                                build.append("\" unselectedRenderer=\"");
+                                build.append(xmlize(g.getUnselected().getName()));
+                                build.append(" selectedRendererEven=\"");
+                                build.append(xmlize(g.getSelectedEven().getName()));
+                                build.append("\" unselectedRendererEven=\"");
+                                build.append(xmlize(g.getUnselectedEven().getName()));
+                                build.append("\" ");
+                            }
+                        }
+                        build.append(">\n");                    
+                        appendComponentXMLBody(containerInstance, cmp, build, res, indent + "  ");
+                        build.append(indent);
+                        build.append("</component>\n");
+                    }
+                }
+            }
+        } else {
+            if(cmp instanceof com.codename1.ui.Label) {
+                com.codename1.ui.Label lbl = (com.codename1.ui.Label)cmp;
+                build.append("text=\"");
+                build.append(xmlize(lbl.getText()));
+                build.append("\" ");
+                if(isPropertyModified(cmp, PROPERTY_ALIGNMENT)) {
+                    build.append("alignment=\"");
+                    build.append(lbl.getAlignment());
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_ICON) && lbl.getIcon() != null) {
+                    build.append("icon=\"");
+                    build.append(xmlize(res.findId(lbl.getIcon())));
+                    build.append("\" ");
+                }
+                if(lbl instanceof com.codename1.ui.Button) {
+                    com.codename1.ui.Button button = (com.codename1.ui.Button)lbl;
+                    if(isPropertyModified(cmp, PROPERTY_ROLLOVER_ICON) && button.getRolloverIcon() != null) {
+                        build.append("rolloverIcon=\"");
+                        build.append(xmlize(res.findId(button.getRolloverIcon())));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_PRESSED_ICON) && button.getPressedIcon() != null) {
+                        build.append("pressedIcon=\"");
+                        build.append(xmlize(res.findId(button.getPressedIcon())));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_DISABLED_ICON) && button.getDisabledIcon() != null) {
+                        build.append("disabledIcon=\"");
+                        build.append(xmlize(res.findId(button.getDisabledIcon())));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TOGGLE_BUTTON)) {
+                        build.append("toggle=\"");
+                        build.append(button.isToggle());
+                        build.append("\" ");
+                    }
+                } else {
+                    if(lbl instanceof com.codename1.ui.Slider) {
+                        com.codename1.ui.Slider sld = (com.codename1.ui.Slider)lbl;
+                        if(isPropertyModified(cmp, PROPERTY_EDITABLE)) {
+                            build.append("editable=\"");
+                            build.append(sld.isEditable());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_INFINITE)) {
+                            build.append("infinite=\"");
+                            build.append(sld.isInfinite());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_SLIDER_THUMB) && sld.getThumbImage() != null) {
+                            build.append("thumbImage=\"");
+                            build.append(xmlize(res.findId(sld.getThumbImage())));
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_PROGRESS)) {
+                            build.append("progress=\"");
+                            build.append(sld.getProgress());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_VERTICAL)) {
+                            build.append("vertical=\"");
+                            build.append(sld.isVertical());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_INCREMENTS)) {
+                            build.append("increments=\"");
+                            build.append(sld.getIncrements());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_MAX_VALUE)) {
+                            build.append("maxValue=\"");
+                            build.append(sld.getMaxValue());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_MIN_VALUE)) {
+                            build.append("minValue=\"");
+                            build.append(sld.getMinValue());
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_RENDER_PERCENTAGE_ON_TOP)) {
+                            build.append("renderPercentageOnTop=\"");
+                            build.append(sld.isRenderPercentageOnTop());
+                            build.append("\" ");
+                        }
+                    }
+                }
+                if(isPropertyModified(cmp, PROPERTY_RADIO_GROUP)) {
+                    build.append("group=\"");
+                    build.append(xmlize(((com.codename1.ui.RadioButton)cmp).getGroup()));
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_SELECTED)) {
+                    build.append("selected=\"");
+                    build.append(((com.codename1.ui.Button)cmp).isSelected());
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_GAP)) {
+                    build.append("gap=\"");
+                    build.append(lbl.getGap());
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_VERTICAL_ALIGNMENT)) {
+                    build.append("verticalAlignment=\"");
+                    build.append(lbl.getVerticalAlignment());
+                    build.append("\" ");
+                }
+                if(isPropertyModified(cmp, PROPERTY_TEXT_POSITION)) {
+                    build.append("textPosition=\"");
+                    build.append(lbl.getTextPosition());
+                    build.append("\" ");
+                }
+            } else {
+                if(cmp instanceof com.codename1.ui.TextArea) {
+                    com.codename1.ui.TextArea txt = (com.codename1.ui.TextArea)cmp;
+                    if(isPropertyModified(cmp, PROPERTY_VERTICAL_ALIGNMENT)) {
+                        build.append("verticalAlignment=\"");
+                        build.append(txt.getVerticalAlignment());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TEXT)) {
+                        build.append("text=\"");
+                        build.append(xmlize(txt.getText()));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TEXT_AREA_GROW)) {
+                        build.append("growByContent=\"");
+                        build.append(txt.isGrowByContent());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TEXT_CONSTRAINT)) {
+                        build.append("constraint=\"");
+                        build.append(txt.getConstraint());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_TEXT_MAX_LENGTH)) {
+                        build.append("maxSize=\"");
+                        build.append(txt.getMaxSize());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_EDITABLE)) {
+                        build.append("editable=\"");
+                        build.append(txt.isEditable());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_ALIGNMENT)) {
+                        build.append("alignment=\"");
+                        build.append(txt.getAlignment());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_HINT)) {
+                        build.append("hint=\"");
+                        build.append(xmlize(txt.getHint()));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_HINT_ICON) && txt.getHintIcon() != null) {
+                        build.append("hintIcon=\"");
+                        build.append(xmlize(res.findId(txt.getHintIcon())));
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_COLUMNS)) {
+                        build.append("columns=\"");
+                        build.append(txt.getColumns());
+                        build.append("\" ");
+                    }
+                    if(isPropertyModified(cmp, PROPERTY_ROWS)) {
+                        build.append("rows=\"");
+                        build.append(txt.getRows());
+                        build.append("\" ");
+                    }
+                } else {
+                    if(cmp instanceof com.codename1.ui.List) {
+                        com.codename1.ui.List lst = (com.codename1.ui.List)cmp;
+                        if(isPropertyModified(cmp, PROPERTY_ITEM_GAP)) {
+                            build.append("itemGap=\"");
+                            build.append(lst.getItemGap());
+                            build.append("\" ");
+                        }
+
+                        if(isPropertyModified(cmp, PROPERTY_LIST_FIXED)) {
+                            build.append("fixedSelection=\"");
+                            build.append(lst.getFixedSelection());
+                            build.append("\" ");
+                        }
+
+                        if(isPropertyModified(cmp, PROPERTY_LIST_ORIENTATION)) {
+                            build.append("orientation=\"");
+                            build.append(lst.getOrientation());
+                            build.append("\" ");
+                        }
+                        
+                        if(isPropertyModified(cmp, PROPERTY_HINT)) {
+                            build.append("hint=\"");
+                            build.append(xmlize(lst.getHint()));
+                            build.append("\" ");
+                        }
+                        if(isPropertyModified(cmp, PROPERTY_HINT_ICON) && lst.getHintIcon() != null) {
+                            build.append("hintIcon=\"");
+                            build.append(xmlize(res.findId(lst.getHintIcon())));
+                            build.append("\" ");
+                        }
+
+                        if(isPropertyModified(cmp, PROPERTY_LIST_RENDERER) && lst.getRenderer() instanceof com.codename1.ui.list.GenericListCellRenderer) {
+                            com.codename1.ui.list.GenericListCellRenderer g = (com.codename1.ui.list.GenericListCellRenderer)lst.getRenderer();
+                            if(g.getSelectedEven() == null) {
+                                build.append(" selectedRenderer=\"");
+                                build.append(xmlize(g.getSelected().getName()));
+                                build.append("\" unselectedRenderer=\"");
+                                build.append(xmlize(g.getUnselected().getName()));
+                                build.append("\" ");
+                            } else {
+                                build.append(" selectedRenderer=\"");
+                                build.append(xmlize(g.getSelected().getName()));
+                                build.append("\" unselectedRenderer=\"");
+                                build.append(xmlize(g.getUnselected().getName()));
+                                build.append(" selectedRendererEven=\"");
+                                build.append(xmlize(g.getSelectedEven().getName()));
+                                build.append("\" unselectedRendererEven=\"");
+                                build.append(xmlize(g.getUnselectedEven().getName()));
+                                build.append("\" ");
+                            }
+                        }
+                    }
+                }
+            }
+            build.append(">\n");                    
+            appendComponentXMLBody(containerInstance, cmp, build, res, indent + "  ");
+            build.append(indent);
+            build.append("</component>\n");
+        }
+    }
+    
+    public static void persistComponent(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, DataOutputStream out, EditableResources res) throws IOException {
         if(cmp.getClientProperty("%base_form%") != null) {
             out.writeUTF((String)cmp.getClientProperty("%base_form%"));
             out.writeInt(PROPERTY_BASE_FORM);
@@ -2802,7 +3808,7 @@ public class UserInterfaceEditor extends BaseForm {
                 out.writeInt(tab.getTabCount());
                 for(int iter = 0 ; iter < tab.getTabCount() ; iter++) {
                     out.writeUTF(tab.getTabTitle(iter));
-                    persistComponent(tab.getTabComponentAt(iter), out);
+                    persistComponent(containerInstance, tab.getTabComponentAt(iter), out, res);
                 }
 
                 if(isPropertyModified(cmp, PROPERTY_TAB_PLACEMENT)) {
@@ -2886,7 +3892,7 @@ public class UserInterfaceEditor extends BaseForm {
                     out.writeInt(PROPERTY_COMPONENTS);
                     out.writeInt(frm.getContentPane().getComponentCount());
                     for(int iter = 0 ; iter < frm.getContentPane().getComponentCount() ; iter++) {
-                        persistComponent(frm.getContentPane().getComponentAt(iter), out);
+                        persistComponent(containerInstance, frm.getContentPane().getComponentAt(iter), out, res);
                     }
 
                     if(isPropertyModified(cmp, PROPERTY_NEXT_FORM) && frm.getClientProperty("%next_form%") != null) {
@@ -3000,7 +4006,7 @@ public class UserInterfaceEditor extends BaseForm {
                         out.writeInt(PROPERTY_COMPONENTS);
                         out.writeInt(cnt.getComponentCount());
                         for(int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
-                            persistComponent(cnt.getComponentAt(iter), out);
+                            persistComponent(containerInstance, cnt.getComponentAt(iter), out, res);
                         }
                     } else {
                         com.codename1.ui.list.ContainerList lst = ((com.codename1.ui.list.ContainerList)cmp);
@@ -3494,7 +4500,7 @@ public class UserInterfaceEditor extends BaseForm {
         out.writeInt(-1);
     }
 
-    private Class getPropertyCustomType(com.codename1.ui.Component cmp, String name) {
+    public static Class getPropertyCustomType(com.codename1.ui.Component cmp, String name) {
         String[] names = cmp.getPropertyNames();
         for(int iter = 0 ; iter < names.length ; iter++) {
             if(name.equals(names[iter])) {
@@ -3504,7 +4510,7 @@ public class UserInterfaceEditor extends BaseForm {
         return null;
     }
 
-    public void setPropertyModified(com.codename1.ui.Component cmp, int propertyId) {
+    public static void setPropertyModified(com.codename1.ui.Component cmp, int propertyId) {
         List<Integer> lst = (List<Integer>)cmp.getClientProperty("$modified$");
         if(lst == null) {
             lst = new ArrayList<Integer>();
@@ -3527,12 +4533,12 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
 
-    private boolean isPropertyModified(com.codename1.ui.Component cmp, int propertyId) {
+    private static boolean isPropertyModified(com.codename1.ui.Component cmp, int propertyId) {
         List<Integer> lst = (List<Integer>)cmp.getClientProperty("$modified$");
         return lst != null && lst.contains(propertyId);
     }
 
-    public void setCustomPropertyModified(com.codename1.ui.Component cmp, String name) {
+    public static void setCustomPropertyModified(com.codename1.ui.Component cmp, String name) {
         List<String> lst = (List<String>)cmp.getClientProperty("$custom_modified$");
         if(lst == null) {
             lst = new ArrayList<String>();
@@ -3541,7 +4547,7 @@ public class UserInterfaceEditor extends BaseForm {
         lst.add(name);
     }
 
-    private boolean isCustomPropertyModified(com.codename1.ui.Component cmp, String name) {
+    private static boolean isCustomPropertyModified(com.codename1.ui.Component cmp, String name) {
         List<String> lst = (List<String>)cmp.getClientProperty("$custom_modified$");
         return lst != null && lst.contains(name);
     }

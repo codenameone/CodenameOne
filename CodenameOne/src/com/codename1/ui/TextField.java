@@ -43,7 +43,7 @@ import java.util.Vector;
  * <p>Notice that due to limitations of text area and text field input modes in
  * text area aren't properly supported since they won't work properly across devices.
  * To limit input modes please use the setInputModeOrder method. All constants 
- * declated in TextArea are ignored with the exception of PASSWORD.
+ * declared in TextArea are ignored with the exception of PASSWORD.
  * 
  * @author Shai Almog
  */
@@ -1534,6 +1534,11 @@ public class TextField extends TextArea {
      */
     public boolean animate() {
         boolean ani = super.animate();
+        
+        // while native editing we don't need the cursor animations
+        if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+            return ani;
+        }
         if(hasFocus() && isVisible()) {
             long currentTime = System.currentTimeMillis();
             if (drawCursor) {

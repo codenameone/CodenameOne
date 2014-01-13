@@ -20,116 +20,71 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.ui.util.xml;
 
+package com.codename1.ui.util.xml.comps;
+
+import com.codename1.ui.util.xml.Val;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlValue;
 
 /**
- * A JAXB XML object for loading the resource file into RAM
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="resource")
+@XmlRootElement(name="mapItems")
 @XmlAccessorType(XmlAccessType.FIELD)
-public class ResourceFileXML {
-    @XmlAttribute
-    private int majorVersion;
+public class MapItems {    
+    @XmlElement
+    private Val[] imageItem; 
 
-    @XmlAttribute
-    private int minorVersion;
+    @XmlElement
+    private Val[] actionItem; 
     
     @XmlElement
-    private Theme[] theme;
-    
-    @XmlElement
-    private Ui[] ui;
+    private Val[] stringItem; 
 
-    @XmlElement
-    private LegacyFont[] legacyFont;
-
-    @XmlElement
-    private Data[] data;
-
-    @XmlElement
-    private Image[] image;
-
-    @XmlElement
-    private L10n[] l10n;
-
-    @XmlAttribute
-    private boolean useXmlUI;
-    
     /**
-     * @return the majorVersion
+     * @return the imageItem
      */
-    public int getMajorVersion() {
-        return majorVersion;
+    public Val[] getImageItem() {
+        return imageItem;
     }
 
     /**
-     * @return the minorVersion
+     * @param imageItem the imageItem to set
      */
-    public int getMinorVersion() {
-        return minorVersion;
+    public void setImageItem(Val[] imageItem) {
+        this.imageItem = imageItem;
     }
 
     /**
-     * @return the theme
+     * @return the actionItem
      */
-    public Theme[] getTheme() {
-        return theme;
+    public Val[] getActionItem() {
+        return actionItem;
     }
 
     /**
-     * @return the ui
+     * @param actionItem the actionItem to set
      */
-    public Ui[] getUi() {
-        return ui;
+    public void setActionItem(Val[] actionItem) {
+        this.actionItem = actionItem;
     }
 
     /**
-     * @return the legacyFont
+     * @return the stringItem
      */
-    public LegacyFont[] getLegacyFont() {
-        return legacyFont;
+    public Val[] getStringItem() {
+        return stringItem;
     }
 
     /**
-     * @return the data
+     * @param stringItem the stringItem to set
      */
-    public Data[] getData() {
-        return data;
-    }
-
-    /**
-     * @return the image
-     */
-    public Image[] getImage() {
-        return image;
-    }
-
-    /**
-     * @return the l10n
-     */
-    public L10n[] getL10n() {
-        return l10n;
-    }
-
-    /**
-     * @return the useXmlUI
-     */
-    public boolean isUseXmlUI() {
-        return useXmlUI;
-    }
-
-    /**
-     * @param useXmlUI the useXmlUI to set
-     */
-    public void setUseXmlUI(boolean useXmlUI) {
-        this.useXmlUI = useXmlUI;
+    public void setStringItem(Val[] stringItem) {
+        this.stringItem = stringItem;
     }
 }

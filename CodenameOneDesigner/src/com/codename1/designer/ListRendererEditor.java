@@ -55,7 +55,7 @@ public class ListRendererEditor extends javax.swing.JPanel {
             if(uiName.equals(currentUI)) {
                 continue;
             }
-            com.codename1.ui.util.UIBuilderOverride b = new com.codename1.ui.util.UIBuilderOverride(null);
+            com.codename1.ui.util.UIBuilderOverride b = new com.codename1.ui.util.UIBuilderOverride();
             if(!(b.createContainer(res, uiName) instanceof com.codename1.ui.Form)) {
                 names.addElement(uiName);
             }
@@ -114,7 +114,7 @@ public class ListRendererEditor extends javax.swing.JPanel {
                 return ((com.codename1.ui.list.ContainerList)parentList).getRenderer();
             }
         }
-        com.codename1.ui.util.UIBuilderOverride b = new com.codename1.ui.util.UIBuilderOverride(null);
+        com.codename1.ui.util.UIBuilderOverride b = new com.codename1.ui.util.UIBuilderOverride();
         com.codename1.ui.Container selectedContainer = b.createContainer(res, (String)selected.getSelectedItem());
         switch(type.getSelectedIndex()) {
             case 0:

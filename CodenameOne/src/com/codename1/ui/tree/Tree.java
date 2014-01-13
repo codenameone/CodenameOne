@@ -31,6 +31,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -237,7 +238,15 @@ public class Tree extends Container {
         nodeImage = nodeIcon;
     }
 
-    private void expandNode(Component c) {
+    private Container expandNode(Component c) {
+        return expandNode(c, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+    }
+    
+    private Container expandNode(Component c, Transition t) {
+        Container p = c.getParent().getLeadParent();
+        if(p != null) {
+            c = p;
+        }
         c.putClientProperty(KEY_EXPANDED, "true");
         setNodeIcon(openFolder, c);
         int depth = ((Integer)c.getClientProperty(KEY_DEPTH)).intValue();
@@ -249,18 +258,95 @@ public class Tree extends Container {
         buildBranch(o, depth, dest);
         // prevent a race condition on node expansion contraction
         if(dummy.getParent() == parent) {
-            parent.replaceAndWait(dummy, dest, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+            parent.replaceAndWait(dummy, dest, t);
+            if(multilineMode) {
+                revalidate();
+            }
+        }
+        return dest;
+    }
+    
+    private boolean isExpanded(Component c) {
+        Object e = c.getClientProperty(KEY_EXPANDED);
+        return e != null && e.equals("true");
+    }
+    
+    private Container expandPathNode(Container parent, Object node) {
+        int cc = parent.getComponentCount();
+        for(int iter = 0 ; iter < cc ; iter++) {
+            Component current = parent.getComponentAt(iter);
+            BorderLayout bl = (BorderLayout)((Container)current).getLayout();
+            
+            // the tree component is always at north expanded or otherwise
+            current = bl.getNorth();
+            Object o = current.getClientProperty(KEY_OBJECT);
+            if(o != null && o.equals(node)) {
+                if(isExpanded(current)) {
+                    return (Container)bl.getCenter();
+                }
+                return expandNode(current, null);
+            }
+        }
+        return null;
+    }
+    
+    private void collapsePathNode(Container parent, Object node) {
+        int cc = parent.getComponentCount();
+        for(int iter = 0 ; iter < cc ; iter++) {
+            Component current = parent.getComponentAt(iter);
+            BorderLayout bl = (BorderLayout)((Container)current).getLayout();
+            
+            // the tree component is always at north expanded or otherwise
+            current = bl.getNorth();
+            Object o = current.getClientProperty(KEY_OBJECT);
+            if(o != null && o.equals(node)) {
+                if(isExpanded(current)) {
+                    collapseNode(current, null);
+                }
+                return;
+            }
         }
     }
 
+    /**
+     * Expands the tree path
+     * @param path the path to expand
+     */
+    public void expandPath(Object... path) {
+        Container c = this;
+        for(int iter = 0 ; iter < path.length ; iter++) {
+            c = expandPathNode(c, path[iter]);
+        }
+    }
+    
+    /**
+     * Collapses the last element in the path
+     * @param path the path to the element that should be collapsed
+     */
+    public void collapsePath(Object... path) {
+        Container c = this;
+        for(int iter = 0 ; iter < path.length - 1; iter++) {
+            c = expandPathNode(c, path[iter]);
+        }        
+        collapsePathNode(c, path[path.length - 1]);
+    }
+    
     private void collapseNode(Component c) {
+        collapseNode(c, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300));
+    }
+    
+    private void collapseNode(Component c, Transition t) {
+        Container lead = c.getParent().getLeadParent();
+        if(lead != null) {
+            c = lead;
+        }
         c.putClientProperty(KEY_EXPANDED, null);
         setNodeIcon(folder, c);
         Container p = c.getParent();
         for(int iter = 0 ; iter < p.getComponentCount() ; iter++) {
             if(p.getComponentAt(iter) != c) {
                 Label dummy = new Label();
-                p.replaceAndWait(p.getComponentAt(iter), dummy, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300), true);
+                p.replaceAndWait(p.getComponentAt(iter), dummy, t, true);
                 p.removeComponent(dummy);
             }
         }
@@ -451,6 +537,10 @@ public class Tree extends Container {
                 return;
             }
             Component c = (Component)evt.getSource();
+            Container lead = c.getParent().getLeadParent();
+            if(lead != null) {
+                c = lead;
+            }
             Object e = c.getClientProperty(KEY_EXPANDED);
             if(e != null && e.equals("true")) {
                 collapseNode(c);

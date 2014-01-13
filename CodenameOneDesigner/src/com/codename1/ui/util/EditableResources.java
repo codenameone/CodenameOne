@@ -50,6 +50,7 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
+import com.codename1.ui.Form;
 import com.codename1.ui.util.xml.Data;
 import com.codename1.ui.util.xml.Entry;
 import com.codename1.ui.util.xml.L10n;
@@ -59,6 +60,7 @@ import com.codename1.ui.util.xml.ResourceFileXML;
 import com.codename1.ui.util.xml.Theme;
 import com.codename1.ui.util.xml.Ui;
 import com.codename1.ui.util.xml.Val;
+import com.codename1.ui.util.xml.comps.ComponentEntry;
 import java.awt.Frame;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -74,6 +76,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -108,7 +111,8 @@ public class EditableResources extends Resources implements TreeModel {
 
     private boolean modified;
     private boolean loadingMode = false;
-
+    private boolean xmlUI;
+    
     private boolean ignoreSVGMode;
     private boolean ignorePNGMode;
 
@@ -404,18 +408,15 @@ public class EditableResources extends Resources implements TreeModel {
                         ResourceFileXML xmlData = (ResourceFileXML)ctx.createUnmarshaller().unmarshal(xml);
                         boolean normalize = xmlData.getMajorVersion() > 1 || xmlData.getMinorVersion() > 5;
                         
+                        majorVersion = (short)xmlData.getMajorVersion();
+                        minorVersion = (short)xmlData.getMinorVersion();
+                        xmlUI = xmlData.isUseXmlUI();
                         if(xmlData.getData() != null) {
                             for(Data d : xmlData.getData()) {
                                 setResource(d.getName(), MAGIC_DATA, readFile(resDir, d.getName(), normalize));
                             }
                         }
-                        
-                        if(xmlData.getUi() != null) {
-                            for(Ui d : xmlData.getUi()) {
-                                setResource(d.getName(), MAGIC_UI, readFile(resDir, d.getName(), normalize));
-                            }
-                        }
-                        
+                                                
                         if(xmlData.getLegacyFont() != null) {
                             for(LegacyFont d : xmlData.getLegacyFont()) {
                                 String name = d.getName();
@@ -687,6 +688,34 @@ public class EditableResources extends Resources implements TreeModel {
                             }
                         }
                         
+                        // we load the UI last since it might depend on images or other elements in the future
+                        if(xmlData.getUi() != null) {
+                            if(xmlData.isUseXmlUI()) {
+                                for(Ui d : xmlData.getUi()) {
+                                    JAXBContext componentContext = JAXBContext.newInstance(ComponentEntry.class);
+                                    File uiFile = new File(resDir, normalizeFileName(d.getName()) + ".ui");
+                                    ComponentEntry uiXMLData = (ComponentEntry)componentContext.createUnmarshaller().unmarshal(uiFile);
+                                    UIBuilderOverride uib = new UIBuilderOverride();
+                                    com.codename1.ui.Container cnt = uib.createInstance(uiXMLData, this);
+                                    
+                                    // encountered an error loading the component fallback to loading with the binary types
+                                    if(cnt == null) {
+                                        for(Ui ui : xmlData.getUi()) {
+                                            setResource(d.getName(), MAGIC_UI, readFile(resDir, ui.getName(), normalize));
+                                        }
+                                        break;
+                                    } else {
+                                        byte[] data = UserInterfaceEditor.persistContainer(cnt, this);
+                                        setResource(d.getName(), MAGIC_UI, data);
+                                    }
+                                }
+                            } else {
+                                for(Ui d : xmlData.getUi()) {
+                                    setResource(d.getName(), MAGIC_UI, readFile(resDir, d.getName(), normalize));
+                                }
+                            }
+                        }
+                        
                         loadingMode = false;
                         modified = false;
                         updateModified();
@@ -718,7 +747,7 @@ public class EditableResources extends Resources implements TreeModel {
      * @param s the string to convert
      * @return XMLized string with entity escapes
      */
-    static String xmlize(String s) {
+    public static String xmlize(String s) {
         s = s.replaceAll("&", "&amp;");
         s = s.replaceAll("<", "&lt;");
         s = s.replaceAll(">", "&gt;");
@@ -729,7 +758,7 @@ public class EditableResources extends Resources implements TreeModel {
             if(c > 127) {
                 // we need to localize the string...
                 StringBuilder b = new StringBuilder();
-                for(int counter = iter ; counter < charCount ; counter++) {
+                for(int counter = 0 ; counter < charCount ; counter++) {
                     c = s.charAt(counter);
                     if(c > 127) {
                         b.append("&#x");
@@ -759,7 +788,7 @@ public class EditableResources extends Resources implements TreeModel {
             Arrays.sort(resourceNames, String.CASE_INSENSITIVE_ORDER);
 
             bw.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
-            bw.write("<resource majorVersion=\"" + MAJOR_VERSION + "\" minorVersion=\"" + MINOR_VERSION + "\">\n");
+            bw.write("<resource majorVersion=\"" + MAJOR_VERSION + "\" minorVersion=\"" + MINOR_VERSION + "\" useXmlUI=\"" + xmlUI + "\">\n");
             
             for(int iter = 0 ; iter < resourceNames.length ; iter++) {
                 String xResourceName = xmlize(resourceNames[iter]);
@@ -1162,6 +1191,13 @@ public class EditableResources extends Resources implements TreeModel {
                         continue;
                     }
                     case MAGIC_UI: {
+                        File uiXML = new File(resourcesDir, resourceNames[iter] + ".ui");
+                        UIBuilderOverride u = new UIBuilderOverride();
+                        com.codename1.ui.Container cnt = u.createContainer(this, resourceNames[iter]);
+                        FileOutputStream fos = new FileOutputStream(uiXML);
+                        writeUIXml(cnt, fos);
+                        fos.close();
+                        
                         File ui = new File(resourcesDir, resourceNames[iter]);
                         DataOutputStream uiOut = new DataOutputStream(new FileOutputStream(ui));
                         InputStream i = getUi(resourceNames[iter]);
@@ -1205,6 +1241,16 @@ public class EditableResources extends Resources implements TreeModel {
         }
     }
     
+    private void writeUIXml(com.codename1.ui.Container cnt, FileOutputStream dest) throws IOException {
+        Writer w = new OutputStreamWriter(dest, "UTF-8");
+        w.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
+
+        StringBuilder bld = new StringBuilder();
+        UserInterfaceEditor.persistToXML(cnt, cnt, bld, this, "");
+        w.write(bld.toString());
+        w.flush();
+    }
+
     public void saveXML(File resFile) throws IOException {
         if(xmlEnabled && resFile.getParentFile().getName().equals("src")) {
             if(new File(resFile.getParentFile().getParentFile(), "codenameone_settings.properties").exists()) {

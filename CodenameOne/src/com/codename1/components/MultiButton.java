@@ -579,7 +579,7 @@ public class MultiButton extends Container {
     /**
      * Sets the icon position based on border layout constraints
      * 
-     * @param s position either North/South/East/West
+     * @param t position either North/South/East/West
      */
     public void setIconPosition(String t) {
         String ip = getEmblemPosition();
@@ -607,7 +607,7 @@ public class MultiButton extends Container {
     /**
      * Sets the emblem position based on border layout constraints
      * 
-     * @param s position either North/South/East/West
+     * @param t position either North/South/East/West
      */
     public void setEmblemPosition(String t) {
         String ip = getIconPosition();

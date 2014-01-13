@@ -306,6 +306,8 @@ public class JSONParser implements JSONParseCallback {
                         case 'x':
                         case 'd':
                         case 'l':
+                        case 'e':
+                        case 'E':
                             currentToken.append(c);
                             continue;
                     }

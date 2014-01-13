@@ -47,7 +47,7 @@ public class TextArea extends Component {
     private static int defaultValign = TOP;
 
     /**
-     * Indicates the defaut vertical alignment for a text field, only applies to single line text fields
+     * Indicates the default vertical alignment for a text field, only applies to single line text fields
      * @return the defaultValign
      */
     public static int getDefaultValign() {
@@ -55,7 +55,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * Indicates the defaut vertical alignment for a text field, only applies to single line text fields
+     * Indicates the default vertical alignment for a text field, only applies to single line text fields
      * @param aDefaultValign the defaultValign to set
      */
     public static void setDefaultValign(int aDefaultValign) {
@@ -398,6 +398,10 @@ public class TextArea extends Component {
         synchronized(this) {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
+        }
+        // while native editing we don't need the cursor animations
+        if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+            return;
         }
         repaint();
     }
@@ -1453,6 +1457,14 @@ public class TextArea extends Component {
         super.setHint(hint, icon);
     }
 
+    /**
+     * Returns the hint label component that can be customized directly
+     * @return hint label component
+     */
+    public Label getHintLabel() {
+        return getHintLabelImpl();
+    }
+    
     Label getHintLabelImpl() {
         return hintLabel;
     }

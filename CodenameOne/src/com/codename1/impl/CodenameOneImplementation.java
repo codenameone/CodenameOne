@@ -322,11 +322,14 @@ public abstract class CodenameOneImplementation {
     /**
      * Allows the implementation to refresh the text field
      */
-    protected final void repaintTextEditor() {
+    protected final void repaintTextEditor(final boolean focus) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 if(editingText != null) {
                     editingText.repaint();
+                    if(focus) {
+                        editingText.requestFocus();
+                    }
                 }
             }
         });

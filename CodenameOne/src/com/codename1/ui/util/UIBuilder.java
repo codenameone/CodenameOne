@@ -112,10 +112,10 @@ public class UIBuilder { //implements Externalizable {
     public static final int BACK_COMMAND_ID = 99999999;
     private static boolean blockAnalytics;
 
-    private static final String COMMAND_ACTION = "$COMMAND_ACTION$";
-    private static final String COMMAND_ARGUMENTS = "$COMMAND_ARGUMENTS$";
-    private static final String TYPE_KEY = "$TYPE_NAME$";
-    private static final String EMBEDDED_FORM_FLAG = "$EMBED$";
+    static final String COMMAND_ACTION = "$COMMAND_ACTION$";
+    static final String COMMAND_ARGUMENTS = "$COMMAND_ARGUMENTS$";
+    static final String TYPE_KEY = "$TYPE_NAME$";
+    static final String EMBEDDED_FORM_FLAG = "$EMBED$";
     static final int PROPERTY_CUSTOM = 1000;
     static final int PROPERTY_TEXT = 1;
     static final int PROPERTY_ALIGNMENT = 2;
@@ -239,7 +239,7 @@ public class UIBuilder { //implements Externalizable {
      */
     private String homeForm;
 
-    private static Hashtable getComponentRegistry() {
+    static Hashtable getComponentRegistry() {
         if(componentRegistry == null) {
             componentRegistry = new Hashtable();
             componentRegistry.put("Button", Button.class);
@@ -394,7 +394,7 @@ public class UIBuilder { //implements Externalizable {
         return createContainer(res, resourceName, null);
     }
 
-    private Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
+    Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
         onCreateRoot(resourceName);
         InputStream source = res.getUi(resourceName);
         if(source == null) {
@@ -968,14 +968,7 @@ public class UIBuilder { //implements Externalizable {
                 property = in.readInt();
             }
         }
-        Class c = (Class)getComponentRegistry().get(name);
-        Component cmp = createComponentInstance(name, c);
-        if(cmp == null) {
-            if(c == null) {
-                throw new RuntimeException("Component not found use UIBuilder.registerCustomComponent(" + name + ", class);");
-            }
-            cmp = (Component)c.newInstance();
-        }
+        Component cmp = createComponentType(name);
 
         if(componentListeners != null) {
             Object listeners = componentListeners.get(name);
@@ -1434,16 +1427,13 @@ public class UIBuilder { //implements Externalizable {
 
                 case PROPERTY_NEXT_FORM:
                     String nextForm = in.readUTF();
-                    cmp.putClientProperty("%next_form%", nextForm);
-                    if(resourceFilePath == null || isKeepResourcesInRam()) {
-                        resourceFile = res;
-                    }
-                    ((Form)root).addShowListener(new FormListener((Form)root, nextForm));
+                    setNextForm(cmp, nextForm, res, root);
                     break;
 
                 case PROPERTY_COMMANDS:
                     readCommands(in, cmp, res, false);
                     break;
+                    
                 case PROPERTY_COMMANDS_LEGACY:
                     readCommands(in, cmp, res, true);
                     break;
@@ -1500,6 +1490,26 @@ public class UIBuilder { //implements Externalizable {
             property = in.readInt();
         }
         postCreateComponent(cmp);
+        return cmp;
+    }
+
+    void setNextForm(Component cmp, String nextForm, Resources res, Container root) {
+        cmp.putClientProperty("%next_form%", nextForm);
+        if(resourceFilePath == null || isKeepResourcesInRam()) {
+            resourceFile = res;
+        }
+        ((Form)root).addShowListener(new FormListener((Form)root, nextForm));
+    }
+
+    Component createComponentType(String name) throws IllegalAccessException, InstantiationException, RuntimeException {
+        Class c = (Class)getComponentRegistry().get(name);
+        Component cmp = createComponentInstance(name, c);
+        if(cmp == null) {
+            if(c == null) {
+                throw new RuntimeException("Component not found use UIBuilder.registerCustomComponent(" + name + ", class);");
+            }
+            cmp = (Component)c.newInstance();
+        }
         return cmp;
     }
 
@@ -2291,7 +2301,7 @@ public class UIBuilder { //implements Externalizable {
         return cnt;
     }
 
-    private Container formToContainer(Form f) {
+    Container formToContainer(Form f) {
         Container cnt = new Container(f.getContentPane().getLayout());
         if(f.getContentPane().getLayout() instanceof BorderLayout ||
                 f.getContentPane().getLayout() instanceof TableLayout) {
