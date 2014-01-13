@@ -1838,7 +1838,7 @@ public final class Display {
 
             //make sure the released event is sent to the same Form who got a
             //pressed event
-            if(xf == f){
+            if(xf == f || multiKeyMode){
                 f.keyReleased(inputEventStackTmp[offset]);                
                 offset++;
             }
