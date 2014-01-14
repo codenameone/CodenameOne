@@ -2812,7 +2812,7 @@ public class UserInterfaceEditor extends BaseForm {
         }
 
         // don't persist children of subclasses like Table etc.
-        if(cmp.getClass() == com.codename1.ui.Container.class || cmp instanceof com.codename1.ui.Form) {
+        if(cmp.getClass() == com.codename1.ui.Container.class || cmp instanceof com.codename1.ui.Form || cmp instanceof com.codename1.ui.ComponentGroup) {
             com.codename1.ui.Container cnt = (com.codename1.ui.Container)cmp;
             if(cnt instanceof com.codename1.ui.Form) {
                 cnt = ((com.codename1.ui.Form)cnt).getContentPane();
