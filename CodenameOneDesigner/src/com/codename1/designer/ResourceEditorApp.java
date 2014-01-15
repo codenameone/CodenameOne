@@ -182,6 +182,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 FileOutputStream fos = new FileOutputStream(output);
                 res.save(fos);
                 fos.close();
+                generate(res, output);
                 System.exit(0);
                 return;
             }
