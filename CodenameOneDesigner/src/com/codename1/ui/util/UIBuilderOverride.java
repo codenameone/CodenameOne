@@ -41,6 +41,7 @@ import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
@@ -48,8 +49,6 @@ import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.table.TableLayout;
-import static com.codename1.ui.util.UIBuilder.COMMAND_ACTION;
-import static com.codename1.ui.util.UIBuilder.EMBEDDED_FORM_FLAG;
 import com.codename1.ui.util.xml.Val;
 import com.codename1.ui.util.xml.comps.CommandEntry;
 import com.codename1.ui.util.xml.comps.ComponentEntry;
@@ -194,20 +193,27 @@ public class UIBuilderOverride extends UIBuilder {
                         ((BorderLayout)l).defineLandscapeSwap(BorderLayout.WEST, root.getBorderLayoutSwapWest());
                     }
                 } else {
-                    if(root.getLayout().equals("GridLayout")) {
-                        l = new GridLayout(root.getGridLayoutRows().intValue(), root.getGridLayoutColumns().intValue());
+                    if(root.getLayout().equals("FlowLayout")) {
+                        l = new FlowLayout();
+                        ((FlowLayout)l).setFillRows(root.isFlowLayoutFillRows());
+                        ((FlowLayout)l).setAlign(root.getFlowLayoutAlign());
+                        ((FlowLayout)l).setValign(root.getFlowLayoutValign());
                     } else {
-                        if(root.getLayout().equals("BoxLayout")) {
-                            if(root.getBoxLayoutAxis().equals("X")) {
-                                l = new BoxLayout(BoxLayout.X_AXIS);
-                            } else {
-                                l = new BoxLayout(BoxLayout.Y_AXIS);
-                            }
+                        if(root.getLayout().equals("GridLayout")) {
+                            l = new GridLayout(root.getGridLayoutRows().intValue(), root.getGridLayoutColumns().intValue());
                         } else {
-                            if(root.getLayout().equals("TableLayout")) {
-                                l = new TableLayout(root.getTableLayoutRows(), root.getTableLayoutColumns());
+                            if(root.getLayout().equals("BoxLayout")) {
+                                if(root.getBoxLayoutAxis().equals("X")) {
+                                    l = new BoxLayout(BoxLayout.X_AXIS);
+                                } else {
+                                    l = new BoxLayout(BoxLayout.Y_AXIS);
+                                }
                             } else {
-                                l = new LayeredLayout();
+                                if(root.getLayout().equals("TableLayout")) {
+                                    l = new TableLayout(root.getTableLayoutRows(), root.getTableLayoutColumns());
+                                } else {
+                                    l = new LayeredLayout();
+                                }
                             }
                         }
                     }
