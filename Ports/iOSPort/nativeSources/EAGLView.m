@@ -203,7 +203,30 @@ extern BOOL isRetina();
 /**
  * User clicked Done or Next button above the keyboard
  */
--(void) keyboardDoneNextClicked {
+-(void) keyboardDoneClicked {
+    if(editingComponent != nil) {
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            stringEdit(YES, -2, ((UITextView*)editingComponent).text);
+        } else {
+            stringEdit(YES, -2, ((UITextField*)editingComponent).text);
+        }
+        if(vkbAlwaysOpen) {
+            com_codename1_impl_ios_IOSImplementation_foldKeyboard__();
+        } else {
+            [editingComponent resignFirstResponder];
+            [editingComponent removeFromSuperview];
+            [editingComponent release];
+            editingComponent = nil;
+        }
+        repaintUI();
+        
+    }
+}
+
+/**
+ * User clicked Done or Next button above the keyboard
+ */
+-(void) keyboardNextClicked {
     if(editingComponent != nil) {
         if([editingComponent isKindOfClass:[UITextView class]]) {
             stringEdit(YES, -2, ((UITextView*)editingComponent).text);
@@ -223,9 +246,11 @@ extern BOOL isRetina();
     }
 }
 
-
 -(void)textViewDidChange:(UITextView *)textView {
-    editingComponent.hidden = NO;
+    if(editingComponent.hidden) {
+        editingComponent.hidden = NO;
+        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__();
+    }
     if([editingComponent isKindOfClass:[UITextView class]]) {
         stringEdit(NO, -1, ((UITextView*)editingComponent).text);
     } else {

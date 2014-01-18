@@ -104,13 +104,7 @@ static CGRect drawingRect;
 
 +(void)updateClipToScale {
     int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
-    if(currentScaleX != 1 || currentScaleY != 1) {
-        int x = round(clipX * currentScaleX);
-        int y = round(clipY * currentScaleY);
-        int w = round(clipW * currentScaleX);
-        int h = round(clipH * currentScaleY);
-        glScissor(x, displayHeight - y - h, w, h);
-    } else {
+    if(currentScaleX == 1 && currentScaleY == 1) {
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
     }
 }

@@ -48,9 +48,10 @@
 #include "java_util_Hashtable.h"
 #include "com_codename1_ui_Image.h"
 #include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
+#import "SocketImpl.h"
 
 //#import "QRCodeReaderOC.h"
-#define INCLUDE_CN1_PUSH2
+
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
 #endif
@@ -202,7 +203,7 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize, 
         int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
-        int padTop, int padBottom, int padLeft, int padRight, NSString* hintString);
+        int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -323,14 +324,14 @@ NSString* toNSString(JAVA_OBJECT str) {
     return [NSString stringWithCharacters:chrArr length:length];
 }
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String(
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(
         JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, 
         JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint)
+                JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, stringToUTF8(n10), 0, forceSlide, color, imagePeer,
-            padTop, padBottom, padLeft, padRight, toNSString(hint));
+            padTop, padBottom, padLeft, padRight, toNSString(hint), showToolbar);
     [pool release];
 }
 
@@ -3418,6 +3419,7 @@ bool datepickerPopover = NO;
 org_xmlvm_runtime_XMLVMArray* pickerStringArray = nil;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
+UIPopoverController* popoverControllerInstance;
 
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -3437,16 +3439,47 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
         pickerView.delegate = [CodenameOne_GLViewController instance];
         if(isIPad()) {
             datepickerPopover = YES;
+            stringPickerSelection = 0;
             UIViewController *vc = [[UIViewController alloc] init];
-            [vc setView:pickerView];
+            UIView *popoverView = [[UIView alloc] init];
+            [vc setView:popoverView];
             [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            
+            UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+            [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+            [toolbar sizeToFit];
+            
+            //add a space filler to the left:
+            UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                                           UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+
+            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+            JAVA_OBJECT str;
+            UIBarButtonItem *doneButton;
+            NSArray *itemsArray = nil;
+            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"OK"), fromNSString(@"OK"));
+            NSString* buttonTitle = toNSString(str);
+            doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(pickerComponentDismiss)];
+            
+            itemsArray = [NSArray arrayWithObjects: doneButton, nil];
+            [flexButton release];
+            [doneButton release];
+            [toolbar setItems:itemsArray];
+            
+            [popoverView addSubview:toolbar];
+            [popoverView addSubview:pickerView];
+            pickerView.frame = CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height);
+            
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
+            popoverControllerInstance = uip;
+
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
             UIActionSheet* actionSheet;
             if(isIOS7()) {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:@"OK" destructiveButtonTitle:nil otherButtonTitles:nil];
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+                [actionSheet addButtonWithTitle:@"OK"];
             } else {
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
@@ -3502,16 +3535,46 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
         [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
         if(isIPad()) {
             datepickerPopover = YES;
+            stringPickerSelection = 0;
             UIViewController *vc = [[UIViewController alloc] init];
-            [vc setView:datePickerView];
+            
+            UIView *popoverView = [[UIView alloc] init];
+            [vc setView:popoverView];
             [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            
+            UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+            [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+            [toolbar sizeToFit];
+            
+            //add a space filler to the left:
+            UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                                           UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+            
+            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+            JAVA_OBJECT str;
+            UIBarButtonItem *doneButton;
+            NSArray *itemsArray = nil;
+            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"OK"), fromNSString(@"OK"));
+            NSString* buttonTitle = toNSString(str);
+            doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(pickerComponentDismiss)];
+            
+            itemsArray = [NSArray arrayWithObjects: doneButton, nil];
+            [flexButton release];
+            [doneButton release];
+            [toolbar setItems:itemsArray];
+            
+            [popoverView addSubview:toolbar];
+            [popoverView addSubview:datePickerView];
+            datePickerView.frame = CGRectMake(0, 44, datePickerView.frame.size.width, datePickerView.frame.size.height);
+            
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
             UIActionSheet* actionSheet;
             if(isIOS7()) {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:@"OK" destructiveButtonTitle:nil otherButtonTitles:nil];
+                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+                [actionSheet addButtonWithTitle:@"OK"];
             } else {
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
@@ -3568,26 +3631,111 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(JAVA_OBJECT inst
     return vkbAlwaysOpen;
 }
 
+void com_codename1_impl_ios_IOSNative_setAsyncEditMode___boolean(JAVA_OBJECT instanceObject, JAVA_BOOLEAN b) {
+    vkbAlwaysOpen = b;
+}
+
 void com_codename1_impl_ios_IOSNative_foldVKB__(JAVA_OBJECT instanceObject) {
      dispatch_async(dispatch_get_main_queue(), ^{
-       if(editingComponent != nil) {
+        if(editingComponent != nil) {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
             [editingComponent release];
             editingComponent = nil;
-        }
+         }
+         repaintUI();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_hideTextEditing__(JAVA_OBJECT instanceObject) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    if(editingComponent == nil) {
+        return;
+    }
+    if(editingComponent.hidden) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         if(editingComponent != nil) {
+            if(editingComponent.hidden) {
+                return;
+            }
             [editingComponent resignFirstResponder];
             [editingComponent becomeFirstResponder];
             editingComponent.hidden = YES;
         }
         [pool release];
-        repaintUI();
     });
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = [[SocketImpl alloc] init];
+    BOOL b = [impl connect:toNSString(host) port:port];
+    [pool release];
+    if(b) {
+        return impl;
+    }
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP__(JAVA_OBJECT instanceObject) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    JAVA_OBJECT o = fromNSString([SocketImpl getIP]);
+    [pool release];
+    return o;
+}
+
+void com_codename1_impl_ios_IOSNative_disconnectSocket___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    [impl disconnect];
+    [pool release];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isSocketConnected___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    JAVA_BOOLEAN b = [impl isConnected];
+    [pool release];
+    return b;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSocketErrorMessage___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    JAVA_OBJECT b = fromNSString([impl getErrorMessage]);
+    [pool release];
+    return b;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getSocketErrorCode___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    JAVA_INT b = [impl getErrorCode];
+    [pool release];
+    return b;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getSocketAvailableInput___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    JAVA_INT b = [impl getAvailableInput];
+    [pool release];
+    return b;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_readFromSocketStream___long(JAVA_OBJECT instanceObject, JAVA_LONG socket) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    JAVA_OBJECT b = nsDataToByteArr([impl readFromStream]);
+    [pool release];
+    return b;
+}
+
+void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG socket, JAVA_OBJECT data) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    SocketImpl* impl = (SocketImpl*)socket;
+    [impl writeToStream:arrayToData(data)];
+    [pool release];
 }

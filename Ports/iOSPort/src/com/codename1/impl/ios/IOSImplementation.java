@@ -219,9 +219,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void hideTextEditor() {
+        if(textEditorHidden) {
+            return;
+        }
         nativeInstance.hideTextEditing();
         textEditorHidden = true;
-        repaintTextEditor();
+        repaintTextEditor(false);
     }
 
     @Override
@@ -250,7 +253,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     if(cmp != null) {
-                        cmp.requestFocus();
+                        Form f = Display.getInstance().getCurrent();
+                        if(f == cmp.getComponentForm()) {
+                            cmp.requestFocus();
+                        }
+                        
+                        // revalidate even if we transition to a different form since the 
+                        // spacing might have remained during the transition
+                        f.revalidate();
                     }
                 }
             });
@@ -266,7 +276,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void showTextEditorAgain() {
         instance.textEditorHidden = false;
-        instance.repaintTextEditor();
+        instance.repaintTextEditor(true);
     }
     
     @Override
@@ -283,14 +293,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
-        if(isAsyncEditMode()) {
-            nativeInstance.foldVKB();
+        if(isAsyncEditMode() && isEditingText()) {
+            foldKeyboard();
         }
     }
     
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
+        if(!cmp.hasFocus()) {
+            cmp.requestFocus();
+        }
         Boolean b = (Boolean)cmp.getClientProperty("ios.async");
         if(isAsyncEditMode() && b == null) {
             // check whether the parent has a scrollable parent
@@ -299,17 +312,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(p.isScrollableY()) {
                     break;
                 }
+                p = p.getParent();
             }
             // no scrollabel parent automatically configure the text field for legacy mode
             if(p == null) {
-                Display.getInstance().getProperty("ios.async", "true");
-                b = Boolean.TRUE;
+                b = Boolean.FALSE;
                 cmp.putClientProperty("ios.async", b);
                 Display.getInstance().setProperty("ios.async", "true");
             }
         }
         if(b != null) {
-            nativeInstance.setAsyncEditMode(b);
+            nativeInstance.setAsyncEditMode(b.booleanValue());
         } else {
             String a = Display.getInstance().getProperty("ios.async", null);
             if(a != null) {
@@ -383,6 +396,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                     cmp.requestFocus();
                     textEditorHidden = false;
                 }
+                boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                
                 nativeInstance.editStringAt(x,
                         y,
                         w,
@@ -393,7 +408,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         pt,
                         pb,
                         pl,
-                        pr, hint);
+                        pr, hint, showToolbar);
             }
         });
         if(isAsyncEditMode()) {
@@ -1469,6 +1484,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             public Object getVariable(String key) {
                 return null;
             }
+
+            public void prepare() {
+            }
         };
     }
     
@@ -1567,6 +1585,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
 
+        public void prepare() {
+        }
+        
         @Override
         public void cleanup() {
             if(moviePlayerPeer != 0) {

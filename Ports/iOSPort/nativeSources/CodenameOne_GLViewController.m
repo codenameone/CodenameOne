@@ -55,7 +55,7 @@ BOOL vkbAlwaysOpen = NO;
 
 int nextPowerOf2(int val) {
     int i;
-    for(i = 8 ; i <= val ; i *= 2);
+    for(i = 8 ; i < val ; i *= 2);
     return i;
 }
 
@@ -133,7 +133,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -220,6 +220,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.returnKeyType = UIReturnKeyDone;
             } else {
                 utf.returnKeyType = UIReturnKeyNext;
+                if(vkbAlwaysOpen) {
+                    if(utf.keyboardType != UIKeyboardTypeDecimalPad
+                        && utf.keyboardType != UIKeyboardTypePhonePad
+                        && utf.keyboardType != UIKeyboardTypeNumberPad) {
+                        isLastEdit = YES;
+                    }
+                }
             }
             
             utf.borderStyle = UITextBorderStyleNone;
@@ -231,34 +238,53 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 
             if ((utf.keyboardType == UIKeyboardTypeDecimalPad
                 || utf.keyboardType == UIKeyboardTypePhonePad
-                || utf.keyboardType == UIKeyboardTypeNumberPad) && !isIPad()) {
+                || utf.keyboardType == UIKeyboardTypeNumberPad
+                || (utf.returnKeyType == UIReturnKeyNext && vkbAlwaysOpen)) && !isIPad()) {
                 //add navigation toolbar to the top of the keyboard
-                UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
-                [toolbar setBarStyle:UIBarStyleBlackTranslucent];
-                [toolbar sizeToFit];
-
-                //add a space filler to the left:
-                UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
-                UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
-                
-                NSString* buttonTitle;
-                
-                JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
-                JAVA_OBJECT str;
-                if (isLastEdit) {
-                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
-                } else {
-                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
+                if(showToolbar) {
+                    UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+                    [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+                    [toolbar sizeToFit];
+                    
+                    //add a space filler to the left:
+                    UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                                                   UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+                    
+                    NSString* buttonTitle;
+                    
+                    JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+                    JAVA_OBJECT str;
+                    UIBarButtonItem *doneButton;
+                    NSArray *itemsArray = nil;
+                    if (isLastEdit) {
+                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
+                        buttonTitle = toNSString(str);
+                        doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
+                    } else {
+                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
+                        buttonTitle = toNSString(str);
+                        doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
+                        if(vkbAlwaysOpen && (utf.keyboardType == UIKeyboardTypeDecimalPad
+                                             || utf.keyboardType == UIKeyboardTypePhonePad
+                                             || utf.keyboardType == UIKeyboardTypeNumberPad)) {
+                            // we need both done and next
+                            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
+                            buttonTitle = toNSString(str);
+                            UIBarButtonItem *anotherButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
+                            itemsArray = [NSArray arrayWithObjects: flexButton, anotherButton, doneButton, nil];
+                            [anotherButton release];
+                        }
+                    }
+                    
+                    if(itemsArray == nil) {
+                        itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
+                    }
+                    
+                    [flexButton release];
+                    [doneButton release];
+                    [toolbar setItems:itemsArray];
+                    [utf setInputAccessoryView:toolbar];
                 }
-                buttonTitle = toNSString(str);
-                UIBarButtonItem *doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneNextClicked)];
-
-                NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
-
-                [flexButton release];
-                [doneButton release];
-                [toolbar setItems:itemsArray];
-                [utf setInputAccessoryView:toolbar];
             }
         } else {
             UITextView* utv = [[UITextView alloc] initWithFrame:rect];
@@ -275,33 +301,38 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
 
-            //add navigation toolbar to the top of the keyboard
-            UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
-            [toolbar setBarStyle:UIBarStyleBlackTranslucent];
-            [toolbar sizeToFit];
-
-            //add a space filler to the left:
-            UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
-                                           UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
-            
-            NSString* buttonTitle;
-            
-            JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
-            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
-            JAVA_OBJECT str;
-            if (isLastEdit) {
-                str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
-            } else {
-                str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
+            if(showToolbar) {
+                //add navigation toolbar to the top of the keyboard
+                UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
+                [toolbar setBarStyle:UIBarStyleBlackTranslucent];
+                [toolbar sizeToFit];
+                
+                //add a space filler to the left:
+                UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
+                                               UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
+                
+                NSString* buttonTitle;
+                
+                JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
+                JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+                JAVA_OBJECT str;
+                UIBarButtonItem *doneButton;
+                if (isLastEdit) {
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
+                    buttonTitle = toNSString(str);
+                    doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneClicked)];
+                } else {
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
+                    buttonTitle = toNSString(str);
+                    doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardNextClicked)];
+                }
+                NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
+                
+                [flexButton release];
+                [doneButton release];
+                [toolbar setItems:itemsArray];
+                [utv setInputAccessoryView:toolbar];
             }
-            buttonTitle = toNSString(str);
-            UIBarButtonItem *doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneNextClicked)];
-            NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
-            
-            [flexButton release];
-            [doneButton release];
-            [toolbar setItems:itemsArray];
-            [utv setInputAccessoryView:toolbar];
         }
         editingComponent.opaque = NO;
         [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
@@ -400,13 +431,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
         
         CGImageRef imageRef = CGBitmapContextCreateImage(context);
         
-        // Support both iPad 3.2 and iPhone 4 Retina displays with the correct scale
-        if([UIImage respondsToSelector:@selector(imageWithCGImage:scale:orientation:)]) {
-            float scale = [[UIScreen mainScreen] scale];
-            image = [UIImage imageWithCGImage:imageRef scale:scale orientation:UIImageOrientationUp];
-        } else {
-            image = [UIImage imageWithCGImage:imageRef];
-        }
+        image = [UIImage imageWithCGImage:imageRef];
         
         CGImageRelease(imageRef);
         CGContextRelease(context);
@@ -1168,11 +1193,11 @@ int keyboardHeight;
     @synchronized([CodenameOne_GLViewController instance]) {
         [currentTarget removeAllObjects];
     }
-    com_codename1_impl_ios_IOSImplementation_paintNow__();
     keyboardIsShown = NO;
     if(!modifiedViewHeight || vkbAlwaysOpen) {
         return;
     }
+    com_codename1_impl_ios_IOSImplementation_paintNow__();
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
@@ -1543,12 +1568,12 @@ bool lockDrawing;
         
         // update the position of the edit component during drag events, we have to do this here
         // since the animation might run for a while
-        if(vkbAlwaysOpen && editingComponent != nil) {
+        if(vkbAlwaysOpen && editingComponent != nil && !editingComponent.hidden) {
             com_codename1_impl_ios_IOSImplementation* impl = (com_codename1_impl_ios_IOSImplementation*)com_codename1_impl_ios_IOSImplementation_GET_instance();
             com_codename1_ui_Component* comp = (com_codename1_ui_Component*)impl->fields.com_codename1_impl_ios_IOSImplementation.currentEditing_;
             if(comp != NULL) {
-                float newEditCompoentX = com_codename1_ui_Component_getAbsoluteX__(comp) / scaleValue;
-                float newEditCompoentY = com_codename1_ui_Component_getAbsoluteY__(comp) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + editComponentPadLeft) / scaleValue;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + editComponentPadTop) / scaleValue;
                 if(newEditCompoentX != editCompoentX || newEditCompoentY != editCompoentY) {
                     for (UIWindow *window in [[UIApplication sharedApplication] windows])
                     {
@@ -1556,8 +1581,8 @@ bool lockDrawing;
                         if([windowDescription isEqualToString:@"UITextEffectsWindow"]) {
                             for(UIView *v in window.subviews) {
                                 if([[[v class] description] isEqualToString:@"UIAutocorrectInlinePrompt"]) {
-                                    v.frame = CGRectMake(newEditCompoentX + editComponentPadLeft / scaleValue,
-                                                         newEditCompoentY  + editComponentPadTop / scaleValue,
+                                    v.frame = CGRectMake(newEditCompoentX,
+                                                         newEditCompoentY,
                                                          v.frame.size.width, v.frame.size.height);
                                     
                                     float vkbPos = displayHeight / scaleValue - keyboardHeight;
@@ -2169,6 +2194,7 @@ extern SKPayment *paymentInstance;
 }
 
 extern int stringPickerSelection;
+extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
     if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
@@ -2201,11 +2227,29 @@ extern int stringPickerSelection;
     }
 }
 
+UIPopoverController* popoverControllerInstance;
+- (void)pickerComponentDismiss {
+    if(popoverControllerInstance != nil) {
+        [popoverControllerInstance dismissPopoverAnimated:YES];
+        popoverControllerInstance = nil;
+        if(currentDatePickerDate == nil) {
+            if(pickerStringArray == nil) {
+                com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+            } else {
+                com_codename1_impl_ios_IOSImplementation_datePickerResult___long(stringPickerSelection);
+                pickerStringArray = nil;
+            }
+        } else {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+            currentDatePickerDate = nil;
+        }
+    }
+}
+
 // Doesn't work for some reason
 //-(void)actionSheetCancel:(UIActionSheet *)actionSheet {
 //}
 
-extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow: (NSInteger)row inComponent:(NSInteger)component {
     stringPickerSelection = row;
 }
