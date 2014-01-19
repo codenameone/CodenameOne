@@ -47,6 +47,9 @@ public class AndroidRecorder implements Media{
         isPlaying = true;
     }
 
+    public void prepare() {
+    }
+
     @Override
     public void pause() {
         recorder.stop();

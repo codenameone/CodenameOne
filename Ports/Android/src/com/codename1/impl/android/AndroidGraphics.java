@@ -41,8 +41,16 @@
  */
 package com.codename1.impl.android;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Region;
+import android.graphics.Xfermode;
 
 /**
  * #######################################################################
@@ -53,9 +61,15 @@ import android.graphics.Paint;
 class AndroidGraphics {
 
     private Canvas canvas;
-    private Paint paint;
+    private final Paint paint;
     private Paint font;
 
+    private boolean clipFresh;
+    private final RectF tmprectF = new RectF();
+    private final Rect tmprect = new Rect();
+    private final Path tmppath = new Path();
+    private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
+    
     AndroidGraphics(AndroidImplementation impl, Canvas canvas) {
         this.canvas = canvas;
         this.paint = new Paint();
@@ -64,10 +78,6 @@ class AndroidGraphics {
         if(canvas != null) {
             canvas.save();
         }
-    }
-
-    Canvas getCanvas() {
-        return canvas;
     }
 
     void setCanvas(Canvas canvas) {
@@ -95,4 +105,185 @@ class AndroidGraphics {
         return paint;
     }
 
+    public void drawImage(Object img, int x, int y) {
+        canvas.drawBitmap((Bitmap) img, x, y, paint);
+    }
+    
+    public void drawImage(Object img, int x, int y, int w, int h) {
+        Bitmap b = (Bitmap) img;
+        Rect src = new Rect();
+        src.top = 0;
+        src.bottom = b.getHeight();
+        src.left = 0;
+        src.right = b.getWidth();
+        Rect dest = new Rect();
+        dest.top = y;
+        dest.bottom = y + h;
+        dest.left = x;
+        dest.right = x + w;
+
+        canvas.drawBitmap(b, src, dest, paint);
+    }
+
+    public void drawLine(int x1, int y1, int x2, int y2) {
+        paint.setStyle(Paint.Style.FILL);
+        canvas.drawLine(x1, y1, x2, y2, paint);
+    }
+    
+    public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        if (nPoints <= 1) {
+            return;
+        }
+        this.tmppath.rewind();
+        this.tmppath.moveTo(xPoints[0], yPoints[0]);
+        for (int i = 1; i < nPoints; i++) {
+            this.tmppath.lineTo(xPoints[i], yPoints[i]);
+        }
+        paint.setStyle(Paint.Style.STROKE);
+        canvas.drawPath(this.tmppath, paint);
+    }
+    
+    public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        if (nPoints <= 1) {
+            return;
+        }
+        this.tmppath.rewind();
+        this.tmppath.moveTo(xPoints[0], yPoints[0]);
+        for (int i = 1; i < nPoints; i++) {
+            this.tmppath.lineTo(xPoints[i], yPoints[i]);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        canvas.drawPath(this.tmppath, paint);
+    }
+    
+    public void drawRGB(int[] rgbData, int offset, int x,
+            int y, int w, int h, boolean processAlpha) {
+        canvas.drawBitmap(rgbData, offset, w, x, y, w, h,
+                processAlpha, null);
+    }
+    
+    public void drawRect(int x, int y, int width, int height) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setAntiAlias(false);
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+    }
+    
+    public void drawRoundRect(int x, int y, int width,
+            int height, int arcWidth, int arcHeight) {
+
+        paint.setStyle(Paint.Style.STROKE);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+    }
+
+    public void drawString(String str, int x, int y) {
+        canvas.drawText(str, x, y - font.getFontMetricsInt().ascent,
+                font);
+    }
+
+    public void drawArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+        paint.setStyle(Paint.Style.STROKE);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, false, paint);
+    }
+
+    public void fillArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+        paint.setStyle(Paint.Style.FILL);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, true, paint);
+    }
+    
+    public void fillRect(int x, int y, int width, int height) {
+        
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        
+    }
+
+    public void fillRoundRect(int x, int y, int width,
+            int height, int arcWidth, int arcHeight) {
+        paint.setStyle(Paint.Style.FILL);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+    }
+
+    public int getAlpha() {
+        return paint.getAlpha();
+    }
+
+    public void setAlpha(int alpha) {
+        paint.setAlpha(alpha);
+        paint.setXfermode(PORTER);
+    }
+
+    private void freshClip() {
+        if(!clipFresh) {
+            clipFresh = true;
+            canvas.getClipBounds(this.tmprect);
+        }
+    }
+    
+    public int getClipHeight() {
+        freshClip();
+        return this.tmprect.height();
+    }
+
+    public int getClipWidth() {
+        freshClip();
+        return this.tmprect.width();
+    }
+
+    public int getClipX() {
+        freshClip();
+        return this.tmprect.left;
+    }
+
+    public int getClipY() {
+        freshClip();
+        return this.tmprect.top;
+    }
+
+    public void setClip(int x, int y, int width, int height) {
+        clipFresh = false;
+        canvas.clipRect(x, y, x + width, y + height, Region.Op.REPLACE);
+    }
+
+    public void clipRect(int x, int y, int width, int height) {
+        clipFresh = false;
+        canvas.clipRect(x, y, x + width, y + height);
+    }
+
+    public int getColor() {
+        return paint.getColor();
+    }
+    
+    public void resetAffine() {
+        canvas.restore();
+        canvas.save();
+    }
+
+    public void scale(float x, float y) {
+        canvas.scale(x, y);
+    }
+
+    public void rotate(float angle) {
+        canvas.rotate((float)Math.toDegrees(angle));
+    }
+
+    public void rotate(float angle, int x, int y) {
+        canvas.rotate((float)Math.toDegrees(angle), x, y);
+    }
+    
+    public final void fillBitmap(int color) {
+        canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);        
+    }
 }

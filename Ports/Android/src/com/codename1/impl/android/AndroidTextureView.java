@@ -46,7 +46,7 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
         super(activity);
         setId(2001);
 
-        cn1View = new CodenameOneView(activity, this, implementation);
+        cn1View = new CodenameOneView(activity, this, implementation, false);
         setSurfaceTextureListener(new SurfaceTextureListener() {
 
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {

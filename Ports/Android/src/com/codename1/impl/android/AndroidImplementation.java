@@ -180,13 +180,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static CodenameOneSurface myView = null;
     private Paint defaultFont;
     private final char[] tmpchar = new char[1];
-    private final RectF tmprectF = new RectF();
     private final Rect tmprect = new Rect();
-    private final Path tmppath = new Path();
     protected int defaultFontHeight;
-    private int lastSizeChangeW = -1;
-    private int lastSizeChangeH = -1;
-    private final char[] tmpDrawChar = new char[1];
     private Vibrator v = null;
     private boolean vibrateInitialized = false;
     private int displayWidth;
@@ -203,6 +198,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static View viewAbove;
     private static int aboveSpacing;
     private static int belowSpacing;
+    public static boolean asyncView = false;
     
     /**
      * This method in used internally for ads
@@ -403,7 +399,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         initSurface();
         /**
-         * devices are extemely sensitive so dragging should start a little
+         * devices are extremely sensitive so dragging should start a little
          * later than suggested by default implementation.
          */
         this.setDragStartPercentage(1);
@@ -519,10 +515,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 RelativeLayout.LayoutParams.FILL_PARENT));
         relativeLayout.setFocusable(false);
 
-        if (android.os.Build.VERSION.SDK_INT < 18){
-            myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
-        }else{
-            myView = new AndroidTextureView(activity, AndroidImplementation.this);                
+        if(asyncView) {
+            if(android.os.Build.VERSION.SDK_INT < 14){
+                myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
+            } else {
+                myView = new AndroidAsyncView(activity, AndroidImplementation.this);                
+            }
+        } else {
+            if(android.os.Build.VERSION.SDK_INT < 18){
+                myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
+            } else {
+                myView = new AndroidTextureView(activity, AndroidImplementation.this);                
+            }
         }
         myView.getAndroidView().setVisibility(View.VISIBLE);
 
@@ -655,8 +659,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected void setLastSizeChangedWH(int w, int h) {
-        this.lastSizeChangeW = w;
-        this.lastSizeChangeH = h;
+        // not used?
+        //this.lastSizeChangeW = w;
+        //this.lastSizeChangeH = h;
     }
 
     /*@Override
@@ -1008,6 +1013,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      *
      * @return true if the platform supports font lookup
      */
+    @Override
     public boolean isLookupFontSupported() {
         return true;
     }
@@ -1031,7 +1037,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics() {
-        return this.myView.getGraphics();
+        return myView.getGraphics();
     }
 
     @Override
@@ -1192,7 +1198,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Bitmap bitmap = Bitmap.createBitmap(width, height,
                 Bitmap.Config.ARGB_8888);
         AndroidGraphics graphics = (AndroidGraphics) this.getNativeGraphics(bitmap);
-        graphics.getCanvas().drawColor(fillColor, Mode.SRC_OVER);
+        graphics.fillBitmap(fillColor);
         return bitmap;
     }
 
@@ -1208,7 +1214,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
-        ((AndroidGraphics) graphics).getCanvas().drawBitmap((Bitmap) img, x, y, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).drawImage(img, x, y);
     }
 
     public boolean isScaledImageDrawingSupported() {
@@ -1216,28 +1222,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
-        Bitmap b = (Bitmap) img;
-        Rect src = new Rect();
-        src.top = 0;
-        src.bottom = b.getHeight();
-        src.left = 0;
-        src.right = b.getWidth();
-        Rect dest = new Rect();
-        dest.top = y;
-        dest.bottom = y + h;
-        dest.left = x;
-        dest.right = x + w;
-
-        ((AndroidGraphics) graphics).getCanvas().drawBitmap(b, src, dest, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).drawImage(img, x, y, w, h);
     }
 
     @Override
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
-
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
-        ((AndroidGraphics) graphics).getCanvas().drawLine(x1, y1, x2, y2,
-                ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).drawLine(x1, y1, x2, y2);
     }
 
     @Override
@@ -1252,142 +1242,67 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
-        if (nPoints <= 1) {
-            return;
-        }
-        this.tmppath.rewind();
-        this.tmppath.moveTo(xPoints[0], yPoints[0]);
-        for (int i = 1; i < nPoints; i++) {
-            this.tmppath.lineTo(xPoints[i], yPoints[i]);
-        }
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
-        ((AndroidGraphics) graphics).getCanvas().drawPath(this.tmppath, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).drawPolygon(xPoints, yPoints, nPoints);
     }
 
     @Override
     public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
-        if (nPoints <= 1) {
-            return;
-        }
-        this.tmppath.rewind();
-        this.tmppath.moveTo(xPoints[0], yPoints[0]);
-        for (int i = 1; i < nPoints; i++) {
-            this.tmppath.lineTo(xPoints[i], yPoints[i]);
-        }
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
-        ((AndroidGraphics) graphics).getCanvas().drawPath(this.tmppath, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).fillPolygon(xPoints, yPoints, nPoints);
     }
 
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x,
             int y, int w, int h, boolean processAlpha) {
-        //Bitmap tmp = Bitmap.createBitmap(rgbData, w, h, Bitmap.Config.ARGB_8888);
-        //((AndroidGraphics) graphics).drawBitmap(tmp, x, y, null);
-        ((AndroidGraphics) graphics).getCanvas().drawBitmap(rgbData, offset, w, x, y, w, h,
-                processAlpha, null);
-
+        ((AndroidGraphics) graphics).drawRGB(rgbData, offset, x, y, w, h, processAlpha);
     }
 
     @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
-
-        boolean antialias = ((AndroidGraphics) graphics).getPaint().isAntiAlias();
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
-        ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
-        ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
-                ((AndroidGraphics) graphics).getPaint());
-        ((AndroidGraphics) graphics).getPaint().setAntiAlias(antialias);
+        ((AndroidGraphics) graphics).drawRect(x, y, width, height);
     }
 
     @Override
     public void drawRoundRect(Object graphics, int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
-
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
-        this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawRoundRect(this.tmprectF, arcWidth,
-                arcHeight, ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).drawRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
 
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
-        // Uncomment this if you need to run on a device that doesn't have proper bidi support
-        // like some hacked 3rd party devices, unfortunately I can't find a way to detect
-        // this situation on the fly
-        //str = Display.getInstance().convertBidiLogicalToVisual(str);
-        ((AndroidGraphics) graphics).getCanvas().drawText(str, x, y - ((AndroidGraphics) graphics).getFont().getFontMetricsInt().ascent,
-                ((AndroidGraphics) graphics).getFont());
-    }
-
-    /**
-     * the next two methods are not used yet and are part of a potential
-     * performance enhancement. see
-     * https://lwuit.dev.java.net/issues/show_bug.cgi?id=218 for details.
-     */
-    //@Override
-    public void drawChar(Object graphics, char c, int x, int y) {
-        tmpDrawChar[0] = c;
-        ((AndroidGraphics) graphics).getCanvas().drawText(tmpDrawChar, 0, 1, x, y - ((AndroidGraphics) graphics).getFont().getFontMetricsInt().ascent,
-                ((AndroidGraphics) graphics).getFont());
-    }
-
-    //@Override
-    public void drawChars(Object graphics, char[] c, int offset, int length, int x, int y) {
-        ((AndroidGraphics) graphics).getCanvas().drawText(c, offset, length, x, y - ((AndroidGraphics) graphics).getFont().getFontMetricsInt().ascent,
-                ((AndroidGraphics) graphics).getFont());
+        ((AndroidGraphics) graphics).drawString(str, x, y);
     }
 
     @Override
     public void drawArc(Object graphics, int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.STROKE);
-        this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 360 - startAngle,
-                -arcAngle, false, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).drawArc(x, y, width, height, startAngle, arcAngle);
     }
 
     @Override
     public void fillArc(Object graphics, int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
-        this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawArc(this.tmprectF, 360 - startAngle,
-                -arcAngle, true, ((AndroidGraphics) graphics).getPaint());
+        ((AndroidGraphics) graphics).fillArc(x, y, width, height, startAngle, arcAngle);
     }
     
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
-        
-        boolean antialias = ((AndroidGraphics) graphics).getPaint().isAntiAlias();
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
-        ((AndroidGraphics) graphics).getPaint().setAntiAlias(false);
-        ((AndroidGraphics) graphics).getCanvas().drawRect(x, y, x + width, y + height,
-                ((AndroidGraphics) graphics).getPaint());
-        ((AndroidGraphics) graphics).getPaint().setAntiAlias(antialias);
-        
+        ((AndroidGraphics) graphics).fillRect(x, y, width, height);
     }
 
     @Override
     public void fillRoundRect(Object graphics, int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
-
-        ((AndroidGraphics) graphics).getPaint().setStyle(Style.FILL);
-        this.tmprectF.set(x, y, x + width, y + height);
-        ((AndroidGraphics) graphics).getCanvas().drawRoundRect(this.tmprectF, arcWidth,
-                arcHeight, ((AndroidGraphics) graphics).getPaint());
-
+        ((AndroidGraphics) graphics).fillRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
 
     @Override
     public int getAlpha(Object graphics) {
-        return ((AndroidGraphics) graphics).getPaint().getAlpha();
+        return ((AndroidGraphics) graphics).getAlpha();
     }
 
     @Override
     public void setAlpha(Object graphics, int alpha) {
-        ((AndroidGraphics) graphics).getPaint().setAlpha(alpha);
-        ((AndroidGraphics) graphics).getPaint().setXfermode(new PorterDuffXfermode(Mode.SRC_OVER));
+        ((AndroidGraphics) graphics).setAlpha(alpha);
     }
 
     @Override
@@ -1417,50 +1332,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getClipHeight(Object graphics) {
-
-        ((AndroidGraphics) graphics).getCanvas().getClipBounds(this.tmprect);
-        return this.tmprect.height();
-
+        return ((AndroidGraphics) graphics).getClipHeight();
     }
 
     @Override
     public int getClipWidth(Object graphics) {
-
-        ((AndroidGraphics) graphics).getCanvas().getClipBounds(this.tmprect);
-        return this.tmprect.width();
-
+        return ((AndroidGraphics) graphics).getClipWidth();
     }
 
     @Override
     public int getClipX(Object graphics) {
-
-        ((AndroidGraphics) graphics).getCanvas().getClipBounds(this.tmprect);
-        return this.tmprect.left;
-
+        return ((AndroidGraphics) graphics).getClipX();
     }
 
     @Override
     public int getClipY(Object graphics) {
-
-        ((AndroidGraphics) graphics).getCanvas().getClipBounds(this.tmprect);
-        return this.tmprect.top;
-
+        return ((AndroidGraphics) graphics).getClipY();
     }
 
     @Override
     public void setClip(Object graphics, int x, int y, int width, int height) {
-        ((AndroidGraphics) graphics).getCanvas().clipRect(x, y, x + width, y + height, Region.Op.REPLACE);
-
+        ((AndroidGraphics) graphics).setClip(x, y, width, height);
     }
 
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
-        ((AndroidGraphics) graphics).getCanvas().clipRect(x, y, x + width, y + height);
+        ((AndroidGraphics) graphics).clipRect(x, y, width, height);
     }
 
     @Override
     public int getColor(Object graphics) {
-        return ((AndroidGraphics) graphics).getPaint().getColor();
+        return ((AndroidGraphics) graphics).getColor();
     }
 
     @Override
@@ -2926,20 +2828,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void resetAffine(Object nativeGraphics) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().restore();
-        ((AndroidGraphics) nativeGraphics).getCanvas().save();
+        ((AndroidGraphics) nativeGraphics).resetAffine();
     }
 
     public void scale(Object nativeGraphics, float x, float y) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().scale(x, y);
+        ((AndroidGraphics) nativeGraphics).scale(x, y);
     }
 
     public void rotate(Object nativeGraphics, float angle) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().rotate((float)Math.toDegrees(angle));
+        ((AndroidGraphics) nativeGraphics).rotate(angle);
     }
 
     public void rotate(Object nativeGraphics, float angle, int x, int y) {
-        ((AndroidGraphics) nativeGraphics).getCanvas().rotate((float)Math.toDegrees(angle), x, y);
+        ((AndroidGraphics) nativeGraphics).rotate(angle, x, y);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
@@ -4233,6 +4134,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
         }
+        
+        public void prepare() { 
+        }
 
         @Override
         public void play() {
@@ -5202,7 +5106,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isNativePickerTypeSupported(int pickerType) {
-        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME;
+        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_STRINGS;
     }
     
     @Override
@@ -5245,6 +5149,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     int hour = ((Integer)currentValue).intValue() / 60;
                     int minute = ((Integer)currentValue).intValue() % 60;
                     TimePickerDialog tp = new TimePickerDialog(activity, pickInstance, hour, minute, true);
+                    tp.setOnCancelListener(pickInstance);
                         //DateFormat.is24HourFormat(activity));
                     tp.show();
                 }
@@ -5296,11 +5201,113 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             activity.runOnUiThread(new Runnable() {
                 public void run() {
                     DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH));
+                    tp.setOnCancelListener(pickInstance);
                     tp.show();
                 }
             });
             Display.getInstance().invokeAndBlock(pickInstance);
             return pickInstance.result;
+        }
+        if(type == Display.PICKER_TYPE_STRINGS) {
+            final String[] values = (String[])data;
+            class StringPick implements Runnable, NumberPicker.OnValueChangeListener {
+                int result = -1;
+                boolean dismissed;
+                boolean canceled;
+                
+                StringPick() {
+                    for(int iter = 0 ; iter < values.length ; iter++) {
+                        if(values.equals(currentValue)) {
+                            result = iter;
+                            break;
+                        }
+                    }
+                }
+                
+                public void run() {
+                    while(!dismissed) {
+                        synchronized(this) {
+                            try {
+                                wait(50);
+                            } catch(InterruptedException er) {}
+                        }
+                    }
+                }
+
+                public void cancel() {
+                    canceled = true;
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }
+                }
+
+                public void ok() {
+                    canceled = false;
+                    dismissed = true;
+                    synchronized(this) {
+                        notify();
+                    }
+                }
+
+                @Override
+                public void onValueChange(NumberPicker np, int oldVal, int newVal) {
+                    result = newVal;
+                }
+            }
+            
+            final StringPick pickInstance = new StringPick();
+
+            activity.runOnUiThread(new Runnable() {
+                public void run() {
+                    NumberPicker picker = new NumberPicker(activity);
+                    picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    picker.setMinValue(0);
+                    picker.setMaxValue(values.length - 1);
+                    picker.setDisplayedValues(values);
+                    picker.setOnValueChangedListener(pickInstance);
+                    if(pickInstance.result > -1) {
+                        picker.setValue(pickInstance.result);
+                    }
+                    RelativeLayout linearLayout = new RelativeLayout(activity);
+                    RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(50, 50);
+                    RelativeLayout.LayoutParams numPicerParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                    numPicerParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
+
+                    linearLayout.setLayoutParams(params);
+                    linearLayout.addView(picker,numPicerParams);
+
+                    AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(activity);
+                    alertDialogBuilder.setView(linearLayout);
+                    alertDialogBuilder
+                            .setCancelable(false)
+                            .setPositiveButton("Ok",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog,
+                                                            int id) {
+                                            pickInstance.ok();
+                                        }
+                                    })
+                            .setNegativeButton("Cancel",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog,
+                                                            int id) {
+                                            dialog.cancel();
+                                            pickInstance.cancel();
+                                        }
+                                    });
+                    AlertDialog alertDialog = alertDialogBuilder.create();
+                    alertDialog.show();
+                }
+            });
+            Display.getInstance().invokeAndBlock(pickInstance);
+            if(pickInstance.canceled) {
+                return null;
+            }
+            if(pickInstance.result < 0) {
+                return null;
+            }
+            return values[pickInstance.result];
         }
         return null;
     }

@@ -45,7 +45,7 @@ public class CodenameOneView {
 
     int width = 1;
     int height = 1;
-    private Bitmap bitmap;
+    Bitmap bitmap;
     AndroidGraphics buffy = null;
     private Canvas canvas;
     private AndroidImplementation implementation = null;
@@ -53,10 +53,12 @@ public class CodenameOneView {
     private final Rect bounds = new Rect();
     private boolean fireKeyDown = false;
     //private volatile boolean created = false;
+    private boolean drawing;
 
-    public CodenameOneView(Activity activity, View androidView, AndroidImplementation implementation) {
+    public CodenameOneView(Activity activity, View androidView, AndroidImplementation implementation, boolean drawing) {
 
         this.implementation = implementation;
+        this.drawing = drawing;
         androidView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.FILL_PARENT,
                 ViewGroup.LayoutParams.FILL_PARENT));
@@ -70,8 +72,10 @@ public class CodenameOneView {
          * tell the system that we do our own caching and it does not need to
          * use an extra offscreen bitmap.
          */
-        androidView.setWillNotCacheDrawing(false);
-        androidView.setWillNotDraw(true);
+        if(!drawing) {
+            androidView.setWillNotCacheDrawing(false);
+            androidView.setWillNotDraw(true);
+        }
 
         this.buffy = new AndroidGraphics(implementation, null);
         this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
@@ -117,9 +121,11 @@ public class CodenameOneView {
     }
     
     private void initBitmaps(int w, int h) {
-        this.bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        this.canvas = new Canvas(this.bitmap);
-        this.buffy.setCanvas(this.canvas);
+        if(!drawing) {
+            this.bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            this.canvas = new Canvas(this.bitmap);
+            this.buffy.setCanvas(this.canvas);
+        }
     }
 
     public void visibilityChangedTo(boolean visible) {
@@ -143,9 +149,11 @@ public class CodenameOneView {
 
     public void handleSizeChange(int w, int h) {
 
-        if ((this.width != w && (this.width < w || this.height < h))
-                || (bitmap.getHeight() < h)) {
-            this.initBitmaps(w, h);
+        if(!drawing) {
+            if ((this.width != w && (this.width < w || this.height < h))
+                    || (bitmap.getHeight() < h)) {
+                this.initBitmaps(w, h);
+            }
         }
         if (this.width == w && this.height == h) {
             return;
