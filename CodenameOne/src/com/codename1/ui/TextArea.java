@@ -180,6 +180,9 @@ public class TextArea extends Component {
     
     private int growLimit = -1;
     
+    private boolean endsWith3Points = false;
+
+    
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     
     private ArrayList rowStrings;
@@ -1591,5 +1594,26 @@ public class TextArea extends Component {
     public void setGrowLimit(int growLimit) {
         this.growLimit = growLimit;
     }
+    
+    /**
+     * If the TextArea text is too long to fit the text to the widget add "..."
+     * points at the last displayable row.
+     * By default this is set to false
+     * 
+     * @param endsWith3Points true if text should add "..." at the end
+     */
+    public void setEndsWith3Points(boolean endsWith3Points){
+        this.endsWith3Points = endsWith3Points;
+    }
+
+    /**
+     * Simple getter
+     * 
+     * @return true if this TextArea adds "..." when the text is too long
+     */
+    public boolean isEndsWith3Points() {
+        return endsWith3Points;
+    }
+    
     
 }
