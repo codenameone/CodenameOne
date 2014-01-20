@@ -1557,7 +1557,11 @@ public class UIBuilder { //implements Externalizable {
             if(p.indexOf('.') > -1) {
                 return Resources.open(p);
             }
-            return Resources.openLayered(p);
+            Resources res = Resources.openLayered(p);
+            if(isKeepResourcesInRam()) {
+                resourceFile = res;
+            }
+            return res;
         } catch (IOException ex) {
             ex.printStackTrace();
             return null;
