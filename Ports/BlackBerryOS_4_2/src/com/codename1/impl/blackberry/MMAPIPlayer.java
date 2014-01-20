@@ -178,6 +178,18 @@ class MMAPIPlayer implements PlayerListener, Media{
         } catch(Throwable t) {}
     }
 
+    public void prepare() {
+        if(deleted){
+            return;
+        }
+        try {
+            nativePlayer.prefetch();
+        } catch (MediaException ex) {
+            ex.printStackTrace();
+            throw new RuntimeException(ex.toString());
+        }
+    }
+    
     public void play() {
         if(deleted){
             return;

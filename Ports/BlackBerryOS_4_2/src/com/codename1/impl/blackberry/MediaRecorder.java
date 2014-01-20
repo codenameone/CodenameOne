@@ -49,6 +49,9 @@ public class MediaRecorder implements Media {
         this(path, "audio/amr");
     }
     
+    public void prepare() {
+    }
+    
     public MediaRecorder(String path, String mimeType) throws IOException {
         try {
             //recorder = Manager.createPlayer("capture://audio?encoding=audio/amr&bitrate=12200&voipMode=true");

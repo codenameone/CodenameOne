@@ -2643,6 +2643,9 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
     public void mkdir(String directory) {
         FileConnection fc = null;
         try {
+            if(!directory.endsWith("/")) {
+                directory += "/";
+            }
             fc = (FileConnection) Connector.open(directory, Connector.READ_WRITE);
             fc.mkdir();
         } catch (IOException err) {

@@ -5083,6 +5083,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             playing = false;
         }
 
+        public void prepare() {
+        }
+        
         public void play() {
             player.play();
             playing = true;

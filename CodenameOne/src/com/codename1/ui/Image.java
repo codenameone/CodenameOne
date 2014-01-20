@@ -649,7 +649,8 @@ public class Image {
      * @return Graphics object allowing us to manipulate the content of a mutable image
      */
     public Graphics getGraphics() {
-        return new Graphics(Display.getInstance().getImplementation().getNativeGraphics(image));
+        Graphics g = new Graphics(Display.getInstance().getImplementation().getNativeGraphics(image));
+        return g;
     }
     
     /**

@@ -77,6 +77,9 @@ public class MediaRecorder implements Media {
         }
     }
 
+    public void prepare() {
+    }
+    
     public void play() {
         try {
             rc.startRecord();

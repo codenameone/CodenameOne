@@ -55,6 +55,7 @@ public class SpanButton extends Container {
         setUIID("Button");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
+        text.setColumns(20);
         text.setUIID("Button");
         text.setEditable(false);
         text.setFocusable(false);

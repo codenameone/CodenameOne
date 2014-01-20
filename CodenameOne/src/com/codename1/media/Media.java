@@ -76,18 +76,20 @@ public interface Media {
             
     /**
      * Starts playing the audio file
-     *
-     * @param handle the handle object returned by create audio
      */
     public void play();
 
     /**
      * Pauses the playback of the audio file
-     *
-     * @param handle the handle object returned by create audio
      */
     public void pause();
-
+    
+    /**
+     * Optional call that allows the caller to prepare the upcoming media player. This is useful
+     * when streaming multiple streams one after another.
+     */
+    public void prepare();
+    
     /**
      * Stops the audio playback and cleans up the resources related to it immediately.
      */

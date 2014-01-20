@@ -1597,6 +1597,10 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
             
             player.play();
         }
+        
+        public void prepare() {
+            player.prepare();
+        }
 
         /**
          * Stope media playback

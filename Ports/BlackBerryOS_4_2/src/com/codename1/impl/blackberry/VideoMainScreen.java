@@ -82,6 +82,10 @@ public class VideoMainScreen extends MainScreen implements Media {
         player.play();
     }
 
+    public void prepare() {
+    }
+    
+
     public void pause() {
         player.pause();
     }
