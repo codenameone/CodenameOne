@@ -130,11 +130,11 @@
         <copy file="../../Skins/lumia.skin" todir="src" />
         <!-- copy file="../../Skins/android.skin" todir="src" / -->
         <copy file="../../Skins/feature_phone.skin" todir="src" />
-        <copy file="../../Skins/ipad.skin" todir="src" />
+        <copy file="../../Skins/ipad_os7.skin" tofile="src/ipad.skin" />
         <copy file="../../Skins/nexus.skin" todir="src" />
-        <copy file="../../Skins/iphone3gs.skin" todir="src" />
-        <copy file="../../Skins/iphone4.skin" todir="src" />
-        <copy file="../../Skins/iphone5.skin" todir="src" />
+        <copy file="../../Skins/iphone3gs_os7.skin" tofile="src/iphone3gs.skin" />
+        <copy file="../../Skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
+        <copy file="../../Skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../Skins/xoom.skin" todir="src" />
     </target>
     
@@ -142,5 +142,11 @@
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="lib/sqlitejdbc-v056.jar" dest="build/classes" /> 
     </target>    
+
+    <target name="desktop" depends="jar">
+        <jar destfile="dist/JavaSEClean.jar">
+            <zipfileset src="${dist.jar}" excludes="*.skin,*.png"/>
+        </jar>
+    </target>
 
 </project>
