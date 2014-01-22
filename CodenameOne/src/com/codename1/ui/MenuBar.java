@@ -352,6 +352,7 @@ public class MenuBar extends Container implements ActionListener {
         Container rightContainer = new Container(new BoxLayout(BoxLayout.X_AXIS));
         t.addComponent(BorderLayout.EAST, rightContainer);
         t.addComponent(BorderLayout.WEST, leftContainer);
+        parent.initTitleBarStatus();
     }
 
     private Container findLeftTitleContainer() {
@@ -409,6 +410,7 @@ public class MenuBar extends Container implements ActionListener {
             }
             t.removeAll();
             t.addComponent(BorderLayout.CENTER, l);
+            parent.initTitleBarStatus();
         }
     }
 
@@ -830,6 +832,7 @@ public class MenuBar extends Container implements ActionListener {
                 leftContainer.removeAll();
                 rightContainer.removeAll();
                 removeAll();
+                parent.initTitleBarStatus();
                 break;
             case 1:
                 if (parent.getBackCommand() != null) {
@@ -841,6 +844,7 @@ public class MenuBar extends Container implements ActionListener {
                 }
                 if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {
                     removeAll();
+                    parent.initTitleBarStatus();
                 }
                 break;
             case 2:
@@ -857,6 +861,7 @@ public class MenuBar extends Container implements ActionListener {
                     }
                     if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {
                         removeAll();
+                        parent.initTitleBarStatus();
                     }
                 } else {
                     addTwoTitleButtons(leftContainer, rightContainer);
@@ -1118,6 +1123,7 @@ public class MenuBar extends Container implements ActionListener {
             l.getParent().removeComponent(l);
         }
         t.addComponent(BorderLayout.CENTER, l);
+        parent.initTitleBarStatus();
     }
 
     /**
@@ -1137,6 +1143,7 @@ public class MenuBar extends Container implements ActionListener {
             parent.getTitleArea().removeAll();
             parent.getTitleArea().addComponent(BorderLayout.CENTER, parent.getTitleComponent());            
             removeAll();
+            parent.initTitleBarStatus();
             return;
         }
         updateCommands();

@@ -1174,7 +1174,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * Returns the content legth header value
+     * Returns the content length header value
      *
      * @return the content length
      */
@@ -1200,6 +1200,9 @@ public class ConnectionRequest implements IOProgressListener {
      * @param url the url to set
      */
     public void setUrl(String url) {
+        if(url.indexOf(' ') > -1) {
+            url = StringUtil.replaceAll(url, " ", "%20");
+        }
         url = url.intern();
         this.url = url;
     }

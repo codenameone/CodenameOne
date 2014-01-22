@@ -29,6 +29,7 @@ import com.codename1.ui.List;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * A renderer that can represent values for Date and time, time is represented as an integer
@@ -149,10 +150,10 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
                     value = twoDigits(month) + separatorChar + twoDigits(day) + separatorChar + (year % 100);
                     break;
                 case Spinner.DATE_FORMAT_DOW_MON_DD:
-                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + MONTHS[month - 1] + separatorChar + twoDigits(day);
+                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day);
                     break;
                 case Spinner.DATE_FORMAT_DOW_MON_DD_YY:
-                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + MONTHS[month - 1] + separatorChar + twoDigits(day) + separatorChar + year;
+                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day) + separatorChar + year;
                     break;
             }
         } else {
@@ -180,6 +181,18 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
             }
         }
         return super.getListCellRendererComponent(list, value, index, isSelected);
+    }
+    
+    private String getLocalizedMonth(int i) {
+        Map<String, String> t = getUIManager().getBundle();
+        String text = MONTHS[i];
+        if (t != null) {
+            Object o = t.get("Calendar." + text);
+            if (o != null) {
+                text = (String) o;
+            }
+        }
+        return text;
     }
 
     /**

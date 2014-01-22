@@ -221,7 +221,7 @@ public class SideMenuBar extends MenuBar {
                             return;
                         }
                         evt.consume();
-                        if (x - initialDragX > Display.getInstance().getDisplayWidth() / 15) {
+                        if (x - initialDragX > Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
@@ -237,7 +237,7 @@ public class SideMenuBar extends MenuBar {
                             return;
                         }
                         evt.consume();
-                        if (initialDragX - x > Display.getInstance().getDisplayWidth() / 15) {
+                        if (initialDragX - x > Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
@@ -252,7 +252,7 @@ public class SideMenuBar extends MenuBar {
                             return;
                         }
                         evt.consume();
-                        if (initialDragY - y > Display.getInstance().getDisplayHeight() / 15) {
+                        if (initialDragY - y > Display.getInstance().getDisplayHeight() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
                             draggedX = y;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
@@ -277,12 +277,12 @@ public class SideMenuBar extends MenuBar {
                     }
                     int displayWidth = Display.getInstance().getDisplayWidth();
                     if (rightSideButton != null) {
-                        rightSideSwipePotential = !transitionRunning && evt.getX() > displayWidth - displayWidth / 11;
+                        rightSideSwipePotential = !transitionRunning && evt.getX() > displayWidth - displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
                     if (parent.getTitleComponent() instanceof Button) {
-                        topSwipePotential = !transitionRunning && evt.getY() < Display.getInstance().getDisplayHeight() / 10;
+                        topSwipePotential = !transitionRunning && evt.getY() < Display.getInstance().getDisplayHeight() / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
-                    sideSwipePotential = !transitionRunning && evt.getX() < displayWidth / 11;
+                    sideSwipePotential = !transitionRunning && evt.getX() < displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     initialDragX = evt.getX();
                     initialDragY = evt.getY();
                     if (sideSwipePotential || rightSideSwipePotential || topSwipePotential) {
@@ -750,7 +750,12 @@ public class SideMenuBar extends MenuBar {
         }
         b.setText(c.getCommandName());
         b.setTextPosition(Label.RIGHT);
-        b.setUIID("SideCommand");
+        String uiid = (String)c.getClientProperty("uiid");
+        if(uiid != null) {
+            b.setUIID(uiid);
+        } else {
+            b.setUIID("SideCommand");
+        }
         return b;
     }
 

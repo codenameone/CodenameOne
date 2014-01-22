@@ -201,9 +201,12 @@ public class Form extends Container {
      */
     void initTitleBarStatus() {
         if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
-            Container bar = new Container();
-            bar.setUIID("StatusBar");
-            titleArea.addComponent(BorderLayout.NORTH, bar);
+            // check if its already added:
+            if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
+                Container bar = new Container();
+                bar.setUIID("StatusBar");
+                titleArea.addComponent(BorderLayout.NORTH, bar);
+            }
         }
     }
 
