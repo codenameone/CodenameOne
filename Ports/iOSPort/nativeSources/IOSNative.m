@@ -1548,31 +1548,40 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    CGFloat components[8] = { 
-        ((float)((n1 & 0xFF0000) >> 16))/255.0, 
-        ((float)(n1 & 0xff00 >> 8))/255.0,
-        ((float)(n1 & 0xff))/255.0, 
-        1.0, 
-        ((float)((n2 & 0xFF0000) >> 16))/255.0, 
-        ((float)(n2 & 0xff00 >> 8))/255.0,
-        ((float)(n2 & 0xff))/255.0, 
+    CGFloat components[8] = {
+        ((float)((n1 >> 16) & 0xff))/255.0,
+        ((float)((n1 >> 8) & 0xFF))/255.0,
+        ((float)(n1 & 0xff))/255.0,
+        1.0,
+        ((float)((n2 >> 16) & 0xFF))/255.0,
+        ((float)((n2 >> 8) & 0xFF))/255.0,
+        ((float)(n2 & 0xff))/255.0,
         1.0 };
+
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
-    
+    CGRect rect = CGRectMake(n3, n4, width, height);
+
+    CGContextSaveGState(UIGraphicsGetCurrentContext());
+    CGContextClipToRect(UIGraphicsGetCurrentContext(), rect);
     if(n7) {
-        CGContextDrawLinearGradient(UIGraphicsGetCurrentContext(), myGradient, 
-                                    CGPointMake(0, 0), CGPointMake(0, width), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+        CGPoint startPoint = CGPointMake(n3, n4+height/2);
+        CGPoint endPoint = CGPointMake(n3+width, n4+height/2);
+        CGContextDrawLinearGradient(UIGraphicsGetCurrentContext(), myGradient,
+                                    startPoint, endPoint, 0);
     } else {
-        CGContextDrawLinearGradient(UIGraphicsGetCurrentContext(), myGradient, 
-                                    CGPointMake(0, 0), CGPointMake(height, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);                        
+        CGPoint startPoint = CGPointMake(n3+width/2, n4);
+        CGPoint endPoint = CGPointMake(n3+width/2, n4+height);
+        CGContextDrawLinearGradient(UIGraphicsGetCurrentContext(), myGradient,
+                                    startPoint, endPoint, 0);
     }
+    CGGradientRelease(myGradient), myGradient = NULL;
+    CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     [pool release];
 }
-
 void com_codename1_impl_ios_IOSNative_releasePeer___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSObject* o = (NSObject*)peer;
