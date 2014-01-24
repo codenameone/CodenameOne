@@ -47,4 +47,6 @@ public interface CodenameOneSurface {
     public int getId();
     
     public void setLayoutParams(ViewGroup.LayoutParams lp);
+    
+    public boolean alwaysRepaintAll();
 }

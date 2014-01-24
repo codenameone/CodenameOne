@@ -213,4 +213,7 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
     }
     
     
+    public boolean alwaysRepaintAll() {
+        return false;
+    }
 }

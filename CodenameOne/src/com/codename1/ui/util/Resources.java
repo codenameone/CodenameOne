@@ -938,6 +938,10 @@ public class Resources {
     }
     
     Image createImage() throws IOException {
+        return createImage(input);
+    }
+    
+    Image createImage(DataInputStream input) throws IOException {
         if(majorVersion == 0 && minorVersion == 0) {
             byte[] data = new byte[input.readInt()];
             input.readFully(data, 0, data.length);
@@ -1122,7 +1126,7 @@ public class Resources {
             if(packed) {
                 bitmap = createPackedImage8();
             } else {
-                bitmap = createImage();
+                bitmap = createImage(input);
             }
             int charCount = input.readShort();
             int[] cutOffsets = new int[charCount];
@@ -1179,7 +1183,7 @@ public class Resources {
     }
 
     Font loadBitmapFont(DataInputStream input, String id, com.codename1.ui.Font font) throws IOException {
-        Image bitmap = createImage();
+        Image bitmap = createImage(input);
         int charCount = input.readShort();
         int[] cutOffsets = new int[charCount];
         int[] charWidth = new int[charCount];

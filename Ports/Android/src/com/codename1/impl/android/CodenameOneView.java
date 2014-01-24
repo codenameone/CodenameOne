@@ -75,9 +75,9 @@ public class CodenameOneView {
         if(!drawing) {
             androidView.setWillNotCacheDrawing(false);
             androidView.setWillNotDraw(true);
+            this.buffy = new AndroidGraphics(implementation, null);
         }
 
-        this.buffy = new AndroidGraphics(implementation, null);
         this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
 
 
@@ -193,13 +193,15 @@ public class CodenameOneView {
 
     //@Override
     protected void d(Canvas canvas) {
-        boolean empty = canvas.getClipBounds(bounds);
-        if (empty) {
-            // ??
-            canvas.drawBitmap(bitmap, 0, 0, null);
-        } else {
-            bounds.intersect(0, 0, width, height);
-            canvas.drawBitmap(bitmap, bounds, bounds, null);
+        if(!drawing) {
+            boolean empty = canvas.getClipBounds(bounds);
+            if (empty) {
+                // ??
+                canvas.drawBitmap(bitmap, 0, 0, null);
+            } else {
+                bounds.intersect(0, 0, width, height);
+                canvas.drawBitmap(bitmap, bounds, bounds, null);
+            }
         }
     }
 

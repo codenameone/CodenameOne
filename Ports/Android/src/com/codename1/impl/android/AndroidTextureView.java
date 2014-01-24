@@ -216,4 +216,8 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
     public View getAndroidView() {
         return this;
     }
+
+    public boolean alwaysRepaintAll() {
+        return false;
+    }
 }

@@ -320,6 +320,16 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Android's highly broken hardware acceleration mode doesn't respect clipping and erases the screen 
+     * occasionally when we only paint part of it: http://stackoverflow.com/questions/7233830/partial-invalidation-in-custom-android-view-with-hardware-acceleration
+     * So this is a workaround for that case making sure repaint always happens on the form regardless.
+     * @return false by default
+     */
+    public boolean alwaysRepaintAll() {
+        return false;
+    }
+    
+    /**
      * Allows the implementation to refresh the text field
      */
     protected final void repaintTextEditor(final boolean focus) {

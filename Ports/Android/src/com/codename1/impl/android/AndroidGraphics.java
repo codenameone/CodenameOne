@@ -43,6 +43,7 @@ package com.codename1.impl.android;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -50,7 +51,6 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
-import android.graphics.Xfermode;
 
 /**
  * #######################################################################
@@ -61,7 +61,7 @@ import android.graphics.Xfermode;
 class AndroidGraphics {
 
     private Canvas canvas;
-    private final Paint paint;
+    private Paint paint;
     private Paint font;
 
     private boolean clipFresh;
@@ -80,11 +80,16 @@ class AndroidGraphics {
         }
     }
 
+
     void setCanvas(Canvas canvas) {
         this.canvas = canvas;
         if(canvas != null) {
             canvas.save();
         }
+    }
+
+    void setCanvasNoSave(Canvas canvas) {
+        this.canvas = canvas;
     }
 
     Paint getFont() {
@@ -105,6 +110,10 @@ class AndroidGraphics {
         return paint;
     }
 
+    void setPaint(Paint p) {
+        paint = p;
+    }
+
     public void drawImage(Object img, int x, int y) {
         canvas.drawBitmap((Bitmap) img, x, y, paint);
     }
@@ -121,7 +130,6 @@ class AndroidGraphics {
         dest.bottom = y + h;
         dest.left = x;
         dest.right = x + w;
-
         canvas.drawBitmap(b, src, dest, paint);
     }
 
@@ -179,8 +187,7 @@ class AndroidGraphics {
     }
 
     public void drawString(String str, int x, int y) {
-        canvas.drawText(str, x, y - font.getFontMetricsInt().ascent,
-                font);
+        canvas.drawText(str, x, y - font.getFontMetricsInt().ascent, font);
     }
 
     public void drawArc(int x, int y, int width, int height,

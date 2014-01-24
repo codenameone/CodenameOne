@@ -118,6 +118,7 @@ import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -502,7 +503,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         });
     }
     
+    @Override
+    public boolean alwaysRepaintAll() {
+        if(myView == null) {
+            return false;
+        }
+        return myView.alwaysRepaintAll();
+    }
     
+    @Override
+    public void repaint(Animation cmp) {
+        if(alwaysRepaintAll()) {
+            if(cmp instanceof Component) {
+                Component c = (Component)cmp;
+                if(c.getParent() != null) {
+                    cmp = c.getComponentForm();
+                }
+            }
+        }
+        super.repaint(cmp);
+    }
 
     /**
      * init view. a lot of back and forth between this thread and the UI thread.
@@ -4063,17 +4083,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
-    public void copyToClipboard(Object obj) {
-        
-        int sdk = android.os.Build.VERSION.SDK_INT;
-        if (sdk < 11) {
-            android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-            clipboard.setText(obj.toString());
-        } else {
-            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-            android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
-            clipboard.setPrimaryClip(clip);
-        }        
+    public void copyToClipboard(final Object obj) {
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                int sdk = android.os.Build.VERSION.SDK_INT;
+                if (sdk < 11) {
+                    android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                    clipboard.setText(obj.toString());
+                } else {
+                    android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                    android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
+                    clipboard.setPrimaryClip(clip);
+                }        
+            }
+        });
     }
 
     /**

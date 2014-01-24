@@ -803,13 +803,21 @@ public class ConnectionRequest implements IOProgressListener {
                     val.append("&");
                 }
             }
-            if(Util.getImplementation().shouldWriteUTFAsGetBytes()) {
+            if(shouldWriteUTFAsGetBytes()) {
                 os.write(val.toString().getBytes("UTF-8"));
             } else {
                 OutputStreamWriter w = new OutputStreamWriter(os, "UTF-8");
                 w.write(val.toString());
             }
         }
+    }
+    
+    /**
+     * Returns whether when writing a post body the platform expects something in the form of 
+     * string.getBytes("UTF-8") or new OutputStreamWriter(os, "UTF-8"). 
+     */
+    protected boolean shouldWriteUTFAsGetBytes() {
+        return Util.getImplementation().shouldWriteUTFAsGetBytes();
     }
     
     /**
