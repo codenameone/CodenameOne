@@ -39,6 +39,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.SideMenuBar;
 import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
@@ -2360,9 +2361,9 @@ public class UIBuilder { //implements Externalizable {
                     String nextForm = (String)f.getClientProperty("%next_form%");
                     
                     // we are in the sidemenu view we should really be using the parent form
-                    Form frm = (Form)currentForm.getClientProperty("cn1$sideMenuParent");
-                    if(frm != null) {
-                        currentForm = frm;
+                    SideMenuBar b = (SideMenuBar)currentForm.getClientProperty("cn1$sideMenuParent");
+                    if(b != null) {
+                        currentForm = b.getParentForm();
                     }
                     
                     // don't add back commands to transitional forms
