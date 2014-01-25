@@ -23,6 +23,7 @@
 
 package com.codename1.ui.util.xml.comps;
 
+import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -1685,5 +1686,17 @@ public class ComponentEntry {
      */
     public void setMapItems(MapItems[] mapItems) {
         this.mapItems = mapItems;
+    }
+    
+    public void findEmbeddedDependencies(List<String> result) {
+        if(type.equals("EmbeddedContainer")) {
+            result.add(embed);
+        }
+        
+        if(component != null) {
+            for(ComponentEntry c : component) {
+                c.findEmbeddedDependencies(result);
+            }
+        }
     }
 }

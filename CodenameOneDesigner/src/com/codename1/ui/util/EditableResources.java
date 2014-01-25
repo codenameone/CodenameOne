@@ -80,6 +80,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -691,22 +692,59 @@ public class EditableResources extends Resources implements TreeModel {
                         // we load the UI last since it might depend on images or other elements in the future
                         if(xmlData.getUi() != null) {
                             if(xmlData.isUseXmlUI()) {
+                                ArrayList<ComponentEntry> guiElements = new ArrayList<ComponentEntry>();
                                 for(Ui d : xmlData.getUi()) {
                                     JAXBContext componentContext = JAXBContext.newInstance(ComponentEntry.class);
                                     File uiFile = new File(resDir, normalizeFileName(d.getName()) + ".ui");
-                                    ComponentEntry uiXMLData = (ComponentEntry)componentContext.createUnmarshaller().unmarshal(uiFile);
+                                    ComponentEntry uiXMLData = (ComponentEntry)componentContext.createUnmarshaller().unmarshal(uiFile);                                    
+                                    guiElements.add(uiXMLData);
+                                }
+                                Collections.sort(guiElements, new Comparator<ComponentEntry>() {
+                                    private final ArrayList<String> entries1 = new ArrayList<String>();
+                                    private final ArrayList<String> entries2 = new ArrayList<String>();
+                                    @Override
+                                    public int compare(ComponentEntry o1, ComponentEntry o2) {
+                                        entries1.clear();
+                                        entries2.clear();
+                                        o1.findEmbeddedDependencies(entries1);
+                                        o2.findEmbeddedDependencies(entries2);
+                                        if(entries1.size() == 0) {
+                                            if(entries2.size() == 0) {
+                                                return 0;
+                                            }
+                                            return -1;
+                                        } else {
+                                            if(entries2.size() == 0) {
+                                                return 1;
+                                            }
+                                        }
+                                        for(String e : entries1) {
+                                            if(e.equals(o2.getName())) {
+                                                return 1;
+                                            }
+                                        }
+                                        for(String e : entries2) {
+                                            if(e.equals(o1.getName())) {
+                                                return -1;
+                                            }
+                                        }
+                                        return 0;
+                                    }
+                                    
+                                });
+                                for(ComponentEntry uiXMLData : guiElements) {
                                     UIBuilderOverride uib = new UIBuilderOverride();
                                     com.codename1.ui.Container cnt = uib.createInstance(uiXMLData, this);
                                     
                                     // encountered an error loading the component fallback to loading with the binary types
                                     if(cnt == null) {
                                         for(Ui ui : xmlData.getUi()) {
-                                            setResource(d.getName(), MAGIC_UI, readFile(resDir, ui.getName(), normalize));
+                                            setResource(uiXMLData.getName(), MAGIC_UI, readFile(resDir, ui.getName(), normalize));
                                         }
                                         break;
                                     } else {
                                         byte[] data = UserInterfaceEditor.persistContainer(cnt, this);
-                                        setResource(d.getName(), MAGIC_UI, data);
+                                        setResource(uiXMLData.getName(), MAGIC_UI, data);
                                     }
                                 }
                             } else {
@@ -2376,6 +2414,17 @@ public class EditableResources extends Resources implements TreeModel {
     @Override
     Image createImage() throws IOException {
         Image i = super.createImage();
+        if(i.isSVG()) {
+            SVG s = (SVG)i.getSVGDocument();
+            s.setRatioH(ratioH);
+            s.setRatioW(ratioW);
+        }
+        return i;
+    }
+
+    @Override
+    Image createImage(DataInputStream input) throws IOException {
+        Image i = super.createImage(input);
         if(i.isSVG()) {
             SVG s = (SVG)i.getSVGDocument();
             s.setRatioH(ratioH);
