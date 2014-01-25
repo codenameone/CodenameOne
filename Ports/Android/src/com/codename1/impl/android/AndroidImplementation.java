@@ -516,8 +516,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(alwaysRepaintAll()) {
             if(cmp instanceof Component) {
                 Component c = (Component)cmp;
+                c.setDirtyRegion(null);
                 if(c.getParent() != null) {
                     cmp = c.getComponentForm();
+                } else {
+                    Form f = getCurrentForm();
+                    if(f != null) {
+                        cmp = f;
+                    }
+                }
+            } else {
+                // make sure the form is repainted for standalone anims e.g. in the case
+                // of replace animation
+                Form f = getCurrentForm();
+                if(f != null) {
+                    super.repaint(f);
                 }
             }
         }
@@ -535,6 +548,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 RelativeLayout.LayoutParams.FILL_PARENT));
         relativeLayout.setFocusable(false);
 
+        activity.getWindow().setBackgroundDrawable(null);
         if(asyncView) {
             if(android.os.Build.VERSION.SDK_INT < 14){
                 myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
