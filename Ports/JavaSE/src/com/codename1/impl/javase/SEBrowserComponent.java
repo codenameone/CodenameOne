@@ -26,6 +26,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -311,8 +312,8 @@ public class SEBrowserComponent extends PeerComponent {
             final int w = getWidth();
             final int h = getHeight();
 
-            cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
-                    (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+            cnt.setBounds((int) ((x + getScreenCoordinateX() + instance.canvas.x) * instance.zoomLevel),
+                    (int) ((y + getScreenCoordinateY() + instance.canvas.y) * instance.zoomLevel),
                     (int) (w * instance.zoomLevel),
                     (int) (h * instance.zoomLevel));
             cnt.validate();
@@ -326,8 +327,8 @@ public class SEBrowserComponent extends PeerComponent {
                 final int w = getWidth();
                 final int h = getHeight();
 
-                cnt.setBounds((int) ((x + instance.getScreenCoordinates().getX() + instance.canvas.x) * instance.zoomLevel),
-                        (int) ((y + instance.getScreenCoordinates().y + instance.canvas.y) * instance.zoomLevel),
+                cnt.setBounds((int) ((x + getScreenCoordinateX() + instance.canvas.x) * instance.zoomLevel),
+                        (int) ((y + getScreenCoordinateY() + instance.canvas.y) * instance.zoomLevel),
                         (int) (w * instance.zoomLevel),
                         (int) (h * instance.zoomLevel));
                 cnt.validate();
@@ -335,6 +336,22 @@ public class SEBrowserComponent extends PeerComponent {
         });
     }
 
+    int getScreenCoordinateX() {
+        Rectangle r = instance.getScreenCoordinates();
+        if(r == null) {
+            return 0;
+        }
+        return r.x;
+    }
+    
+    int getScreenCoordinateY() {
+        Rectangle r = instance.getScreenCoordinates();
+        if(r == null) {
+            return 0;
+        }
+        return r.y;
+    }
+    
     void setProperty(String key, Object value) {
     }
 

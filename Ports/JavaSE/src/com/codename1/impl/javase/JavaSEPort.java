@@ -3301,6 +3301,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setClip(x, y, width, height);
+        if (perfMonitor != null) {
+            perfMonitor.setClip(x, y, width, height);
+        }
     }
 
     /**
@@ -3310,6 +3313,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.clipRect(x, y, width, height);
+        if (perfMonitor != null) {
+            perfMonitor.clipRect(x, y, width, height);
+        }
     }
 
     /**
@@ -3319,6 +3325,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawLine(x1, y1, x2, y2);
+        if (perfMonitor != null) {
+            perfMonitor.drawLine(x1, y1, x2, y2);
+        }
     }
 
     /**
@@ -3328,6 +3337,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRect(x, y, w, h);
+        if (perfMonitor != null) {
+            perfMonitor.fillRect(x, y, w, h);
+        }
     }
 
     /**
@@ -3345,6 +3357,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRect(x, y, width, height);
+        if (perfMonitor != null) {
+            perfMonitor.drawRect(x, y, width, height);
+        }
     }
 
     /**
@@ -3354,6 +3369,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
+        if (perfMonitor != null) {
+            perfMonitor.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
+        }
     }
 
     /**
@@ -3363,6 +3381,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
+        if (perfMonitor != null) {
+            perfMonitor.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
+        }
     }
 
     /**
@@ -3372,6 +3393,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillArc(x, y, width, height, startAngle, arcAngle);
+        if (perfMonitor != null) {
+            perfMonitor.fillArc(x, y, width, height, startAngle, arcAngle);
+        }
     }
 
     /**
@@ -3381,6 +3405,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawArc(x, y, width, height, startAngle, arcAngle);
+        if (perfMonitor != null) {
+            perfMonitor.drawArc(x, y, width, height, startAngle, arcAngle);
+        }
     }
 
     /**
@@ -3390,6 +3417,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setColor(new Color(RGB));
+        if (perfMonitor != null) {
+            perfMonitor.setColor(RGB);
+        }
     }
 
     /**
@@ -3409,6 +3439,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
         nativeGraphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
+        if (perfMonitor != null) {
+            perfMonitor.setAlpha(alpha);
+        }
     }
 
     /**
@@ -3442,6 +3475,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
         }
+        if (perfMonitor != null) {
+            perfMonitor.drawString(str, x, y);
+        }
     }
 
     @Override
@@ -3458,6 +3494,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, null);
+        if (perfMonitor != null) {
+            perfMonitor.drawImage(img, x, y);
+        }
     }
 
     /**
@@ -3467,6 +3506,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, w, h, null);
+        if (perfMonitor != null) {
+            perfMonitor.drawImage(img, x, y, w, h);
+        }
     }
 
     /**
@@ -3476,6 +3518,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillPolygon(new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
+        if (perfMonitor != null) {
+            perfMonitor.fillTriangle(x1, y1, x2, y2, x3, y3);
+        }
     }
     private BufferedImage cache;
 
@@ -3490,6 +3535,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         cache.setRGB(0, 0, w, h, rgbData, offset, w);
         nativeGraphics.drawImage(cache, x, y, null);
+        if (perfMonitor != null) {
+            perfMonitor.drawRGB(rgbData, offset, x, y, w, h, processAlpha);
+        }
     }
 
     /**
@@ -3544,6 +3592,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int stringWidth(Object nativeFont, String str) {
+        if (perfMonitor != null) {
+            perfMonitor.stringWidth(nativeFont, str);
+        }
         checkEDT();
         return (int) Math.ceil(font(nativeFont).getStringBounds(str, canvas.getFRC()).getWidth());
     }
@@ -3552,6 +3603,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int charWidth(Object nativeFont, char ch) {
+        if (perfMonitor != null) {
+            perfMonitor.charWidth(nativeFont, ch);
+        }
         checkEDT();
         return (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
     }
@@ -5345,6 +5399,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.afterComponentPaint(c);
         }
     }
+    
+    @Override
+    public void nothingWithinComponentPaint(Component c) {
+        if (perfMonitor != null) {
+            perfMonitor.nothingWithinComponentPaint(c);
+        }
+    }
+    
     private L10NManager l10n;
 
     /**

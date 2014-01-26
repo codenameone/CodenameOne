@@ -1104,7 +1104,9 @@ public class MenuBar extends Container implements ActionListener {
             int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();
             if (softkeyCount > 1 || type == Display.COMMAND_BEHAVIOR_BUTTON_BAR
                     || type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK) {
-                parent.addComponentToForm(BorderLayout.SOUTH, this);
+                if(Display.getInstance().getProperty("adPaddingBottom", null) == null) {
+                    parent.addComponentToForm(BorderLayout.SOUTH, this);
+                }
             }
         }
     }

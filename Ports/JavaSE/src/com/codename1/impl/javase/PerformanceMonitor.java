@@ -26,15 +26,44 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.font.FontRenderContext;
+import java.awt.font.LineBreakMeasurer;
+import java.awt.font.TextLayout;
 import java.awt.image.BufferedImage;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.text.AttributedCharacterIterator;
+import java.text.AttributedString;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.swing.AbstractAction;
+import javax.swing.AbstractCellEditor;
+import javax.swing.Action;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.border.LineBorder;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 
@@ -47,6 +76,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
     private int componentId = 0;
     private static String idString = "$prefid";
     private Map<Integer, Stats> componentStats = new HashMap<Integer, Stats>();
+
+    private DefaultTableModel trackedDrawing;
+    private boolean trackDrawing;
     
     private boolean paused;
     private static final String[] COLUMNS = {
@@ -61,6 +93,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
     /** Creates new form PerformanceMonitor */
     public PerformanceMonitor() {
         initComponents();
+        if(Display.getInstance().getCurrent() != null) {
+            refreshFrameActionPerformed(null);
+        }
         resultData.setModel(new Model());
         performanceLog.setLineWrap(true);
         resultData.setRowSorter(new TableRowSorter<Model>((Model)resultData.getModel()));
@@ -87,6 +122,8 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
         jScrollPane2 = new javax.swing.JScrollPane();
         jTable1 = new javax.swing.JTable();
+        jTabbedPane1 = new javax.swing.JTabbedPane();
+        jPanel1 = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
         resultData = new javax.swing.JTable();
         clearData = new javax.swing.JButton();
@@ -97,6 +134,14 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         performanceLog = new javax.swing.JTextArea();
         imageMemory = new javax.swing.JLabel();
         runGC = new javax.swing.JButton();
+        jPanel2 = new javax.swing.JPanel();
+        jSplitPane1 = new javax.swing.JSplitPane();
+        jScrollPane4 = new javax.swing.JScrollPane();
+        componentHierarchy = new javax.swing.JTree();
+        jScrollPane5 = new javax.swing.JScrollPane();
+        renderedItems = createJTable();
+        jToolBar1 = new javax.swing.JToolBar();
+        refreshFrame = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -138,20 +183,20 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         runGC.setText("GC");
         runGC.addActionListener(formListener);
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 817, Short.MAX_VALUE)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 817, Short.MAX_VALUE)
-                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(jScrollPane3, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 793, Short.MAX_VALUE)
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 793, Short.MAX_VALUE)
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addComponent(clearData)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(pauseContinue)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 122, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 89, Short.MAX_VALUE)
                         .addComponent(runGC)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(imageMemory))
@@ -160,13 +205,13 @@ public class PerformanceMonitor extends javax.swing.JFrame {
                 .addContainerGap())
         );
 
-        layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {clearData, pauseContinue, runGC});
+        jPanel1Layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {clearData, pauseContinue, runGC});
 
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(clearData)
                     .addComponent(pauseContinue)
                     .addComponent(imageMemory)
@@ -174,11 +219,76 @@ public class PerformanceMonitor extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel1)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 199, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 170, Short.MAX_VALUE)
                 .addGap(18, 18, 18)
                 .addComponent(jLabel2)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 166, Short.MAX_VALUE)
+                .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 137, Short.MAX_VALUE)
+                .addContainerGap())
+        );
+
+        jTabbedPane1.addTab("Generic Statistics", jPanel1);
+
+        componentHierarchy.addTreeSelectionListener(formListener);
+        jScrollPane4.setViewportView(componentHierarchy);
+
+        jSplitPane1.setLeftComponent(jScrollPane4);
+
+        renderedItems.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+                {null, null, null, null},
+                {null, null, null, null},
+                {null, null, null, null},
+                {null, null, null, null}
+            },
+            new String [] {
+                "Title 1", "Title 2", "Title 3", "Title 4"
+            }
+        ));
+        jScrollPane5.setViewportView(renderedItems);
+
+        jSplitPane1.setRightComponent(jScrollPane5);
+
+        jToolBar1.setRollover(true);
+
+        refreshFrame.setText("Refresh");
+        refreshFrame.setFocusable(false);
+        refreshFrame.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        refreshFrame.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        refreshFrame.addActionListener(formListener);
+        jToolBar1.add(refreshFrame);
+
+        javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
+        jPanel2.setLayout(jPanel2Layout);
+        jPanel2Layout.setHorizontalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jSplitPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 805, Short.MAX_VALUE)
+            .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        );
+        jPanel2Layout.setVerticalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
+                .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jSplitPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 385, Short.MAX_VALUE))
+        );
+
+        jTabbedPane1.addTab("Rendering Details", jPanel2);
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+        getContentPane().setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jTabbedPane1)
+                .addContainerGap())
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jTabbedPane1)
                 .addContainerGap())
         );
 
@@ -187,7 +297,7 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     // Code for dispatching events from components to event handlers.
 
-    private class FormListener implements java.awt.event.ActionListener, java.awt.event.WindowListener {
+    private class FormListener implements java.awt.event.ActionListener, java.awt.event.WindowListener, javax.swing.event.TreeSelectionListener {
         FormListener() {}
         public void actionPerformed(java.awt.event.ActionEvent evt) {
             if (evt.getSource() == clearData) {
@@ -198,6 +308,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
             }
             else if (evt.getSource() == runGC) {
                 PerformanceMonitor.this.runGCActionPerformed(evt);
+            }
+            else if (evt.getSource() == refreshFrame) {
+                PerformanceMonitor.this.refreshFrameActionPerformed(evt);
             }
         }
 
@@ -224,6 +337,12 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
         public void windowOpened(java.awt.event.WindowEvent evt) {
         }
+
+        public void valueChanged(javax.swing.event.TreeSelectionEvent evt) {
+            if (evt.getSource() == componentHierarchy) {
+                PerformanceMonitor.this.componentHierarchyValueChanged(evt);
+            }
+        }
     }// </editor-fold>//GEN-END:initComponents
 
     public void printToLog(String t) {
@@ -248,13 +367,83 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         System.gc(); System.gc();
     }//GEN-LAST:event_runGCActionPerformed
 
+    private void refreshFrameActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshFrameActionPerformed
+        componentHierarchy.setModel(new ComponentTreeModel(Display.getInstance().getCurrent()));
+        
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                trackDrawing = true;
+                Display.getInstance().getCurrent().repaint();
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        // data collected
+                        trackDrawing = false;
+                        renderedItems.setModel(createTableModel());
+                    }
+                });
+            }
+        });
+    }//GEN-LAST:event_refreshFrameActionPerformed
+    
+    private void refreshComponentStatsTable(Component c) {
+        TableModel tm = (TableModel)c.getClientProperty("track");
+        if(tm != null) {
+            renderedItems.setModel(tm);
+        } else {
+            renderedItems.setModel(createTableModel());
+        }
+    }
+    
+    private void componentHierarchyValueChanged(javax.swing.event.TreeSelectionEvent evt) {//GEN-FIRST:event_componentHierarchyValueChanged
+        if(evt.getPath() != null) {
+            Component c = (Component)evt.getPath().getLastPathComponent();
+            refreshComponentStatsTable(c);
+        }
+    }//GEN-LAST:event_componentHierarchyValueChanged
+
+    public void nothingWithinComponentPaint(Component c) {
+        if(trackDrawing) {
+            if(c.getParent() != null) {
+                trackedDrawing = (DefaultTableModel)c.getParent().getClientProperty("track");
+            }
+        }
+    }
+    
+    private static DefaultTableModel createTableModel() {
+        return new DefaultTableModel(new String[]{"Call", "Details", "Comments", "Stack", "Image"}, 0) {
+
+                @Override
+                public Class<?> getColumnClass(int columnIndex) {
+                    if(columnIndex == 3) {
+                        return Action.class;
+                    }
+                    if(columnIndex == 4) {
+                        return Icon.class;
+                    }
+                    return String.class;
+                }
+                
+            };
+    }
+    
     public void beforeComponentPaint(Component c) {
+        if(trackDrawing) {
+            trackedDrawing = createTableModel();
+            c.putClientProperty("track", trackedDrawing);
+            return;
+        }
         if(!paused) {
             c.putClientProperty("$t", new Long(System.nanoTime()));
         }
     }
 
     public void afterComponentPaint(Component c) {
+        if(trackDrawing) {
+            if(c.getParent() != null) {
+                trackedDrawing = (DefaultTableModel)c.getParent().getClientProperty("track");
+            }
+            return;
+        }
         if(paused) {
             return;
         }
@@ -278,6 +467,231 @@ public class PerformanceMonitor extends javax.swing.JFrame {
                 }
             }
             st.updateInvocation(t);
+        }
+    }
+    
+    public static String getStackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        t.printStackTrace(new PrintWriter(sw));
+        String s = sw.toString();
+        int pos = s.indexOf("at");
+        pos = s.indexOf("at", pos + 2);
+        return s.substring(pos + 2);
+    }
+    
+    public void setClip(int x, int y, int width, int height) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "setClip(" + x + ", " + y + ", " + width + ", " + height + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void clipRect(int x, int y, int width, int height) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "clipRect(" + x + ", " + y + ", " + width + ", " + height + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+
+    public void drawLine(int x1, int y1, int x2, int y2) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawLine(" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+
+    public void fillRect(int x, int y, int w, int h) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "fillRect(" + x + ", " + y + ", " + w + ", " + h + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void drawRect(int x, int y, int width, int height) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawRect(" + x + ", " + y + ", " + width + ", " + height + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }    
+    
+    public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawRoundRect(" + x + ", " + y + ", " + width + ", " + height + ", " + arcWidth + ", " + arcHeight + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+
+    public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "fillRoundRect(" + x + ", " + y + ", " + width + ", " + height + ", " + arcWidth + ", " + arcHeight + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+
+    public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "fillArc(" + x + ", " + y + ", " + width + ", " + height + ", " + startAngle + ", " + arcAngle + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawArc(" + x + ", " + y + ", " + width + ", " + height + ", " + startAngle + ", " + arcAngle + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void setColor(int RGB) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "setColor(0x" + Integer.toHexString(RGB) + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void setAlpha(int alpha) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "setAlpha(0x" + Integer.toHexString(alpha) + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void drawString(String str, int x, int y) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawString(" + str + ", " + x + ", " + y + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void drawImage(Object img, int x, int y) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawImage(" + x + ", " + y + ")",
+                "Image size: " + ((BufferedImage) img).getWidth() + "x" + ((BufferedImage) img).getHeight(),
+                "",
+                getStackTrace(new Throwable()),
+                new ImageIcon((BufferedImage)img)
+            });
+        }
+    }
+
+    public void drawImage(Object img, int x, int y, int w, int h) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawImage(" + x + ", " + y + ", " + w + ", " + h + ")",
+                "Image size: " + ((BufferedImage) img).getWidth() + "x" + ((BufferedImage) img).getHeight(),
+                "This version of the method is slow on feature phones",
+                getStackTrace(new Throwable()),
+                new ImageIcon((BufferedImage)img)
+            });
+        }
+    }
+    
+    public void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "fillTriangle(" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + ", " + x3 + ", " + y3 + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    public void drawRGB(int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "drawRGB(" + x + ", " + y + ", " + w + ", " + h + ")",
+                "Rgb data length " + rgbData.length,
+                "This method is problematic on some devices!",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }    
+    
+    public void stringWidth(Object nativeFont, String str) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "stringWidth(" + str + ")",
+                "",
+                "Slow method, don't overuse",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }    
+    
+    public void charWidth(Object nativeFont, char ch) {        
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "charWidth(" + ch + ")",
+                "",
+                "Slow method, don't overuse",
+                getStackTrace(new Throwable()),
+                null
+            });
         }
     }
     
@@ -487,17 +901,335 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         }
     }
     
+    private static JTable createJTable() {
+        final JTable t = new JTable(createTableModel()) {    
+            MultilineTableCell wordWrapRenderer = new MultilineTableCell();
+            public TableCellRenderer getCellRenderer(int row, int column) {
+                if (column < 3 ) {
+                    return wordWrapRenderer;
+                }
+                else {
+                    return super.getCellRenderer(row, column);
+                }
+            }
+        };       
+        Action view = new AbstractAction()
+        {
+            public void actionPerformed(ActionEvent e)
+            {
+                JTable table = (JTable)e.getSource();
+                int modelRow = Integer.valueOf( e.getActionCommand() );
+                String s = (String)((DefaultTableModel)table.getModel()).getValueAt(modelRow, 3);
+                JOptionPane.showMessageDialog(t, s, "Stack", JOptionPane.INFORMATION_MESSAGE);
+            }
+        };
+
+        ButtonColumn buttonColumn = new ButtonColumn(t, view, 3);
+        buttonColumn.setMnemonic(KeyEvent.VK_D);
+        
+        return t;
+    }
+    public static class ButtonColumn extends AbstractCellEditor
+            implements TableCellRenderer, TableCellEditor, ActionListener, MouseListener
+    {
+            private JTable table;
+            private Action action;
+            private int mnemonic;
+            private Border originalBorder;
+            private Border focusBorder;
+
+            private JButton renderButton;
+            private JButton editButton;
+            private Object editorValue;
+            private boolean isButtonColumnEditor;
+
+            /**
+             *  Create the ButtonColumn to be used as a renderer and editor. The
+             *  renderer and editor will automatically be installed on the TableColumn
+             *  of the specified column.
+             *
+             *  @param table the table containing the button renderer/editor
+             *  @param action the Action to be invoked when the button is invoked
+             *  @param column the column to which the button renderer/editor is added
+             */
+            public ButtonColumn(JTable table, Action action, int column)
+            {
+                    this.table = table;
+                    this.action = action;
+
+                    renderButton = new JButton();
+                    editButton = new JButton();
+                    editButton.setFocusPainted( false );
+                    editButton.addActionListener( this );
+                    originalBorder = editButton.getBorder();
+                    setFocusBorder( new LineBorder(Color.BLUE) );
+
+                    TableColumnModel columnModel = table.getColumnModel();
+                    columnModel.getColumn(column).setCellRenderer( this );
+                    columnModel.getColumn(column).setCellEditor( this );
+                    table.addMouseListener( this );
+                    table.setDefaultEditor(Action.class, this);
+                    table.setDefaultRenderer(Action.class, this);
+            }
+
+
+            /**
+             *  Get foreground color of the button when the cell has focus
+             *
+             *  @return the foreground color
+             */
+            public Border getFocusBorder()
+            {
+                    return focusBorder;
+            }
+
+            /**
+             *  The foreground color of the button when the cell has focus
+             *
+             *  @param focusBorder the foreground color
+             */
+            public void setFocusBorder(Border focusBorder)
+            {
+                    this.focusBorder = focusBorder;
+                    editButton.setBorder( focusBorder );
+            }
+
+            public int getMnemonic()
+            {
+                    return mnemonic;
+            }
+
+            /**
+             *  The mnemonic to activate the button when the cell has focus
+             *
+             *  @param mnemonic the mnemonic
+             */
+            public void setMnemonic(int mnemonic)
+            {
+                    this.mnemonic = mnemonic;
+                    renderButton.setMnemonic(mnemonic);
+                    editButton.setMnemonic(mnemonic);
+            }
+
+            @Override
+            public java.awt.Component getTableCellEditorComponent(
+                    JTable table, Object value, boolean isSelected, int row, int column)
+            {
+                    if (value == null)
+                    {
+                            editButton.setText( "" );
+                            editButton.setIcon( null );
+                    }
+                    else if (value instanceof Icon)
+                    {
+                            editButton.setText( "" );
+                            editButton.setIcon( (Icon)value );
+                    }
+                    else
+                    {
+                            editButton.setText( value.toString() );
+                            editButton.setIcon( null );
+                    }
+
+                    this.editorValue = value;
+                    return editButton;
+            }
+
+            @Override
+            public Object getCellEditorValue()
+            {
+                    return editorValue;
+            }
+
+    //
+    //  Implement TableCellRenderer interface
+    //
+            public java.awt.Component getTableCellRendererComponent(
+                    JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
+            {
+                    if (isSelected)
+                    {
+                            renderButton.setForeground(table.getSelectionForeground());
+                            renderButton.setBackground(table.getSelectionBackground());
+                    }
+                    else
+                    {
+                            renderButton.setForeground(table.getForeground());
+                            renderButton.setBackground(UIManager.getColor("Button.background"));
+                    }
+
+                    if (hasFocus)
+                    {
+                            renderButton.setBorder( focusBorder );
+                    }
+                    else
+                    {
+                            renderButton.setBorder( originalBorder );
+                    }
+
+    //		renderButton.setText( (value == null) ? "" : value.toString() );
+                    if (value == null)
+                    {
+                            renderButton.setText( "" );
+                            renderButton.setIcon( null );
+                    }
+                    else if (value instanceof Icon)
+                    {
+                            renderButton.setText( "" );
+                            renderButton.setIcon( (Icon)value );
+                    }
+                    else
+                    {
+                            renderButton.setText( value.toString() );
+                            renderButton.setIcon( null );
+                    }
+
+                    return renderButton;
+            }
+
+    //
+    //  Implement ActionListener interface
+    //
+            /*
+             *	The button has been pressed. Stop editing and invoke the custom Action
+             */
+            public void actionPerformed(ActionEvent e)
+            {
+                    int row = table.convertRowIndexToModel( table.getEditingRow() );
+                    fireEditingStopped();
+
+                    //  Invoke the Action
+
+                    ActionEvent event = new ActionEvent(
+                            table,
+                            ActionEvent.ACTION_PERFORMED,
+                            "" + row);
+                    action.actionPerformed(event);
+            }
+
+    //
+    //  Implement MouseListener interface
+    //
+            /*
+             *  When the mouse is pressed the editor is invoked. If you then then drag
+             *  the mouse to another cell before releasing it, the editor is still
+             *  active. Make sure editing is stopped when the mouse is released.
+             */
+        public void mousePressed(MouseEvent e)
+        {
+            if (table.isEditing()
+                    &&  table.getCellEditor() == this)
+                            isButtonColumnEditor = true;
+        }
+
+        public void mouseReleased(MouseEvent e)
+        {
+            if (isButtonColumnEditor
+            &&  table.isEditing())
+                    table.getCellEditor().stopCellEditing();
+
+                    isButtonColumnEditor = false;
+        }
+
+        public void mouseClicked(MouseEvent e) {}
+            public void mouseEntered(MouseEvent e) {}
+        public void mouseExited(MouseEvent e) {}
+    }
+    
+    static class MultilineTableCell implements TableCellRenderer {
+        class CellArea extends DefaultTableCellRenderer {
+            /**
+             * 
+             */
+            private static final long serialVersionUID = 1L;
+            private String text;
+            protected int rowIndex;
+            protected int columnIndex;
+            protected JTable table;
+            protected java.awt.Font font;
+            private int paragraphStart,paragraphEnd;
+            private LineBreakMeasurer lineMeasurer;
+
+            public CellArea(String s, JTable tab, int row, int column,boolean isSelected) {
+                text = s;
+                rowIndex = row;
+                columnIndex = column;
+                table = tab;
+                font = table.getFont();
+                if (isSelected) {
+                    setForeground(table.getSelectionForeground());
+                    setBackground(table.getSelectionBackground());
+                }
+            }
+            public void paintComponent(java.awt.Graphics gr) {
+                super.paintComponent(gr);
+                if ( text != null && !text.isEmpty() ) {
+                    Graphics2D g = (Graphics2D) gr;
+                    if (lineMeasurer == null) {
+                        AttributedCharacterIterator paragraph = new AttributedString(text).getIterator();
+                        paragraphStart = paragraph.getBeginIndex();
+                        paragraphEnd = paragraph.getEndIndex();
+                        FontRenderContext frc = g.getFontRenderContext();
+                        lineMeasurer = new LineBreakMeasurer(paragraph,BreakIterator.getWordInstance(), frc);
+                    }
+                    float breakWidth = (float)table.getColumnModel().getColumn(columnIndex).getWidth();
+                    float drawPosY = 0;
+                    // Set position to the index of the first character in the paragraph.
+                    lineMeasurer.setPosition(paragraphStart);
+                    // Get lines until the entire paragraph has been displayed.
+                    while (lineMeasurer.getPosition() < paragraphEnd) {
+                        // Retrieve next layout. A cleverer program would also cache
+                        // these layouts until the component is re-sized.
+                        TextLayout layout = lineMeasurer.nextLayout(breakWidth);
+                        // Compute pen x position. If the paragraph is right-to-left we
+                        // will align the TextLayouts to the right edge of the panel.
+                        // Note: this won't occur for the English text in this sample.
+                        // Note: drawPosX is always where the LEFT of the text is placed.
+                        float drawPosX = layout.isLeftToRight()
+                            ? 0 : breakWidth - layout.getAdvance();
+                        // Move y-coordinate by the ascent of the layout.
+                        drawPosY += layout.getAscent();
+                        // Draw the TextLayout at (drawPosX, drawPosY).
+                        layout.draw(g, drawPosX, drawPosY);
+                        // Move y-coordinate in preparation for next layout.
+                        drawPosY += layout.getDescent() + layout.getLeading();
+                    }
+                    table.setRowHeight(rowIndex,(int) drawPosY);
+                }
+            }
+        }
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,boolean isSelected, boolean hasFocus, int row,int column
+            )
+        {
+            if(value == null) {
+                value = "";
+            }
+            CellArea area = new CellArea(value.toString(),table,row,column,isSelected);
+            return area;
+        }   
+    }
+    
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton clearData;
+    private javax.swing.JTree componentHierarchy;
     private javax.swing.JLabel imageMemory;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
+    private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel2;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
+    private javax.swing.JScrollPane jScrollPane4;
+    private javax.swing.JScrollPane jScrollPane5;
+    private javax.swing.JSplitPane jSplitPane1;
+    private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTable jTable1;
+    private javax.swing.JToolBar jToolBar1;
     private javax.swing.JButton pauseContinue;
     private javax.swing.JTextArea performanceLog;
+    private javax.swing.JButton refreshFrame;
+    private javax.swing.JTable renderedItems;
     private javax.swing.JTable resultData;
     private javax.swing.JButton runGC;
     // End of variables declaration//GEN-END:variables

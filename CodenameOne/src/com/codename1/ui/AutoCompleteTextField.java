@@ -302,4 +302,20 @@ public class AutoCompleteTextField extends TextField {
         }
         return super.setPropertyValue(name, value);
     }
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     * @return the startsWithMode
+     */
+    public boolean isStartsWithMode() {
+        return filter.isStartsWithMode();
+    }
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     * @param startsWithMode the startsWithMode to set
+     */
+    public void setStartsWithMode(boolean startsWithMode) {
+        filter.setStartsWithMode(startsWithMode);
+    }
 }

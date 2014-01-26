@@ -1015,7 +1015,7 @@ public class Component implements Animation, StyleListener {
         }
     }
 
-    private void internalPaintImpl(Graphics g, boolean paintIntersects) {
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
         paintBackground(g);
 

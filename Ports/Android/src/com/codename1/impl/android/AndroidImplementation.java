@@ -503,40 +503,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         });
     }
     
-    @Override
-    public boolean alwaysRepaintAll() {
-        if(myView == null) {
-            return false;
-        }
-        return myView.alwaysRepaintAll();
-    }
-    
-    @Override
-    public void repaint(Animation cmp) {
-        if(alwaysRepaintAll()) {
-            if(cmp instanceof Component) {
-                Component c = (Component)cmp;
-                c.setDirtyRegion(null);
-                if(c.getParent() != null) {
-                    cmp = c.getComponentForm();
-                } else {
-                    Form f = getCurrentForm();
-                    if(f != null) {
-                        cmp = f;
-                    }
-                }
-            } else {
-                // make sure the form is repainted for standalone anims e.g. in the case
-                // of replace animation
-                Form f = getCurrentForm();
-                if(f != null) {
-                    super.repaint(f);
-                }
-            }
-        }
-        super.repaint(cmp);
-    }
-
     /**
      * init view. a lot of back and forth between this thread and the UI thread.
      */

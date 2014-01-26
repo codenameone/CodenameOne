@@ -54,6 +54,7 @@ public class OnOffSwitch extends Container {
     private String on = "ON";
     private String off = "OFF";
     private boolean iosMode;
+    private boolean noTextMode;
     private boolean value;
     private CheckBox button;
     private boolean dragged;
@@ -92,6 +93,7 @@ public class OnOffSwitch extends Container {
             switchMaskImage = UIManager.getInstance().getThemeImageConstant("switchMaskImage");
             switchOnImage = UIManager.getInstance().getThemeImageConstant("switchOnImage");
             switchOffImage = UIManager.getInstance().getThemeImageConstant("switchOffImage");
+            noTextMode = UIManager.getInstance().isThemeConstant("noTextModeBool", false);
         } else {
             setLayout(new BoxLayout(BoxLayout.Y_AXIS));
             button = new CheckBox(on);
@@ -239,7 +241,9 @@ public class OnOffSwitch extends Container {
                 int sX = x + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;
                 int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;
                 g.setFont(s.getFont());
-                g.drawString(str, sX, sY);
+                if(!noTextMode) {
+                    g.drawString(str, sX, sY);
+                }
             }
             
             g.drawImage(switchMaskImage, x, y);
@@ -534,5 +538,21 @@ public class OnOffSwitch extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * iOS 7 changed the switch to not include any text
+     * @return the noTextMode
+     */
+    public boolean isNoTextMode() {
+        return noTextMode;
+    }
+
+    /**
+     * iOS 7 changed the switch to not include any text
+     * @param noTextMode the noTextMode to set
+     */
+    public void setNoTextMode(boolean noTextMode) {
+        this.noTextMode = noTextMode;
     }
 }

@@ -179,6 +179,9 @@ public class Form extends Container {
             Container pad = new Container();
             int dim = Integer.parseInt(adPaddingBottom);
             dim = d.convertToPixels(dim, true);
+            if(Display.getInstance().isTablet()) {
+                dim *= 2;
+            }
             pad.setPreferredSize(new Dimension(dim, dim));
             addComponentToForm(BorderLayout.SOUTH, pad);
         }
@@ -901,7 +904,7 @@ public class Form extends Container {
         contentPane.removeComponent(cmp);
     }
 
-    void addComponentToForm(Object constraints, Component cmp) {
+    final void addComponentToForm(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
 
@@ -2711,18 +2714,29 @@ public class Form extends Container {
         contentPane.setRTL(r);
     }
 
+    private boolean inInternalPaint;
+    
     /**
      * @inheritDoc
      */
     public void paint(Graphics g) {
-        paintBackground(g);
+        if(!inInternalPaint) {
+            paintBackground(g);
+        }
         super.paint(g);
         if (tint) {
             g.setColor(tintColor);
             g.fillRect(0, 0, getWidth(), getHeight(), (byte) ((tintColor >> 24) & 0xff));
         }
     }
-
+    
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        // workaround for form drawing its background twice on standard paint
+        inInternalPaint = true;
+        super.internalPaintImpl(g, paintIntersects);
+        inInternalPaint = false;
+    }
+    
     /**
      * @inheritDoc
      */

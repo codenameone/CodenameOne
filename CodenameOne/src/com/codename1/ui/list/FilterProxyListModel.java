@@ -38,6 +38,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     private ListModel<T> underlying;
     private ArrayList<Integer> filter;
     private ArrayList<DataChangedListener> listeners = new ArrayList<DataChangedListener>();
+    private boolean startsWithMode;
     
     /**
      * The proxy is applied to the actual model and effectively hides it
@@ -184,22 +185,45 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
         for(int iter = 0 ; iter < underlying.getSize() ; iter++) {
             Object o = underlying.getItemAt(iter);
             if(o != null) {
-                if(o instanceof Map) {
-                    Map h = (Map)o;
-                    if(comp(h.get("name"), str)) {
-                        filter.add(new Integer(iter));
-                    }
-                } else {
-                    String element = o.toString();
-                    if(element.toUpperCase().indexOf(str) > -1) {
-                        filter.add(new Integer(iter));
-                    }
+                if(check(o, str)) {
+                    filter.add(new Integer(iter));                    
                 }
             }
         }
     }
 
+    /**
+     * Checks whether the filter condition is matched, receives an uppercase version of the 
+     * filter string to match against
+     * @param o the object being compared
+     * @param str the string
+     * @return true if match is checked
+     */
+    protected boolean check(Object o, String str) {
+        if(o instanceof Map) {
+            Map h = (Map)o;
+            if(comp(h.get("name"), str)) {
+                return true;
+            }
+        } else {
+            String element = o.toString();
+            if(startsWithMode) {
+                if(element.toUpperCase().startsWith(str)) {
+                    return true;
+                }
+            } else {
+                if(element.toUpperCase().indexOf(str) > -1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    } 
+
     private boolean comp(Object val, String str) {
+        if(startsWithMode) {
+            return val != null && ((String)val).toUpperCase().startsWith(str);
+        }
         return val != null && ((String)val).toUpperCase().indexOf(str) > -1;
     }
 
@@ -349,5 +373,21 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
                 }
             }
         });
+    }
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     * @return the startsWithMode
+     */
+    public boolean isStartsWithMode() {
+        return startsWithMode;
+    }
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     * @param startsWithMode the startsWithMode to set
+     */
+    public void setStartsWithMode(boolean startsWithMode) {
+        this.startsWithMode = startsWithMode;
     }
 }
