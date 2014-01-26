@@ -1129,7 +1129,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-
+    
+    @Override
+    public void repaint(Animation cmp) {
+        if(myView.alwaysRepaintAll()) {
+            if(cmp instanceof Component) {
+                Component c = (Component)cmp;
+                c.setDirtyRegion(null);
+                if(c.getParent() != null) {
+                    cmp = c.getComponentForm();
+                } else {
+                    Form f = getCurrentForm();
+                    if(f != null) {
+                        cmp = f;
+                    }
+                }
+            } else {
+                // make sure the form is repainted for standalone anims e.g. in the case
+                // of replace animation
+                Form f = getCurrentForm();
+                if(f != null) {
+                    super.repaint(f);
+                }
+            }
+        }
+        super.repaint(cmp);
+    }
+    
     @Override
     public Object createImage(InputStream i) throws IOException {
         BitmapFactory.Options opts = new BitmapFactory.Options();
