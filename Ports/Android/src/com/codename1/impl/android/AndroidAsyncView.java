@@ -99,6 +99,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
         //c.restore();
         renderingOperations.clear();
+        
+        // paint child views
+        dispatchDraw(c);
         //c.drawBitmap(cn1View.bitmap, c.getClipBounds(), c.getClipBounds(), null);
     }
     

@@ -112,6 +112,7 @@ public class InPlaceEditView extends FrameLayout {
         setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
         setFocusableInTouchMode(true);
         initInputTypeMap();
+        setBackgroundDrawable(null);
     }
 
     /**
@@ -234,6 +235,7 @@ public class InPlaceEditView extends FrameLayout {
         }
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
         mEditText = new EditView(activity, textArea, this, id);
+        mEditText.setBackgroundDrawable(null);
         
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);

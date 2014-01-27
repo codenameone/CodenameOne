@@ -540,7 +540,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
             lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
             
-            final int dps = aboveSpacing;
+            int factor = 1;
+            if(isTablet()) {
+                factor = 2;
+            }
+            final int dps = aboveSpacing * factor;
             final float scale = getContext().getResources().getDisplayMetrics().density;
             final int pixels = (int) (dps * scale + 0.5f);
             
@@ -555,7 +559,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
             
-            final int dps = belowSpacing;
+            int factor = 1;
+            if(isTablet()) {
+                factor = 2;
+            }
+            final int dps = belowSpacing * factor;
             final float scale = getContext().getResources().getDisplayMetrics().density;
             final int pixels = (int) (dps * scale + 0.5f);
             
@@ -1128,6 +1136,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
+    }
+    
+    @Override
+    public boolean areMutableImagesFast() {
+        return !myView.alwaysRepaintAll();
     }
     
     @Override
@@ -2175,16 +2188,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         private View v;
         private AndroidImplementation.AndroidRelativeLayout layoutWrapper = null;
-        private Bitmap nativeBuffer;
-        private Image image;
-        private Rect bounds;
-        private Canvas canvas;
         private Paint clear = new Paint();
 
-        public void clear() {
-            //clear the canvas
-            canvas.drawRect(bounds, clear);
-        }
 
         public AndroidPeer(View vv) {
             super(vv);
@@ -2247,7 +2252,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    while (!removed[0]);
+                    while (!removed[0]) {
+                        try {
+                            Thread.sleep(5);
+                        } catch(InterruptedException er) {}
+                    }
                 }
             });
         }
@@ -2270,6 +2279,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                          * around on the surface view as we like.
                          */
                         layoutWrapper = new AndroidImplementation.AndroidRelativeLayout(activity, AndroidImplementation.AndroidPeer.this, v);
+                        layoutWrapper.setBackgroundDrawable(null);
+                        v.setVisibility(View.INVISIBLE);
                         v.setFocusable(AndroidImplementation.AndroidPeer.this.isFocusable());
                         v.setFocusableInTouchMode(true);
                         ArrayList<View> viewList = new ArrayList<View>();
@@ -2327,7 +2338,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                        while (!added[0]);
+                    while (!added[0]) {
+                        try {
+                            Thread.sleep(5);
+                        } catch(InterruptedException err) {}
+                    }
                 }
             });
         }
@@ -2428,31 +2443,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 });
             }
-        }
-
-        @Override
-        public void paint(Graphics g) {
-            super.paint(g);
-
-            if (canvas != null) {
-                //copy the native drawing to a different image
-                synchronized (canvas) {
-                    g.drawImage(image, getX(), getY());
-                }
-            }
-        }
-
-        public Canvas getBuffer() {
-
-            if (nativeBuffer == null || getWidth() != nativeBuffer.getWidth()
-                    || getHeight() != nativeBuffer.getHeight()) {
-                this.nativeBuffer = Bitmap.createBitmap(
-                        getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-                image = new AndroidImplementation.NativeImage(nativeBuffer);
-                bounds = new Rect(0, 0, getWidth(), getHeight());
-                canvas = new Canvas(nativeBuffer);
-            }
-            return canvas;
         }
 
         public void release() {
@@ -3108,6 +3098,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         
+        @Override
         protected Image generatePeerImage() {
             Bitmap nativeBuffer = Bitmap.createBitmap(
                     getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
