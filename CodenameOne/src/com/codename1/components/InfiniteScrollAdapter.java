@@ -28,6 +28,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.FlowLayout;
 
 /**
  * Allows adapting a scroll container to scroll indefinitely (or at least until
@@ -39,19 +40,24 @@ import com.codename1.ui.geom.Dimension;
 public class InfiniteScrollAdapter {    
     private Container infiniteContainer;
     private Runnable fetchMore;
-    private InfiniteProgress ip = new InfiniteProgress();
+    private Component ip;
     private Component endMarker = new Component() {
         public Dimension calcPreferredSize() {
             return new Dimension(1,1);
         }
         public void paint(Graphics g) {
-            if(isInClippingRegion(g)) {
+            if(getParent() != null && isInClippingRegion(g)) {
                 reachedEnd();
             }
         }
     };
     
-    private InfiniteScrollAdapter() {}
+    private InfiniteScrollAdapter() {
+        InfiniteProgress progress = new InfiniteProgress();
+        Container p = new Container(new FlowLayout(Component.CENTER));
+        p.addComponent(progress);
+        ip = p;
+    }
     
     void reachedEnd() {
         infiniteContainer.removeComponent(endMarker);
@@ -71,12 +77,31 @@ public class InfiniteScrollAdapter {
      * @param fetchMore a callback that will be invoked on the EDT to fetch more data (do not block this method)
      */
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore) {
+        return createInfiniteScroll(cont, fetchMore, true);
+    }
+    
+    /**
+     * Creates an instance of the InfiniteScrollAdapter that will invoke the fetch more
+     * callback to fetch additional components, once that method completes its task it 
+     * should add the components via the addMoreComponents() invocation.
+     * Notice that the container MUST be empty when invoking this method, fetchMore 
+     * will be invoked immediately and you can add your data when ready.
+     * 
+     * @param cont the container to bind, it MUST be empty and must be scrollable on the Y axis
+     * @param fetchMore a callback that will be invoked on the EDT to fetch more data (do not block this method)
+     * @param fetchOnCreate if true the fetchMore callback is called upon calling this method
+     */
+    public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore, boolean fetchOnCreate) {
         InfiniteScrollAdapter a = new InfiniteScrollAdapter();
         cont.putClientProperty("cn1$infinite", a);
         a.infiniteContainer = cont;
         a.fetchMore = fetchMore;
-        cont.addComponent(a.ip);
-        Display.getInstance().callSerially(fetchMore);
+        if(fetchOnCreate){
+            cont.addComponent(a.ip);
+            Display.getInstance().callSerially(fetchMore);
+        }else{
+            a.infiniteContainer.addComponent(a.endMarker);
+        }
         return a;
     }
     
@@ -106,7 +131,7 @@ public class InfiniteScrollAdapter {
             c.setY(infiniteContainer.getHeight());
             infiniteContainer.addComponent(c);
         }
-        infiniteContainer.animateLayoutAndWait(300);
+        infiniteContainer.revalidate();
         if(areThereMore) {
             // if this is animated we get redundant calls to reached end
             infiniteContainer.addComponent(endMarker);
