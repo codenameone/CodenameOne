@@ -6021,7 +6021,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             name = fd.getFile().toLowerCase();
             for(String t : types) {
                 if(name.endsWith(t)) {
-                    return new File(fd.getDirectory(), fd.getFile());
+                    File f = new File(fd.getDirectory(), fd.getFile());
+                    if(!f.exists()){
+                        return new File(fd.getDirectory());
+                    }else{
+                        return f;
+                    }
                 }
             }
         }
