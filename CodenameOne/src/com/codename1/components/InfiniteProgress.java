@@ -122,7 +122,7 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             return;
         }
-        int v = angle+=20 % 360;
+        int v = angle+=8 % 360;
         Style s = getStyle();
         /*if(g.isAffineSupported()) {
             g.rotate(((float)v) / 57.2957795f, getAbsoluteX() + s.getPadding(LEFT) + getWidth() / 2, getAbsoluteY() + s.getPadding(TOP) + getHeight() / 2);
