@@ -1823,6 +1823,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
+                url = fixAttachmentPath(url);
                 intent = new Intent();
                 intent.setAction(Intent.ACTION_VIEW);
                 if (url.startsWith("/")) {
