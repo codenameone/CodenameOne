@@ -453,7 +453,7 @@ public class CodenameOneActivity extends Activity {
             if (icon != null) {
                 Bitmap b = (Bitmap) icon.getImage();
                 // Using BitmapDrawable with resources, to use device density (from 1.6 and above).
-                BitmapDrawable d = new BitmapDrawable(b);
+                BitmapDrawable d = new BitmapDrawable(getResources(), b);
                 item.setIcon(d);
             }
             if(!command.isEnabled()) {

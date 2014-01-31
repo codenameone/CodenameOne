@@ -4746,7 +4746,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Image icon = f.getTitleComponent().getIcon();
                 try {
                     if(icon != null){
-                        ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable((Bitmap)icon.getImage()));
+                        ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable(activity.getResources(), (Bitmap)icon.getImage()));
                     }else{
                         if(activity.getApplicationInfo().icon != 0){
                             ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
