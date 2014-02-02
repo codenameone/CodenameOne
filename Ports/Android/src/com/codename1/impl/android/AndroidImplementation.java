@@ -93,6 +93,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -1725,6 +1726,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return defaultValue;
         }
 
+        android.content.Intent intent = activity.getIntent();
+        if(intent != null){
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                String value = extras.getString(key);
+                if(value != null) {
+                    return value;
+                }
+            }
+        }
+        
         //these keys/values are from the Application Resources (strings values)
         try {
             int id = activity.getResources().getIdentifier(key, "string", activity.getApplicationInfo().packageName);
