@@ -241,7 +241,11 @@ public class Picker extends Button {
         return (String) value;
     }
     
-    void updateValue() {
+    /**
+     * Updates the display value of the picker, subclasses can override this to invoke 
+     * set text with the right value
+     */
+    protected void updateValue() {
         if(value == null) {
             setText("...");
             return;
