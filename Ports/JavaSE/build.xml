@@ -83,6 +83,9 @@
         <copy file="../../Themes/android_holo_light.res" todir="../../Skins/xoom" />
         <copy file="../../Themes/winTheme.res" todir="../../Skins/lumia" />
         <copy file="../../Themes/iOS7Theme.res" todir="../../Skins/iphone5_os7" />
+        <copy file="../../Themes/iOS7Theme.res" todir="../../Skins/ipad_os7" />
+        <copy file="../../Themes/iOS7Theme.res" todir="../../Skins/iphone3gs_os7" />
+        <copy file="../../Themes/iOS7Theme.res" todir="../../Skins/iphone4_os7" />
 
         
         <zip basedir="../../Skins/nexus" destfile="../../Skins/nexus.skin" compress="false">
@@ -112,6 +115,15 @@
         <zip basedir="../../Skins/iphone5" destfile="../../Skins/iphone5.skin" compress="false">
             <exclude name="**/svn/"/>
             <exclude name="*.psd"/>
+        </zip>
+        <zip basedir="../../Skins/ipad_os7" destfile="../../Skins/ipad_os7.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/iphone3gs_os7" destfile="../../Skins/iphone3gs_os7.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <zip basedir="../../Skins/iphone4_os7" destfile="../../Skins/iphone4_os7.skin" compress="false">
+            <exclude name="**/svn/"/>
         </zip>
         <zip basedir="../../Skins/iphone5_os7" destfile="../../Skins/iphone5_os7.skin" compress="false">
             <exclude name="**/svn/"/>
