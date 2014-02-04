@@ -181,6 +181,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 java.awt.Container cnt = new java.awt.Container();
                 com.codename1.ui.Display.init(cnt);
                 File output = new File(args[1]);
+                EditableResources.setXMLEnabled(true);
                 EditableResources res = new EditableResources();
                 res.openFileWithXMLSupport(output);
                 FileOutputStream fos = new FileOutputStream(output);
