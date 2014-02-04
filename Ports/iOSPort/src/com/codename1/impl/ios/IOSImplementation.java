@@ -83,8 +83,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayOutputStream;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -2860,8 +2858,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     class NativeIPhoneView extends PeerComponent {
         private long[] nativePeer;
-        private boolean lightweightMode;
-        
+        private boolean lightweightMode; 
+       
         public NativeIPhoneView(Object nativePeer) {
             super(nativePeer);
             this.nativePeer = (long[])nativePeer;
@@ -4007,6 +4005,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public boolean isNativeShareSupported(){
+        String ver = nativeInstance.getOSVersion();
+        if(ver.startsWith("5.") || ver.startsWith("4.")) {
+            return false;
+        }
         return true;
     }
     

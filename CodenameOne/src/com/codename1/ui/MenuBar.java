@@ -1518,7 +1518,7 @@ public class MenuBar extends Container implements ActionListener {
         b.setTextPosition(Label.BOTTOM);
         b.setEndsWith3Points(false);
         b.setUIID("TouchCommand");
-        Integer gap = (Integer)b.getClientProperty("iconGap");
+        Integer gap = (Integer)c.getClientProperty("iconGap");
         if(gap != null) {
             b.setGap(gap.intValue());
         }

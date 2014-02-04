@@ -43,6 +43,7 @@ import com.codename1.ui.plaf.UIManager;
 public class InfiniteProgress extends Component {
     private Image animation;
     private int angle = 0;
+    private int tick;
     
     /**
      * Default constructor to define the UIID
@@ -95,8 +96,10 @@ public class InfiniteProgress extends Component {
      * @inheritDoc
      */
     public boolean animate() {
-        super.animate();
-        return true;
+        // reduce repaint thrushing of the UI from the infinite progress
+        boolean val = super.animate() || tick % 4 == 0;
+        tick++;
+        return val;
     }
     
     /**
@@ -122,7 +125,7 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             return;
         }
-        int v = angle+=8 % 360;
+        int v = angle+=16 % 360;
         Style s = getStyle();
         /*if(g.isAffineSupported()) {
             g.rotate(((float)v) / 57.2957795f, getAbsoluteX() + s.getPadding(LEFT) + getWidth() / 2, getAbsoluteY() + s.getPadding(TOP) + getHeight() / 2);

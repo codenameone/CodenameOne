@@ -540,17 +540,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
             lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
-            
-            int factor = 1;
-            if(isTablet()) {
-                factor = 2;
-            }
-            final int dps = aboveSpacing * factor;
-            final float scale = getContext().getResources().getDisplayMetrics().density;
-            final int pixels = (int) (dps * scale + 0.5f);
-            
+                        
             RelativeLayout.LayoutParams lp2 = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
-            lp2.setMargins(0, 0, pixels, 0);
+            lp2.setMargins(0, 0, aboveSpacing, 0);
             relativeLayout.setLayoutParams(lp2);
             root.addView(viewAbove, lp);
         }
@@ -559,17 +551,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
             lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
-            
-            int factor = 1;
-            if(isTablet()) {
-                factor = 2;
-            }
-            final int dps = belowSpacing * factor;
-            final float scale = getContext().getResources().getDisplayMetrics().density;
-            final int pixels = (int) (dps * scale + 0.5f);
-            
+                        
             RelativeLayout.LayoutParams lp2 = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
-            lp2.setMargins(0, 0, 0, pixels);
+            lp2.setMargins(0, 0, 0, belowSpacing);
             relativeLayout.setLayoutParams(lp2);
             root.addView(viewBelow, lp);
         }
@@ -1703,10 +1687,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return defaultValue;
         }
         if ("Platform".equals(key)) {
-            return System.getProperty("platform");
+            String p = System.getProperty("platform");
+            if(p == null) {
+                return defaultValue;
+            }
+            return p;
         }
         if ("User-Agent".equals(key)) {
             String ua = getUserAgent();
+            if(ua == null) {
+                return defaultValue;
+            }
             return ua;
         }
         if("OSVer".equals(key)) {

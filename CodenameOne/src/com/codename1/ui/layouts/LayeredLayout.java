@@ -98,4 +98,11 @@ public class LayeredLayout extends Layout {
     public boolean isOverlapSupported() {
         return true;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean obscuresPotential(Container parent) {
+        return true;
+    }
 }

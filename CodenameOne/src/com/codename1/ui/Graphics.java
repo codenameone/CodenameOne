@@ -381,7 +381,8 @@ public final class Graphics {
     }
 
     private void drawStringImpl(String str, int x, int y) {
-        if(str.length() == 0) {
+        // remove a commonly used trick to create a spacer label from the paint queue
+        if(str.length() == 0 || str == " ") {
             return;
         }
         if(!(current instanceof CustomFont)) {

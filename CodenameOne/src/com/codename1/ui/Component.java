@@ -1379,7 +1379,7 @@ public class Component implements Animation, StyleListener {
             getStyle().getBgPainter().paint(g, bounds);
         }
     }
-
+    
     /**
      * This method paints the Component on the screen, it should be overriden
      * by subclasses to perform custom drawing or invoke the UI API's to let
@@ -3241,9 +3241,9 @@ public class Component implements Animation, StyleListener {
      * Used as an optimization to mark that this component is currently being
      * used as a cell renderer
      * 
-     * @return rtue is this component is currently being used as a cell renderer
+     * @return true is this component is currently being used as a cell renderer
      */
-    boolean isCellRenderer() {
+    public boolean isCellRenderer() {
         return cellRenderer;
     }
 

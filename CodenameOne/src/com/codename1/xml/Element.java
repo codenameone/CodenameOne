@@ -426,7 +426,7 @@ public class Element {
      * @param text The text to look for (null to return all text children)
      * @param caseSensitive true to perform a case sensitive match, false to ignore case
      * @param depth The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
-     * @return A vector containing decensants containing the specified text
+     * @return A vector containing descendants containing the specified text
      */
     public Vector getTextDescendants(String text,boolean caseSensitive,int depth) {
         if (depth<1) {

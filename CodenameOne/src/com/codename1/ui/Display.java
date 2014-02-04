@@ -2635,6 +2635,10 @@ public final class Display {
      * @param value the value of the property
      */
     public void setProperty(String key, String value) {
+        if("blockOverdraw".equals(key)) {
+            Container.blockOverdraw = true;
+            return;
+        }
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }

@@ -153,6 +153,10 @@ public class ResourceEditorApp extends SingleFrameApplication {
      * Main method launching the application.
      */
     public static void main(String[] args) throws Exception {
+        JavaSEPortWithSVGSupport.blockMonitors();
+        JavaSEPortWithSVGSupport.setDesignMode(true);
+        JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
+        JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
         if(args.length > 0) {
             if(args[0].equalsIgnoreCase("-buildVersion")) {
                 Properties p = new Properties();
@@ -187,10 +191,6 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 return;
             }
         }
-        JavaSEPortWithSVGSupport.blockMonitors();
-        JavaSEPortWithSVGSupport.setDesignMode(true);
-        JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
-        JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
         launch(ResourceEditorApp.class, args);

@@ -163,7 +163,7 @@ public class Container extends Component {
 
     /**
      * Returns the lead container thats handling the leading, this is useful for
-     * a container hierachy where the parent container might not be the leader
+     * a container hierarchy where the parent container might not be the leader
      *
      * @return the lead component
      */
@@ -876,6 +876,53 @@ public class Container extends Component {
             cmp.setX(oldX);
             cmp.setY(oldY);
         }
+    }
+
+    static boolean blockOverdraw = false;
+    
+    /**
+     * Invoked internally to indicate if child components are hiding this container
+     * thus removing the need to invoke its own paint methods
+     * @return true if child components are obscuring this component
+     */
+    boolean isObscuredByChildren() {
+        if(!blockOverdraw) {
+            return false;
+        }
+        if(!getLayout().obscuresPotential(this)) {
+            return false;
+        }
+        Style s = getStyle();
+        if(s.getPadding(TOP) != 0 || s.getPadding(LEFT) != 0 || s.getPadding(RIGHT) != 0 || s.getPadding(BOTTOM) != 0) {
+            return false;
+        }
+        
+        int size = components.size();
+        for(int iter = 0 ; iter < size ; iter++) {
+            Component cmp = components.get(iter);
+            s = cmp.getStyle();
+            if(cmp.getWidth() == 0 || cmp.getHeight() == 0) {
+                continue;
+            }
+            // need to think of a better way, this means we invoke the same logic recurisvely again and again by a factor of depth. Not good...
+            if(cmp instanceof Container) {
+                if(!((Container)cmp).getLayout().obscuresPotential(this)) {
+                    return false;
+                }
+                if(s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                    return false;
+                }
+                if((s.getBgTransparency() & 0xff) != 0xff && !((Container)cmp).isObscuredByChildren()) {
+                    return false;
+                }
+            } else {
+                if((s.getBgTransparency() & 0xff) != 0xff || s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                    return false;
+                }
+            }
+        }        
+        
+        return true;
     }
     
     /**
@@ -1660,22 +1707,7 @@ public class Container extends Component {
      * occupies its entire face
      */
     private boolean shouldPaintContainerBackground() {
-        if(getComponentCount() == 1) {
-            Style s = getStyle();
-            if(s.getPadding(TOP) == 0 && s.getPadding(BOTTOM) == 0 &&
-                    s.getPadding(LEFT) == 0 && s.getPadding(RIGHT) == 0) {
-                Component c = getComponentAt(0);
-                if(c.getWidth() == getWidth() && c.getHeight() == getHeight()) {
-                    if(c.isFlatten() || (c.getStyle().getBgTransparency() & 0xff) == 0xff) {
-                        return false;
-                    }
-                    if(c instanceof Container) {
-                        return ((Container)c).shouldPaintContainerBackground();
-                    }
-                }
-            }
-        }
-        return true;
+        return !isObscuredByChildren();
     }
 
     /**

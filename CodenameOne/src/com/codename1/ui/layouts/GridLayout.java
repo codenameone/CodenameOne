@@ -237,4 +237,11 @@ public class GridLayout extends Layout{
     public void setAutoFit(boolean autoFit) {
         this.autoFit = autoFit;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean obscuresPotential(Container parent) {
+        return parent.getComponentCount() == rows * columns || autoFit;
+    }
 }

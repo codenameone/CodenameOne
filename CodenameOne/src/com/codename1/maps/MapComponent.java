@@ -248,9 +248,9 @@ public class MapComponent extends Container {
      */
     protected void laidOut() {
         super.laidOut();
-        if (buffer != null) {
+        /*if (buffer != null) {
             buffer.dispose();
-        }
+        }*/
         refreshLayers = true;
         _needTiles = true;
         buffer = null;
@@ -444,7 +444,7 @@ public class MapComponent extends Container {
             scaleY = 0;
             oldDistance = -1;
             if (buffer != null) {
-                buffer.dispose();
+                //buffer.dispose();
                 buffer = null;
                 refreshLayers = true;
             }

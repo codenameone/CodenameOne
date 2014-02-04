@@ -50,7 +50,7 @@ public class BorderLayout extends Layout {
 
     /**
      * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
-     * the space availble to the center component.
+     * the space available to the center component.
      */
     public static final int CENTER_BEHAVIOR_CENTER = 1;
 
@@ -262,8 +262,18 @@ public class BorderLayout extends Layout {
                         }
                         w = d.getWidth();
                     }
+                    int append = 0;
+                    int th = targetHeight;
+                    if(north != null) {
+                        append = north.getHeight();
+                        th -= append;
+                    }
+                    if(south != null) {
+                        th -= south.getHeight();
+                        append += south.getHeight();
+                    }
                     if(d.getHeight() < h) {
-                        int newY = s.getPadding(false, Component.TOP) + targetHeight / 2 - d.getHeight() / 2;
+                        int newY = (s.getPadding(false, Component.TOP) + th) / 2 - d.getHeight() / 2 + append;
                         if(newY > y) {
                             y = newY;
                         }
@@ -584,4 +594,11 @@ public class BorderLayout extends Layout {
     public boolean isConstraintTracking() {
         return false;
     }    
+    
+    /**
+     * @inheritDoc
+     */
+    public boolean obscuresPotential(Container parent) {
+        return getCenter() != null;
+    }
 }

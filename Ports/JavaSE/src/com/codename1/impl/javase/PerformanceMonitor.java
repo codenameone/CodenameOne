@@ -403,6 +403,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     public void nothingWithinComponentPaint(Component c) {
         if(trackDrawing) {
+            if(c.isCellRenderer()) {
+                return;
+            }
             if(c.getParent() != null) {
                 trackedDrawing = (DefaultTableModel)c.getParent().getClientProperty("track");
             }
@@ -428,6 +431,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
     
     public void beforeComponentPaint(Component c) {
         if(trackDrawing) {
+            if(c.isCellRenderer()) {
+                return;
+            }
             trackedDrawing = createTableModel();
             c.putClientProperty("track", trackedDrawing);
             return;
@@ -439,6 +445,9 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     public void afterComponentPaint(Component c) {
         if(trackDrawing) {
+            if(c.isCellRenderer()) {
+                return;
+            }
             if(c.getParent() != null) {
                 trackedDrawing = (DefaultTableModel)c.getParent().getClientProperty("track");
             }

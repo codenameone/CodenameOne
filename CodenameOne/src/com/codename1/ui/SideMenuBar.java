@@ -1002,17 +1002,41 @@ public class SideMenuBar extends MenuBar {
             }
         } else {
             if (Display.getInstance().isPortrait()) {
+                int v = 0;
                 if (Display.getInstance().isTablet()) {
-                    rightPanel.setPreferredW(m.getWidth() * 2 / 3);
+                    v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
+                    if(v < 0) {
+                        v = m.getWidth() * 2 / 3;
+                    } else {
+                        v = m.getWidth() / 100 * v;                        
+                    }
                 } else {
-                    rightPanel.setPreferredW(openButton.getWidth());
+                    v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
+                    if(v < 0) {
+                        v = openButton.getWidth();
+                    } else {
+                        v = m.getWidth() / 100 * v;                        
+                    }
                 }
+                rightPanel.setPreferredW(v);
             } else {
+                int v = 0;
                 if (Display.getInstance().isTablet()) {
-                    rightPanel.setPreferredW(m.getWidth() * 3 / 4);
+                    v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
+                    if(v < 0) {
+                        v = m.getWidth() * 3 / 4;
+                    } else {
+                        v = m.getWidth() / 100 * v;                        
+                    }
                 } else {
-                    rightPanel.setPreferredW(m.getWidth() * 4 / 10);
+                    v = getUIManager().getThemeConstant("sideMenuSizeLandscapeInt", -1);
+                    if(v < 0) {
+                        v = m.getWidth() * 4 / 10;
+                    } else {
+                        v = m.getWidth() / 100 * v;                        
+                    }
                 }
+                rightPanel.setPreferredW(v);
             }
         }
         if (sidePanel != null) {

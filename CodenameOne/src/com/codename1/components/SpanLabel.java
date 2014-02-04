@@ -53,7 +53,7 @@ public class SpanLabel extends Container {
      * Constructor accepting default text
      */
     public SpanLabel(String txt) {
-        setUIID("Label");
+        setUIID("Container");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setUIID("Label");

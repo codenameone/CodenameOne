@@ -132,7 +132,7 @@ public abstract class CodenameOneImplementation {
     private static Runnable onExit;
     
     private boolean useNativeCookieStore = true;
-    
+        
     static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
@@ -434,8 +434,10 @@ public abstract class CodenameOneImplementation {
         }
         if (size > 0) {
             Graphics wrapper = getCodenameOneGraphics();
-            int topX = getDisplayWidth();
-            int topY = getDisplayHeight();
+            int dwidth = getDisplayWidth();
+            int dheight = getDisplayHeight();
+            int topX = dwidth;
+            int topY = dheight;
             int bottomX = 0;
             int bottomY = 0;
             for (int iter = 0; iter < size; iter++) {
@@ -447,12 +449,13 @@ public abstract class CodenameOneImplementation {
                 }
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
-                wrapper.setClip(0, 0, getDisplayWidth(), getDisplayHeight());
+                wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
                     Rectangle dirty = cmp.getDirtyRegion();
                     if (dirty != null) {
-                        wrapper.setClip(dirty.getX(), dirty.getY(), dirty.getSize().getWidth(), dirty.getSize().getHeight());
+                        Dimension d = dirty.getSize();
+                        wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                         cmp.setDirtyRegion(null);
                     }
 
@@ -464,8 +467,8 @@ public abstract class CodenameOneImplementation {
                     topY = Math.min(cmpAbsY, topY);
                     bottomY = Math.max(cmpAbsY + cmp.getHeight(), bottomY);
                 } else {
-                    bottomX = getDisplayWidth();
-                    bottomY = getDisplayHeight();
+                    bottomX = dwidth;
+                    bottomY = dheight;
                     topX = 0;
                     topY = 0;
                     ani.paint(wrapper);
@@ -1863,9 +1866,6 @@ public abstract class CodenameOneImplementation {
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
      * Codename One.
-     * 
-     * @param w the size of the screen
-     * @param h the size of the screen
      */
     protected void hideNotify() {
         Display.getInstance().hideNotify();
@@ -1874,9 +1874,6 @@ public abstract class CodenameOneImplementation {
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
      * Codename One.
-     * 
-     * @param w the size of the screen
-     * @param h the size of the screen
      */
     protected void showNotify() {
         Display.getInstance().showNotify();
@@ -2343,8 +2340,8 @@ public abstract class CodenameOneImplementation {
      * Scales the coordinate system using the affine transform
      *
      * @param nativeGraphics the native graphics object
-     * @param scale factor for x
-     * @param scale factor for y
+     * @param x factor for x
+     * @param y factor for y
      */
     public void scale(Object nativeGraphics, float x, float y) {
         System.out.println("Affine unsupported");
@@ -2375,8 +2372,8 @@ public abstract class CodenameOneImplementation {
     /**
      * Shear the graphics coordinate system using the affine transform
      *
-     * @param shear factor for x
-     * @param shear factor for y
+     * @param x factor for x
+     * @param y factor for y
      * @param nativeGraphics the native graphics object
      */
     public void shear(Object nativeGraphics, float x, float y) {
@@ -2397,7 +2394,7 @@ public abstract class CodenameOneImplementation {
      * Creates an SVG Image from the given byte array data and the base URL
      *
      * @param baseURL URL which is used to resolve relative references within the SVG file
-     * @param data the conten of the SVG file
+     * @param data the content of the SVG file
      * @return a native image that can be used within the image object
      * @throws IOException if resource lookup fail SVG is unsupported
      */
@@ -2446,8 +2443,8 @@ public abstract class CodenameOneImplementation {
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
      * order to be detectable. The file name should contain no slashes or any such value.
      *
-     * @param the name of the font
-     * @param the file name of the font as it appears in the src directory of the project 
+     * @param fontName the name of the font
+     * @param fileName the file name of the font as it appears in the src directory of the project 
      * @return the native font created from the stream
      */
     public Object loadTrueTypeFont(String fontName, String fileName) {
@@ -2458,7 +2455,7 @@ public abstract class CodenameOneImplementation {
      * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
      * will only work in the case of truetype fonts!
      * @param font the native font instance
-     * @param sizePixels the size of the font in pixels
+     * @param size the size of the font in pixels
      * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
      * @return scaled font instance
      */
@@ -3324,7 +3321,7 @@ public abstract class CodenameOneImplementation {
 
     /**
      * Release browser native resources
-     * @param browserPeer browser instance
+     * @param internal browser instance
      */
     public void browserDestroy(PeerComponent internal) {
     }
@@ -4485,10 +4482,10 @@ public abstract class CodenameOneImplementation {
      * Create a contact to the device contacts book
      * 
      * @param firstName the Contact firstName
-     * @param familyName the Contact familyName
-     * @param workPhone the Contact work phone or null
+     * @param surname the Contact familyName
+     * @param officePhone the Contact work phone or null
      * @param homePhone the Contact home phone or null
-     * @param mobilePhone the Contact mobile phone or null
+     * @param cellPhone the Contact mobile phone or null
      * @param email the Contact email or null
      * 
      * @return the contact id if creation succeeded or null  if failed
@@ -4531,7 +4528,7 @@ public abstract class CodenameOneImplementation {
      * 
      * @param text String to share.
      * @param image file path to the image or null
-     * @param mime type of the image or null if no image to share
+     * @param mimeType type of the image or null if no image to share
      */
     public void share(String text, String image, String mimeType){
     }

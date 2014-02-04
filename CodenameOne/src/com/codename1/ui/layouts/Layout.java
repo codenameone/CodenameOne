@@ -115,4 +115,16 @@ public abstract class Layout {
     public boolean isConstraintTracking() {
         return false;
     }
+    
+    /**
+     * Some layout managers can obscure their child components in some cases this
+     * returns true if the basic underpinnings are in place for that. This method
+     * doesn't take padding/margin etc. into account since that is checked by the 
+     * caller
+     * @param parent parent container
+     * @return true if there is a chance that this layout manager can fully obscure the background
+     */
+    public boolean obscuresPotential(Container parent) {
+        return false;
+    }
 }

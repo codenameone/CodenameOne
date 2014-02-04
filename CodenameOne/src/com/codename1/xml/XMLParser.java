@@ -40,6 +40,7 @@ public class XMLParser {
 
     private static final Element END_TAG = new Element();
     private boolean eventParser;
+    private boolean caseSensitive;
     ParserCallback parserCallback;
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
 
@@ -572,7 +573,9 @@ public class XMLParser {
         //collect tag name
         while ((!isWhiteSpace(c)) && (c!='>') && (c!='/')) {
         	if (eventParser == false) {
+                    if(!caseSensitive) {
         		c = Character.toLowerCase(c);
+                    }
         	}
         	tagName.append(c);
                 int i = read(is);
@@ -679,7 +682,9 @@ public class XMLParser {
             c=(char)read(is);
             while ((!isWhiteSpace(c)) && (c!='=') && (c!='>')) {
             	if (eventParser == false) {
+                    if(!caseSensitive) {
             		c = Character.toLowerCase(c);
+                    }
             	}
                 curAttribute.append(c);
                 c=(char)read(is);
@@ -947,6 +952,22 @@ public class XMLParser {
      */
     public void setParserCallback(ParserCallback parserCallback) {
         this.parserCallback=parserCallback;
+    }
+
+    /**
+     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+     * @return the caseSensitive
+     */
+    public boolean isCaseSensitive() {
+        return caseSensitive;
+    }
+
+    /**
+     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+     * @param caseSensitive the caseSensitive to set
+     */
+    public void setCaseSensitive(boolean caseSensitive) {
+        this.caseSensitive = caseSensitive;
     }
 
 }

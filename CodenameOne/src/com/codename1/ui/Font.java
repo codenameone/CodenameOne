@@ -338,6 +338,11 @@ public class Font {
         if(str == null || str.length() == 0) {
             return 0;
         }
+        // Its common to use a space character to create a label that takes up space but the value
+        // of string width in this case becomes less important
+        if(str == " ") {
+            return 5;
+        }
         return Display.getInstance().getImplementation().stringWidth(font, str);
     }
     

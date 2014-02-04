@@ -845,6 +845,9 @@ private void exportResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                         for(int row = 0 ; row < rowCount ; row++) {
                             for(int col = 0 ; col < columnCount ; col++) {
                                 String c = (String)m.getValueAt(row, col);
+                                if(c == null) {
+                                    c = "";
+                                }
                                 c = c.replaceAll("\"", "\"\"");
                                 w.append('"');
                                 w.append(c);

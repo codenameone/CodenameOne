@@ -2632,10 +2632,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             setText(tf, text);
         }
         canvas.add(tf);
-        int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP) + cmp.getSelectedStyle().getMargin(Component.TOP);
-        int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT) + cmp.getSelectedStyle().getMargin(Component.LEFT);
-        int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT) + cmp.getSelectedStyle().getMargin(Component.RIGHT);
-        int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM) + cmp.getSelectedStyle().getMargin(Component.BOTTOM);
+        int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
+        int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
+        int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
+        int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
         if (getSkin() != null) {
             tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
