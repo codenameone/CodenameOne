@@ -347,6 +347,8 @@ public class Form extends Container {
      * @param h the new height of the Form
      */
     void sizeChangedInternal(int w, int h) {
+        int oldWidth = getWidth();
+        int oldHeight = getHeight();        
         sizeChanged(w, h);
         Style formStyle = getStyle();
         w = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
@@ -360,8 +362,11 @@ public class Form extends Container {
             scrollComponentToVisible(focused);
             Component.setDisableSmoothScrolling(false);
         }
-        if (orientationListener != null) {
-            orientationListener.fireActionEvent(new ActionEvent(this));
+        
+        if(oldWidth != w && oldHeight != h){
+            if (orientationListener != null) {
+                orientationListener.fireActionEvent(new ActionEvent(this));
+            }
         }
         repaint();
     }
