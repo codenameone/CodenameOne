@@ -3104,12 +3104,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         protected Image generatePeerImage() {
-            Bitmap nativeBuffer = Bitmap.createBitmap(
-                    getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-            Image image = new AndroidImplementation.NativeImage(nativeBuffer);
-            Canvas canvas = new Canvas(nativeBuffer);
-            web.draw(canvas);
-            return image;
+            try {
+                final Bitmap nativeBuffer = Bitmap.createBitmap(
+                        getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
+                Image image = new AndroidImplementation.NativeImage(nativeBuffer);
+                activity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Canvas canvas = new Canvas(nativeBuffer);
+                            web.draw(canvas);
+                        } catch(Throwable t) {
+                            t.printStackTrace();
+                        }
+                    }
+                });
+                return image;
+            } catch(Throwable t) {
+                t.printStackTrace();
+                return Image.createImage(5, 5);
+            }
         }
         
         protected boolean shouldRenderPeerImage() {
