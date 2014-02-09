@@ -97,6 +97,12 @@ public class OnOffSwitch extends Container {
         } else {
             setLayout(new BoxLayout(BoxLayout.Y_AXIS));
             button = new CheckBox(on);
+            button.setToggle(true);
+            button.setUIID("Button");
+            button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());
+            button.getSelectedStyle().setFont(getSelectedStyle().getFont());
+            button.getPressedStyle().setFont(getSelectedStyle().getFont());
+            
             Dimension d = button.getPreferredSize();
             button.setText(off);
             int pw = button.getPreferredW();
@@ -104,11 +110,7 @@ public class OnOffSwitch extends Container {
             
             // prevents the button from growing/shrinking as its states flip
             button.setPreferredSize(d);
-            button.setToggle(true);
-            button.setUIID("Button");
-            button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());
-            button.getSelectedStyle().setFont(getSelectedStyle().getFont());
-            button.getPressedStyle().setFont(getSelectedStyle().getFont());
+            
             buttonWidth = button.getPreferredW();
             button.setFocusable(false);
             updateButton();
