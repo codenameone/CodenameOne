@@ -956,13 +956,30 @@
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneMediaPlayerActionPerformed"/>
                                   </Events>
                                 </Component>
+                                <Component class="javax.swing.JButton" name="codenameOnePicker">
+                                  <Properties>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    </Property>
+                                    <Property name="text" type="java.lang.String" value="Picker"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Picker&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Important: a picker is rendered natively and will look differently on the device!&lt;/b&gt;&lt;br&gt;&#xa;A spinner dialog component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                                      <Border info="null"/>
+                                    </Property>
+                                    <Property name="horizontalAlignment" type="int" value="2"/>
+                                    <Property name="name" type="java.lang.String" value="codenameOnePicker" noResource="true"/>
+                                  </Properties>
+                                  <Events>
+                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOnePickerActionPerformed"/>
+                                  </Events>
+                                </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneNumericSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
                                       <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Numeric Spinner"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Numeric Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Numeric Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                       <Border info="null"/>
                                     </Property>
@@ -979,7 +996,7 @@
                                       <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Date Spinner"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                       <Border info="null"/>
                                     </Property>
@@ -996,7 +1013,7 @@
                                       <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Time Spinner"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                       <Border info="null"/>
                                     </Property>
@@ -1013,7 +1030,7 @@
                                       <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Date &amp; Time Spinner"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date &amp;amp; Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date &amp;amp; Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                       <Border info="null"/>
                                     </Property>
@@ -1030,7 +1047,7 @@
                                       <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Generic Spinner"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Generic Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A spinner component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
+                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Generic Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;A spinner component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
                                       <Border info="null"/>
                                     </Property>

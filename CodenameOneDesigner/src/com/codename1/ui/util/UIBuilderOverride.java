@@ -97,6 +97,7 @@ public class UIBuilderOverride extends UIBuilder {
         registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
         registerCustomComponent("ImageViewer", com.codename1.components.ImageViewer.class);
         registerCustomComponent("AutoCompleteTextField", com.codename1.ui.AutoCompleteTextField.class);
+        registerCustomComponent("Picker", com.codename1.ui.spinner.Picker.class);
     }
 
     void modifyingProperty(com.codename1.ui.Component c, int p) {

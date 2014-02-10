@@ -1889,6 +1889,7 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneOnOffSwitch, com.codename1.components.OnOffSwitch.class, "OnOffSwitch", null);
         makeDraggable(codenameOneImageViewer, com.codename1.components.ImageViewer.class, "ImageViewer", null);
         makeDraggable(codenameOneAutoCompleteTextField, com.codename1.ui.AutoCompleteTextField.class, "AutoCompleteTextField", null);
+        makeDraggable(codenameOnePicker, com.codename1.ui.spinner.Picker.class, "Picker", null);
 
         if(customComponents != null) {
             for(CustomComponent currentCmp : customComponents) {
@@ -5377,6 +5378,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneContainerList = new javax.swing.JButton();
         codenameOneComponentGroup = new javax.swing.JButton();
         codenameOneMediaPlayer = new javax.swing.JButton();
+        codenameOnePicker = new javax.swing.JButton();
         codenameOneNumericSpinner = new javax.swing.JButton();
         codenameOneDateSpinner = new javax.swing.JButton();
         codenameOneTimeSpinner = new javax.swing.JButton();
@@ -5834,9 +5836,18 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMediaPlayer.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneMediaPlayer);
 
+        codenameOnePicker.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOnePicker.setText("Picker");
+        codenameOnePicker.setToolTipText("<html><body><b>Picker</b><br> \n<p>\n<b>Important: a picker is rendered natively and will look differently on the device!</b><br>\nA spinner dialog component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
+        codenameOnePicker.setBorder(null);
+        codenameOnePicker.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        codenameOnePicker.setName("codenameOnePicker"); // NOI18N
+        codenameOnePicker.addActionListener(formListener);
+        codenameOneExtraComponents.add(codenameOnePicker);
+
         codenameOneNumericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneNumericSpinner.setText("Numeric Spinner");
-        codenameOneNumericSpinner.setToolTipText("<html><body><b>Numeric Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneNumericSpinner.setToolTipText("<html><body><b>Numeric Spinner</b><br> \n<p>\n\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneNumericSpinner.setBorder(null);
         codenameOneNumericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneNumericSpinner.setName("codenameOneNumericSpinner"); // NOI18N
@@ -5845,7 +5856,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneDateSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneDateSpinner.setText("Date Spinner");
-        codenameOneDateSpinner.setToolTipText("<html><body><b>Date Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateSpinner.setToolTipText("<html><body><b>Date Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateSpinner.setBorder(null);
         codenameOneDateSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneDateSpinner.setName("codenameOneDateSpinner"); // NOI18N
@@ -5854,7 +5865,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneTimeSpinner.setText("Time Spinner");
-        codenameOneTimeSpinner.setToolTipText("<html><body><b>Time Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneTimeSpinner.setToolTipText("<html><body><b>Time Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneTimeSpinner.setBorder(null);
         codenameOneTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneTimeSpinner.setName("codenameOneTimeSpinner"); // NOI18N
@@ -5863,7 +5874,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneDateTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneDateTimeSpinner.setText("Date & Time Spinner");
-        codenameOneDateTimeSpinner.setToolTipText("<html><body><b>Date &amp; Time Spinner</b><br> \n<p>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneDateTimeSpinner.setToolTipText("<html><body><b>Date &amp; Time Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateTimeSpinner.setBorder(null);
         codenameOneDateTimeSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneDateTimeSpinner.setName("codenameOneDateTimeSpinner"); // NOI18N
@@ -5872,7 +5883,7 @@ public class UserInterfaceEditor extends BaseForm {
 
         codenameOneGenericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
         codenameOneGenericSpinner.setText("Generic Spinner");
-        codenameOneGenericSpinner.setToolTipText("<html><body><b>Generic Spinner</b><br> \n<p>\nA spinner component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
+        codenameOneGenericSpinner.setToolTipText("<html><body><b>Generic Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nA spinner component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
         codenameOneGenericSpinner.setBorder(null);
         codenameOneGenericSpinner.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
         codenameOneGenericSpinner.setName("codenameOneGenericSpinner"); // NOI18N
@@ -6070,6 +6081,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneTextField) {
                 UserInterfaceEditor.this.codenameOneTextFieldActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOneAutoCompleteTextField) {
+                UserInterfaceEditor.this.codenameOneAutoCompleteTextFieldActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneSlider) {
                 UserInterfaceEditor.this.codenameOneSliderActionPerformed(evt);
             }
@@ -6145,8 +6159,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneAutoCompleteTextField) {
-                UserInterfaceEditor.this.codenameOneAutoCompleteTextFieldActionPerformed(evt);
+            else if (evt.getSource() == codenameOnePicker) {
+                UserInterfaceEditor.this.codenameOnePickerActionPerformed(evt);
             }
         }
 
@@ -6854,6 +6868,14 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
         addComponentToContainer(new com.codename1.ui.AutoCompleteTextField(), "AutoCompleteTextField");
     }//GEN-LAST:event_codenameOneAutoCompleteTextFieldActionPerformed
 
+    private void codenameOnePickerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOnePickerActionPerformed
+        if(lockForDragging) {
+            lockForDragging = false;
+            return; 
+        }
+        addComponentToContainer(new com.codename1.ui.AutoCompleteTextField(), "Picker");
+    }//GEN-LAST:event_codenameOnePickerActionPerformed
+
 
     private String findUniqueName(String prefix) {
         // try prefix first
@@ -6976,6 +6998,7 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton codenameOneMultiList;
     private javax.swing.JButton codenameOneNumericSpinner;
     private javax.swing.JButton codenameOneOnOffSwitch;
+    private javax.swing.JButton codenameOnePicker;
     private javax.swing.JButton codenameOneRadioButton;
     private javax.swing.JButton codenameOneShare;
     private javax.swing.JButton codenameOneSlider;

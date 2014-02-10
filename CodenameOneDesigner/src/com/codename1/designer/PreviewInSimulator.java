@@ -167,6 +167,7 @@ public class PreviewInSimulator {
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("OnOffSwitch", com.codename1.components.OnOffSwitch.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("ImageViewer", com.codename1.components.ImageViewer.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("AutoCompleteTextField", com.codename1.ui.AutoCompleteTextField.class);
+                    com.codename1.ui.util.UIBuilder.registerCustomComponent("Picker", com.codename1.ui.spinner.Picker.class);
                     com.codename1.ui.util.UIBuilder builder = new com.codename1.ui.util.UIBuilder();
                     com.codename1.ui.Container c = builder.createContainer(res, selection);
                     if(c instanceof com.codename1.ui.Form) {
