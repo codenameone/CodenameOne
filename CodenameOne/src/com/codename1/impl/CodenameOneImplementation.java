@@ -31,6 +31,7 @@ import com.codename1.db.Database;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
@@ -1759,23 +1760,30 @@ public abstract class CodenameOneImplementation {
             dragActivationCounter++;
             return false;
         }
+        boolean dragRegion = getCurrentForm().isDragRegion(x, y);
+
         //send the drag events to the form only after latency of 7 drag events,
         //most touch devices are too sensitive and send too many drag events.
         //7 is just a latency const number that is pretty good for most devices
         //this may be tuned for specific devices.
         dragActivationCounter++;
-        if (dragActivationCounter > getDragAutoActivationThreshold()) {
+        if (!dragRegion && dragActivationCounter > getDragAutoActivationThreshold()) {
             return true;
         }
+        float start = getDragStartPercentage();
+        if(dragRegion) {
+            start = 0.9f;
+        }
+        
         // have we passed the motion threshold on the X axis?
-        if (((float) getDisplayWidth()) / 100.0f * ((float) getDragStartPercentage()) <=
+        if (((float) getDisplayWidth()) / 100.0f * start <=
                 Math.abs(dragActivationX - x)) {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
             return true;
         }
 
         // have we passed the motion threshold on the Y axis?
-        if (((float) getDisplayHeight()) / 100.0f * ((float) getDragStartPercentage()) <=
+        if (((float) getDisplayHeight()) / 100.0f * start <=
                 Math.abs(dragActivationY - y)) {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
             return true;
@@ -4661,7 +4669,7 @@ public abstract class CodenameOneImplementation {
      */
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
-        System.out.println("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey);
+        Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
         if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
@@ -4669,7 +4677,7 @@ public abstract class CodenameOneImplementation {
                     DataInputStream d = new DataInputStream(input);
                     long pid = d.readLong();
                     Preferences.set("push_id", pid);
-                    System.out.println("registerPushOnServer push id received from server: " + pid);
+                    Log.p("registerPushOnServer push id received from server: " + pid);
                 }
             };
             r.setPost(false);

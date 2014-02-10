@@ -468,6 +468,19 @@ public class Component implements Animation, StyleListener {
         bounds.setY(y);
         onParentPositionChange();
     }
+    
+    /**
+     * Indicates if the section within the X/Y area is a "drag region" where
+     * we expect people to drag and never actually "press" in which case we
+     * can instantly start dragging making perceived performance faster. This
+     * is invoked by the implementation code to optimize drag start behavior
+     * @param x x location for the touch
+     * @param y y location for the touch 
+     * @return true if the touch is in a region specifically designated as a "drag region"
+     */
+    protected boolean isDragRegion(int x, int y) {
+        return isDraggable();
+    }
 
     /**
      * This callback allows subcomponents who are interested in following position change of their parents

@@ -387,6 +387,24 @@ public class Form extends Container {
     }
 
     /**
+     * Indicates if the section within the X/Y area is a "drag region" where
+     * we expect people to drag and never actually "press" in which case we
+     * can instantly start dragging making perceived performance faster. This
+     * is invoked by the implementation code to optimize drag start behavior
+     * @param x x location for the touch
+     * @param y y location for the touch 
+     * @return true if the touch is in a region specifically designated as a "drag region"
+     */
+    public boolean isDragRegion(int x, int y) {
+        if(getMenuBar().isDragRegion(x, y)) {
+            return true;
+        }
+        Container actual = getActualPane();
+        Component c = actual.getComponentAt(x, y);
+        return c != null && c.isDragRegion(x, y);
+    }
+    
+    /**
      * This method can be overriden by a component to draw on top of itself or its children
      * after the component or the children finished drawing in a similar way to the glass
      * pane but more refined per component

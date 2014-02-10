@@ -788,7 +788,7 @@ public class Tabs extends Container {
         removeComponent(tabsContainer);
         revalidate();
     }
-
+    
     /**
      * Show the tabs bar if it was hidden
      */

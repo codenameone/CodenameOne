@@ -53,7 +53,8 @@ public class ImageViewer extends Component {
     private ListModel<Image> swipeableImages;
     private DataChangedListener listListener;
     private Image swipePlaceholder;
-    
+    private float swipeThreshold = 0.4f;
+        
     // return values from image aspect calc
     private int prefX, prefY, prefW, prefH;
 
@@ -213,7 +214,7 @@ public class ImageViewer extends Component {
      * @return y position within the image for the top left corner
      */
     public int getImageY() {
-        return imageX;
+        return imageY;
     }
 
     /**
@@ -288,7 +289,7 @@ public class ImageViewer extends Component {
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         if(panPositionX > 1) {
-            if(panPositionX >= 1.4f && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
+            if(panPositionX >= 1 + swipeThreshold && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
             } else {
                 // animate back
@@ -297,7 +298,7 @@ public class ImageViewer extends Component {
             return;
         } 
         if(panPositionX < 0) {
-            if(panPositionX <= -0.4f && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
+            if(panPositionX <= swipeThreshold * -1 && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
                 new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
             } else {
                 // animate back
@@ -306,6 +307,7 @@ public class ImageViewer extends Component {
             return;
         }
     }
+    
     
     /**
      * @inheritDoc
@@ -652,6 +654,26 @@ public class ImageViewer extends Component {
      */
     public void setCycleRight(boolean cycleRight) {
         this.cycleRight = cycleRight;
+    }
+
+    /**
+     * The swipe threshold is a number between 0 and 1 that indicates the threshold 
+     * after which the swiped image moves to the next image. Below that number the image 
+     * will bounce back
+     * @return the threshold
+     */
+    public float getSwipeThreshold() {
+        return swipeThreshold;
+    }
+
+    /**
+     * The swipe threshold is a number between 0 and 1 that indicates the threshold 
+     * after which the swiped image moves to the next image. Below that number the image 
+     * will bounce back
+     * @param swipeThreshold the swipeThreshold to set
+     */
+    public void setSwipeThreshold(float swipeThreshold) {
+        this.swipeThreshold = swipeThreshold;
     }
     
     class AnimatePanX implements Animation {

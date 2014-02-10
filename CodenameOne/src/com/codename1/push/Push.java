@@ -101,8 +101,6 @@ public class Push {
      * @param googleAuthKey authorization key from the google play store
      * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
      * @param iosCertificatePassword the password for the push certificate
-     * @return true if the message reached the Codename One server successfully, this makes no guarantee
-     * of delivery.
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
@@ -124,8 +122,6 @@ public class Push {
      * @param bbApp the application id to authenticate on push for RIM devices
      * @param bbPass the application password credentials authenticate on push for RIM devices
      * @param bbPort the port of the blackberry push
-     * @return true if the message reached the Codename One server successfully, this makes no guarantee
-     * of delivery.
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {

@@ -298,6 +298,18 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    protected boolean isDragRegion(int x, int y) {
+        if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
+            if (x - initialDragX > Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void installRightCommands() {
         if (rightCommands != null) {
             for (int i = 0; i < rightCommands.size(); i++) {

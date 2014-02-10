@@ -1656,4 +1656,18 @@ public class MenuBar extends Container implements ActionListener {
     public void setMinimizeOnBack(boolean minimizeOnBack) {
         this.minimizeOnBack = minimizeOnBack;
     }
+
+    /**
+     * Indicates if the section within the X/Y area is a "drag region" where
+     * we expect people to drag and never actually "press" in which case we
+     * can instantly start dragging making perceived performance faster. This
+     * always return false but on the side menu we use it to indicate better
+     * sensitivity for side swiping
+     * @param x x location for the touch
+     * @param y y location for the touch 
+     * @return true if the touch is in a region specifically designated as a "drag region"
+     */
+    protected boolean isDragRegion(int x, int y) {
+        return false;
+    }
 }

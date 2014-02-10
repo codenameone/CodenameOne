@@ -3629,7 +3629,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     public static void pushRegistered(final String deviceKey) {
-        System.out.println("Push handleRegistration() Sending registration to server!");
+        if(instance != null) {
+            instance.systemOut("Push handleRegistration() Sending registration to server: " + deviceKey);
+        }
         String c = callback.getClass().getName();
         final String clsName = c.substring(0, c.lastIndexOf('.'));
         if(pushCallback != null) {

@@ -110,6 +110,8 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
@@ -457,7 +459,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
-    class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener {
+    class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
 
         private BufferedImage buffer;
         boolean painted;
@@ -470,6 +472,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             super(null);
             addKeyListener(this);
             addMouseListener(this);
+            addMouseWheelListener(this);
             addMouseMotionListener(this);
             addHierarchyBoundsListener(this);
             setFocusable(true);
@@ -964,6 +967,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             repaint();
 
         }
+
+        public void mouseWheelMoved(MouseWheelEvent e) {
+            e.consume();
+            if (!isEnabled()) {
+                return;
+            }
+            final int x = scaleCoordinateX(e.getX());
+            final int y = scaleCoordinateY(e.getY());
+            if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+                final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Form f = getCurrentForm();
+                        f.pointerPressed(x, y);
+                        f.pointerDragged(x, y + units / 4);
+                    }
+                });
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Form f = getCurrentForm();
+                        f.pointerDragged(x, y + units / 4 * 2);
+                    }
+                });
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Form f = getCurrentForm();
+                        f.pointerDragged(x, y + units / 4 * 3);
+                    }
+                });
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Form f = getCurrentForm();
+                        f.pointerDragged(x, y + units);
+                        f.pointerReleased(x, y + units);
+                    }
+                });
+            } 
+        }
+        
     }
     C canvas;
 
@@ -5134,7 +5176,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void cleanup() {
-            playing = false;
+            pause();
         }
 
         public void prepare() {
@@ -5146,7 +5188,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void pause() {
-            player.pause();
+            if(playing) {
+                player.pause();
+            }
             playing = false;
         }
 

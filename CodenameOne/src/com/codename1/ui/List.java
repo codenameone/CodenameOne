@@ -442,6 +442,14 @@ public class List<T> extends Component {
     }
 
     /**
+     * @inheritDoc
+     */
+    protected boolean isDragRegion(int x, int y) {
+        // large lists should be more sensitive to scrolling
+        return getModel().getSize() > 20;
+    }
+    
+    /**
      * Sets the current selected offset in the list
      *
      * @param index the current selected offset in the list
