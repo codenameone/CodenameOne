@@ -593,11 +593,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
                 //if this is the last line to display and there is more content and isEndsWith3Points() is true
                 //add "..." at the last row
-                if(ta.isEndsWith3Points() && (i+1) < line && !Rectangle.intersects(x, nextY, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight) ){
+                if(ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line){
                     if(displayText.length() > 3){
                         displayText = displayText.substring(0, displayText.length() - 3);
                     }
                     g.drawString(displayText + "...", x, y ,ta.getStyle().getTextDecoration());                
+                    return;
                 }else{            
                     g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
                 }
