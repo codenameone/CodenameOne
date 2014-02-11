@@ -796,6 +796,8 @@ public class Container extends Component {
             Component cmp = arr[iter];
             removeComponent(cmp);
         }
+        setScrollX(0);
+        setScrollY(0);
     }
 
     /**
