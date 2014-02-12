@@ -69,10 +69,23 @@ public class BarCodeScanner {
         }
     }
 
+    class HandleDecodedTextCall implements Runnable {
+        Result theResult;
+        public void run() {
+            callback.scanCompleted(theResult.getText(), theResult.getBarcodeFormat().getName(), theResult.getRawBytes());
+            stop();
+            media.cleanup();
+            backForm.showBack();
+            backForm = null;
+            cameraForm = null;
+            callback = null;
+        }        
+    }
 
-    public void handleDecodedText(Result theResult) {
-        callback.scanCompleted(theResult.getText(), theResult.getBarcodeFormat().getName(), theResult.getRawBytes());
-        cancelScan();
+    public void handleDecodedText(final Result theResult) {
+        HandleDecodedTextCall h = new HandleDecodedTextCall();
+        h.theResult = theResult;
+        Display.getInstance().callSerially(h);
     }
 
     private void stop() {
@@ -116,14 +129,20 @@ public class BarCodeScanner {
         startScan();
     }
 
+    class CancelScanCall implements Runnable {
+        public void run() {
+            stop();
+            media.cleanup();
+            backForm.showBack();
+            callback.scanCanceled();
+            backForm = null;
+            cameraForm = null;
+            callback = null;
+        }        
+    }
+
     private void cancelScan() {
-        stop();
-        media.cleanup();
-        backForm.showBack();
-        callback.scanCanceled();
-        backForm = null;
-        cameraForm = null;
-        callback = null;
+        Display.getInstance().callSerially(new CancelScanCall());
     }
     
     private static boolean isAMMSPresent() {
