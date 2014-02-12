@@ -145,6 +145,7 @@ public class Form extends Container {
     int initialPressX;
     int initialPressY;
     private EventDispatcher orientationListener;
+    private EventDispatcher sizeChangedListener;    
     private UIManager uiManager;
     private Component stickyDrag;
     private boolean dragStopFlag;
@@ -309,6 +310,30 @@ public class Form extends Container {
     }
 
     /**
+     * This listener is invoked when device size is changed
+     *
+     * @param l listener
+     */
+    public void addSizeChangedListener(ActionListener l) {
+        if (sizeChangedListener == null) {
+            sizeChangedListener = new EventDispatcher();
+        }
+        sizeChangedListener.addListener(l);
+    }
+
+    /**
+     * Remove SizeChangedListener
+     *
+     * @param l the listener
+     */
+    public void removeSizeChangedListener(ActionListener l) {
+        if (sizeChangedListener == null) {
+            return;
+        }
+        sizeChangedListener.removeListener(l);
+    }
+    
+    /**
      * This method is only invoked when the underlying canvas for the form is hidden
      * this method isn't called for form based events and is generally usable for
      * suspend/resume based behavior
@@ -368,6 +393,10 @@ public class Form extends Container {
                 orientationListener.fireActionEvent(new ActionEvent(this));
             }
         }
+        if (sizeChangedListener != null) {
+            sizeChangedListener.fireActionEvent(new ActionEvent(this, w, h));
+        }
+        
         repaint();
     }
 
