@@ -285,29 +285,33 @@ public class Rectangle {
     /**
      * Returns a rectangle that intersects the given rectangle with this rectangle
      *
-     * @param rX rectangle to intersect with this rectangle
-     * @param rY rectangle to intersect with this rectangle
-     * @param rW rectangle to intersect with this rectangle
-     * @param rH rectangle to intersect with this rectangle
-     * @param tx1 rectangle to intersect with this rectangle
-     * @param ty1 rectangle to intersect with this rectangle
-     * @param tw2 rectangle to intersect with this rectangle
-     * @param th2 rectangle to intersect with this rectangle
+     * @param rrX rectangle to intersect with this rectangle
+     * @param rrY rectangle to intersect with this rectangle
+     * @param rrW rectangle to intersect with this rectangle
+     * @param rrH rectangle to intersect with this rectangle
+     * @param rtx1 rectangle to intersect with this rectangle
+     * @param rty1 rectangle to intersect with this rectangle
+     * @param rtw2 rectangle to intersect with this rectangle
+     * @param rth2 rectangle to intersect with this rectangle
      * @param dest result of the intersection are stored here
      */
-    public static void intersection(int rX, int rY, int rW, int rH, int tx1, int ty1, int tw2, int th2, Rectangle dest) {
-        int rx1 = rX;
-        int ry1 = rY;
-        int rx2 = rx1; rx2 += rW;
-        int ry2 = ry1; ry2 += rH;
+    public static void intersection(int rrX, int rrY, int rrW, int rrH, int rtx1, int rty1, int rtw2, int rth2, Rectangle dest) {
+        int tx1 = rtx1;
+        int ty1 = rty1;
+        int rx1 = rrX;
+        int ry1 = rrY;
+        int tx2 = tx1; 
+        tx2 += rtw2;
+        int ty2 = ty1; 
+        ty2 += rth2;
+        int rx2 = rx1; rx2 += rrW;
+        int ry2 = ry1; ry2 += rrH;
         if (tx1 < rx1) {
             tx1 = rx1;
         }
         if (ty1 < ry1) {
             ty1 = ry1;
         }
-        int tx2 = tx1; tx2 += tw2;
-        int ty2 = ty1; ty2 += th2;
         if (tx2 > rx2) {
             tx2 = rx2;
         }
@@ -316,6 +320,7 @@ public class Rectangle {
         }
         tx2 -= tx1;
         ty2 -= ty1;
+        
         // tx2,ty2 will never overflow (they will never be
         // larger than the smallest of the two source w,h)
         // they might underflow, though...

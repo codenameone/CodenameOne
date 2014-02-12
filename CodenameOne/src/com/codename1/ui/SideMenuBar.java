@@ -162,6 +162,7 @@ public class SideMenuBar extends MenuBar {
             }
         }
         super.removeAllCommands();
+        parent.initTitleBarStatus();
     }
 
     /**
@@ -344,6 +345,7 @@ public class SideMenuBar extends MenuBar {
             }
 
         }
+        parent.initTitleBarStatus();
     }
 
     /**
@@ -506,7 +508,11 @@ public class SideMenuBar extends MenuBar {
             }
             titleArea.addComponent(BorderLayout.CENTER, l);
             installRightCommands();
-            ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+            if(parent.getUIManager().isThemeConstant("leftAlignSideMenuBool", false)) {
+                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            } else {
+                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+            }
         }
         if (cmd != null) {
             String placement = (String) cmd.getClientProperty(COMMAND_PLACEMENT_KEY);
@@ -524,6 +530,7 @@ public class SideMenuBar extends MenuBar {
                 }
             }
         }
+        parent.initTitleBarStatus();
     }
 
     private void validateCommandPlacement(String placement) {
@@ -617,18 +624,22 @@ public class SideMenuBar extends MenuBar {
                         if (isRTL) {
                             int x = Math.max(draggedX, rightPanel.getWidth()) - c.getWidth();
                             g.translate(x, 0);
+                            Container.sidemenuBarTranslation = x;
                             if (shadow != null) {
                                 g.tileImage(shadow, x + c.getWidth() - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
                             }
                             c.paintComponent(g, true);
+                            Container.sidemenuBarTranslation = 0;
                             g.translate(-x, 0);
                         } else {
                             int x = Math.min(draggedX, rightPanel.getX());
                             g.translate(x, 0);
+                            Container.sidemenuBarTranslation = x;
                             if (shadow != null) {
                                 g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());
                             }
                             c.paintComponent(g, true);
+                            Container.sidemenuBarTranslation = 0;
                             g.translate(-x, 0);
                         }
                         c.setVisible(b);
@@ -706,6 +717,7 @@ public class SideMenuBar extends MenuBar {
                 } else {
                     menu.addComponent(cmp);
                 }
+                parent.initTitleBarStatus();
             } else {
                 menu.addComponent(createTouchCommandButton(c));
             }
@@ -991,7 +1003,9 @@ public class SideMenuBar extends MenuBar {
                     c.setVisible(true);
                     int x = getAbsoluteX();
                     g.translate(x, 0);
+                    Container.sidemenuBarTranslation = x;
                     c.paintComponent(g, true);
+                    Container.sidemenuBarTranslation = 0;
                     g.translate(-x, 0);
                     c.setVisible(b);
                 }
@@ -1264,18 +1278,22 @@ public class SideMenuBar extends MenuBar {
                 if (fwd) {
                     dest.paintComponent(g, true);
                     g.translate(position, 0);
+                    Container.sidemenuBarTranslation = position;
                     if (shadow != null) {
                         g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
                     }
                     src.paintComponent(g, true);
+                    Container.sidemenuBarTranslation = 0;
                     g.translate(-position, 0);
                 } else {
                     src.paintComponent(g, true);
                     g.translate(position, 0);
+                    Container.sidemenuBarTranslation = position;
                     if (shadow != null) {
                         g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());
                     }
                     dest.paintComponent(g, true);
+                    Container.sidemenuBarTranslation = 0;
                     g.translate(-position, 0);
                 }
             }

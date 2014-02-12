@@ -356,7 +356,11 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     private Container findLeftTitleContainer() {
-        return (Container) ((BorderLayout) parent.getTitleArea().getLayout()).getWest();
+        Component cmp = ((BorderLayout) parent.getTitleArea().getLayout()).getWest();
+        if(cmp instanceof Container) {
+            return (Container)cmp;
+        }
+        return null;
     }
 
     private Container findRightTitleContainer() {
@@ -801,6 +805,11 @@ public class MenuBar extends Container implements ActionListener {
     private void synchronizeCommandsWithButtonsInBackbutton() {
         adaptTitleLayoutBackCommandStructure();
         Container leftContainer = findLeftTitleContainer();
+        
+        if(leftContainer == null && getCommandBehavior() == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            return;
+        }
+        
         Container rightContainer = findRightTitleContainer();
 
         int componentCount = getCommandCount();

@@ -46,7 +46,7 @@ import java.util.Vector;
  * @see List
  * @author Chen Fishbein
  */
-public class ComboBox extends List {
+public class ComboBox<T> extends List<T> {
     private static boolean defaultActAsSpinnerDialog;
 
     /**
@@ -86,7 +86,7 @@ public class ComboBox extends List {
      * 
      * @param items set of items placed into the combo box model
      */
-    public ComboBox(Vector items) {
+    public ComboBox(Vector<T> items) {
         this(new DefaultListModel(items));
     }
 
@@ -103,7 +103,7 @@ public class ComboBox extends List {
      * Constructs an empty combo box
      */
     public ComboBox() {
-        this(new DefaultListModel());
+        this(new DefaultListModel<T>());
     }
 
     /**
@@ -111,14 +111,14 @@ public class ComboBox extends List {
      * 
      * @param model the model for the combo box elements and selection
      */
-    public ComboBox(ListModel model) {
+    public ComboBox(ListModel<T> model) {
         super(model);
         super.setUIID("ComboBox");
         ((DefaultListCellRenderer) super.getRenderer()).setShowNumbers(false);
         setInputOnFocus(false);
         setIsScrollVisible(false);
         setFixedSelection(FIXED_NONE_CYCLIC);
-        ListCellRenderer r = getRenderer();
+        ListCellRenderer<T> r = getRenderer();
         if(r instanceof Component) {
             Component c = (Component) getRenderer();
             c.setUIID("ComboBoxItem");
@@ -214,7 +214,7 @@ public class ComboBox extends List {
      * @param l the list of the popup
      * @return a dialog instance
      */
-    protected Dialog createPopupDialog(List l) {
+    protected Dialog createPopupDialog(List<T> l) {
         Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle"){
 
             protected void autoAdjust(int w, int h) {
@@ -343,7 +343,7 @@ public class ComboBox extends List {
      * @inheritDoc
      */
     protected void fireClicked() {
-        List l = createPopupList();
+        List<T> l = createPopupList();
         l.dispatcher = dispatcher;
         l.eventSource = this;
         l.disposeDialogOnSelection = true;
@@ -369,8 +369,8 @@ public class ComboBox extends List {
      * 
      * @return a newly created list object used when the user presses the combo box.
      */
-    protected List createPopupList() {
-        List l = new List(getModel());
+    protected List<T> createPopupList() {
+        List<T> l = new List<T>(getModel());
         l.setSmoothScrolling(isSmoothScrolling());
         l.setFixedSelection(getFixedSelection());
         l.setListCellRenderer(getRenderer());

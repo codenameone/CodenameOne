@@ -61,6 +61,12 @@ public class Container extends Component {
     private UIManager uiManager;
 
     /**
+     * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
+     * this is visible with the table component where the lines slide out of place
+     */
+    static int sidemenuBarTranslation;
+
+    /**
      * Constructs a new Container with a new layout manager.
      * 
      * @param layout the specified layout manager
@@ -955,11 +961,16 @@ public class Container extends Component {
         int tx = g.getTranslateX();
         int ty = g.getTranslateY();
         g.translate(-tx, -ty);
-        paintGlass(g);
+        if(sidemenuBarTranslation > 0) {
+            g.translate(sidemenuBarTranslation, 0);
+            paintGlass(g);
+            g.translate(-sidemenuBarTranslation, 0);
+        } else {
+            paintGlass(g);
+        }
         g.translate(tx, ty);
         g.translate(-getX(), -getY());
     }
-
 
     /**
      * This method can be overriden by a component to draw on top of itself or its children
