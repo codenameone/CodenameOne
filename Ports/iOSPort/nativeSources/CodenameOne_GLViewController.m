@@ -998,8 +998,8 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    
     [self becomeFirstResponder];
+    //replaceViewDidAppear
 }
 
 - (BOOL)canBecomeFirstResponder {
@@ -1140,9 +1140,13 @@ static CodenameOne_GLViewController *sharedSingleton;
 
         //some hacking to scale launch image so that it will be drawn correctly
         GLfloat xScale = 1;
+        int statusbarHeight = 20;
+        if(isIOS7()) {
+            statusbarHeight = 0;
+        }
         if(isPortrait) {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
-            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, wi, he));
+            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, wi, he));
             img = [UIImage imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
@@ -1151,7 +1155,7 @@ static CodenameOne_GLViewController *sharedSingleton;
             [(EAGLView *)self.view setFramebuffer];
         } else {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
-            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, 20 * scale, he, wi));
+            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, he, wi));
             img = [UIImage imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
@@ -2017,22 +2021,29 @@ extern int popoverSupported();
 	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
-		UIImage* image = [info objectForKey:UIImagePickerControllerOriginalImage];
+		UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
+            [originalImage retain];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+                UIImage* image = originalImage;
+                if (image.imageOrientation != UIImageOrientationUp) {
+                    UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                    [image drawInRect:(CGRect){0, 0, image.size}];
+                    image = UIGraphicsGetImageFromCurrentImageContext();
+                    UIGraphicsEndImageContext();
+                }
+                [originalImage release];
+
+                NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+
+                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                NSString *documentsDirectory = [paths objectAtIndex:0];
+                NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+                [data writeToFile:path atomically:YES];
+                com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));
+                [pool release];
+            });
         
-        if (image.imageOrientation != UIImageOrientationUp) {
-            UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-            [image drawInRect:(CGRect){0, 0, image.size}];
-            image = UIGraphicsGetImageFromCurrentImageContext();
-            UIGraphicsEndImageContext();
-        }
-        
-        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
-        [data writeToFile:path atomically:YES];
-        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));
 	} else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
@@ -2174,13 +2185,11 @@ extern SKPayment *paymentInstance;
 
 - (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
     if(datepickerPopover) {
-        if(currentDatePickerDate == nil) {
-            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
-        } else {
-            com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+        if(currentDatePickerDate != nil) {
             [currentDatePickerDate release];
             currentDatePickerDate = nil;
         }
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
         datepickerPopover = NO;
     }
 }

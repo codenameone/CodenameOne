@@ -186,4 +186,5 @@ extern void repaintUI();
     [super dealloc];
 }
 
+//GL_APP_DELEGATE_BODY
 @end

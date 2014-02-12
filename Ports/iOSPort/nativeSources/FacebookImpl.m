@@ -24,10 +24,11 @@
 #include "xmlvm-util.h"
 #import <UIKit/UIKit.h>
 
-//#define INCLUDE_FACEBOOK
+#define INCLUDE_FACEBOOK
 #ifdef INCLUDE_FACEBOOK
 #include "com_codename1_social_FacebookImpl.h"
 #import "FBSession.h"
+
 
 extern JAVA_OBJECT fromNSString(NSString* str);
 
@@ -36,11 +37,11 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJE
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         FBSession* s = [FBSession activeSession];
         if(s == nil || !s.isOpen) {
-            s = [[FBSession alloc] init];
-            [FBSession setActiveSession:s];
-            [s openWithCompletionHandler:^(FBSession *session,
+            [FBSession openActiveSessionWithReadPermissions:@[@"basic_info"] allowLoginUI:YES
+                                completionHandler:^(FBSession *session,
                                            FBSessionState status,
                                            NSError *error) {
+                [FBSession setActiveSession:session];
                 if(status == FBSessionStateClosedLoginFailed || status == FBSessionStateOpen) {
                     com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
                     impl->fields.com_codename1_social_FacebookImpl.loginCompleted_ = TRUE;

@@ -57,6 +57,8 @@
 #endif
 #import "Rotate.h"
 
+#define INCLUDE_CN1_PUSH2
+
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
 JAVA_OBJECT fromNSString(NSString* str)
 {
@@ -3448,7 +3450,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
         pickerView.delegate = [CodenameOne_GLViewController instance];
         if(isIPad()) {
             datepickerPopover = YES;
-            stringPickerSelection = 0;
+            stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
             UIView *popoverView = [[UIView alloc] init];
             [vc setView:popoverView];
@@ -3509,7 +3511,14 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             
             //[actionSheet showInView:self.view];
             [actionSheet showInView:[UIApplication sharedApplication].keyWindow];
-            [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+            if (UIDeviceOrientationIsLandscape([[CodenameOne_GLViewController instance] interfaceOrientation])) {
+                [actionSheet setBounds:CGRectMake(0, 0, 485, 320)];
+            } else {
+                [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+            }
+        }
+        if(selection > -1) {
+            [pickerView selectRow:selection inComponent:0 animated:NO];
         }
         [pool release];
         repaintUI();
@@ -3577,6 +3586,8 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
             datePickerView.frame = CGRectMake(0, 44, datePickerView.frame.size.width, datePickerView.frame.size.height);
             
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
+            popoverControllerInstance = uip;
+            
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
@@ -3604,7 +3615,11 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
             
             //[actionSheet showInView:self.view];
             [actionSheet showInView:[UIApplication sharedApplication].keyWindow];
-            [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+            if (UIDeviceOrientationIsLandscape([[CodenameOne_GLViewController instance] interfaceOrientation])) {
+                [actionSheet setBounds:CGRectMake(0, 0, 485, 320)];
+            } else {
+                [actionSheet setBounds:CGRectMake(0, 0, 320, 485)];
+            }
         }
         [pool release];
         repaintUI();
