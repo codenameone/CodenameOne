@@ -329,6 +329,9 @@ public class ComponentEntry {
     
     @XmlAttribute
     private Boolean commandBack;
+
+    @XmlAttribute
+    private String clientProperties;
     
     /**
      * @return the name
@@ -1698,5 +1701,19 @@ public class ComponentEntry {
                 c.findEmbeddedDependencies(result);
             }
         }
+    }
+
+    /**
+     * @return the clientProperties
+     */
+    public String getClientProperties() {
+        return clientProperties;
+    }
+
+    /**
+     * @param clientProperties the clientProperties to set
+     */
+    public void setClientProperties(String clientProperties) {
+        this.clientProperties = clientProperties;
     }
 }

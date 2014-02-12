@@ -33,6 +33,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JComboBox;
@@ -50,7 +52,9 @@ import javax.swing.event.ChangeListener;
  * @author Shai Almog
  */
 public class AddAndScaleMultiImage extends javax.swing.JPanel {
-
+    private float aspect;
+    private File selectedFile;
+    
     /** Creates new form AddAndScaleMultiImage */
     public AddAndScaleMultiImage() {
         initComponents();
@@ -66,17 +70,17 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         initSpinner(veryHighHeight, "veryHighHeightSpinner", 96);
         initSpinner(hdWidth, "hdWidthSpinner", 196);
         initSpinner(hdHeight, "hdHeightSpinner", 196);
-        percentWidth.setModel(new SpinnerNumberModel(20, 1, 100, 1));
-        percentHeight.setModel(new SpinnerNumberModel(15, 1, 100, 1));
+        percentWidth.setModel(new SpinnerNumberModel(20.0, 1.0, 100.0, 1.0));
+        percentHeight.setModel(new SpinnerNumberModel(15.0, 1.0, 100.0, 1.0));
     }
 
-    private int get(JSpinner s) {
-        return ((Number)s.getValue()).intValue();
+    private float get(JSpinner s) {
+        return ((Number)s.getValue()).floatValue();
     }
 
     private EncodedImage createScale(BufferedImage bi, JSpinner ws, JSpinner hs) throws IOException {
-        int w = get(ws);
-        int h = get(hs);
+        int w = (int)get(ws);
+        int h = (int)get(hs);
         if(w != 0 && h != 0) {
             return EncodedImage.create(scale(bi, w, h));
         }
@@ -222,9 +226,10 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
 
     public void selectFiles(JComponent parent, EditableResources res) {
         File[] selection = ResourceEditorView.showOpenFileChooser(true, "Images", ".gif", ".png", ".jpg");
-        if (selection == null) {
+        if (selection == null || selection.length == 0) {
             return;
         }
+        selectedFile = selection[0];
         int result = JOptionPane.showConfirmDialog(parent, this, "Select Resolutions", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if(result != JOptionPane.OK_OPTION) {
             return;
@@ -281,6 +286,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         percentWidth = new javax.swing.JSpinner();
         percentHeight = new javax.swing.JSpinner();
         squareImages = new javax.swing.JCheckBox();
+        preserveAspectRatio = new javax.swing.JCheckBox();
 
         FormListener formListener = new FormListener();
 
@@ -293,8 +299,10 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         jLabel2.setName("jLabel2"); // NOI18N
 
         veryLowWidth.setName("veryLowWidth"); // NOI18N
+        veryLowWidth.addChangeListener(formListener);
 
         veryLowHeight.setName("veryLowHeight"); // NOI18N
+        veryLowHeight.addChangeListener(formListener);
 
         jLabel3.setText("Size");
         jLabel3.setName("jLabel3"); // NOI18N
@@ -309,36 +317,46 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         jLabel6.setName("jLabel6"); // NOI18N
 
         lowWidth.setName("lowWidth"); // NOI18N
+        lowWidth.addChangeListener(formListener);
 
         lowHeight.setName("lowHeight"); // NOI18N
+        lowHeight.addChangeListener(formListener);
 
         jLabel7.setText("Medium");
         jLabel7.setName("jLabel7"); // NOI18N
 
         mediumWidth.setName("mediumWidth"); // NOI18N
+        mediumWidth.addChangeListener(formListener);
 
         mediumHeight.setName("mediumHeight"); // NOI18N
+        mediumHeight.addChangeListener(formListener);
 
         jLabel8.setText("High");
         jLabel8.setName("jLabel8"); // NOI18N
 
         highWidth.setName("highWidth"); // NOI18N
+        highWidth.addChangeListener(formListener);
 
         highHeight.setName("highHeight"); // NOI18N
+        highHeight.addChangeListener(formListener);
 
         jLabel9.setText("Very High");
         jLabel9.setName("jLabel9"); // NOI18N
 
         veryHighWidth.setName("veryHighWidth"); // NOI18N
+        veryHighWidth.addChangeListener(formListener);
 
         veryHighHeight.setName("veryHighHeight"); // NOI18N
+        veryHighHeight.addChangeListener(formListener);
 
         jLabel10.setText("HD");
         jLabel10.setName("jLabel10"); // NOI18N
 
         hdWidth.setName("hdWidth"); // NOI18N
+        hdWidth.addChangeListener(formListener);
 
         hdHeight.setName("hdHeight"); // NOI18N
+        hdHeight.addChangeListener(formListener);
 
         jLabel11.setText("% (will affect all entries)");
         jLabel11.setName("jLabel11"); // NOI18N
@@ -353,51 +371,55 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         squareImages.setName("squareImages"); // NOI18N
         squareImages.addActionListener(formListener);
 
+        preserveAspectRatio.setText("Preserve Aspect Ratio");
+        preserveAspectRatio.setName("preserveAspectRatio"); // NOI18N
+        preserveAspectRatio.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
+                .add(6, 6, 6)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jLabel3)
+                    .add(jLabel2)
+                    .add(jLabel6)
+                    .add(jLabel7)
+                    .add(jLabel8)
+                    .add(jLabel9)
+                    .add(jLabel10)
+                    .add(jLabel11))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(percentWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(hdWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(veryHighWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(highWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(mediumWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(lowWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(veryLowWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
+                    .add(jLabel4))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(percentHeight)
+                    .add(hdHeight)
+                    .add(veryHighHeight)
+                    .add(highHeight)
+                    .add(mediumHeight)
+                    .add(lowHeight)
+                    .add(veryLowHeight)
+                    .add(jLabel5))
+                .add(125, 125, 125))
+            .add(layout.createSequentialGroup()
                 .add(10, 10, 10)
                 .add(jLabel1)
-                .addContainerGap())
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .add(layout.createSequentialGroup()
-                .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(layout.createSequentialGroup()
-                        .add(squareImages)
-                        .addContainerGap())
-                    .add(layout.createSequentialGroup()
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jLabel3)
-                            .add(jLabel2)
-                            .add(jLabel6)
-                            .add(jLabel7)
-                            .add(jLabel8)
-                            .add(jLabel9)
-                            .add(jLabel10)
-                            .add(jLabel11))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(percentWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(hdWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(veryHighWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(highWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(mediumWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(lowWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(veryLowWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 43, Short.MAX_VALUE)
-                            .add(jLabel4))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(percentHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(hdHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(veryHighHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(highHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(mediumHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(lowHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(veryLowHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
-                            .add(jLabel5))
-                        .add(125, 125, 125))))
+                    .add(squareImages)
+                    .add(preserveAspectRatio))
+                .add(0, 0, Short.MAX_VALUE))
         );
 
         layout.linkSize(new java.awt.Component[] {jLabel4, jLabel5}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -449,7 +471,9 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     .add(percentHeight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(squareImages)
-                .addContainerGap(14, Short.MAX_VALUE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(preserveAspectRatio)
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
     }
 
@@ -461,6 +485,9 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             if (evt.getSource() == squareImages) {
                 AddAndScaleMultiImage.this.squareImagesActionPerformed(evt);
             }
+            else if (evt.getSource() == preserveAspectRatio) {
+                AddAndScaleMultiImage.this.preserveAspectRatioActionPerformed(evt);
+            }
         }
 
         public void stateChanged(javax.swing.event.ChangeEvent evt) {
@@ -469,6 +496,42 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             }
             else if (evt.getSource() == percentHeight) {
                 AddAndScaleMultiImage.this.percentHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == veryLowWidth) {
+                AddAndScaleMultiImage.this.veryLowWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == lowWidth) {
+                AddAndScaleMultiImage.this.lowWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == mediumWidth) {
+                AddAndScaleMultiImage.this.mediumWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == highWidth) {
+                AddAndScaleMultiImage.this.highWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == veryHighWidth) {
+                AddAndScaleMultiImage.this.veryHighWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == hdWidth) {
+                AddAndScaleMultiImage.this.hdWidthStateChanged(evt);
+            }
+            else if (evt.getSource() == veryLowHeight) {
+                AddAndScaleMultiImage.this.veryLowHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == lowHeight) {
+                AddAndScaleMultiImage.this.lowHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == mediumHeight) {
+                AddAndScaleMultiImage.this.mediumHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == highHeight) {
+                AddAndScaleMultiImage.this.highHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == veryHighHeight) {
+                AddAndScaleMultiImage.this.veryHighHeightStateChanged(evt);
+            }
+            else if (evt.getSource() == hdHeight) {
+                AddAndScaleMultiImage.this.hdHeightStateChanged(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -485,7 +548,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
     }//GEN-LAST:event_squareImagesActionPerformed
 
     private void percentWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_percentWidthStateChanged
-        float percentRatio = ((float)get(percentWidth))/ 100.0f;
+        float percentRatio = get(percentWidth) / 100.0f;
         veryLowWidth.setValue((int)(174.0f * percentRatio));
         lowWidth.setValue((int)(240.0f * percentRatio));
         mediumWidth.setValue((int)(320.0f * percentRatio));
@@ -495,7 +558,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
     }//GEN-LAST:event_percentWidthStateChanged
 
     private void percentHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_percentHeightStateChanged
-        float percentRatio = ((float)get(percentHeight))/ 100.0f;
+        float percentRatio = get(percentHeight) / 100.0f;
         veryLowHeight.setValue((int)(220.0f * percentRatio));
         lowHeight.setValue((int)(320.0f * percentRatio));
         mediumHeight.setValue((int)(480.0f * percentRatio));
@@ -504,7 +567,86 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         hdHeight.setValue((int)(1920.0f * percentRatio));
     }//GEN-LAST:event_percentHeightStateChanged
 
+    private void preserveAspectRatioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_preserveAspectRatioActionPerformed
+        if(preserveAspectRatio.isSelected()) {
+            try {
+                BufferedImage bi = ImageIO.read(selectedFile);
+                aspect = ((float)bi.getWidth()) / ((float)bi.getHeight());
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }//GEN-LAST:event_preserveAspectRatioActionPerformed
 
+    private void veryLowWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_veryLowWidthStateChanged
+        updateHeight(veryLowWidth, veryLowHeight);
+    }//GEN-LAST:event_veryLowWidthStateChanged
+
+    private void lowWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_lowWidthStateChanged
+        updateHeight(lowWidth, lowHeight);
+    }//GEN-LAST:event_lowWidthStateChanged
+
+    private void mediumWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_mediumWidthStateChanged
+        updateHeight(mediumWidth, mediumHeight);
+    }//GEN-LAST:event_mediumWidthStateChanged
+
+    private void highWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_highWidthStateChanged
+        updateHeight(highWidth, highHeight);
+    }//GEN-LAST:event_highWidthStateChanged
+
+    private void veryHighWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_veryHighWidthStateChanged
+        updateHeight(veryHighWidth, veryHighHeight);
+    }//GEN-LAST:event_veryHighWidthStateChanged
+
+    private void hdWidthStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_hdWidthStateChanged
+        updateHeight(hdWidth, hdHeight);
+    }//GEN-LAST:event_hdWidthStateChanged
+
+    private void veryLowHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_veryLowHeightStateChanged
+        updateWidth(veryLowHeight, veryLowWidth);
+    }//GEN-LAST:event_veryLowHeightStateChanged
+
+    private void lowHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_lowHeightStateChanged
+        updateWidth(lowHeight, lowWidth);
+    }//GEN-LAST:event_lowHeightStateChanged
+
+    private void mediumHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_mediumHeightStateChanged
+        updateWidth(mediumHeight, mediumWidth);
+    }//GEN-LAST:event_mediumHeightStateChanged
+
+    private void highHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_highHeightStateChanged
+        updateWidth(highHeight, highWidth);
+    }//GEN-LAST:event_highHeightStateChanged
+
+    private void veryHighHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_veryHighHeightStateChanged
+        updateWidth(veryHighHeight, veryHighWidth);
+    }//GEN-LAST:event_veryHighHeightStateChanged
+
+    private void hdHeightStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_hdHeightStateChanged
+        updateWidth(hdHeight, hdWidth);
+    }//GEN-LAST:event_hdHeightStateChanged
+
+    private boolean lock;
+    private void updateHeight(JSpinner source, JSpinner dest) {
+        if(preserveAspectRatio.isSelected() && !lock) {
+            lock = true;
+            float width = get(source);
+            float height = width / aspect;
+            dest.setValue(new Integer((int)height));
+            lock = false;
+        }
+    }
+
+    private void updateWidth(JSpinner source, JSpinner dest) {
+        if(preserveAspectRatio.isSelected() && !lock) {
+            lock = true;
+            float height = get(source);
+            float width = height *  aspect;
+            dest.setValue(new Integer((int)width));
+            lock = false;
+        }
+    }
+    
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JSpinner hdHeight;
     private javax.swing.JSpinner hdWidth;
@@ -527,6 +669,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
     private javax.swing.JSpinner mediumWidth;
     private javax.swing.JSpinner percentHeight;
     private javax.swing.JSpinner percentWidth;
+    private javax.swing.JCheckBox preserveAspectRatio;
     private javax.swing.JCheckBox squareImages;
     private javax.swing.JSpinner veryHighHeight;
     private javax.swing.JSpinner veryHighWidth;

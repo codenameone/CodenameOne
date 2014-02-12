@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.5" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <Properties>
@@ -19,54 +19,53 @@
   <Layout>
     <DimensionLayout dim="0">
       <Group type="103" groupAlignment="0" attributes="0">
+          <Group type="102" alignment="0" attributes="0">
+              <EmptySpace min="6" pref="6" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel6" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel7" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel8" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel9" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel10" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Component id="percentWidth" alignment="0" pref="43" max="32767" attributes="0"/>
+                  <Component id="hdWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="veryHighWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="highWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="mediumWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="lowWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="veryLowWidth" pref="43" max="32767" attributes="0"/>
+                  <Component id="jLabel4" linkSize="1" alignment="0" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="-2" max="-2" attributes="0"/>
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Component id="percentHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="hdHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="veryHighHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="highHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="mediumHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="lowHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="veryLowHeight" alignment="0" max="32767" attributes="0"/>
+                  <Component id="jLabel5" linkSize="1" alignment="0" min="-2" max="-2" attributes="0"/>
+              </Group>
+              <EmptySpace min="125" pref="125" max="-2" attributes="0"/>
+          </Group>
           <Group type="102" attributes="0">
               <EmptySpace min="10" pref="10" max="10" attributes="0"/>
               <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
-              <EmptySpace max="-2" attributes="0"/>
+              <EmptySpace max="32767" attributes="0"/>
           </Group>
           <Group type="102" alignment="0" attributes="0">
-              <EmptySpace min="-2" max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" alignment="0" attributes="0">
-                      <Component id="squareImages" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                  </Group>
-                  <Group type="102" alignment="0" attributes="0">
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="jLabel3" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel6" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel7" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel8" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel9" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel10" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace min="-2" max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="percentWidth" alignment="0" pref="43" max="32767" attributes="0"/>
-                          <Component id="hdWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="veryHighWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="highWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="mediumWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="lowWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="veryLowWidth" pref="43" max="32767" attributes="0"/>
-                          <Component id="jLabel4" linkSize="1" alignment="0" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace min="-2" max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="percentHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="hdHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="veryHighHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="highHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="mediumHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="lowHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="veryLowHeight" alignment="0" pref="42" max="32767" attributes="0"/>
-                          <Component id="jLabel5" linkSize="1" alignment="0" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace min="125" pref="125" max="-2" attributes="0"/>
-                  </Group>
+                  <Component id="squareImages" alignment="0" min="-2" max="-2" attributes="0"/>
+                  <Component id="preserveAspectRatio" alignment="0" min="-2" max="-2" attributes="0"/>
               </Group>
+              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -125,6 +124,8 @@
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="squareImages" min="-2" max="-2" attributes="0"/>
+              <EmptySpace max="-2" attributes="0"/>
+              <Component id="preserveAspectRatio" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="32767" attributes="0"/>
           </Group>
       </Group>
@@ -147,11 +148,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="veryLowWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="veryLowWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="veryLowHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="veryLowHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="veryLowHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel3">
       <Properties>
@@ -181,11 +188,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="lowWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="lowWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="lowHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="lowHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="lowHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel7">
       <Properties>
@@ -197,11 +210,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="mediumWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="mediumWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="mediumHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="mediumHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="mediumHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel8">
       <Properties>
@@ -213,11 +232,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="highWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="highWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="highHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="highHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="highHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel9">
       <Properties>
@@ -229,11 +254,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="veryHighWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="veryHighWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="veryHighHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="veryHighHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="veryHighHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel10">
       <Properties>
@@ -245,11 +276,17 @@
       <Properties>
         <Property name="name" type="java.lang.String" value="hdWidth" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="hdWidthStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSpinner" name="hdHeight">
       <Properties>
         <Property name="name" type="java.lang.String" value="hdHeight" noResource="true"/>
       </Properties>
+      <Events>
+        <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="hdHeightStateChanged"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel11">
       <Properties>
@@ -280,6 +317,15 @@
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="squareImagesActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JCheckBox" name="preserveAspectRatio">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Preserve Aspect Ratio"/>
+        <Property name="name" type="java.lang.String" value="preserveAspectRatio" noResource="true"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="preserveAspectRatioActionPerformed"/>
       </Events>
     </Component>
   </SubComponents>

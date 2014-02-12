@@ -813,7 +813,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
 
-    public void clipRect(Object graphics, int x, int y, int width, int height) {
+    /*public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng.clipH == 0 || ng.clipW == 0) {
             return;
@@ -834,8 +834,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipH = d.getHeight();
             setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
         }
-    }
-    /*public void clipRect(Object graphics, int x, int y, int width, int height) {
+    }*/
+    public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng.clipH == 0 || ng.clipW == 0) {
             return;
@@ -856,7 +856,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.clipH = d.getHeight();
             setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
         }
-    }*/
+    }
 
     private static void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2) {
         nativeInstance.nativeDrawLineMutable(color, alpha, x1, y1, x2, y2);
@@ -3424,6 +3424,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.getDocumentsDir(),
             nativeInstance.getResourcesDir()
         };
+        for(int iter = 0 ; iter < roots.length ; iter++) {
+            if(roots[iter].startsWith("/")) {
+                roots[iter] = "file:/" + roots[iter];
+            }
+            if(!roots[iter].endsWith("/")) {
+                roots[iter] = roots[iter] + "/";
+            }
+        }
         return roots;
     }
 
