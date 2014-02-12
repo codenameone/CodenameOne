@@ -293,6 +293,7 @@ public class TextField extends TextArea {
      */
     public TextField(String text, int columns) {
         super(text, 1, columns);
+        setUIID("TextField");
         setSingleLineTextArea(true);
     }
     
