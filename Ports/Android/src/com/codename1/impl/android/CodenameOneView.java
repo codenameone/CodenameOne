@@ -172,7 +172,7 @@ public class CodenameOneView {
 
         if (InPlaceEditView.isEditing()) {
             final Form f = this.implementation.getCurrentForm();
-            ActionListener orientation = new ActionListener() {
+            ActionListener sizeChanged = new ActionListener() {
 
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -183,10 +183,10 @@ public class CodenameOneView {
                             InPlaceEditView.reLayoutEdit();
                         }
                     });
-                    f.removeOrientationListener(this);
+                    f.removeSizeChangedListener(this);
                 }
             };
-            f.addOrientationListener(orientation);
+            f.addSizeChangedListener(sizeChanged);
         }
         Display.getInstance().sizeChanged(w, h);
     }
