@@ -88,7 +88,7 @@ public class Picker extends Button {
                             cld.setTime((Date)value);
                             ds.setStartYear(1900);
                             ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
-                            ds.setCurrentMonth(cld.get(Calendar.MONTH + 1));
+                            ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);
                             ds.setCurrentYear(cld.get(Calendar.YEAR));
                             showDialog(pickerDlg, ds);
                             cld.set(Calendar.DAY_OF_MONTH, ds.getCurrentDay());
