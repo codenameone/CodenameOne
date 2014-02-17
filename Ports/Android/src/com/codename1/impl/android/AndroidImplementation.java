@@ -201,6 +201,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int aboveSpacing;
     private static int belowSpacing;
     public static boolean asyncView = false;
+    public static boolean textureView = false;    
     
     /**
      * This method in used internally for ads
@@ -523,7 +524,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(activity, AndroidImplementation.this);                
             }
         } else {
-            if(android.os.Build.VERSION.SDK_INT == 18){
+            if(textureView){
                 myView = new AndroidTextureView(activity, AndroidImplementation.this);                
             } else {
                 myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
