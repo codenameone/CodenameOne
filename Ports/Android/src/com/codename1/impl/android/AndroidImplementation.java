@@ -201,7 +201,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int aboveSpacing;
     private static int belowSpacing;
     public static boolean asyncView = false;
-    public static boolean textureView = false;    
+    public static boolean textureView = false;
     
     /**
      * This method in used internally for ads
@@ -380,8 +380,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((CodenameOneActivity) m).setIntentResultListener(this);
         }
 
-        int hardwareAcceleration = 16777216;
-        activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
         /**
          * translate our default font height depending on the screen density.
          * this is required for new high resolution devices. otherwise
@@ -521,6 +519,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(android.os.Build.VERSION.SDK_INT < 14){
                 myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
             } else {
+                int hardwareAcceleration = 16777216;
+                activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
                 myView = new AndroidAsyncView(activity, AndroidImplementation.this);                
             }
         } else {
@@ -2873,12 +2873,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
+    /**
+     * Executes r on the UI thread and blocks the EDT to completion
+     * @param r runnable to execute
+     */
+    public static void runOnUiThreadAndBlock(final Runnable r) {
+        final boolean[] completed = new boolean[1];
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                r.run();
+                completed[0] = true;
+                synchronized(completed) {
+                    completed.notify();
+                }
+            }
+        });
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                synchronized(completed) {
+                    while(!completed[0]) {
+                        try {
+                            completed.wait();
+                        } catch(InterruptedException err) {}
+                    }
+                }
+            }
+        });
+    }
+    
     public int convertToPixels(int dipCount, boolean horizontal) {
         DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-        if (horizontal) {
-            return (int) (((float) dipCount) / 25.4f * dm.xdpi);
-        }
-        return (int) (((float) dipCount) / 25.4f * dm.ydpi);
+        float ppi = dm.density * 160f;
+        return (int) (((float) dipCount) / 25.4f * ppi);
     }
 
     public boolean isPortrait() {
@@ -4123,16 +4151,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public Object getPasteDataFromClipboard() {
-        
-        int sdk = android.os.Build.VERSION.SDK_INT;
-        if (sdk < 11) {
-            android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-            return clipboard.getText().toString();
-        } else {
-            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-            ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-            return item.getText();    
-        }
+        final Object[] response = new Object[1];
+        runOnUiThreadAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                int sdk = android.os.Build.VERSION.SDK_INT;
+                if (sdk < 11) {
+                    android.text.ClipboardManager clipboard = (android.text.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                    response[0] = clipboard.getText().toString();
+                } else {
+                    android.content.ClipboardManager clipboard = (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                    response[0] = item.getText();    
+                }
+            }
+        });
+        return response[0];
     }
     
     
@@ -4913,7 +4947,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(activity);
-            if(!in.initiateScan(IntentIntegrator.PRODUCT_CODE_TYPES, "ONE_D_MODE")){
+            Collection<String> types = IntentIntegrator.PRODUCT_CODE_TYPES;
+            if(Display.getInstance().getProperty("scanAllCodeTypes", "false").equals("true")) {
+                types = IntentIntegrator.ALL_CODE_TYPES;
+            } 
+            if(!in.initiateScan(types, "ONE_D_MODE")){
                 // restore old activity handling
                  Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -4922,7 +4960,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             CodeScannerImpl.this.callback = null;
                         }
                     });
-                 
+
                 if (activity instanceof CodenameOneActivity) {
                     ((CodenameOneActivity) activity).restoreIntentResultListener();
                 }
@@ -5259,12 +5297,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 boolean canceled;
                 
                 StringPick() {
-                    for(int iter = 0 ; iter < values.length ; iter++) {
-                        if(values.equals(currentValue)) {
-                            result = iter;
-                            break;
-                        }
-                    }
                 }
                 
                 public void run() {
@@ -5300,6 +5332,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             
             final StringPick pickInstance = new StringPick();
+            for(int iter = 0 ; iter < values.length ; iter++) {
+                if(values[iter].equals(currentValue)) {
+                    pickInstance.result = iter;
+                    break;
+                }
+            }
 
             activity.runOnUiThread(new Runnable() {
                 public void run() {
