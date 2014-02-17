@@ -214,6 +214,16 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y
 extern int isIPad();
 extern int isIOS7();
 
+NSString* fixFilePath(NSString* ns) {
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+        while([ns hasPrefix:@"//"]) {
+            ns = [ns substringFromIndex:1];
+        }
+    }
+    return ns;
+}
+
 JAVA_OBJECT utf8String = NULL;
 
 const char* stringToUTF8(JAVA_OBJECT str) {
@@ -1019,7 +1029,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(JAVA
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
     if(error != nil) {  
-        NSLog(@"Error in recording: %@", [error localizedDescription]);        
+        NSLog(@"Error in fileCountInDir: %@", [error localizedDescription]);        
     }
     int i = nsArr.count;
     [fm release];
@@ -1475,6 +1485,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_l
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         const char* chrs = stringToUTF8(uri);
         NSString* ns = [NSString stringWithUTF8String:chrs];
+        if([ns hasPrefix:@"file:/"]) {
+            ns = fixFilePath(ns);
+            NSURL* nu = [NSURL fileURLWithPath:ns];
+            ns = [nu absoluteString];
+        }
         com_codename1_impl_ios_IOSNative_createAudio = [[AudioPlayer alloc] initWithURL:ns callback:onCompletion];
         [pool release];
     });
@@ -1819,6 +1834,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
         if(picker == nil || ![MFMailComposeViewController canSendMail]) {
+            [picker release];
             return;
         }
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2739,32 +2755,64 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
             NSLog(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
             return;
         }
-        NSString * filePath = toNSString(destinationFile);
-        
-        // cleanup older file if it exists in this location
-        NSFileManager* fm = [[NSFileManager alloc] init];
-        NSString* ns = filePath;
-        if([ns hasPrefix:@"file:"]) {
-            ns = [ns substringFromIndex:5];
+        if (isIOS7()) {
+            NSLog(@"Asking for record permission");
+            [audioSession requestRecordPermission:^(BOOL granted) {
+                NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+                if (granted) {
+                    NSString * filePath = toNSString(destinationFile);
+                    
+                    // cleanup older file if it exists in this location
+                    NSFileManager* fm = [[NSFileManager alloc] init];
+                    NSString* ns = fixFilePath(filePath);
+                    if([fm fileExistsAtPath:ns]) {
+                        [fm removeItemAtPath:ns error:&err];
+                    }
+                    
+                    NSLog(@"Recording audio to: %@", filePath);
+                    NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                                    [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
+                                                    [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
+                                                    [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
+                                                    nil];
+                    NSError *error = nil;
+                    recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:ns]
+                                                           settings: recordSettings
+                                                              error: &error];
+                    if(error != nil) {  
+                        NSLog(@"Error in recording: %@", [error localizedDescription]);        
+                    }
+                    recorder.delegate = [CodenameOne_GLViewController instance];
+                } else {
+                    recorder = nil;
+                }
+                [pool release];
+            }];
+        } else {
+            NSString * filePath = toNSString(destinationFile);
+            
+            // cleanup older file if it exists in this location
+            NSFileManager* fm = [[NSFileManager alloc] init];
+            NSString* ns = fixFilePath(ns);
+            if([fm fileExistsAtPath:ns]) {
+                [fm removeItemAtPath:ns error:&err];
+            }
+            
+            NSLog(@"Recording audio to: %@", filePath);
+            NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                            [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
+                                            [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
+                                            [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
+                                            nil];
+            NSError *error = nil;
+            recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:filePath]
+                                                   settings: recordSettings
+                                                      error: &error];
+            if(error != nil) {
+                NSLog(@"Error in recording: %@", [error localizedDescription]);
+            }
+            recorder.delegate = [CodenameOne_GLViewController instance];
         }
-        if([fm fileExistsAtPath:ns]) {
-            [fm removeItemAtPath:ns error:&err];
-        }
-        
-        NSLog(@"Recording audio to: %@", filePath);
-        NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
-                                        [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
-                                        [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
-                                        [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
-                                        nil];
-        NSError *error = nil;
-        recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:filePath]
-             settings: recordSettings
-             error: &error];
-        if(error != nil) {  
-            NSLog(@"Error in recording: %@", [error localizedDescription]);        
-        }
-        recorder.delegate = [CodenameOne_GLViewController instance];
         [pool release];
     });
     return recorder;
@@ -3419,6 +3467,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(JAVA_OBJECT in
         UIWebView* webView = [[UIWebView alloc] initWithFrame:CGRectZero];
         NSString* userAgentString = [webView stringByEvaluatingJavaScriptFromString:@"navigator.userAgent"];
         c = fromNSString(userAgentString);
+        [webView release];
         [pool release];
     });
 

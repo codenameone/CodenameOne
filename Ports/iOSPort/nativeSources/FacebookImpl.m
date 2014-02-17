@@ -24,7 +24,7 @@
 #include "xmlvm-util.h"
 #import <UIKit/UIKit.h>
 
-#define INCLUDE_FACEBOOK
+//#define INCLUDE_FACEBOOK
 #ifdef INCLUDE_FACEBOOK
 #include "com_codename1_social_FacebookImpl.h"
 #import "FBSession.h"

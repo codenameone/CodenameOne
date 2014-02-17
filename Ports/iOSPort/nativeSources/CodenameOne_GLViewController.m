@@ -1327,7 +1327,7 @@ int keyboardHeight;
 - (void)didReceiveMemoryWarning
 {
     // Releases the view if it doesn't have a superview.
-    [super didReceiveMemoryWarning];
+    //[super didReceiveMemoryWarning];
     com_codename1_impl_ios_IOSImplementation_flushSoftRefMap__();
     GC_gcollect_and_unmap();
     // Release any cached data, images, etc. that aren't in use.
@@ -2016,33 +2016,41 @@ extern int popoverSupported();
     [picker dismissModalViewControllerAnimated:YES];
 }
 
+//#define LOW_MEM_CAMERA
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
 	if ([mediaType isEqualToString:@"public.image"]) {
 		// get the image
 		UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
-            [originalImage retain];
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-                UIImage* image = originalImage;
-                if (image.imageOrientation != UIImageOrientationUp) {
-                    UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-                    [image drawInRect:(CGRect){0, 0, image.size}];
-                    image = UIGraphicsGetImageFromCurrentImageContext();
-                    UIGraphicsEndImageContext();
-                }
+        [originalImage retain];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+            UIImage* image = originalImage;
+            BOOL releaseImage = YES;
+#ifndef LOW_MEM_CAMERA
+            if (image.imageOrientation != UIImageOrientationUp) {
+                UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                [image drawInRect:(CGRect){0, 0, image.size}];
+                releaseImage = NO;
                 [originalImage release];
-
-                NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-
-                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-                NSString *documentsDirectory = [paths objectAtIndex:0];
-                NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
-                [data writeToFile:path atomically:YES];
-                com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));
-                [pool release];
-            });
+                image = UIGraphicsGetImageFromCurrentImageContext();
+                UIGraphicsEndImageContext();
+            }
+#endif
+            
+            NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+            [data writeToFile:path atomically:YES];
+            if(releaseImage) {
+                [originalImage release];
+            }
+            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(fromNSString(path));
+            [pool release];
+        });
         
 	} else {
         // was movie type
@@ -2055,11 +2063,15 @@ extern int popoverSupported();
         popoverController.delegate = nil;
         popoverController = nil;
 	} else {
+#ifdef LOW_MEM_CAMERA
+		[picker dismissModalViewControllerAnimated:NO];
+#else
 		[picker dismissModalViewControllerAnimated:YES];
+#endif
 	}
     
-	picker.delegate = nil;
-    picker = nil;
+	//picker.delegate = nil;
+    //picker = nil;
     [pool release];
 }
 
