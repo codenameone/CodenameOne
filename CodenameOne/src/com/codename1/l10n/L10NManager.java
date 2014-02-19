@@ -172,4 +172,59 @@ public class L10NManager {
     public static L10NManager getInstance() {
         return Display.getInstance().getLocalizationManager();
     }
+
+    /**
+     * Formats a number as a String with a fixed number of decimal places
+     * @param number the number
+     * @param decimalPlaces decimals
+     * @return formatted string 
+     */
+    public String format(double number, int decimalPlaces) {
+        return format(number);
+    }
+    
+    /**
+     * Parses a double based on locale conventions
+     * @param localeFormattedDecimal the locale formatted number
+     * @return the parsed double
+     */
+    public double parseDouble(String localeFormattedDecimal) {
+        return Double.parseDouble(localeFormattedDecimal);
+    }
+    
+    /**
+     * Parses a long based on locale conventions
+     * @param localeFormattedLong the number
+     * @return a long
+     */
+    public long parseLong(String localeFormattedLong) {
+        return Long.parseLong(localeFormattedLong);
+    }
+
+    /**
+     * Parses an integer based on locale conventions
+     * 
+     * @param localeFormattedInteger the number
+     * @return a parsed number
+     */
+    public int parseInt(String localeFormattedInteger) {
+        return Integer.parseInt(localeFormattedInteger);
+    }
+    
+    /**
+     * Parses the currency value
+     * @param amount the amount
+     * @return a numeric value for the currency
+     */
+    public double parseCurrency(String amount) {
+        StringBuilder b = new StringBuilder();
+        int l = amount.length();
+        for(int iter = 0 ; iter < l ; iter++) {
+            char c = amount.charAt(iter);
+            if(Character.isDigit(c) || c == '.' || c == ',' || c == '-') {
+                b.append(c);
+            }
+        }
+        return parseDouble(b.toString());
+    }
 }

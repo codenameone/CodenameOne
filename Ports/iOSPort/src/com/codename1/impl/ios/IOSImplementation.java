@@ -1395,14 +1395,18 @@ public class IOSImplementation extends CodenameOneImplementation {
             private boolean playing;
             @Override
             public void play() {
-                nativeInstance.startAudioRecord(peer[0]);
-                playing = true;
+                if(peer[0] != 0) {
+                    nativeInstance.startAudioRecord(peer[0]);
+                    playing = true;
+                }
             }
 
             @Override
             public void pause() {
-                nativeInstance.pauseAudioRecord(peer[0]);
-                playing = false;
+                if(peer[0] != 0) {
+                    nativeInstance.pauseAudioRecord(peer[0]);
+                    playing = false;
+                }
             }
             
             protected void finalize() {
@@ -2154,6 +2158,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.cleanupAudio(l[0]);
     }*/
 
+    @Override
+    public int getDeviceDensity() {
+        // ipad mini is ignored, there is no sensible way to detect it
+        if(isTablet()) {
+            if(getDisplayWidth() < 1100) {
+                return Display.DENSITY_MEDIUM;
+            }
+            return Display.DENSITY_VERY_HIGH;
+        } else {
+            if(getDisplayWidth() < 500) {
+                return Display.DENSITY_MEDIUM;
+            }
+            return Display.DENSITY_VERY_HIGH;
+        }
+    }
+    
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
         // ipad mini is ignored, there is no sensible way to detect it

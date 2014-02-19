@@ -744,6 +744,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int selectedWidth;
         ListModel model = l.getModel();
         int numOfcomponents = Math.max(model.getSize(), l.getMinElementHeight());
+        numOfcomponents = Math.min(numOfcomponents, l.getMaxElementHeight());
         Object prototype = l.getRenderingPrototype();
 
         Style unselectedEntryStyle = null;

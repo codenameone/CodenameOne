@@ -132,7 +132,7 @@ public class Push {
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(true);
-        cr.setUrl("https://codename-one.appspot.com/sendPushMessage");
+        cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "sendPushMessage");
         cr.addArgument("packageName", Display.getInstance().getProperty("package_name", ""));
         cr.addArgument("email", Display.getInstance().getProperty("built_by_user", ""));
         if(deviceKey != null) {

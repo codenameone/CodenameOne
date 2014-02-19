@@ -203,6 +203,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static void setDesignMode(boolean aDesignMode) {
         designMode = aDesignMode;
     }
+
+    /**
+     * @return the defaultPixelMilliRatio
+     */
+    public static Double getDefaultPixelMilliRatio() {
+        return defaultPixelMilliRatio;
+    }
+
+    /**
+     * @param aDefaultPixelMilliRatio the defaultPixelMilliRatio to set
+     */
+    public static void setDefaultPixelMilliRatio(Double aDefaultPixelMilliRatio) {
+        defaultPixelMilliRatio = aDefaultPixelMilliRatio;
+    }
     private TestRecorder testRecorder;
     private Hashtable contacts;
     private static boolean designMode;
@@ -286,7 +300,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean showEDTViolationStacks = false;
     private boolean inInit;
     private boolean showMenu = true;
-    private Double pixelMilliRatio;
+    private static Double defaultPixelMilliRatio;
+    private Double pixelMilliRatio = defaultPixelMilliRatio;
     private boolean manualPurchaseSupported;
     private boolean managedPurchaseSupported;
     private boolean subscriptionSupported;
@@ -4376,7 +4391,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            FileOutputStream fc = new FileOutputStream((String) connection);
+            FileOutputStream fc = new FileOutputStream(unfile((String) connection));
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
             return o;
         }
@@ -4417,7 +4432,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
-        RandomAccessFile rf = new RandomAccessFile((String) connection, "rw");
+        RandomAccessFile rf = new RandomAccessFile(unfile((String) connection), "rw");
         rf.seek(offset);
         FileOutputStream fc = new FileOutputStream(rf.getFD());
         BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
@@ -4430,7 +4445,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public InputStream openInputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            FileInputStream fc = new FileInputStream((String) connection);
+            FileInputStream fc = new FileInputStream(unfile((String) connection));
             BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
             return o;
         }

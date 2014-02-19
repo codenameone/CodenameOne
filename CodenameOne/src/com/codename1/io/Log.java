@@ -161,7 +161,7 @@ public class Log {
             }
         };
         r.setPost(false);
-        r.setUrl("https://codename-one.appspot.com/registerDeviceServlet");
+        r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "registerDeviceServlet");
         r.addArgument("a", Display.getInstance().getProperty("AppName", ""));
         r.addArgument("b", buildKey);
         r.addArgument("by",Display.getInstance().getProperty("built_by_user", ""));
@@ -193,7 +193,7 @@ public class Log {
             }
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
-            r.setUrl("https://codename-one.appspot.com/uploadLogRequest");
+            r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "uploadLogRequest");
             r.setFailSilently(true);
             NetworkManager.getInstance().addToQueueAndWait(r);
             String url = new String(r.getResponseData());

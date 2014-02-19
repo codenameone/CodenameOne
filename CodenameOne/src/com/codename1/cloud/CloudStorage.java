@@ -846,7 +846,7 @@ public class CloudStorage {
         }
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
-        req.setUrl(SERVER_URL + "/CloudFileStorageDelete");
+        req.setUrl(SERVER_URL + "/fileStoreDelete");
         req.addArgument("i", fileId);
         req.addArgument("t", CloudPersona.getCurrentPersona().getToken());
         NetworkManager.getInstance().addToQueueAndWait(req);

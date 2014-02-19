@@ -24,8 +24,10 @@
 
 package com.codename1.io;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import java.io.ByteArrayOutputStream;
@@ -1073,5 +1075,72 @@ public class Util {
     public static void mergeArrays(Object[] arr1, Object[] arr2, Object[] destinationArray) {
         System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);
         System.arraycopy(arr2, 0, destinationArray, arr1.length, arr2.length);
+    }
+    
+    /**
+     * Blocking method that will download the given URL to storage and return when the 
+     * operation completes
+     * @param url the URL
+     * @param fileName the storage file name
+     * @param showProgress whether to block the UI until download completes/fails
+     * @return true on success false on error
+     */
+    public static boolean downloadUrlToStorage(String url, String fileName, boolean showProgress) {
+        return downloadUrlTo(url, fileName, showProgress, false, true);
+    }
+
+    /**
+     * Blocking method that will download the given URL to the file system storage and return when the 
+     * operation completes
+     * @param url the URL
+     * @param fileName the file name
+     * @param showProgress whether to block the UI until download completes/fails
+     * @return true on success false on error
+     */
+    public static boolean downloadUrlToFile(String url, String fileName, boolean showProgress) {
+        return downloadUrlTo(url, fileName, showProgress, false, false);
+    }
+
+    /**
+     * Non-blocking method that will download the given URL to storage in the background and return immediately
+     * @param url the URL
+     * @param fileName the storage file name
+     */
+    public static void downloadUrlToStorageInBackground(String url, String fileName) {
+        downloadUrlTo(url, fileName, false, true, true);
+    }
+
+    /**
+     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
+     * @param url the URL
+     * @param fileName the file name
+     */
+    public static void downloadUrlToFileSystemInBackground(String url, String fileName) {
+        downloadUrlTo(url, fileName, false, true, false);
+    }
+
+    private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setUrl(url);
+        if(storage) {
+            cr.setDestinationStorage(fileName);
+        } else {
+            cr.setDestinationFile(fileName);
+        }
+        if(background) {
+            NetworkManager.getInstance().addToQueue(cr);
+            return true;
+        } 
+        if(showProgress) {
+            InfiniteProgress ip = new InfiniteProgress();
+            Dialog d = ip.showInifiniteBlocking();
+            NetworkManager.getInstance().addToQueueAndWait(cr);
+            d.dispose();
+        } else {
+            NetworkManager.getInstance().addToQueueAndWait(cr);
+        }
+        return cr.getResponseCode() == 200;
     }
 }

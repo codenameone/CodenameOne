@@ -25,6 +25,7 @@ package com.codename1.impl.javase;
 import com.codename1.location.Location;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -73,20 +74,23 @@ class StubLocationManager extends LocationManager {
 
             @Override
             public void run() {
-                
-                Location loc;
-                try {
-                    loc = getCurrentLocation();
-                    loc.setLongitude(loc.getLongitude() + 0.001);
-                    loc.setLatitude(loc.getLatitude() + + 0.001);                    
-                    l.locationUpdated(loc);
-                } catch (IOException ex) {
-                    Logger.getLogger(StubLocationManager.class.getName()).log(Level.SEVERE, null, ex);
-                }
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Location loc;
+                        try {
+                            loc = getCurrentLocation();
+                            loc.setLongitude(loc.getLongitude() + 0.001);
+                            loc.setLatitude(loc.getLatitude() + + 0.001);                    
+                            l.locationUpdated(loc);
+                        } catch (IOException ex) {
+                            Logger.getLogger(StubLocationManager.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                });
             }
         };
         timer = new Timer();
-        timer.schedule(task, 300, 300);
+        timer.schedule(task, 3000, 3000);
     }
 
     @Override

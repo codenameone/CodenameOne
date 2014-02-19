@@ -114,7 +114,11 @@ public class AutoCompleteTextField extends TextField {
         if (f != null && popup.getParent() == null) {
             addPopup();
         }
-        popup.setVisible(filter.getSize() > 0);
+        boolean v = filter.getSize() > 0;
+        if(v != popup.isVisible()) {
+            popup.setVisible(v);
+            f.repaint();
+        } 
         popup.revalidate();
     }
     

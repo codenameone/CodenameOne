@@ -4682,7 +4682,7 @@ public abstract class CodenameOneImplementation {
             };
             r.setPost(false);
             r.setFailSilently(true);
-            r.setUrl("https://codename-one.appspot.com/registerPush");
+            r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "registerPush");
             long val = Preferences.get("push_id", (long)-1);
             if(val > -1) {
                 r.addArgument("i", "" + val);
@@ -4721,7 +4721,7 @@ public abstract class CodenameOneImplementation {
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
-            r.setUrl("https://codename-one.appspot.com/deregisterPush");
+            r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "deregisterPush");
             r.addArgument("p", "" + i);
             r.addArgument("a", getApplicationKey());
             NetworkManager.getInstance().addToQueue(r);
@@ -4760,7 +4760,7 @@ public abstract class CodenameOneImplementation {
                     while(pollingThreadRunning) {
                         try {
                             ConnectionRequest cr = new ConnectionRequest();
-                            cr.setUrl("https://codename-one.appspot.com/pollManualPush");
+                            cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "pollManualPush");
                             cr.setPost(false);
                             cr.setFailSilently(true);
                             cr.addArgument("i", "" + pushId);

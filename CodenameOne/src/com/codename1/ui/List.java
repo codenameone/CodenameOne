@@ -170,6 +170,13 @@ public class List<T> extends Component {
     private int minElementHeight = 0;
 
     /**
+     * Maximum number of elements shown in a list, this member is used to calculate
+     * the list preferred size. If the number of elements in the model is larger than
+     * this then this value is used in the calculations.
+     */
+    private int maxElementHeight = Integer.MAX_VALUE;
+
+    /**
      * Indicates the gap between each item in the list
      */
     private int itemGap = 2;
@@ -363,6 +370,28 @@ public class List<T> extends Component {
     public boolean isScrollableX() {
         return (getScrollDimension().getWidth() > getWidth()) && (fixedSelection < FIXED_NONE_BOUNDRY) &&
                 orientation == HORIZONTAL;
+    }
+
+    /**
+     * Maximum number of elements shown in a list, this member is used to calculate
+     * the list preferred size. If the number of elements in the model is larger than
+     * this then this value is used in the calculations.
+     *
+     * @return the maximum number of elements
+     */
+    public int getMaxElementHeight() {
+        return maxElementHeight;
+    }
+
+    /**
+     * Maximum number of elements shown in a list, this member is used to calculate
+     * the list preferred size. If the number of elements in the model is larger than
+     * this then this value is used in the calculations.
+     *
+     * @param maxElementHeight the maximum number of elements
+     */
+    public void setMaxElementHeight(int maxElementHeight) {
+        this.maxElementHeight = maxElementHeight;
     }
 
     /**

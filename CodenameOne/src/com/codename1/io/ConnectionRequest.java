@@ -146,6 +146,9 @@ public class ConnectionRequest implements IOProgressListener {
     private String responseContentType;
     private boolean redirecting;
 
+    private String destinationFile;
+    private String destinationStorage;
+    
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
      * customize the name of the cookie header to Cookie
@@ -706,7 +709,19 @@ public class ConnectionRequest implements IOProgressListener {
      * @throws IOException when a read input occurs
      */
     protected void readResponse(InputStream input) throws IOException  {
-        data = Util.readInputStream(input);
+        if(destinationFile != null) {
+            OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
+            Util.copy(input, o);
+            Util.cleanup(o);
+        } else {
+            if(destinationStorage != null) {
+                OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
+                Util.copy(input, o);
+                Util.cleanup(o);
+            } else {
+                data = Util.readInputStream(input);
+            }
+        }
         if(hasResponseListeners()) {
             fireResponseListener(new NetworkEvent(this, data));
         }
@@ -1493,5 +1508,41 @@ public class ConnectionRequest implements IOProgressListener {
      */ 
     public boolean isRedirecting(){
         return redirecting;
+    }
+
+    /**
+     * When set to a none null string saves the response to file system under
+     * this file name
+     * @return the destinationFile
+     */
+    public String getDestinationFile() {
+        return destinationFile;
+    }
+
+    /**
+     * When set to a none null string saves the response to file system under
+     * this file name
+     * @param destinationFile the destinationFile to set
+     */
+    public void setDestinationFile(String destinationFile) {
+        this.destinationFile = destinationFile;
+    }
+
+    /**
+     * When set to a none null string saves the response to storage under
+     * this file name
+     * @return the destinationStorage
+     */
+    public String getDestinationStorage() {
+        return destinationStorage;
+    }
+
+    /**
+     * When set to a none null string saves the response to storage under
+     * this file name
+     * @param destinationStorage the destinationStorage to set
+     */
+    public void setDestinationStorage(String destinationStorage) {
+        this.destinationStorage = destinationStorage;
     }
 }

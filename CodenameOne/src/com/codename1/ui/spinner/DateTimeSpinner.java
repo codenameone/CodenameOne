@@ -23,6 +23,7 @@
 package com.codename1.ui.spinner;
 
 import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * The date and time spinner extends the time spinner by allowing to pick a specific day as well
@@ -37,10 +38,18 @@ public class DateTimeSpinner extends TimeSpinner {
     private Date endDate = new Date(System.currentTimeMillis() + 10000 * 24 * 60 * 60000);
     private boolean markToday = true;
     private boolean includeYear;
+    private int off;
+
+    /**
+     * Default constructor
+     */
+    public DateTimeSpinner() {
+        off = TimeZone.getDefault().getRawOffset();
+    }
     
     void initSpinner() {
         if(date == null) {
-            date = Spinner.createDate(startDate.getTime(), endDate.getTime(), currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);
+            date = Spinner.createDate(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);
             if(includeYear) {
                 date.setRenderingPrototype("XXX XXX 99 9999");
                 ((DateTimeRenderer)date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD_YY);
@@ -96,7 +105,7 @@ public class DateTimeSpinner extends TimeSpinner {
     public void setStartDate(Date startDate) {
         this.startDate = startDate;
         if(date != null) {
-            date.setModel(new SpinnerDateModel(startDate.getTime(), endDate.getTime(), currentDate.getTime()));
+            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));
         }
     }
 
@@ -113,7 +122,7 @@ public class DateTimeSpinner extends TimeSpinner {
     public void setEndDate(Date endDate) {
         this.endDate = endDate;
         if(date != null) {
-            date.setModel(new SpinnerDateModel(startDate.getTime(), endDate.getTime(), currentDate.getTime()));
+            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));
         }
     }
 
@@ -130,7 +139,7 @@ public class DateTimeSpinner extends TimeSpinner {
     public void setMarkToday(boolean markToday) {
         this.markToday = markToday;
         if(date != null) {
-            ((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime());
+            ((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime() + off);
         }
     }
 

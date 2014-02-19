@@ -149,7 +149,7 @@ public class AnalyticsService {
 
             NetworkManager.getInstance().addToQueue(req);
         } else {
-            String url = "https://codename-one.appspot.com/anal";
+            String url = Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "anal";
             ConnectionRequest r = new ConnectionRequest();
             r.setUrl(url);
             r.setPost(false);

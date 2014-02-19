@@ -282,7 +282,7 @@ class PushInbox {
         }
         ConnectionRequest r = new ConnectionRequest();
         r.setPost(true);
-        r.setUrl("https://codename-one.appspot.com/sendPushInboxResponse");
+        r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "sendPushInboxResponse");
         r.addArgument("from", from);
         r.addArgument("title", title);
         r.addArgument("body", body);

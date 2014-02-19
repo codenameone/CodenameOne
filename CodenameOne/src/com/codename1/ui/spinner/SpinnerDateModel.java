@@ -29,6 +29,7 @@ import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * Represents a date model for the spinner
@@ -45,7 +46,7 @@ class SpinnerDateModel implements ListModel {
     private static final long DAY = 24 * 60 * 60 * 1000;
 
     void setValue(Date value) {
-        currentValue = value.getTime();
+        currentValue = value.getTime() + TimeZone.getDefault().getRawOffset();
     }
 
     Object getValue() {

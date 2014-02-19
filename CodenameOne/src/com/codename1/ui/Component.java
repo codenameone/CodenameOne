@@ -1493,6 +1493,11 @@ public class Component implements Animation, StyleListener {
         }
         onScrollX(scrollX);
     }
+    
+    void resetScroll() {
+        scrollX = 0;
+        scrollY = 0;
+    }
 
     /**
      * Indicates the X position of the scrolling, this number is relative to the

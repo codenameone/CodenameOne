@@ -76,17 +76,33 @@ public class SideMenuBar extends MenuBar {
     /**
      * This string can be used in putClientProperty within command to hint about
      * the placement of the command e.g.
-     * putClientProperty(COMMAND_PLACEMENT_KEY, COMMAND_PLACEMENT_VALUE_RIGHT);
+     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
      */
     public static final String COMMAND_PLACEMENT_VALUE_RIGHT = "right";
 
     /**
      * This string can be used in putClientProperty within command to hint about
      * the placement of the command e.g.
-     * putClientProperty(COMMAND_PLACEMENT_KEY, COMMAND_PLACEMENT_VALUE_TOP);
+     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
      */
     public static final String COMMAND_PLACEMENT_VALUE_TOP = "top";
 
+    /**
+     * Allows placing a component instance into the client properties of the command so 
+     * it is shown instead of the command e.g.:
+     * putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, myCustomComponentInstance);
+     */
+    public static final String COMMAND_SIDE_COMPONENT = "SideComponent";
+
+    /**
+     * When using a side component we might want to only have it behave as a visual tool
+     * and still execute the command when it is clicked. The default behavior is to
+     * delegate events to the component, however if this flag is used the command 
+     * will act as normal while using the COMMAND_SIDE_COMPONENT only for visual effect e.g.:
+     * putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
+     */
+    public static final String COMMAND_ACTIONABLE = "Actionable";
+    
     /**
      * Empty Constructor
      */
@@ -702,12 +718,12 @@ public class SideMenuBar extends MenuBar {
             if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {
                 continue;
             }
-            Component cmp = (Component) c.getClientProperty("SideComponent");
+            Component cmp = (Component) c.getClientProperty(COMMAND_SIDE_COMPONENT);
             if (cmp != null) {
                 if (cmp.getParent() != null) {
                     cmp.getParent().removeAll();
                 }
-                if (c.getClientProperty("Actionable") != null) {
+                if (c.getClientProperty(COMMAND_ACTIONABLE) != null) {
                     Container cnt = new Container(new BorderLayout());
                     cnt.addComponent(BorderLayout.CENTER, cmp);
                     Button btn = createTouchCommandButton(c);
@@ -719,6 +735,11 @@ public class SideMenuBar extends MenuBar {
                 }
                 parent.initTitleBarStatus();
             } else {
+                // special case: hide back button that doesn't have text, icon or a side component entry
+                if(parent.getBackCommand() == c && (c.getCommandName() == null || c.getCommandName().length() == 0) &&
+                        c.getIcon() == null) {
+                    continue;
+                }
                 menu.addComponent(createTouchCommandButton(c));
             }
         }

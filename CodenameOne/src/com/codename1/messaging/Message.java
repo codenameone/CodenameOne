@@ -179,7 +179,7 @@ public class Message {
     
     private ConnectionRequest createMessage(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
         ConnectionRequest cr = new ConnectionRequest();
-        cr.setUrl("https://codename-one.appspot.com/sendEmailServlet");
+        cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "sendEmailServlet");
         cr.setPost(true);
         cr.addArgument("d", Display.getInstance().getProperty("built_by_user", ""));
         cr.addArgument("from", sender);

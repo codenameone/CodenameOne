@@ -225,7 +225,9 @@ public class OnOffSwitch extends Container {
                 strWidth = s.getFont().stringWidth(off);
                 g.setColor(0x333333);
                 sX = offX + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;
-                g.drawString(off, sX, sY);
+                if(!noTextMode) {
+                    g.drawString(off, sX, sY);
+                }
             } else {
                 String str;
                 switchButtonPadInt /= 2;

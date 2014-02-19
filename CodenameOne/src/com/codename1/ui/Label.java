@@ -69,6 +69,7 @@ public class Label extends Component {
     
     private String maskName;
     private EventDispatcher textBindListeners = null;
+    private boolean shouldLocalize = true;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -145,7 +146,9 @@ public class Label extends Component {
     
 
     private void localize() {
-        this.text =  getUIManager().localize(text, text);
+        if(shouldLocalize) {
+            this.text =  getUIManager().localize(text, text);
+        }
     }
     
     /**
@@ -688,5 +691,25 @@ public class Label extends Component {
             return;
         }
         super.setBoundPropertyValue(prop, value);
+    }
+
+    /**
+     * Indicates if text should be localized when set to the label, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific label.
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+        return shouldLocalize;
+    }
+
+    /**
+     * Indicates if text should be localized when set to the label, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific label.
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+        this.shouldLocalize = shouldLocalize;
     }
 }
