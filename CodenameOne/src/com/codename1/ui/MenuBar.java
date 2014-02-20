@@ -123,6 +123,16 @@ public class MenuBar extends Container implements ActionListener {
      */
     public MenuBar() {
     }
+
+    private int componentCountOffset(Container c) {
+        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+            Container t = parent.getTitleArea();
+            if(t == c && ((BorderLayout)t.getLayout()).getNorth() != null) {
+                return 1;
+            }
+        }
+        return 0;
+    }
     
     /**
      * Initialize the MenuBar
@@ -336,7 +346,7 @@ public class MenuBar extends Container implements ActionListener {
 
     private void adaptTitleLayoutBackCommandStructure() {
         Container t = parent.getTitleArea();
-        if (t.getComponentCount() == 3) {
+        if (t.getComponentCount() - componentCountOffset(t) == 3) {
             return;
         }
         BorderLayout titleLayout = (BorderLayout) t.getLayout();
@@ -402,7 +412,7 @@ public class MenuBar extends Container implements ActionListener {
                 }
             }
         }
-        if (t.getComponentCount() > 1) {
+        if (t.getComponentCount() - componentCountOffset(t) > 1) {
             if (Display.COMMAND_BEHAVIOR_ICS == getCommandBehavior()) {
                 titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             } else {
@@ -814,7 +824,7 @@ public class MenuBar extends Container implements ActionListener {
 
         int componentCount = getCommandCount();
         if (parent.getBackCommand() != null) {
-            if (leftContainer.getComponentCount() == 0) {
+            if (leftContainer.getComponentCount() - componentCountOffset(leftContainer) <= 0) {
                 Button back = createBackCommandButton();
                 leftContainer.addComponent(back);
                 if(!back.getUIID().equals("BackCommand")) {
@@ -916,7 +926,7 @@ public class MenuBar extends Container implements ActionListener {
     }
     
     private void ensureCommandsInContainer(Command a, Command b, Container c, String styleA, String styleB) {
-        if (c.getComponentCount() == 0) {
+        if (c.getComponentCount() - componentCountOffset(c) == 0) {
             Button btn = new Button(a);
             if(!btn.getUIID().equals(styleA)) {
                 btn.setUIID(styleA);
@@ -932,7 +942,7 @@ public class MenuBar extends Container implements ActionListener {
             hideEmptyCommand(btn);
             return;
         }
-        if (c.getComponentCount() == 1) {
+        if (c.getComponentCount() - componentCountOffset(c) == 1) {
             Button btn = (Button) c.getComponentAt(0);
             if(!btn.getUIID().equals(styleA)) {
                 btn.setUIID(styleA);
@@ -950,7 +960,7 @@ public class MenuBar extends Container implements ActionListener {
             hideEmptyCommand(btn);
             return;
         }
-        if (c.getComponentCount() == 2) {
+        if (c.getComponentCount() - componentCountOffset(c) == 2) {
             Button btn = (Button) c.getComponentAt(0);
             if(!btn.getUIID().equals(styleA)) {
                 btn.setUIID(styleA);
