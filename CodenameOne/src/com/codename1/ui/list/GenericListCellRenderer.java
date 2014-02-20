@@ -250,6 +250,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         if(val == null) {
                             val = h.get(currentName);
                         }
+                        String uiid = (String)h.get(currentName + "_uiid");
+                        if(uiid != null) {
+                            entries[iter].setUIID(uiid);
+                        }
                     }
                     setComponentValueWithTickering(entries[iter], val, list, cmp);
                     entries[iter].setFocus(lead || entries[iter].isFocusable());
@@ -308,6 +312,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     if(currentName.equals("$number")) {
                         setComponentValue(entries[iter], "" + (index + 1), list, cmp);
                         continue;
+                    }
+                    String uiid = (String)h.get(currentName + "_uiid");
+                    if(uiid != null) {
+                        entries[iter].setUIID(uiid);
                     }
                     setComponentValue(entries[iter], h.get(currentName), list, cmp);
                 }

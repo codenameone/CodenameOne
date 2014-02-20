@@ -62,6 +62,8 @@ public class Storage {
             name = StringUtil.replaceAll(name, "%", "_");
             name = StringUtil.replaceAll(name, "?", "_");
             name = StringUtil.replaceAll(name, "*", "_");
+            name = StringUtil.replaceAll(name, ":", "_");
+            name = StringUtil.replaceAll(name, "=", "_");            
         }
         return name;
     }

@@ -795,7 +795,7 @@ public class CloudStorage {
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
         req.setUrl(SERVER_URL + "/fileStoreURLRequest");
-        req.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
+        //req.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
 
         NetworkManager.getInstance().addToQueueAndWait(req);
         int rc = req.getResposeCode();

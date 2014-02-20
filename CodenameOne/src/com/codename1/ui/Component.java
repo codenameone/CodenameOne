@@ -1519,10 +1519,7 @@ public class Component implements Animation, StyleListener {
             int h = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
             this.scrollY = Math.min(this.scrollY, h);
             this.scrollY = Math.max(this.scrollY, 0);
-        } else {
-            updateTensileHighlightIntensity();
-        }
-        
+        }         
         if (isScrollableY()) {
             onParentPositionChange();            
             repaint();
@@ -1548,7 +1545,7 @@ public class Component implements Animation, StyleListener {
 
     
     
-    private void updateTensileHighlightIntensity() {
+    private void updateTensileHighlightIntensity(int lastScroll, int scroll, boolean motion) {
         if(tensileHighlightEnabled) {
             int h = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
             if(h <= 0) {
@@ -1558,10 +1555,14 @@ public class Component implements Animation, StyleListener {
             }
             if(h > this.scrollY) {
                 if(this.scrollY < 0) {
-                    tensileHighlightIntensity = 255;
+                    if(scroll > lastScroll || motion) {
+                        tensileHighlightIntensity = 255;
+                    }
                 }
             } else {
-                tensileHighlightIntensity = 255;
+                if(lastScroll > scroll || motion) {
+                    tensileHighlightIntensity = 255;
+                }
             }
         }
     }
@@ -2243,6 +2244,7 @@ public class Component implements Animation, StyleListener {
                         setScrollY(scroll);
                     }
                 }
+                updateTensileHighlightIntensity(lastScrollY, y, false);
             }
             if (isScrollableX()) {
                 int tl;
@@ -2977,7 +2979,7 @@ public class Component implements Animation, StyleListener {
         Image bgImage = getStyle().getBgImage();
         boolean animateBackground = bgImage != null && bgImage.isAnimation() && bgImage.animate();
         Motion m = getAnimationMotion();
-
+        
         // perform regular scrolling
         if (m != null && destScrollY != -1 && destScrollY != getScrollY()) {
             // change the variable directly for efficiency both in removing redundant
@@ -2986,6 +2988,7 @@ public class Component implements Animation, StyleListener {
             if (destScrollY == scrollY) {
                 destScrollY = -1;
                 deregisterAnimatedInternal();
+                updateTensileHighlightIntensity(0, 0, m != null);
             }
             return true;
         }
@@ -3022,11 +3025,12 @@ public class Component implements Animation, StyleListener {
                 
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
+                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB(), false);            
             }
 
             scrollY = dragVal;
             onScrollY(scrollY);
-            updateTensileHighlightIntensity();
+            updateTensileHighlightIntensity(0, 0, false);
             animateY = true;
         }
         if (draggedMotionX != null) {

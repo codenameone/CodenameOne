@@ -462,7 +462,7 @@ public class UIBuilder { //implements Externalizable {
         if(isBack) {
             Form f = c.getComponentForm();
             if(f != null) {
-                f.setBackCommand(cmd);
+                setBackCommand(f, cmd);
             } else {
                 if(backCommands == null) {
                     backCommands = new Vector();
@@ -739,7 +739,7 @@ public class UIBuilder { //implements Externalizable {
                 commands[iter].setPressedIcon(res.getImage(pressed));
             }
             if(isBack) {
-                ((Form)cmp).setBackCommand(commands[iter]);
+                setBackCommand(((Form)cmp), commands[iter]);
             }
             // trigger listener creation if this is the only command in the form
             getFormListenerInstance(((Form)cmp), null);
@@ -2122,6 +2122,19 @@ public class UIBuilder { //implements Externalizable {
         return "Back";
     }
     
+    /**
+     * Invoked internally to set the back command on the form, this method allows subclasses
+     * to change the behavior of back command adding or disable it
+     * @param f the form
+     * @param backCommand the back command 
+     */
+    protected void setBackCommand(Form f, Command backCommand) {
+        if(shouldAddBackCommandToMenu()) {
+            f.addCommand(backCommand, f.getCommandCount());
+        }
+        f.setBackCommand(backCommand);
+    }
+    
     private void initBackForm(Form f) {
         Vector formNavigationStack = baseFormNavigationStack;
         if(formNavigationStack != null && formNavigationStack.size() > 0) {
@@ -2132,10 +2145,7 @@ public class UIBuilder { //implements Externalizable {
                 String commandAction = (String)previous.get(FORM_STATE_KEY_NAME);
                 Command backCommand = createCommandImpl(getBackCommandText((String)previous.get(FORM_STATE_KEY_TITLE)), null,
                         BACK_COMMAND_ID, commandAction, true, "");
-                if(shouldAddBackCommandToMenu()) {
-                    f.addCommand(backCommand, f.getCommandCount());
-                }
-                f.setBackCommand(backCommand);
+                setBackCommand(f, backCommand);
                 
                 // trigger listener creation if this is the only command in the form
                 getFormListenerInstance(f, null);
@@ -2154,7 +2164,7 @@ public class UIBuilder { //implements Externalizable {
             String commandAction = (String)previous.get(FORM_STATE_KEY_NAME);
             Command backCommand = createCommandImpl(getBackCommandText((String)previous.get(FORM_STATE_KEY_TITLE)), null,
                     BACK_COMMAND_ID, commandAction, true, "");
-            destForm.setBackCommand(backCommand);
+            setBackCommand(destForm, backCommand);
             backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
             backCommand.putClientProperty(COMMAND_ACTION, commandAction);
         }
@@ -2203,7 +2213,7 @@ public class UIBuilder { //implements Externalizable {
         Form newForm = (Form)createContainer(fetchResourceFile(), currentForm.getName());
 
         if (backCommand != null) {
-            newForm.setBackCommand(backCommand);
+            setBackCommand(newForm, backCommand);
 
             // trigger listener creation if this is the only command in the form
             getFormListenerInstance(newForm, null);
@@ -2380,10 +2390,7 @@ public class UIBuilder { //implements Externalizable {
                                 backCommand.putClientProperty(COMMAND_ACTION, commandAction);
                             }
                             if(backCommand != null) {
-                                f.setBackCommand(backCommand);
-                                if(shouldAddBackCommandToMenu() && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) { 
-                                    f.addCommand(backCommand, f.getCommandCount());
-                                }
+                                setBackCommand(f, backCommand);
                             }
 
                             // trigger listener creation if this is the only command in the form

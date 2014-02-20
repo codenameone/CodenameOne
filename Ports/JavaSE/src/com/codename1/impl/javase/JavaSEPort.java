@@ -2684,7 +2684,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             text += ((char) keyCode);
             setText(tf, text);
             setCaretPosition(tf, text.length());
-            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+            if(cmp instanceof com.codename1.ui.TextField) {
+                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+            }
         } else {
             setText(tf, text);
         }

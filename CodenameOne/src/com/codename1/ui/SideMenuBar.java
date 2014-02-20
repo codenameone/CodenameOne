@@ -497,8 +497,9 @@ public class SideMenuBar extends MenuBar {
             out = parent.getTransitionOutAnimator();
             in = parent.getTransitionInAnimator();
             parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(300, false, -1, direction));
-            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
+            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(0, true, dest, direction));
             menu.show();
+            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
         }
     }
 

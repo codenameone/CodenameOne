@@ -156,6 +156,8 @@ public abstract class LookAndFeel {
 
     private Image tensileHighlightTopImage;
     private Image tensileHighlightBottomImage;
+    private Image tensileGlowTopImage;
+    private Image tensileGlowBottomImage;
     
     private UIManager manager;
     public LookAndFeel(UIManager manager){
@@ -958,6 +960,8 @@ public abstract class LookAndFeel {
         if(defaultTensileHighlight) {
             tensileHighlightBottomImage = manager.getThemeImageConstant("tensileHighlightBottomImage");
             tensileHighlightTopImage = manager.getThemeImageConstant("tensileHighlightTopImage");
+            tensileGlowBottomImage = manager.getThemeImageConstant("tensileGlowBottomImage");
+            tensileGlowTopImage = manager.getThemeImageConstant("tensileGlowTopImage");
             if(tensileHighlightBottomImage != null && tensileHighlightTopImage != null) {
                 defaultTensileDrag = true;
                 defaultAlwaysTensile = false;
@@ -1312,14 +1316,33 @@ public abstract class LookAndFeel {
      */
     public void paintTensileHighlight(Component t, Graphics  g, boolean top, int opacity) {
         if(opacity > 0 && tensileHighlightTopImage != null && tensileHighlightBottomImage != null) {
-            int a = g.getAlpha();
-            g.setAlpha(opacity);
-            if(top) {
-                g.drawImage(tensileHighlightTopImage, t.getX(), t.getY(), Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
+            int absX = t.getAbsoluteX();
+            int absY = t.getAbsoluteY();
+            if(tensileGlowTopImage != null) {
+                int a = g.getAlpha();
+                float aspect = ((float)tensileGlowTopImage.getWidth()) / ((float)Display.getInstance().getDisplayWidth());
+                int newHeight = (int)(((float)tensileGlowTopImage.getHeight()) * aspect);
+                if(top) {
+                    g.drawImage(tensileHighlightTopImage, absX, absY, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
+                    g.setAlpha(opacity / 3);
+                    g.drawImage(tensileGlowTopImage, absX, absY, Display.getInstance().getDisplayWidth(), newHeight);
+                    g.setAlpha(a);
+                } else {
+                    g.drawImage(tensileHighlightBottomImage, absX, Display.getInstance().getDisplayHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                    g.setAlpha(opacity / 3);
+                    g.drawImage(tensileGlowBottomImage, absX, Display.getInstance().getDisplayHeight() - newHeight, Display.getInstance().getDisplayWidth(), newHeight);
+                    g.setAlpha(a);
+                }
             } else {
-                g.drawImage(tensileHighlightBottomImage, t.getX(), Display.getInstance().getDisplayHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                int a = g.getAlpha();
+                g.setAlpha(opacity);
+                if(top) {
+                    g.drawImage(tensileHighlightTopImage, absX, absY, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
+                } else {
+                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                }
+                g.setAlpha(a);
             }
-            g.setAlpha(a);
         }
     }
     
