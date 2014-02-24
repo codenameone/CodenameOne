@@ -4216,6 +4216,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         }
         
+        @Override
+        public void init() {
+            super.init();
+            setVisible(true);
+        }        
+        
         public void prepare() { 
         }
 
