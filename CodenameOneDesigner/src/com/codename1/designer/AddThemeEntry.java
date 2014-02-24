@@ -1136,6 +1136,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         baseStyleType = new javax.swing.JComboBox();
         defineAttribute = new javax.swing.JCheckBox();
         deriveHelp6 = new javax.swing.JButton();
+        jLabel22 = new javax.swing.JLabel();
         jPanel7 = new javax.swing.JPanel();
         bitmapFont = new javax.swing.JRadioButton();
         systemFont = new javax.swing.JRadioButton();
@@ -1949,6 +1950,9 @@ public class AddThemeEntry extends javax.swing.JPanel {
         deriveHelp6.setName("deriveHelp6"); // NOI18N
         deriveHelp6.addActionListener(formListener);
 
+        jLabel22.setText("Please note that deriving to/from builtin components e.g. Button, TextField etc. is unreliable due to cyclic dependencies");
+        jLabel22.setName("jLabel22"); // NOI18N
+
         org.jdesktop.layout.GroupLayout jPanel10Layout = new org.jdesktop.layout.GroupLayout(jPanel10);
         jPanel10.setLayout(jPanel10Layout);
         jPanel10Layout.setHorizontalGroup(
@@ -1963,7 +1967,10 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel10Layout.createSequentialGroup()
                         .add(baseStyle, 0, 736, Short.MAX_VALUE)
                         .add(18, 18, 18)
-                        .add(baseStyleType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(baseStyleType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jPanel10Layout.createSequentialGroup()
+                        .add(jLabel22)
+                        .add(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         jPanel10Layout.setVerticalGroup(
@@ -1977,7 +1984,9 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(baseStyle, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(baseStyleType, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(394, Short.MAX_VALUE))
+                .add(18, 18, 18)
+                .add(jLabel22)
+                .addContainerGap(360, Short.MAX_VALUE))
         );
 
         addTabs.addTab("Derive", jPanel10);
@@ -3000,6 +3009,7 @@ private void trueTypeFontSizeValueStateChanged(javax.swing.event.ChangeEvent evt
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel20;
     private javax.swing.JLabel jLabel21;
+    private javax.swing.JLabel jLabel22;
     private javax.swing.JLabel jLabel23;
     private javax.swing.JLabel jLabel24;
     private javax.swing.JLabel jLabel25;

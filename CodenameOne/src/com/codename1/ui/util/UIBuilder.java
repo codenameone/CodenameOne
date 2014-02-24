@@ -194,6 +194,8 @@ public class UIBuilder { //implements Externalizable {
     static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
     static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
 
+    static final int PROPERTY_CLIENT_PROPERTIES = 77;
+    
     static final int LAYOUT_BOX_X = 5002;
     static final int LAYOUT_BOX_Y = 5003;
     static final int LAYOUT_GRID = 5006;
@@ -1316,6 +1318,21 @@ public class UIBuilder { //implements Externalizable {
 
                 case PROPERTY_TEXT_POSITION:
                     ((Label)cmp).setTextPosition(in.readInt());
+                    break;
+                    
+                case PROPERTY_CLIENT_PROPERTIES:
+                    int count = in.readInt();
+                    StringBuilder sb = new StringBuilder();
+                    for(int iter = 0 ; iter < count ; iter++) {
+                        String k = in.readUTF();
+                        String v = in.readUTF();
+                        cmp.putClientProperty(k, v);
+                        sb.append(k);
+                        if(iter < count - 1) {
+                            sb.append(",");
+                        }
+                    }
+                    cmp.putClientProperty("cn1$Properties", sb.toString());
                     break;
 
                 case PROPERTY_NAME:

@@ -161,9 +161,7 @@ public class CloudStorage {
      * This operation executes immeditely without waiting for commit.
      * 
      * @param objects objects to refresh
-     * @param callback object for the response
-     * @return status code matching the situation, one of: RETURN_CODE_SUCCESS, 
-     * RETURN_CODE_FAIL_SERVER_ERROR
+     * @param response object for the response
      */
     public void refresh(CloudObject[] objects, CloudResponse<Integer> response) {
         refreshImpl(objects, response);

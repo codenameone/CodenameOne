@@ -23,6 +23,7 @@
 package com.codename1.contacts;
 
 import com.codename1.ui.Image;
+import java.util.Collection;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -159,6 +160,12 @@ public class Contact {
      * @return the Contact primary email or null if not declared
      */
     public String getPrimaryEmail() {
+        if(primaryEmail == null) {
+            Collection c = emails.values();
+            if(c.size() > 0) {
+                return (String)c.iterator().next();
+            }
+        }
         return primaryEmail;
     }
 

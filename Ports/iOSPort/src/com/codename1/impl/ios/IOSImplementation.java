@@ -2160,6 +2160,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public int getDeviceDensity() {
+        if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
+            return super.getDeviceDensity();
+        }
         // ipad mini is ignored, there is no sensible way to detect it
         if(isTablet()) {
             if(getDisplayWidth() < 1100) {

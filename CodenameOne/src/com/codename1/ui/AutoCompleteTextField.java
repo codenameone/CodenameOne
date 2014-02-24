@@ -101,7 +101,7 @@ public class AutoCompleteTextField extends TextField {
         if (text == null) {
             return;
         }
-        if(filter(text)) {
+        if(filterImpl(text)) {
             updateFilterList();
         } 
     }
@@ -135,6 +135,23 @@ public class AutoCompleteTextField extends TextField {
         return false;
     }
     
+    private boolean filterImpl(String text) {
+        boolean res = filter(text);
+        if(filter != null && popup != null) {
+            boolean v = filter.getSize() > 0;
+            if(v != popup.isVisible()) {
+                popup.setVisible(v);
+                if(!v) {
+                    Form f = getComponentForm();
+                    if(f != null) {
+                        f.repaint();
+                    }
+                }
+            } 
+        }
+        return res;
+    }
+
     /**
      * Returns the list model to show within the completion list
      * @return the list model can be anything
@@ -211,7 +228,7 @@ public class AutoCompleteTextField extends TextField {
     private void addPopup() {
         Form f = getComponentForm();
         popup.removeAll();
-        filter(getText());
+        filterImpl(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
         for(ActionListener al : listeners) {
             l.addActionListener(al);

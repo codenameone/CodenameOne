@@ -167,6 +167,22 @@ public class UIBuilderOverride extends UIBuilder {
             }
             c.putClientProperty(TYPE_KEY, root.getType());
             c.setName(root.getName());
+            
+            String clientProps = root.getClientProperties();
+            if(clientProps != null && clientProps.length() > 0) {
+                String[] props = clientProps.split(",");
+                StringBuilder b = new StringBuilder();
+                for(String p : props) {
+                    String[] keyVal = p.split("=");
+                    c.putClientProperty(keyVal[0], keyVal[1]);
+                    if(b.length() > 0) {
+                        b.append(",");
+                    }
+                    b.append(keyVal[0]);
+                }
+                c.putClientProperty("cn1$Properties", b.toString());
+            }
+            
             rootContainer.putClientProperty("%" + root.getName() + "%", c);
             
             // layout must be first since we might need to rely on it later on with things such as constraints

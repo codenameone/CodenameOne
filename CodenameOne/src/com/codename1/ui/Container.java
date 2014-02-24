@@ -1492,7 +1492,7 @@ public class Container extends Component {
      * @inheritDoc
      */
     public boolean isScrollableY() {
-        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() || isAlwaysTensile());
+        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() - Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() || isAlwaysTensile());
     }
 
     /**

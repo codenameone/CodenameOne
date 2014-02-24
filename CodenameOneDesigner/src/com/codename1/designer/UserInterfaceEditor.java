@@ -225,6 +225,7 @@ public class UserInterfaceEditor extends BaseForm {
     static final int PROPERTY_DISPOSE_WHEN_POINTER_OUT = 74;
     static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
     static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
+    static final int PROPERTY_CLIENT_PROPERTIES = 77;
 
     private static final String TYPE_KEY = "$TYPE_NAME$";
 
@@ -3784,6 +3785,17 @@ public class UserInterfaceEditor extends BaseForm {
             out.writeUTF(cmp.getName());
         } else {
             out.writeUTF("");
+        }
+        if(cmp.getClientProperty("cn1$Properties") != null) {
+            String[] p = ((String)cmp.getClientProperty("cn1$Properties")).split(",");
+            if(p.length > 0) {
+                out.writeInt(PROPERTY_CLIENT_PROPERTIES);
+                out.writeInt(p.length);
+                for(String c : p) {
+                    out.writeUTF(c);
+                    out.writeUTF((String)cmp.getPropertyValue(c));
+                }
+            }
         }
         if(cmp.getCloudBoundProperty() != null) {
             out.writeInt(PROPERTY_CLOUD_BOUND_PROPERTY);

@@ -115,8 +115,6 @@ import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.net.*;
 import java.sql.DriverManager;
@@ -314,6 +312,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean disconnectedMode;
 
     private static boolean exposeFilesystem;
+    private boolean scrollWheeling;
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -991,9 +990,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int x = scaleCoordinateX(e.getX());
             final int y = scaleCoordinateY(e.getY());
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+                requestFocus();
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
+                        scrollWheeling = true;
                         Form f = getCurrentForm();
                         f.pointerPressed(x, y);
                         f.pointerDragged(x, y + units / 4);
@@ -1016,6 +1017,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Form f = getCurrentForm();
                         f.pointerDragged(x, y + units);
                         f.pointerReleased(x, y + units);
+                        scrollWheeling = false;
                     }
                 });
             } 
@@ -2644,6 +2646,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
+        if(scrollWheeling) {
+            return;
+        }
         if(System.getProperty("TextCompatMode") != null) {
             editStringLegacy(cmp, maxSize, constraint, text, keyCode);
             return;
@@ -4831,6 +4836,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getPlatformName() {
+        if(getSkin() == null) {
+            if(IS_MAC) {
+                return "mac";
+            }
+            return "win";
+        }
         return platformName;
     }
 

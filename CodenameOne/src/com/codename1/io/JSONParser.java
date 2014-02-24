@@ -26,7 +26,10 @@ package com.codename1.io;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -62,8 +65,9 @@ public class JSONParser implements JSONParseCallback {
 
     }
 
-    private Hashtable state;
-    private Vector parseStack;
+    private boolean modern;
+    private Map<String, Object> state;
+    private java.util.List<Object> parseStack;
     private String currentKey;
     static class KeyStack extends Vector {
 		protected String peek() {
@@ -324,7 +328,6 @@ public class JSONParser implements JSONParseCallback {
             i.close();
         }
     }
-
     /**
      * Parses the given input stream into this object and returns the parse tree
      *
@@ -332,24 +335,42 @@ public class JSONParser implements JSONParseCallback {
      * @return the parse tree as a hashtable
      * @throws IOException if thrown by the stream
      */
-    public Hashtable parse(Reader i) throws IOException {
-        state = new Hashtable();
-        parseStack = new Vector();
+    public Map<String, Object> parseJSON(Reader i) throws IOException {
+        modern = true;
+        state = new HashMap<String, Object>();
+        parseStack = new ArrayList<Object>();
         currentKey = null;
         parse(i, this);
         return state;
     }
 
+    /**
+     * Parses the given input stream into this object and returns the parse tree
+     *
+     * @param i the reader
+     * @return the parse tree as a hashtable
+     * @throws IOException if thrown by the stream
+     * @deprecated use the new parseJSON instead
+     */
+    public Hashtable<String, Object> parse(Reader i) throws IOException {
+        modern = false;
+        state = new Hashtable();
+        parseStack = new Vector();
+        currentKey = null;
+        parse(i, this);
+        return (Hashtable<String, Object>)state;
+    }
+
     private boolean isStackHash() {
-        return parseStack.elementAt(parseStack.size() - 1) instanceof Hashtable;
+        return parseStack.get(parseStack.size() - 1) instanceof Hashtable;
     }
 
     private Hashtable getStackHash() {
-        return (Hashtable) parseStack.elementAt(parseStack.size() - 1);
+        return (Hashtable) parseStack.get(parseStack.size() - 1);
     }
 
-    private Vector getStackVec() {
-        return (Vector) parseStack.elementAt(parseStack.size() - 1);
+    private java.util.List<Object> getStackVec() {
+        return (java.util.List<Object>) parseStack.get(parseStack.size() - 1);
     }
 
     /**
@@ -357,16 +378,21 @@ public class JSONParser implements JSONParseCallback {
      */
     public void startBlock(String blockName) {
         if (parseStack.size() == 0) {
-            parseStack.addElement(state);
+            parseStack.add(state);
         } else {
-            Hashtable newOne = new Hashtable();
+            Map newOne;
+            if(modern) {
+                newOne = new HashMap();
+            } else {
+                newOne = new Hashtable();
+            }
             if (isStackHash()) {
                 getStackHash().put(currentKey, newOne);
                 currentKey = null;
             } else {
-                getStackVec().addElement(newOne);
+                getStackVec().add(newOne);
             }
-            parseStack.addElement(newOne);
+            parseStack.add(newOne);
         }
     }
 
@@ -374,34 +400,40 @@ public class JSONParser implements JSONParseCallback {
      * @inheritDoc
      */
     public void endBlock(String blockName) {
-        parseStack.removeElementAt(parseStack.size() - 1);
+        parseStack.remove(parseStack.size() - 1);
     }
 
     /**
      * @inheritDoc
      */
     public void startArray(String arrayName) {
-        Vector currentVector = new Vector();
+        java.util.List<Object> currentVector;
+        Map newOne;
+        if(modern) {
+            currentVector = new ArrayList<Object>();
+        } else {
+            currentVector = new Vector<Object>();
+        }
 
         // the root of the JSON is an array, we need to wrap it in an assignment
         if (parseStack.size() == 0) {
-            parseStack.addElement(state);
+            parseStack.add(state);
             currentKey = "root";
         }
         if (isStackHash()) {
             getStackHash().put(currentKey, currentVector);
             currentKey = null;
         } else {
-            getStackVec().addElement(currentVector);
+            getStackVec().add(currentVector);
         }
-        parseStack.addElement(currentVector);
+        parseStack.add(currentVector);
     }
 
     /**
      * @inheritDoc
      */
     public void endArray(String arrayName) {
-        parseStack.removeElementAt(parseStack.size() - 1);
+        parseStack.remove(parseStack.size() - 1);
     }
 
     /**
@@ -418,7 +450,7 @@ public class JSONParser implements JSONParseCallback {
                 currentKey = null;
             }
         } else {
-            getStackVec().addElement(tok);
+            getStackVec().add(tok);
         }
     }
 
@@ -430,7 +462,7 @@ public class JSONParser implements JSONParseCallback {
             getStackHash().put(currentKey, new Double(tok));
             currentKey = null;
         } else {
-            getStackVec().addElement(new Double(tok));
+            getStackVec().add(new Double(tok));
         }
     }
 

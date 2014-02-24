@@ -137,7 +137,7 @@ public class EditableResources extends Resources implements TreeModel {
     
     /**
      * Copies the value from the base to the override resource as a starting point
-     * @param the name of the resource
+     * @param name the name of the resource
      */
     public void overrideResource(String name) {
         overrideResource.setResource(name, getResourceType(name), getResourceObject(name));
