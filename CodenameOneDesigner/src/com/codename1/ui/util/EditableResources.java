@@ -693,19 +693,32 @@ public class EditableResources extends Resources implements TreeModel {
                         if(xmlData.getUi() != null) {
                             if(xmlData.isUseXmlUI()) {
                                 ArrayList<ComponentEntry> guiElements = new ArrayList<ComponentEntry>();
+                                
+                                // place renderers first
+                                final ArrayList<String> renderers = new ArrayList<String>();
                                 for(Ui d : xmlData.getUi()) {
                                     JAXBContext componentContext = JAXBContext.newInstance(ComponentEntry.class);
                                     File uiFile = new File(resDir, normalizeFileName(d.getName()) + ".ui");
                                     ComponentEntry uiXMLData = (ComponentEntry)componentContext.createUnmarshaller().unmarshal(uiFile);                                    
                                     guiElements.add(uiXMLData);
+                                    uiXMLData.findRendererers(renderers);
                                 }
+                                
                                 Collections.sort(guiElements, new Comparator<ComponentEntry>() {
                                     private final ArrayList<String> entries1 = new ArrayList<String>();
                                     private final ArrayList<String> entries2 = new ArrayList<String>();
                                     @Override
                                     public int compare(ComponentEntry o1, ComponentEntry o2) {
+                                        if(renderers.contains(o1.getName())) {
+                                            return -1;
+                                        }
+                                        if(renderers.contains(o2.getName())) {
+                                            return 1;
+                                        }
+                                        
                                         entries1.clear();
                                         entries2.clear();
+                                        
                                         o1.findEmbeddedDependencies(entries1);
                                         o2.findEmbeddedDependencies(entries2);
                                         if(entries1.size() == 0) {

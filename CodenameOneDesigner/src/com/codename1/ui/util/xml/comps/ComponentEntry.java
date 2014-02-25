@@ -1690,6 +1690,34 @@ public class ComponentEntry {
     public void setMapItems(MapItems[] mapItems) {
         this.mapItems = mapItems;
     }
+
+    public void findRendererers(List<String> result) {
+        if(unselectedRenderer != null) {
+            if(!result.contains(unselectedRenderer)) {
+                result.add(unselectedRenderer);
+            }
+        }
+        if(selectedRenderer != null) {
+            if(!result.contains(selectedRenderer)) {
+                result.add(selectedRenderer);
+            }
+        }
+        if(unselectedRendererEven != null) {
+            if(!result.contains(unselectedRendererEven)) {
+                result.add(unselectedRendererEven);
+            }
+        }
+        if(selectedRendererEven != null) {
+            if(!result.contains(selectedRendererEven)) {
+                result.add(selectedRendererEven);
+            }
+        }
+        if(component != null) {
+            for(ComponentEntry c : component) {
+                c.findRendererers(result);
+            }
+        }
+    }
     
     public void findEmbeddedDependencies(List<String> result) {
         if(type.equals("EmbeddedContainer")) {
