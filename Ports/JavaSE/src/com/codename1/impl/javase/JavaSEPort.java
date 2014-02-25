@@ -996,27 +996,35 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         scrollWheeling = true;
                         Form f = getCurrentForm();
-                        f.pointerPressed(x, y);
-                        f.pointerDragged(x, y + units / 4);
+                        if(f != null){
+                            f.pointerPressed(x, y);
+                            f.pointerDragged(x, y + units / 4);
+                        }
                     }
                 });
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         Form f = getCurrentForm();
-                        f.pointerDragged(x, y + units / 4 * 2);
+                        if(f != null){
+                            f.pointerDragged(x, y + units / 4 * 2);
+                        }
                     }
                 });
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         Form f = getCurrentForm();
-                        f.pointerDragged(x, y + units / 4 * 3);
+                        if(f != null){
+                            f.pointerDragged(x, y + units / 4 * 3);
+                        }
                     }
                 });
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         Form f = getCurrentForm();
-                        f.pointerDragged(x, y + units);
-                        f.pointerReleased(x, y + units);
+                        if(f != null){
+                            f.pointerDragged(x, y + units);
+                            f.pointerReleased(x, y + units);
+                        }
                         scrollWheeling = false;
                     }
                 });
