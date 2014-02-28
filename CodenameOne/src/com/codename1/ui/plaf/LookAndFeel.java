@@ -1328,7 +1328,7 @@ public abstract class LookAndFeel {
                     g.drawImage(tensileGlowTopImage, absX, absY, Display.getInstance().getDisplayWidth(), newHeight);
                     g.setAlpha(a);
                 } else {
-                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - newHeight), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - tensileHighlightBottomImage.getHeight()), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
                     g.setAlpha(opacity / 3);
                     g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() +(t.getHeight() - newHeight), Display.getInstance().getDisplayWidth(), newHeight);
                     g.setAlpha(a);
