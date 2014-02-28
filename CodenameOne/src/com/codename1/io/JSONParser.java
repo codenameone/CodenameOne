@@ -362,7 +362,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private boolean isStackHash() {
-        return parseStack.get(parseStack.size() - 1) instanceof Hashtable;
+        return parseStack.get(parseStack.size() - 1) instanceof Map;
     }
 
     private Hashtable getStackHash() {
