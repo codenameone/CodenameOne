@@ -365,8 +365,8 @@ public class JSONParser implements JSONParseCallback {
         return parseStack.get(parseStack.size() - 1) instanceof Map;
     }
 
-    private Hashtable getStackHash() {
-        return (Hashtable) parseStack.get(parseStack.size() - 1);
+    private Map getStackHash() {
+        return (Map) parseStack.get(parseStack.size() - 1);
     }
 
     private java.util.List<Object> getStackVec() {
