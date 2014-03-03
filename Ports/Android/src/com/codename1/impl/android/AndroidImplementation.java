@@ -346,6 +346,49 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
     
+    public static String[] getPendingPush(String type, Context a) {
+        InputStream i = null;
+        try {
+            i = a.openFileInput("CN1$AndroidPendingNotifications");
+            if (i == null) {
+                return null;
+            }
+            DataInputStream is = new DataInputStream(i);
+            int count = is.readByte();
+            Vector v = new Vector<String>();
+            for (int iter = 0; iter < count; iter++) {
+                boolean hasType = is.readBoolean();
+                String actualType = null;
+                if (hasType) {
+                    actualType = is.readUTF();
+                }
+                final String t = actualType;
+                final String b = is.readUTF();
+                long s = is.readLong();
+                if (t.equals(type)) {
+                    v.add(b);
+                }
+
+            }
+            String [] retVal = new String[v.size()];
+            for (int j = 0; j < retVal.length; j++) {
+                retVal[j] = (String)v.get(j);
+            }
+            return retVal;
+            
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
+            try {
+                if(i != null){
+                    i.close();
+                }
+            } catch (IOException ex) {
+            }
+        }
+        return null;
+    }
+    
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
