@@ -30,6 +30,7 @@ import com.codename1.io.Externalizable;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.events.ActionListener;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -1086,7 +1087,7 @@ public class Util {
      * @return true on success false on error
      */
     public static boolean downloadUrlToStorage(String url, String fileName, boolean showProgress) {
-        return downloadUrlTo(url, fileName, showProgress, false, true);
+        return downloadUrlTo(url, fileName, showProgress, false, true, null);
     }
 
     /**
@@ -1098,7 +1099,7 @@ public class Util {
      * @return true on success false on error
      */
     public static boolean downloadUrlToFile(String url, String fileName, boolean showProgress) {
-        return downloadUrlTo(url, fileName, showProgress, false, false);
+        return downloadUrlTo(url, fileName, showProgress, false, false, null);
     }
 
     /**
@@ -1107,7 +1108,7 @@ public class Util {
      * @param fileName the storage file name
      */
     public static void downloadUrlToStorageInBackground(String url, String fileName) {
-        downloadUrlTo(url, fileName, false, true, true);
+        downloadUrlTo(url, fileName, false, true, true, null);
     }
 
     /**
@@ -1116,14 +1117,37 @@ public class Util {
      * @param fileName the file name
      */
     public static void downloadUrlToFileSystemInBackground(String url, String fileName) {
-        downloadUrlTo(url, fileName, false, true, false);
+        downloadUrlTo(url, fileName, false, true, false, null);
     }
 
-    private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage) {
+    /**
+     * Non-blocking method that will download the given URL to storage in the background and return immediately
+     * @param url the URL
+     * @param fileName the storage file name
+     * @param onCompletion invoked when download completes
+     */
+    public static void downloadUrlToStorageInBackground(String url, String fileName, ActionListener onCompletion) {
+        downloadUrlTo(url, fileName, false, true, true, onCompletion);
+    }
+
+    /**
+     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
+     * @param url the URL
+     * @param fileName the file name
+     * @param onCompletion invoked when download completes
+     */
+    public static void downloadUrlToFileSystemInBackground(String url, String fileName, ActionListener onCompletion) {
+        downloadUrlTo(url, fileName, false, true, false, onCompletion);
+    }
+
+    private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
         cr.setUrl(url);
+        if(callback != null) {
+            cr.addResponseListener(callback);
+        }
         if(storage) {
             cr.setDestinationStorage(fileName);
         } else {

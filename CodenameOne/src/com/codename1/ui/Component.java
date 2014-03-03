@@ -3700,6 +3700,8 @@ public class Component implements Animation, StyleListener {
         paintLockImage = null;
     }
 
+    private static boolean paintLockEnableChecked;
+    private static boolean paintLockEnabled;
     /**
      * This method locks the component so it will always paint the given image
      * instead of running through its paint logic. This is useful when running
@@ -3715,7 +3717,11 @@ public class Component implements Animation, StyleListener {
      * @return the image in case of a hard lock
      */
     public Image paintLock(boolean hardLock) {
-        if(!Display.getInstance().areMutableImagesFast()) {
+        if(!paintLockEnableChecked) {
+            paintLockEnableChecked = true;
+            paintLockEnabled = Display.getInstance().getProperty("paintLockEnabled", "true").equals("true");
+        }
+        if(!paintLockEnabled || !Display.getInstance().areMutableImagesFast()) {
             return null;
         }
         if((getStyle().getBgTransparency() & 0xff) != 0xff) {

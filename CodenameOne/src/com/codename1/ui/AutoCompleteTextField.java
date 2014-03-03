@@ -88,7 +88,7 @@ public class AutoCompleteTextField extends TextField {
         getComponentForm().removePointerPressedListener(listener);
     }
 
-    private void setParentText(String text) {
+    void setParentText(String text) {
         super.setText(text);
     }
 
@@ -243,6 +243,11 @@ public class AutoCompleteTextField extends TextField {
 
             public void actionPerformed(ActionEvent evt) {
                 setParentText((String) l.getSelectedItem());
+                
+                // relaunch text editing if we are still editing
+                if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
+                    Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                }
                 removePopup();
             }
         });

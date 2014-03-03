@@ -401,7 +401,7 @@ public class UIBuilder { //implements Externalizable {
         onCreateRoot(resourceName);
         InputStream source = res.getUi(resourceName);
         if(source == null) {
-            throw new RuntimeException("Resource doesn't existing within the current resource object: " + resourceName);
+            throw new RuntimeException("Resource doesn't exist within the current resource object: " + resourceName);
         }
         DataInputStream in = new DataInputStream(source);
         try {

@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -37,12 +38,14 @@ import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.URLImage;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * The generic list cell renderer can display containers or arbitrary Codename One components
@@ -94,6 +97,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     private boolean firstCharacterRTL;
     private boolean fisheye;
     private boolean waitingForRegisterAnimation;
+    private HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
 
     /**
      * Constructs a generic renderer with the given selected/unselected components
@@ -122,6 +126,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         for(int iter = 0 ; iter < e.length ; iter++) {
             if(e[iter] instanceof Button) {
                 ((Button)e[iter]).addActionListener(mon);
+            }
+            String n = e[iter].getName();
+            if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
+                placeholders.put(n, (EncodedImage)((Label)e[iter]).getIcon());
             }
         }
     }
@@ -250,10 +258,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         if(val == null) {
                             val = h.get(currentName);
                         }
-                        String uiid = (String)h.get(currentName + "_uiid");
-                        if(uiid != null) {
-                            entries[iter].setUIID(uiid);
-                        }
+                        val = updateModelValues(h, currentName, entries, iter, val);
                     }
                     setComponentValueWithTickering(entries[iter], val, list, cmp);
                     entries[iter].setFocus(lead || entries[iter].isFocusable());
@@ -313,11 +318,9 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         setComponentValue(entries[iter], "" + (index + 1), list, cmp);
                         continue;
                     }
-                    String uiid = (String)h.get(currentName + "_uiid");
-                    if(uiid != null) {
-                        entries[iter].setUIID(uiid);
-                    }
-                    setComponentValue(entries[iter], h.get(currentName), list, cmp);
+                    Object val = h.get(currentName);
+                    val = updateModelValues(h, currentName, entries, iter, val);
+                    setComponentValue(entries[iter], val, list, cmp);
                 }
             } else {
                 if(value instanceof CloudObject) {
@@ -340,6 +343,28 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             }
             return cmp;
         }
+    }
+
+    private Object updateModelValues(Map h, String currentName, Component[] entries, int iter, Object val) {
+        String uiid = (String)h.get(currentName + "_uiid");
+        if(uiid != null) {
+            entries[iter].setUIID(uiid);
+        }
+        if(currentName.endsWith("_URLImage")) {
+            URLImage img = (URLImage)h.get(currentName + "Actual");
+            if(img != null) {
+                val = img;
+            } else {
+                String name = (String)h.get(currentName + "Name");
+                if(name == null) {
+                    name = val.toString();
+                    name = name.substring(name.lastIndexOf('/'));
+                }
+                val = URLImage.createToStorage(placeholders.get(currentName), name, val.toString(), URLImage.RESIZE_SCALE);
+                h.put(currentName + "Actual", val);
+            }
+        }
+        return val;
     }
 
 

@@ -605,7 +605,7 @@ public class NetworkManager {
     /**
      * Kills the given request and waits until the request is killed if it is
      * being processed by one of the threads. This method must not be invoked from
-     * a network thread or a Codename One thread!
+     * a network thread!
      * @param request
      */
     public void killAndWait(final ConnectionRequest request) {

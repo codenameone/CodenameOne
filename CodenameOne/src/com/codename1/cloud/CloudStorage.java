@@ -787,8 +787,12 @@ public class CloudStorage {
     }
     
     private String uploadCloudFileImpl(String mimeType, String file, InputStream data, int dataSize) throws CloudException, IOException {
-        if(CloudPersona.getCurrentPersona().getToken() == null) {
-            CloudPersona.createAnonymous();
+        String token = CloudPersona.getCurrentPersona().getToken();
+        if(token == null || token.length() == 0) {
+            if(!CloudPersona.createAnonymous()) {
+                throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR, "Error creating anonymous login");
+            }
+            token = CloudPersona.getCurrentPersona().getToken();
         }
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
@@ -796,7 +800,7 @@ public class CloudStorage {
         //req.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
 
         NetworkManager.getInstance().addToQueueAndWait(req);
-        int rc = req.getResposeCode();
+        int rc = req.getResponseCode();
         if(rc != 200) {
             if(rc == 420) {
                 throw new CloudException(RETURN_CODE_FAIL_QUOTA_EXCEEDED);
@@ -822,7 +826,7 @@ public class CloudStorage {
             uploadReq.addData(file, data, dataSize, mimeType);
         }
         NetworkManager.getInstance().addToQueueAndWait(uploadReq);
-        if(uploadReq.getResposeCode() != 200) {
+        if(uploadReq.getResponseCode() != 200) {
             throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
         }
         String r = new String(uploadReq.getResponseData());
@@ -848,7 +852,7 @@ public class CloudStorage {
         req.addArgument("i", fileId);
         req.addArgument("t", CloudPersona.getCurrentPersona().getToken());
         NetworkManager.getInstance().addToQueueAndWait(req);
-        if(req.getResposeCode() == 200) {
+        if(req.getResponseCode() == 200) {
             return new String(req.getResponseData()).equals("OK");
         }
         return false;

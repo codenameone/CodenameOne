@@ -33,6 +33,11 @@ public class CloudException extends Exception {
         super("Cloud exception " + errorCode);
         this.errorCode = errorCode;
     }
+
+    CloudException(int errorCode, String message) {
+        super("Cloud exception: " + message);
+        this.errorCode = errorCode;
+    }
     
     /**
      * Returns the error code for the cloud exception, see the cloud storage for return codes

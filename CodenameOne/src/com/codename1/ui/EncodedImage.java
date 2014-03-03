@@ -493,33 +493,44 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * Performs scaling using ImageIO to gnerate an encoded Image
+     * @param width the width of the image
+     * @param height the height of the image
+     * @return new encoded image
      */
-    public Image scaled(int width, int height) {
+    public EncodedImage scaledEncoded(int width, int height) {
         if(width == getWidth() && height == getHeight()) {
             return this;
         }
         try {
-            if(Display.getInstance().getProperty("encodedImageScaling", "true").equals("true")) {
-                ImageIO io = ImageIO.getImageIO();
-                if(io != null && io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                    // do an image IO scale which is more efficient
-                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                    io.save(new ByteArrayInputStream(getImageData()), bo, ImageIO.FORMAT_PNG, width, height, 0.9f);
-                    Util.cleanup(bo);
-                    EncodedImage img = EncodedImage.create(bo.toByteArray());
-                    img.opaque = opaque;
-                    img.opaqueChecked = opaqueChecked;
-                    if(width > -1 && height > -1) {
-                        img.width = width;
-                        img.height = height;
-                    }
-                    return img;
+            ImageIO io = ImageIO.getImageIO();
+            if(io != null && io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                // do an image IO scale which is more efficient
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                io.save(new ByteArrayInputStream(getImageData()), bo, ImageIO.FORMAT_PNG, width, height, 0.9f);
+                Util.cleanup(bo);
+                EncodedImage img = EncodedImage.create(bo.toByteArray());
+                img.opaque = opaque;
+                img.opaqueChecked = opaqueChecked;
+                if(width > -1 && height > -1) {
+                    img.width = width;
+                    img.height = height;
                 }
+                return img;
             }
         } catch(IOException err) {
             // normally this shouldn't happen but this will keep falling back to the existing scaled code
             err.printStackTrace();
+        }
+        return null;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public Image scaled(int width, int height) {
+        if(Display.getInstance().getProperty("encodedImageScaling", "true").equals("true")) {
+            return scaledEncoded(width, height);
         }
         return getInternalImpl().scaled(width, height);
     }
