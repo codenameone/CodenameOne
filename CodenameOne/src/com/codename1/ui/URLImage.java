@@ -32,6 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * The URLImage allows us to create an image from a URL. If the image was downloaded 
@@ -47,11 +48,15 @@ public class URLImage extends EncodedImage {
      * Will fail if the downloaded image has a different size from the placeholder image
      */
     public static final ImageAdapter RESIZE_FAIL = new ImageAdapter() {
-        public EncodedImage adaptImage(EncodedImage downloadedImage, Image placeholderImage) {
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 throw new RuntimeException("Invalid image size");
             }
             return downloadedImage;
+        }
+
+        public boolean isAsyncAdapter() {
+            return false;
         }
     };
     
@@ -59,11 +64,43 @@ public class URLImage extends EncodedImage {
      * Scales the image to match the size of the new image exactly
      */
     public static final ImageAdapter RESIZE_SCALE = new ImageAdapter() {
-        public EncodedImage adaptImage(EncodedImage downloadedImage, Image placeholderImage) {
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 return downloadedImage.scaledEncoded(placeholderImage.getWidth(), placeholderImage.getHeight());
             }
             return downloadedImage;
+        }
+        
+        public boolean isAsyncAdapter() {
+            return false;
+        }
+    };
+
+    /**
+     * Scales the image to match to fill the area while preserving aspect ratio
+     */
+    public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ImageAdapter() {
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
+            if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
+                Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());
+                if(tmp.getWidth() > placeholderImage.getWidth()) {
+                    int diff = tmp.getWidth() - placeholderImage.getWidth();
+                    int x = diff / 2;
+                    tmp = tmp.subImage(x, 0, placeholderImage.getWidth(), placeholderImage.getHeight(), true);
+                } else {
+                    if(tmp.getHeight() > placeholderImage.getHeight()) {
+                        int diff = tmp.getHeight() - placeholderImage.getHeight();
+                        int y = diff / 2;
+                        tmp = tmp.subImage(0, y, placeholderImage.getWidth(), placeholderImage.getHeight(), true);
+                    }
+                }
+                return EncodedImage.createFromImage(tmp, true);
+            }
+            return downloadedImage;
+        }
+        
+        public boolean isAsyncAdapter() {
+            return true;
         }
     };
 
@@ -75,6 +112,7 @@ public class URLImage extends EncodedImage {
     private boolean fetching;
     private byte[] imageData;
     private boolean repaintImage;
+    private static final String IMAGE_SUFFIX = "ImageURLTMP";
     
     private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
         super(placeholder.getWidth(), placeholder.getHeight());
@@ -85,9 +123,53 @@ public class URLImage extends EncodedImage {
         this.fileSystemFile = fileSystemFile;
     }
 
-    class DownloadCompleted implements ActionListener {
-
+    class DownloadCompleted implements ActionListener, Runnable {
+        private EncodedImage adapt;
+        private EncodedImage adaptedIns;
+        public void run() {
+            adaptedIns = adapter.adaptImage(adapt, placeholder);
+        }
+        
         public void actionPerformed(ActionEvent evt) {
+            if(adapter != null) {
+                try {
+                    byte[] d;
+                    InputStream is;
+                    if(storageFile != null) {
+                        d = new byte[Storage.getInstance().entrySize(storageFile + IMAGE_SUFFIX)];
+                        is = Storage.getInstance().createInputStream(storageFile + IMAGE_SUFFIX);
+                    } else {
+                        d = new byte[(int)FileSystemStorage.getInstance().getLength(fileSystemFile + IMAGE_SUFFIX)];
+                        is = FileSystemStorage.getInstance().openInputStream(fileSystemFile + IMAGE_SUFFIX);
+                    }
+                    Util.readFully(is, d);
+                    EncodedImage img = EncodedImage.create(d);
+                    EncodedImage adapted;
+                    if(adapter.isAsyncAdapter()) {
+                        adapt = img;
+                        Display.getInstance().invokeAndBlock(this);
+                        adapted = adaptedIns;
+                        adaptedIns = null;
+                        adapt = null;
+                    } else {
+                        adapted = adapter.adaptImage(img, placeholder);
+                    }
+                    if(storageFile != null) {
+                        OutputStream o = Storage.getInstance().createOutputStream(storageFile);
+                        o.write(adapted.getImageData());
+                        o.close();
+                        Storage.getInstance().deleteStorageFile(storageFile + IMAGE_SUFFIX);
+                    } else {
+                        OutputStream o = FileSystemStorage.getInstance().openOutputStream(fileSystemFile);
+                        o.write(adapted.getImageData());
+                        o.close();
+                        FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);
+                    }
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                    return;
+                }
+            }
             fetching = false;
             // invoke fetch again to load the local files
             fetch();
@@ -116,7 +198,11 @@ public class URLImage extends EncodedImage {
                     repaintImage = true;
                     return;
                 } 
-                Util.downloadUrlToStorageInBackground(url, storageFile, new DownloadCompleted());
+                if(adapter != null) {
+                    Util.downloadUrlToStorageInBackground(url, storageFile + IMAGE_SUFFIX, new DownloadCompleted());
+                } else {
+                    Util.downloadUrlToStorageInBackground(url, storageFile, new DownloadCompleted());                    
+                }
             } else {
                 if(FileSystemStorage.getInstance().exists(fileSystemFile)) {
                     imageData = new byte[(int)FileSystemStorage.getInstance().getLength(fileSystemFile)];
@@ -127,7 +213,11 @@ public class URLImage extends EncodedImage {
                     repaintImage = true;
                     return;
                 }
-                Util.downloadUrlToFileSystemInBackground(url, fileSystemFile, new DownloadCompleted());
+                if(adapter != null) {
+                    Util.downloadUrlToFileSystemInBackground(url, fileSystemFile + IMAGE_SUFFIX, new DownloadCompleted());
+                } else {
+                    Util.downloadUrlToFileSystemInBackground(url, fileSystemFile + IMAGE_SUFFIX, new DownloadCompleted());
+                }
             }
         } catch(IOException ioErr) {
             throw new RuntimeException(ioErr.toString());
@@ -219,6 +309,13 @@ public class URLImage extends EncodedImage {
          * @param placeholderImage the placeholder image
          * @return the adapted image or the same image
          */
-        public EncodedImage adaptImage(EncodedImage downloadedImage, Image placeholderImage);
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage);
+        
+        /**
+         * Return true if the adapter should work on a separate thread to avoid blocking the EDT
+         * this is especially important for image masks and heavy image manipulation
+         * @return true to run off the EDT
+         */
+        public boolean isAsyncAdapter();
     }
 }

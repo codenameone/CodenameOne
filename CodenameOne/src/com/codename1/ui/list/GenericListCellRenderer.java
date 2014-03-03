@@ -61,6 +61,22 @@ import java.util.HashMap;
  * @author Shai Almog
  */
 public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRenderer<T> {
+
+    /**
+     * The default adapter to use for image URLs
+     * @return the defaultAdapter
+     */
+    public static URLImage.ImageAdapter getDefaultAdapter() {
+        return defaultAdapter;
+    }
+
+    /**
+     * The default adapter to use for image URLs
+     * @param aDefaultAdapter the defaultAdapter to set
+     */
+    public static void setDefaultAdapter(URLImage.ImageAdapter aDefaultAdapter) {
+        defaultAdapter = aDefaultAdapter;
+    }
     private Button lastClickedComponent;
     private ArrayList<Image> pendingAnimations;
 
@@ -98,7 +114,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     private boolean fisheye;
     private boolean waitingForRegisterAnimation;
     private HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
-
+    
+    private static URLImage.ImageAdapter defaultAdapter = URLImage.RESIZE_SCALE;
+    private URLImage.ImageAdapter adapter = defaultAdapter;
+    
     /**
      * Constructs a generic renderer with the given selected/unselected components
      *
@@ -360,7 +379,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     name = val.toString();
                     name = name.substring(name.lastIndexOf('/'));
                 }
-                val = URLImage.createToStorage(placeholders.get(currentName), name, val.toString(), URLImage.RESIZE_SCALE);
+                val = URLImage.createToStorage(placeholders.get(currentName), name, val.toString(), adapter);
                 h.put(currentName + "Actual", val);
             }
         }
@@ -578,6 +597,22 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
      */
     public void setFisheye(boolean fisheye) {
         this.fisheye = fisheye;
+    }
+
+    /**
+     * The adapter used when dealing with image URL's
+     * @return the adapter
+     */
+    public URLImage.ImageAdapter getAdapter() {
+        return adapter;
+    }
+
+    /**
+     * The adapter used when dealing with image URL's
+     * @param adapter the adapter to set
+     */
+    public void setAdapter(URLImage.ImageAdapter adapter) {
+        this.adapter = adapter;
     }
 
 

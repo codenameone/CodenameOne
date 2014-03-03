@@ -864,6 +864,24 @@ public class Image {
             return scaled((int)(getWidth() * wRatio), (int)(getHeight() * wRatio));
         }
     }
+    
+    /**
+     * Scales the image while maintaining the aspect ratio to the larger size 
+     * image
+     * 
+     * @param width the given new image width
+     * @param height the given new image height
+     * @return the newly created image
+     */
+    public Image scaledLargerRatio(int width, int height) {
+        float hRatio = ((float)height) / ((float)getHeight());
+        float wRatio = ((float)width) / ((float)getWidth());
+        if(hRatio > wRatio) {
+            return scaled((int)(getWidth() * hRatio), (int)(getHeight() * hRatio));
+        } else {
+            return scaled((int)(getWidth() * wRatio), (int)(getHeight() * wRatio));
+        }
+    }
 
     /**
      * Returns a scaled version of this image image using the given width and height, 
@@ -875,6 +893,19 @@ public class Image {
      * @return new image instance scaled to the given height and width
      */
     public Image scaled(int width, int height) {        
+        return scaledImpl(width, height);
+    }
+    
+    /**
+     * Returns a scaled version of this image image using the given width and height, 
+     * this is a fast algorithm that preserves translucent information.
+     * The method accepts -1 to preserve aspect ratio in the given axis.
+     * 
+     * @param width width for the scaling
+     * @param height height of the scaled image
+     * @return new image instance scaled to the given height and width
+     */
+    private Image scaledImpl(int width, int height) {        
         if(width == -1) {
             return scaledHeight(height);
         } 

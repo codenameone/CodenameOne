@@ -93,6 +93,52 @@ public class EncodedImage extends Image {
     }
     
     /**
+     * Converts an image to encoded image
+     * @param i image
+     * @param jpeg true to try and set jpeg, will do a best effort but this isn't guaranteed
+     * @return an encoded image or null
+     */
+    public static EncodedImage createFromImage(Image i, boolean jpeg) {
+        if(i instanceof EncodedImage) {
+            return ((EncodedImage)i);
+        }
+        ImageIO io = ImageIO.getImageIO();
+        if(io != null) {
+            String format;
+            if(jpeg) {
+                if(!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                    format = ImageIO.FORMAT_PNG; 
+                } else {
+                    format = ImageIO.FORMAT_JPEG; 
+                }
+            } else {
+                if(!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    format = ImageIO.FORMAT_JPEG;
+                } else {
+                    format = ImageIO.FORMAT_PNG;
+                }
+            }
+            try {
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                io.save(i, bo, format, 0.9f);
+                Util.cleanup(bo);
+                EncodedImage enc = EncodedImage.create(bo.toByteArray());
+                enc.width = i.getWidth();
+                enc.height = i.getHeight();
+                if(format == ImageIO.FORMAT_JPEG) {
+                    enc.opaque = true;
+                    enc.opaqueChecked = true;
+                }
+                enc.cache = Display.getInstance().createSoftWeakRef(i);
+                return enc;
+            } catch(IOException err) {
+                err.printStackTrace();
+            }            
+        }
+        return null;
+    }
+    
+    /**
      * Tries to create an encoded image from RGB which is more efficient,
      * however if this fails it falls back to regular RGB image. This method
      * is slower than creating an RGB image (not to be confused with the RGBImage class which is
