@@ -567,7 +567,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(activity, AndroidImplementation.this);                
             }
         } else {
-            if(textureView){
+            if(textureView || android.os.Build.VERSION.SDK_INT == 18){
                 myView = new AndroidTextureView(activity, AndroidImplementation.this);                
             } else {
                 myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
