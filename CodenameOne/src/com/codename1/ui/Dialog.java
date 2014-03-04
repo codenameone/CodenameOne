@@ -1229,10 +1229,15 @@ public class Dialog extends Form {
                     }
                 }
             }
-
-            if(componentPos.getX() < availableWidth / 2) {
+            
+            
+            if(prefWidth > componentPos.getX()) {
                 // popup right
                 x = componentPos.getX() + componentPos.getSize().getWidth();
+                if(x + prefWidth > availableWidth){
+                    x = availableWidth - prefWidth;
+                }
+                
                 width = Math.min(prefWidth, availableWidth - x);
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
