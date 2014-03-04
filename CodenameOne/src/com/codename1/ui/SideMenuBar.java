@@ -242,7 +242,7 @@ public class SideMenuBar extends MenuBar {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
-                            openMenu(null, 0, draggedX);
+                            openMenu(null, 0, draggedX, false);
                         }
                         return;
                     }
@@ -258,7 +258,7 @@ public class SideMenuBar extends MenuBar {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
-                            openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX);
+                            openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
                         }
                     }
                     if (topSwipePotential) {
@@ -273,7 +273,7 @@ public class SideMenuBar extends MenuBar {
                             draggedX = y;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
-                            openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX);
+                            openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX, false);
                         }
                     }
                 }
@@ -318,13 +318,13 @@ public class SideMenuBar extends MenuBar {
     /**
      * @inheritDoc
      */
-    protected boolean isDragRegion(int x, int y) {
+    protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
             if (x - initialDragX > Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
-                return true;
+                return DRAG_REGION_LIKELY_DRAG_X;
             }
         }
-        return false;
+        return DRAG_REGION_NOT_DRAGGABLE;
     }
     
     private void installRightCommands() {
@@ -484,22 +484,27 @@ public class SideMenuBar extends MenuBar {
      * Opens the menu if it is currently closed
      */
     public void openMenu(String direction) {
-        openMenu(direction, -1, 300);
+        openMenu(direction, -1, 300, true);
     }
 
     /**
      * Opens the menu if it is currently closed
      */
-    void openMenu(String direction, int time, int dest) {
+    void openMenu(String direction, int time, int dest, boolean transition) {
         if (Display.getInstance().getCurrent() == parent) {
             menu = createMenu(direction);
             //replace transtions to perform the Form shift
             out = parent.getTransitionOutAnimator();
             in = parent.getTransitionInAnimator();
             parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(300, false, -1, direction));
-            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(0, true, dest, direction));
-            menu.show();
-            parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
+            if(transition) {
+                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
+                menu.show();
+            } else {
+                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(0, true, dest, direction));
+                menu.show();
+                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
+            }
         }
     }
 
@@ -1021,15 +1026,19 @@ public class SideMenuBar extends MenuBar {
 
                 public void paint(Graphics g) {
                     Component c = (Component) rightPanel.getClientProperty("$parent");
-                    boolean b = c.isVisible();
-                    c.setVisible(true);
-                    int x = getAbsoluteX();
-                    g.translate(x, 0);
-                    Container.sidemenuBarTranslation = x;
-                    c.paintComponent(g, true);
-                    Container.sidemenuBarTranslation = 0;
-                    g.translate(-x, 0);
-                    c.setVisible(b);
+                    
+                    // not sure why its happening: https://code.google.com/p/codenameone/issues/detail?id=1072
+                    if(c != null) {
+                        boolean b = c.isVisible();
+                        c.setVisible(true);
+                        int x = getAbsoluteX();
+                        g.translate(x, 0);
+                        Container.sidemenuBarTranslation = x;
+                        c.paintComponent(g, true);
+                        Container.sidemenuBarTranslation = 0;
+                        g.translate(-x, 0);
+                        c.setVisible(b);
+                    }
                 }
             };
         }

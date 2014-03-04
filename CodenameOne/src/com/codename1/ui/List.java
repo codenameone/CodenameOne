@@ -473,9 +473,14 @@ public class List<T> extends Component {
     /**
      * @inheritDoc
      */
-    protected boolean isDragRegion(int x, int y) {
-        // large lists should be more sensitive to scrolling
-        return getModel().getSize() > 20;
+    protected int getDragRegionStatus(int x, int y) {
+        if(!isScrollable()) {
+            return DRAG_REGION_NOT_DRAGGABLE;
+        }
+        if(getOrientation() == HORIZONTAL) {
+            return DRAG_REGION_POSSIBLE_DRAG_X;
+        }
+        return DRAG_REGION_POSSIBLE_DRAG_Y;
     }
     
     /**

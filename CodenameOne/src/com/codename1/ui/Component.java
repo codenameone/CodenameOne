@@ -48,6 +48,41 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {
+    /**
+     * Used by getDragRegionStatus to indicate no dragability
+     */
+    public static final int DRAG_REGION_NOT_DRAGGABLE = 1;
+
+    /**
+     * Used by getDragRegionStatus to indicate limited dragability
+     */
+    public static final int DRAG_REGION_POSSIBLE_DRAG_X = 10;
+
+    /**
+     * Used by getDragRegionStatus to indicate limited dragability
+     */
+    public static final int DRAG_REGION_POSSIBLE_DRAG_Y = 11;
+
+    /**
+     * Used by getDragRegionStatus to indicate limited dragability
+     */
+    public static final int DRAG_REGION_POSSIBLE_DRAG_XY = 12;
+
+    /**
+     * Used by getDragRegionStatus to indicate likely dragability
+     */
+    public static final int DRAG_REGION_LIKELY_DRAG_X = 21;
+
+    /**
+     * Used by getDragRegionStatus to indicate likely dragability
+     */
+    public static final int DRAG_REGION_LIKELY_DRAG_Y = 22;
+
+    /**
+     * Used by getDragRegionStatus to indicate likely dragability
+     */
+    public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
+    
     private String selectText;
     private boolean alwaysTensile;
     private int tensileLength = -1;
@@ -477,11 +512,54 @@ public class Component implements Animation, StyleListener {
      * @param x x location for the touch
      * @param y y location for the touch 
      * @return true if the touch is in a region specifically designated as a "drag region"
+     * @deprecated replaced with getDragRegionStatus
      */
     protected boolean isDragRegion(int x, int y) {
         return isDraggable();
     }
-
+        
+    /**
+     * Indicates if the section within the X/Y area is a "drag region" where
+     * we expect people to drag or press in which case we
+     * can instantly start dragging making perceived performance faster. This
+     * is invoked by the implementation code to optimize drag start behavior
+     * @param x x location for the touch
+     * @param y y location for the touch 
+     * @return one of the DRAG_REGION_* values
+     */
+    protected int getDragRegionStatus(int x, int y) {
+        if(isDraggable()) {
+            return DRAG_REGION_LIKELY_DRAG_XY;
+        }
+        Component c = getScrollable();
+        if(c != null) {
+            boolean xc = c.isScrollableX();
+            boolean yc = c.isScrollableY();
+            if(isDragRegion(x, y)) {
+                if(xc && yc) {
+                    return DRAG_REGION_LIKELY_DRAG_XY;
+                }
+                if(xc) {
+                    return DRAG_REGION_LIKELY_DRAG_X;
+                }
+                if(yc) {
+                    return DRAG_REGION_LIKELY_DRAG_Y;
+                }
+            } else {
+                if(xc && yc) {
+                    return DRAG_REGION_POSSIBLE_DRAG_XY;
+                }
+                if(xc) {
+                    return DRAG_REGION_POSSIBLE_DRAG_X;
+                }
+                if(yc) {
+                    return DRAG_REGION_POSSIBLE_DRAG_Y;
+                }
+            }
+        }
+        return DRAG_REGION_NOT_DRAGGABLE;
+    }
+    
     /**
      * This callback allows subcomponents who are interested in following position change of their parents
      * to receive such an event

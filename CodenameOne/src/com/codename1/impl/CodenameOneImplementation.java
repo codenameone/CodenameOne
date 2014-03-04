@@ -1760,30 +1760,58 @@ public abstract class CodenameOneImplementation {
             dragActivationCounter++;
             return false;
         }
-        boolean dragRegion = getCurrentForm().isDragRegion(x, y);
+        int dragRegion = getCurrentForm().getDragRegionStatus(x, y);
 
         //send the drag events to the form only after latency of 7 drag events,
         //most touch devices are too sensitive and send too many drag events.
         //7 is just a latency const number that is pretty good for most devices
         //this may be tuned for specific devices.
         dragActivationCounter++;
-        if (!dragRegion && dragActivationCounter > getDragAutoActivationThreshold()) {
-            return true;
-        }
-        float start = getDragStartPercentage();
-        if(dragRegion) {
-            start = 0.9f;
+        float startX = getDragStartPercentage();
+        float startY = startX;
+        switch(dragRegion) {
+            case Component.DRAG_REGION_NOT_DRAGGABLE:
+                if (dragActivationCounter > getDragAutoActivationThreshold()) {
+                    return true;
+                }
+                startX = Math.max(5, startX);
+                startY = startX;
+                break;
+            case Component.DRAG_REGION_LIKELY_DRAG_X:
+                startY = Math.max(5, startY);
+                startX = 0.9f;
+                break;
+            case Component.DRAG_REGION_LIKELY_DRAG_Y:
+                startX = Math.max(5, startX);
+                startY = 0.9f;
+                break;
+            case Component.DRAG_REGION_LIKELY_DRAG_XY:
+                startX = 0.9f;
+                startY = 0.9f;
+                break;
+            case Component.DRAG_REGION_POSSIBLE_DRAG_X:
+                startY = Math.max(5, startY);
+                startX = Math.min(startY, 2f);
+                break;
+            case Component.DRAG_REGION_POSSIBLE_DRAG_Y:
+                startX = Math.max(5, startX);
+                startY = Math.min(startY, 2f);
+                break;
+            case Component.DRAG_REGION_POSSIBLE_DRAG_XY:
+                startX = Math.min(startX, 2f);;
+                startY = Math.min(startY, 2f);;
+                break;
         }
         
         // have we passed the motion threshold on the X axis?
-        if (((float) getDisplayWidth()) / 100.0f * start <=
+        if (((float) getDisplayWidth()) / 100.0f * startX <=
                 Math.abs(dragActivationX - x)) {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
             return true;
         }
 
         // have we passed the motion threshold on the Y axis?
-        if (((float) getDisplayHeight()) / 100.0f * start <=
+        if (((float) getDisplayHeight()) / 100.0f * startY <=
                 Math.abs(dragActivationY - y)) {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
             return true;

@@ -423,6 +423,7 @@ public class Form extends Container {
      * @param x x location for the touch
      * @param y y location for the touch 
      * @return true if the touch is in a region specifically designated as a "drag region"
+     * @deprecated this method was replaced by getDragRegionStatus
      */
     public boolean isDragRegion(int x, int y) {
         if(getMenuBar().isDragRegion(x, y)) {
@@ -431,6 +432,31 @@ public class Form extends Container {
         Container actual = getActualPane();
         Component c = actual.getComponentAt(x, y);
         return c != null && c.isDragRegion(x, y);
+    }
+    
+    /**
+     * Indicates if the section within the X/Y area is a "drag region" where
+     * we expect people to drag or press in which case we
+     * can instantly start dragging making perceived performance faster. This
+     * is invoked by the implementation code to optimize drag start behavior
+     * @param x x location for the touch
+     * @param y y location for the touch 
+     * @return one of the DRAG_REGION_* values
+     */
+    public int getDragRegionStatus(int x, int y) {
+        int menuBarDrag = getMenuBar().getDragRegionStatus(x, y);
+        if(menuBarDrag != DRAG_REGION_NOT_DRAGGABLE) {
+            return menuBarDrag;
+        }
+        Container actual = getActualPane();
+        Component c = actual.getComponentAt(x, y);
+        if(c != null) {
+            return c.getDragRegionStatus(x, y);
+        }
+        if(isScrollable()) {
+            return DRAG_REGION_LIKELY_DRAG_Y;
+        }
+        return DRAG_REGION_NOT_DRAGGABLE;
     }
     
     /**

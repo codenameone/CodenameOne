@@ -1677,16 +1677,9 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * Indicates if the section within the X/Y area is a "drag region" where
-     * we expect people to drag and never actually "press" in which case we
-     * can instantly start dragging making perceived performance faster. This
-     * always return false but on the side menu we use it to indicate better
-     * sensitivity for side swiping
-     * @param x x location for the touch
-     * @param y y location for the touch 
-     * @return true if the touch is in a region specifically designated as a "drag region"
+     * @inheritDoc
      */
-    protected boolean isDragRegion(int x, int y) {
-        return false;
+    protected int getDragRegionStatus(int x, int y) {
+        return DRAG_REGION_NOT_DRAGGABLE;
     }
 }
