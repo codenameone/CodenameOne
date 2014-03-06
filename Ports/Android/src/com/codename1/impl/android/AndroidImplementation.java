@@ -568,6 +568,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         } else {
             if(textureView || android.os.Build.VERSION.SDK_INT == 18){
+                int hardwareAcceleration = 16777216;
+                activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
                 myView = new AndroidTextureView(activity, AndroidImplementation.this);                
             } else {
                 myView = new AndroidSurfaceView(activity, AndroidImplementation.this);        
