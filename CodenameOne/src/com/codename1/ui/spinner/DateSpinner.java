@@ -47,6 +47,8 @@ public class DateSpinner extends BaseSpinner {
     private boolean monthDayYear = true;
     private boolean numericMonths = false;
 
+    private String monthRenderingPrototype = "WWW";
+    
     /**
      * Default constructor
      */
@@ -77,7 +79,7 @@ public class DateSpinner extends BaseSpinner {
             };
             month.setRenderer(render);
             month.initSpinnerRenderer();
-            month.setRenderingPrototype("WWW");
+            month.setRenderingPrototype(monthRenderingPrototype);
 
             year = Spinner.create(startYear, endYear, currentYear, 1);
             addComponents();
@@ -304,4 +306,15 @@ public class DateSpinner extends BaseSpinner {
         
         return super.setPropertyValue(name, value);
     }        
+    
+    
+    /**
+     * Sets the Month Rendering Prototype to be used, useful when the language 
+     * is changed and you need the month spinner to be wider.
+     * 
+     * @param monthPrototype a prototype to be used to calc the month cell size
+     */ 
+    public void setMonthRenderingPrototype(String monthPrototype){
+        this.monthRenderingPrototype = monthPrototype;
+    }
 }
