@@ -3793,7 +3793,7 @@ public class UserInterfaceEditor extends BaseForm {
                 out.writeInt(p.length);
                 for(String c : p) {
                     out.writeUTF(c);
-                    out.writeUTF((String)cmp.getPropertyValue(c));
+                    out.writeUTF((String)cmp.getClientProperty(c));
                 }
             }
         }
