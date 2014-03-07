@@ -3094,6 +3094,23 @@ public class UserInterfaceEditor extends BaseForm {
             build.append(xmlize(cmp.getName()));
         } 
         build.append("\" ");
+        if(cmp.getClientProperty("cn1$Properties") != null) {
+            String[] p = ((String)cmp.getClientProperty("cn1$Properties")).split(",");
+            if(p.length > 0) {
+                build.append("\" clientProperties=\"");
+                boolean first = true;
+                for(String c : p) {
+                    if(!first) {
+                        build.append(",");
+                    }
+                    first = false;
+                    build.append(c);
+                    build.append("=");
+                    build.append((String)cmp.getClientProperty(c));
+                }
+                build.append("\" ");
+            }
+        }
         if(tabTitle != null) {
             build.append("tabTitle=\"");
             build.append(xmlize(tabTitle));
