@@ -3097,7 +3097,7 @@ public class UserInterfaceEditor extends BaseForm {
         if(cmp.getClientProperty("cn1$Properties") != null) {
             String[] p = ((String)cmp.getClientProperty("cn1$Properties")).split(",");
             if(p.length > 0) {
-                build.append("\" clientProperties=\"");
+                build.append("clientProperties=\"");
                 boolean first = true;
                 for(String c : p) {
                     if(!first) {
