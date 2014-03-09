@@ -575,7 +575,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     public Image scaled(int width, int height) {
-        if(Display.getInstance().getProperty("encodedImageScaling", "true").equals("true")) {
+        if(Display.getInstance().getProperty("encodedImageScaling", "true").equals("true") && ImageIO.getImageIO() != null) {
             return scaledEncoded(width, height);
         }
         return getInternalImpl().scaled(width, height);

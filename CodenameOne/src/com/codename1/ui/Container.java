@@ -1481,6 +1481,14 @@ public class Container extends Component {
         }
     }
 
+    boolean scrollableXFlag() {
+        return scrollableX;
+    }
+
+    boolean scrollableYFlag() {
+        return scrollableY;
+    }
+    
     /**
      * @inheritDoc
      */

@@ -44,6 +44,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.MathUtil;
+import java.util.ArrayList;
 
 
 /**
@@ -81,6 +82,7 @@ public class MapComponent extends Container {
     private int singleTapThreshold = 200;
     private int doubleTapThreshold = 200;
     private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
+    private ArrayList<MapListener> listeners;
     
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last
@@ -297,6 +299,7 @@ public class MapComponent extends Container {
             }
         }
         super.repaint();
+        fireMapListenerEvent();
     }
 
     /**
@@ -309,6 +312,7 @@ public class MapComponent extends Container {
         pressedy = y;
         draggedx = x;
         draggedy = y;
+        fireMapListenerEvent();
     }
 
     /**
@@ -350,6 +354,7 @@ public class MapComponent extends Container {
         } else {
             super.pointerDragged(x, y);
         }
+        fireMapListenerEvent();
     }
 
     private double distance(int[] x, int[] y) {
@@ -1046,6 +1051,37 @@ public class MapComponent extends Container {
         }
     }
 
+    private void fireMapListenerEvent() {
+        // assuming always EDT
+        if(listeners != null) {
+            for(MapListener l : listeners) {
+                l.mapPositionUpdated(this, _zoom, _center);
+            }
+        }
+    }
+    
+    /**
+     * Adds a listener to map panning/zooming
+     * @param listener the listener callback
+     */
+    public void addMapListener(MapListener listener) {
+        if(listeners == null) {
+            listeners = new ArrayList<MapListener>();
+        }
+        listeners.add(listener);
+    }
+
+    /**
+     * Removes the map listener callback
+     * @param listener the listener
+     */
+    public void removeMapListener(MapListener listener) {
+        if(listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+    }
+    
     /**
      * @inheritDoc
      */

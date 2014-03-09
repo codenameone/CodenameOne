@@ -101,6 +101,9 @@ public class PeerComponent extends Component {
      * @param nativePeer the native platform specific peer component.
      */
     public static PeerComponent create(Object nativePeer) {
+        if(nativePeer == null) {
+            return null;
+        }
         return Display.getInstance().getImplementation().createNativePeer(nativePeer);
     }
 

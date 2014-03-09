@@ -531,10 +531,10 @@ public class Component implements Animation, StyleListener {
         if(isDraggable()) {
             return DRAG_REGION_LIKELY_DRAG_XY;
         }
-        Component c = getScrollable();
+        Component c = getScrollableFast();
         if(c != null) {
-            boolean xc = c.isScrollableX();
-            boolean yc = c.isScrollableY();
+            boolean xc = c.scrollableXFlag();
+            boolean yc = c.scrollableYFlag();
             if(isDragRegion(x, y)) {
                 if(xc && yc) {
                     return DRAG_REGION_LIKELY_DRAG_XY;
@@ -1458,6 +1458,20 @@ public class Component implements Animation, StyleListener {
         return p.getScrollable();
     }
     
+    /**
+     * Returns the scrollable parent of this component
+     */
+    private Component getScrollableFast() {
+        if(scrollableXFlag() || scrollableYFlag()) {
+            return this;
+        }
+        Component p = getParent();
+        if(p == null) {
+            return null;
+        }
+        return p.getScrollableFast();
+    }
+
     private void paintBackgroundImpl(Graphics g) {
         if (isBorderPainted()) {
             Border b = getBorder();
@@ -1507,6 +1521,14 @@ public class Component implements Animation, StyleListener {
      */
     public boolean isScrollableY() {
         return false;
+    }
+
+    boolean scrollableXFlag() {
+        return isScrollableX();
+    }
+
+    boolean scrollableYFlag() {
+        return isScrollableY();
     }
 
     /**
@@ -3913,10 +3935,18 @@ public class Component implements Animation, StyleListener {
     void paintHint(Graphics g) {
         Label hintLabel = getHintLabelImpl();
         if (hintLabel != null && shouldShowHint()) {
+            switch(hintLabel.getVerticalAlignment()) {
+                case TOP:
+                    hintLabel.setHeight(hintLabel.getPreferredH());
+                    hintLabel.setY(getY());
+                    break;
+                default:
+                    hintLabel.setHeight(getHeight());
+                    hintLabel.setY(getY());
+                    break;
+            }
             hintLabel.setX(getX());
-            hintLabel.setY(getY());
             hintLabel.setWidth(getWidth());
-            hintLabel.setHeight(getHeight());
             hintLabel.paint(g);
         }
     }
