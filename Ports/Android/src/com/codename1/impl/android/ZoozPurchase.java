@@ -128,12 +128,13 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
     // ZOOZMARKER_START    
-        failMessage = null;
         if(resultCode == Activity.RESULT_OK){
+            failMessage = null;
             purchaseId = data.getStringExtra(CheckoutActivity.ZOOZ_TRANSACTION_ID);
             amount = data.getDoubleExtra(CheckoutActivity.ZOOZ_AMOUNT, -1);
             currency = data.getStringExtra(CheckoutActivity.ZOOZ_CURRENCY_CODE);
         }else{
+            failMessage = "";
             if (data != null){
                 //failed to purchase - the purchaseId will be null
                 Log.d("Codename One", data.getStringExtra(CheckoutActivity.ZOOZ_ERROR_MSG));

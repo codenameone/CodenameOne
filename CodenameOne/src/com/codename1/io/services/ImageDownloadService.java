@@ -580,6 +580,10 @@ public class ImageDownloadService extends ConnectionRequest {
 
                 public void run() {
                     l.setIcon(i);
+                    Form f = l.getComponentForm();
+                    if(f != null) {
+                        f.revalidate();
+                    }
                 }
             });
             return;

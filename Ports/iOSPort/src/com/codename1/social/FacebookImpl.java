@@ -41,7 +41,8 @@ public class FacebookImpl extends FacebookConnect {
     
     @Override
     public boolean isFacebookSDKSupported() {
-        return true;
+        String v = Display.getInstance().getProperty("OSVer", "6");
+        return !v.startsWith("5");
     }
 
     @Override

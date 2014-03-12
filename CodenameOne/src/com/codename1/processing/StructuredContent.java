@@ -22,8 +22,8 @@
  */
 package com.codename1.processing;
 
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.Map;
+import java.util.List;
 
 /**
  * Internal interface, do not use.
@@ -38,12 +38,12 @@ import java.util.Vector;
 interface StructuredContent {
 	/**
 	 * Select all children directly below the current position with a given tag
-	 * name. An empty vector is returned if no matches found.
+	 * name. An empty List is returned if no matches found.
 	 * 
 	 * @param name tag name to select.
 	 * @return an array of elements that match the tag name.
 	 */
-	public Vector getChildren(String name);
+	public List getChildren(String name);
 
 	/**
 	 * Select a single direct child node from the current position.
@@ -55,12 +55,12 @@ interface StructuredContent {
 
 	/**
 	 * Globally select all children from the current position with a given tag
-	 * name. An empty vector is returned if no matches found.
+	 * name. An empty List is returned if no matches found.
 	 * 
 	 * @param name tag name to select.
 	 * @return an array of elements that match the tag name.
 	 */
-	public Vector getDescendants(String name);
+	public List getDescendants(String name);
 
 	/**
 	 * Select an attribute from the current node.
@@ -77,7 +77,7 @@ interface StructuredContent {
          * @return all attributes, or null if no attributes are
          * present.
          */
-        public Hashtable getAttributes();
+        public Map getAttributes();
         
 	/**
 	 * Select the parent of the current node.
@@ -100,7 +100,7 @@ interface StructuredContent {
 	/**
 	 * Get the native structured document object. For example, an XML document
 	 * would return an Element object, and a JSON document would return a
-	 * Hashtable.
+	 * Map.
 	 * 
 	 * @return native structured document object.
 	 */

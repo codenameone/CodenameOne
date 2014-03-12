@@ -26,13 +26,16 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.Map;
+import java.util.List;
 
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLParser;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Vector;
 
 /**
  * A DOM accessor implementation for working with XML content.
@@ -106,10 +109,15 @@ class XMLContent implements StructuredContent {
 	 * @param array
 	 * @return
 	 */
-	private Vector _asStructuredContentArray(Vector array) {
-		Vector children = new Vector();
-		for (Enumeration elements = array.elements(); elements.hasMoreElements(); ) {
-			children.addElement(new XMLContent((Element)elements.nextElement()));
+	private List _asStructuredContentArray(List array) {
+		List children;
+                if(array instanceof Vector) {
+                    children = new Vector();
+                } else {
+                    children = new ArrayList();
+                }
+		for (Iterator elements = array.iterator(); elements.hasNext(); ) {
+			children.add(new XMLContent((Element)elements.next()));
 		}
 		return children;
 	}
@@ -117,7 +125,7 @@ class XMLContent implements StructuredContent {
 	/* (non-Javadoc)
 	 * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
 	 */
-	public Vector getChildren(String name) {
+	public List getChildren(String name) {
 		return _asStructuredContentArray(root.getChildrenByTagName(name));
 	}
 	
@@ -132,7 +140,7 @@ class XMLContent implements StructuredContent {
 	/* (non-Javadoc)
 	 * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String)
 	 */
-	public Vector getDescendants(String name) {
+	public List getDescendants(String name) {
 		return _asStructuredContentArray(root.getDescendantsByTagName(name));
 	}
 
@@ -146,7 +154,7 @@ class XMLContent implements StructuredContent {
         /* (non-Javadoc)
          * @see com.codename1.processing.StructuredContent#getAttributes()
          */
-        public Hashtable getAttributes() {
+        public Map getAttributes() {
             return root.getAttributes();
         }        
         

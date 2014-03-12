@@ -2846,6 +2846,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setBrowserURL(PeerComponent browserPeer, String url) {
+        url = unfile(url);
         if(url.startsWith("jar://")) {
             url = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + url.substring(6);
         } 
@@ -2926,6 +2927,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         protected void deinitialize() {
             if(nativePeer != null && nativePeer[0] != 0) {
+                setPeerImage(generatePeerImage());
                 nativeInstance.peerDeinitialized(nativePeer[0]);
             }
         }
@@ -3469,6 +3471,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFiles(String directory) throws IOException {
+        directory = unfile(directory);
         String[] a = new String[nativeInstance.fileCountInDir(directory)];
         nativeInstance.listFilesInDir(directory, a);
         return a;
@@ -3492,14 +3495,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void mkdir(String directory) {
-        nativeInstance.createDirectory(directory);
+        nativeInstance.createDirectory(unfile(directory));
     }
 
     /**
      * @inheritDoc
      */
     public void deleteFile(String file) {
-        nativeInstance.deleteFile(file);
+        nativeInstance.deleteFile(unfile(file));
     }
 
     /**
@@ -3519,18 +3522,25 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public long getFileLength(String file) {
-        return nativeInstance.getFileSize(file);
+        return nativeInstance.getFileSize(unfile(file));
     }
 
     public long getFileLastModified(String file) {
-        return nativeInstance.getFileLastModified(file);
+        return nativeInstance.getFileLastModified(unfile(file));
     }
 
+    private String unfile(String file) {
+        if(file.startsWith("file:/")) {
+            file = file.substring(5);
+        }
+        return file;
+    }
+    
     /**
      * @inheritDoc
      */
     public boolean isDirectory(String file) {
-        return nativeInstance.isDirectory(file);
+        return nativeInstance.isDirectory(unfile(file));
     }
 
     /**

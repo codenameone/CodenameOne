@@ -272,6 +272,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        AndroidNativeUtil.onResume();
         waitingForResult = false;
         background = false;
     }        
@@ -308,6 +309,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AndroidNativeUtil.onCreate(savedInstanceState);
 
         if (android.os.Build.VERSION.SDK_INT >= 11) {
             getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
@@ -408,6 +410,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        AndroidNativeUtil.onDestroy();
         if(isBillingEnabled()) {
             purchaseDB.close();
             billing.unbind();
@@ -423,6 +426,24 @@ public class CodenameOneActivity extends Activity {
         // By returning true we signal let Android know that we want the menu
         // to be displayed
         return nativeMenu;
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState); 
+        AndroidNativeUtil.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory(); 
+        AndroidNativeUtil.onLowMemory();
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause(); 
+        AndroidNativeUtil.onPause();
     }
 
     @Override

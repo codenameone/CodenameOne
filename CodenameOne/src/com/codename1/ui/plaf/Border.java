@@ -73,7 +73,7 @@ public class Border {
     Image[] images;
 
     private Image[] specialTile;
-    private Component trackComponent;
+    private Rectangle trackComponent;
 
     /**
      * Indicates whether theme colors should be used or whether colors are specified
@@ -133,6 +133,22 @@ public class Border {
      * @param trackComponent the component that will be tracked for the positioning of the tile
      */
     public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Component trackComponent) {
+        specialTile = new Image[] {tileTop, tileBottom, tileLeft, tileRight};
+        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
+    }
+
+    /**
+     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+     * so it points at the center of the track component
+     *
+     * @param tileTop an image that will replace one of the tiles on the top if the track component is there
+     * @param tileBottom an image that will replace one of the tiles on the bottom if the track component is there
+     * @param tileLeft an image that will replace one of the tiles on the left if the track component is there
+     * @param tileRight an image that will replace one of the tiles on the right if the track component is there
+     * @param trackComponent the component that will be tracked for the positioning of the tile
+     */
+    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
         specialTile = new Image[] {tileTop, tileBottom, tileLeft, tileRight};
         this.trackComponent = trackComponent;
     }
@@ -1177,8 +1193,8 @@ public class Border {
                 // we need to draw an arrow on one of the sides
                 if(trackComponent != null) {
                     int cabsY = c.getAbsoluteY();
-                    int trackY = trackComponent.getAbsoluteY();
-                    int trackX = trackComponent.getAbsoluteX();
+                    int trackY = trackComponent.getY();
+                    int trackX = trackComponent.getX();
                     int cabsX = c.getAbsoluteX();
                     if(cabsY >= trackY + trackComponent.getHeight()) {
                         // we are below the component

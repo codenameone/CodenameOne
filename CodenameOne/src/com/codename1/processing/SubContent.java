@@ -22,129 +22,142 @@
  */
 package com.codename1.processing;
 
-import java.util.Hashtable;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.List;
 import java.util.Vector;
 
 /**
  * Internal class, do not use.
- * 
+ *
  * An accessor implementation for working with subset of data.
- * 
+ *
  * @author Eric Coolman
- * 
+ *
  */
 class SubContent implements StructuredContent {
-	private Vector<StructuredContent> root;
-	private StructuredContent parent;
 
-	/**
-	 * Construct from subset of content.
-	 * 
-	 * @param content subset content
-	 */
-	public SubContent(Vector<StructuredContent> content) {
-		this.root = content;
-	}
+    private List<StructuredContent> root;
+    private StructuredContent parent;
 
-	/**
-	 * INTERNAL - link a node to it's parent so we can traverse backwards when
-	 * required.
-	 * 
-	 * @param content a subset of data.
-	 * @param parent the parent element of content.
-	 */
-	SubContent(Vector<StructuredContent> content, StructuredContent parent) {
-		this.root = content;
-		this.parent = parent;
-	}
+    /**
+     * Construct from subset of content.
+     *
+     * @param content subset content
+     */
+    public SubContent(List<StructuredContent> content) {
+        this.root = content;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * com.codename1.processing.StructuredContent#getChildren(java.lang.String)
-	 */
-	public Vector getChildren(String name) {
-		Vector v = new Vector();
-		for (StructuredContent sc : root) {
-			v.addAll(sc.getChildren(name));
-		}
-		return v;
-	}
+    /**
+     * INTERNAL - link a node to it's parent so we can traverse backwards when
+     * required.
+     *
+     * @param content a subset of data.
+     * @param parent the parent element of content.
+     */
+    SubContent(List<StructuredContent> content, StructuredContent parent) {
+        this.root = content;
+        this.parent = parent;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.codename1.processing.StructuredContent#getChild(int)
-	 */
-	public StructuredContent getChild(int index) {
-		if (root != null && root.size() > 0) {
-			return root.elementAt(0).getChild(0);
-		}
-		return null;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.codename1.processing.StructuredContent#getChildren(java.lang.String)
+     */
+    public List getChildren(String name) {
+        List v;
+        if (root instanceof Vector) {
+            v = new Vector();
+        } else {
+            v = new ArrayList();
+        }
+        for (StructuredContent sc : root) {
+            v.addAll(sc.getChildren(name));
+        }
+        return v;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * com.codename1.processing.StructuredContent#getDescendants(java.lang.String
-	 * )
-	 */
-	public Vector getDescendants(String name) {
-		Vector v = new Vector();
-		for (StructuredContent sc : root) {
-			v.addAll(sc.getDescendants(name));
-		}
-		return v;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.codename1.processing.StructuredContent#getChild(int)
+     */
+    public StructuredContent getChild(int index) {
+        if (root != null && root.size() > 0) {
+            return root.get(0).getChild(0);
+        }
+        return null;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
-	 */
-	public String getAttribute(String name) {
-		return null;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.codename1.processing.StructuredContent#getDescendants(java.lang.String
+     * )
+     */
+    public List getDescendants(String name) {
+        List v;
+        if (root instanceof Vector) {
+            v = new Vector();
+        } else {
+            v = new ArrayList();
+        }
+        for (StructuredContent sc : root) {
+            v.addAll(sc.getDescendants(name));
+        }
+        return v;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.codename1.processing.StructuredContent#getAttributes()
-	 */
-	public Hashtable getAttributes() {
-		return null;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
+     */
+    public String getAttribute(String name) {
+        return null;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.codename1.processing.StructuredContent#getParent()
-	 */
-	public StructuredContent getParent() {
-		return parent;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.codename1.processing.StructuredContent#getAttributes()
+     */
+    public Map getAttributes() {
+        return null;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.codename1.processing.StructuredContent#getText()
-	 */
-	public String getText() {
-		return null;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.codename1.processing.StructuredContent#getParent()
+     */
+    public StructuredContent getParent() {
+        return parent;
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.codename1.processing.StructuredContent#getNativeRoot()
-	 */
-	public Object getNativeRoot() {
-		if (parent != null) {
-			return parent.getNativeRoot();
-		}
-		return null;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.codename1.processing.StructuredContent#getText()
+     */
+    public String getText() {
+        return null;
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.codename1.processing.StructuredContent#getNativeRoot()
+     */
+    public Object getNativeRoot() {
+        if (parent != null) {
+            return parent.getNativeRoot();
+        }
+        return null;
+    }
 }

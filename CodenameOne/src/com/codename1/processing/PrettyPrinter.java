@@ -36,39 +36,40 @@ Derivative Revision History:
  */
 package com.codename1.processing;
 
+import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.Map;
+import java.util.List;
 
 /**
  * Private class, do not use.
  * 
  * An internal utility method used by toString() methods to produce a JSON document
- * from a given hashtable or vector.
+ * from a given Map or List.
  * 
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
 class PrettyPrinter {
-    Hashtable myHashMap;
+    Map myHashMap;
     
-    private PrettyPrinter(Hashtable h) {
+    private PrettyPrinter(Map h) {
     	this.myHashMap = h;
     }
     
-    public static String print(Hashtable h) {
+    public static String print(Map h) {
     	return print(h, 2, 0);
     }
 
-    public static String print(Vector v) {
+    public static String print(List v) {
     	return print(v, 2, 0);
     }
 
-    static String print(Hashtable h, int indentFactor, int indent) {
+    static String print(Map h, int indentFactor, int indent) {
     	PrettyPrinter printer = new PrettyPrinter(h);
     	return printer.toString(indentFactor, indent);
     }
     
-    static String print(Vector v, int indentFactor, int indent) {
+    static String print(List v, int indentFactor, int indent) {
         int len = v.size();
         if (len == 0) {
             return "[]";
@@ -76,7 +77,7 @@ class PrettyPrinter {
         int i;
         StringBuffer sb = new StringBuffer("[");
         if (len == 1) {
-            sb.append(valueToString(v.elementAt(0),
+            sb.append(valueToString(v.get(0),
                     indentFactor, indent));
         } else {
             int newindent = indent + indentFactor;
@@ -88,7 +89,7 @@ class PrettyPrinter {
                 for (int j = 0; j < newindent; j += 1) {
                     sb.append(' ');
                 }
-                sb.append(valueToString(v.elementAt(i),
+                sb.append(valueToString(v.get(i),
                         indentFactor, newindent));
             }
             sb.append('\n');
@@ -102,25 +103,25 @@ class PrettyPrinter {
     }
 
     /**
-     * Get the number of keys stored in the Hashtable.
+     * Get the number of keys stored in the Map.
      *
-     * @return The number of keys in the Hashtable.
+     * @return The number of keys in the Map.
      */
     public int length() {
         return this.myHashMap.size();
     }
 
     /**
-     * Get an enumeration of the keys of the Hashtable.
+     * Get an enumeration of the keys of the Map.
      *
      * @return An iterator of the keys.
      */
     public Enumeration keys() {
-        return this.myHashMap.keys();
+        return Collections.enumeration(this.myHashMap.keySet());
     }
 
     /**
-     * Make a prettyprinted JSON text of this Hashtable.
+     * Make a prettyprinted JSON text of this Map.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
      * @param indentFactor The number of spaces to add to each level of
@@ -136,7 +137,7 @@ class PrettyPrinter {
 
 
     /**
-     * Make a prettyprinted JSON text of this Hashtable.
+     * Make a prettyprinted JSON text of this Map.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
      * @param indentFactor The number of spaces to add to each level of
@@ -224,11 +225,11 @@ class PrettyPrinter {
         if (value instanceof Boolean) {
             return value.toString();
         }
-        if (value instanceof Hashtable) {
-            return print((Hashtable)value, indentFactor, indent);
+        if (value instanceof Map) {
+            return print((Map)value, indentFactor, indent);
         }
-        if (value instanceof Vector) {
-            return print((Vector)value, indentFactor, indent);
+        if (value instanceof List) {
+            return print((List)value, indentFactor, indent);
         }
         return quote(value.toString());
     }
@@ -324,8 +325,8 @@ class PrettyPrinter {
              value instanceof Integer || value instanceof Long) {
              return numberToString(value);
          }
-         if (value instanceof Boolean || value instanceof Hashtable ||
-                 value instanceof Vector) {
+         if (value instanceof Boolean || value instanceof Map ||
+                 value instanceof List) {
              return value.toString();
          }
          return quote(value.toString());

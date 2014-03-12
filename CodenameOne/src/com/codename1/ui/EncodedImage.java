@@ -266,15 +266,26 @@ public class EncodedImage extends Image {
      * @throws java.io.IOException if thrown by the input stream
      */
     public static EncodedImage create(InputStream i) throws IOException {
-        ByteArrayOutputStream bo = new ByteArrayOutputStream();
-        byte[] buffer = new byte[4096];
-        int size = i.read(buffer);
-        while(size > -1) {
-            bo.write(buffer, 0, size);
-            size = i.read(buffer);
+        byte[] buffer = Util.readInputStream(i);
+        if(buffer.length > 200000) {
+            System.out.println("Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)");
         }
-        bo.close();
-        return new EncodedImage(new byte[][] {bo.toByteArray()});
+        return new EncodedImage(new byte[][] {buffer});
+    }
+
+    /**
+     * Creates an image from the input stream, this version of the method is somewhat faster
+     * than the version that doesn't accept size
+     * 
+     * @param i the input stream
+     * @param size the size of the stream
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(InputStream i, int size) throws IOException {
+        byte[] buffer = new byte[size];
+        Util.readFully(i, buffer);
+        return new EncodedImage(new byte[][] {buffer});
     }
 
     private Image getInternalImpl() {

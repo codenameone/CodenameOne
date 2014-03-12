@@ -256,9 +256,10 @@ public class SEBrowserComponent extends PeerComponent {
                 web.snapshot(null, w);
                 BufferedImage bi = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
                 SwingFXUtils.fromFXImage(w, bi);
-                img[0] = com.codename1.ui.Image.createImage(bi);
-                setPeerImage(img[0]);
+                Image i = com.codename1.ui.Image.createImage(bi);
+                setPeerImage(i);
                 synchronized(img) {
+                    img[0] = i;
                     img.notify();
                 }
             }

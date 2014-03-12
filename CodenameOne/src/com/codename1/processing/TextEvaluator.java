@@ -167,7 +167,7 @@ class TextEvaluator extends AbstractEvaluator {
 	 * (non-Javadoc)
 	 * 
 	 * @see
-	 * com.codename1.processing.AbstractEvaluator#evaluateSingle(java.util.Vector
+	 * com.codename1.processing.AbstractEvaluator#evaluateSingle(java.util.List
 	 * , java.lang.String)
 	 */
 	protected Object evaluateSingle(StructuredContent element, String expr) {

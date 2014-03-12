@@ -22,7 +22,7 @@
  */
 package com.codename1.processing;
 
-import java.util.Vector;
+import java.util.List;
 
 /**
  * Private interface, do not use.
@@ -77,7 +77,7 @@ interface Evaluator {
 	 * @return Either a single StructuredContent element, or an array of StructuredContent elements.
 	 * @throws IllegalArgumentException thrown if there is an error processing the predicate expression.
 	 */
-	public Object evaluate(Vector elements)
+	public Object evaluate(List elements)
 			throws IllegalArgumentException;
 
 	/**

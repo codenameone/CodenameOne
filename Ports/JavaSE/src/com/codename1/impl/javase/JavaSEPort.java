@@ -169,7 +169,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
-
+    private static String appHomeDir = ".cn1";
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
      * used, this is important when running a real application rather than just a simulator skin
@@ -214,6 +214,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public static void setDefaultPixelMilliRatio(Double aDefaultPixelMilliRatio) {
         defaultPixelMilliRatio = aDefaultPixelMilliRatio;
+    }
+
+    /**
+     * @return the appHomeDir
+     */
+    public static String getAppHomeDir() {
+        return appHomeDir;
+    }
+
+    /**
+     * @param aAppHomeDir the appHomeDir to set
+     */
+    public static void setAppHomeDir(String aAppHomeDir) {
+        appHomeDir = aAppHomeDir;
     }
     private TestRecorder testRecorder;
     private Hashtable contacts;
@@ -1729,7 +1743,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 1;
-                    Display.getInstance().getCurrent().repaint();
+                    if(Display.getInstance().getCurrent() != null) {
+                        Display.getInstance().getCurrent().repaint();
+                    }
                     frm.repaint();
                 }
             });
@@ -1741,7 +1757,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.5f;
-                    Display.getInstance().getCurrent().repaint();
+                    if(Display.getInstance().getCurrent() != null) {
+                        Display.getInstance().getCurrent().repaint();
+                    }
                     frm.repaint();
                 }
             });
@@ -1753,7 +1771,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 2;
-                    Display.getInstance().getCurrent().repaint();
+                    if(Display.getInstance().getCurrent() != null) {
+                        Display.getInstance().getCurrent().repaint();
+                    }
                     frm.repaint();
                 }
             });
@@ -4735,7 +4755,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private String unfile(String file) {
         if(file.startsWith("file://home")) {
-            return System.getProperty("user.home") + File.separator + ".cn1" + file.substring(11).replace('/', File.separatorChar);
+            return System.getProperty("user.home") + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
         }
         if (file.startsWith("file://")) {
             return file.substring(7);
@@ -6114,7 +6134,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public String getAppHomePath() {
-        new File(System.getProperty("user.home") + File.separator + ".cn1").mkdirs();
+        new File(System.getProperty("user.home") + File.separator + appHomeDir).mkdirs();
         return "file://home";
     }
 

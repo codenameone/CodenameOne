@@ -848,6 +848,7 @@ public class CloudStorage {
         }
         ConnectionRequest req = new ConnectionRequest();
         req.setPost(false);
+        req.setFailSilently(true);
         req.setUrl(SERVER_URL + "/fileStoreDelete");
         req.addArgument("i", fileId);
         req.addArgument("t", CloudPersona.getCurrentPersona().getToken());
@@ -856,6 +857,46 @@ public class CloudStorage {
             return new String(req.getResponseData()).equals("OK");
         }
         return false;
+    }
+
+    /**
+     * Deletes all the cloud files under this user, notice that this method
+     * is asynchronous and a background server process performs the actual deletion
+     */
+    public void deleteAllCloudFilesForUser() {
+        if(CloudPersona.getCurrentPersona().getToken() == null) {
+            return;
+        }
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setFailSilently(true);
+        req.setUrl(SERVER_URL + "/purgeCloudFiles");
+        req.addArgument("own", CloudPersona.getCurrentPersona().getToken());
+        req.addArgument("u", Display.getInstance().getProperty("built_by_user", ""));
+        NetworkManager.getInstance().addToQueue(req);
+    }
+    
+    /**
+     * Deletes all the cloud files before the given time stamp for the given
+     * development account. Notice that this method is meant for internal use 
+     * and not for distributable apps since it includes your developer account.
+     * This method works in a background server process and returns immediately.
+     * @param timestamp the timestamp since epoch (as in System.currentTimemillis).
+     * @param developerAccount your developer email
+     * @param developerPassword your developer password
+     */
+    public void deleteAllCloudFilesBefore(long timestamp, String developerAccount, String developerPassword) {
+        if(CloudPersona.getCurrentPersona().getToken() == null) {
+            return;
+        }
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setFailSilently(true);
+        req.setUrl(SERVER_URL + "/purgeCloudFiles");
+        req.addArgument("d", "" + timestamp);
+        req.addArgument("u", developerAccount);
+        req.addArgument("p", developerPassword);
+        NetworkManager.getInstance().addToQueue(req);
     }
 
     /**

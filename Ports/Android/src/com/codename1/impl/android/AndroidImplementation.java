@@ -3968,7 +3968,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             attachment = fileUri;
         }
-        if (attachment.indexOf("://") < 0) {
+        if (attachment.indexOf(":") < 0) {
             attachment = "file://" + attachment;
         }
         return attachment;

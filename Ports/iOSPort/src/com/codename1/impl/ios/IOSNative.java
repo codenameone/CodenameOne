@@ -194,9 +194,11 @@ public final class IOSNative {
     native String getBrowserURL(long browserPeer);
     
     native long createVideoComponent(String url);
-
     native long createVideoComponent(byte[] video);
     native long createVideoComponentNSData(long video);
+    native long createNativeVideoComponent(String url);
+    native long createNativeVideoComponent(byte[] video);
+    native long createNativeVideoComponentNSData(long video);
 
     native void startVideoComponent(long peer); 
     

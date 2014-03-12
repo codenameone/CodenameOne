@@ -114,8 +114,13 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
         } catch (Throwable e) {
             Log.e("Codename One", "paint problem.", e);
         } finally {
-            if (c != null) {
-                this.surfaceHolder.unlockCanvasAndPost(c);
+            try {
+                if (c != null) {
+                    this.surfaceHolder.unlockCanvasAndPost(c);
+                }
+            } catch(Throwable t) {
+                // workaround for potential exception here
+                t.printStackTrace();
             }
         }
     }

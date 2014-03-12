@@ -39,13 +39,14 @@ Derivative Revision History:
 package com.codename1.processing;
 
 import java.util.Enumeration;
-import java.util.Hashtable;
+import java.util.Map;
+import java.util.List;
 import java.util.Vector;
 
 /**
  * Internal class, do not use.
  * 
- * Used internally by Result class apply() methods, this converts a path expression into a Vector of string tokens.
+ * Used internally by Result class apply() methods, this converts a path expression into a List of string tokens.
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  * 
@@ -69,8 +70,8 @@ class ResultTokenizer {
         predicate = false;
     }
     
-    Vector tokenize(Hashtable namespaceAliases) {
-        final Vector tokens = new Vector();
+    List tokenize(Map namespaceAliases) {
+        final List tokens = new Vector();
         String tok;
         int i;
         for (pos = 0, tok = next(); !"".equals(tok); tok = next()) {
@@ -80,7 +81,7 @@ class ResultTokenizer {
                     tok = mapto + tok.substring(i);
                 }
             }
-            tokens.addElement(tok);
+            tokens.add(tok);
         }
         return tokens;
     }

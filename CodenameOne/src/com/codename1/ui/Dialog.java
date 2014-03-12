@@ -1094,6 +1094,22 @@ public class Dialog extends Form {
      * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
      */
     public Command showPopupDialog(Component c) {
+        Rectangle componentPos = c.getSelectedRect();
+        componentPos.setX(componentPos.getX() - c.getScrollX());
+        componentPos.setY(componentPos.getY() - c.getScrollY());
+        
+        return showPopupDialog(componentPos);
+    }
+    
+    /**
+     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
+     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the PopupDialog style by default.
+     *
+     * @param rect the screen rectangle to which the popup should point
+     * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
+     */
+    public Command showPopupDialog(Rectangle rect) {
         if(getDialogUIID().equals("Dialog")) {
             setDialogUIID("PopupDialog");
             if(getTitleComponent().getUIID().equals("DialogTitle")) {
@@ -1155,7 +1171,7 @@ public class Dialog extends Form {
             Image r = manager.getThemeImageConstant(getDialogUIID() + "ArrowRightImage");
             Border border = contentPaneStyle.getBorder();
             if(border != null) {
-                border.setImageBorderSpecialTile(t, b, l, r, c);
+                border.setImageBorderSpecialTile(t, b, l, r, rect);
                 restoreArrow = true;
             }
         }
@@ -1165,10 +1181,6 @@ public class Dialog extends Form {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
-
-        Rectangle componentPos = c.getSelectedRect();
-        componentPos.setX(componentPos.getX() - c.getScrollX());
-        componentPos.setY(componentPos.getY() - c.getScrollY());
         
         int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
@@ -1181,17 +1193,17 @@ public class Dialog extends Form {
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
-            if(availableHeight < (availableWidth - c.getWidth()) / 2) {
+            if(availableHeight < (availableWidth - rect.getWidth()) / 2) {
                 showPortrait = false;
             }
         } else {
-            if(availableHeight / 2 > availableWidth - c.getWidth()) {
+            if(availableHeight / 2 > availableWidth - rect.getWidth()) {
                 showPortrait = true;
             }
         }
         if(showPortrait) {
             if(width < availableWidth) {
-                int idealX = componentPos.getX() - width / 2 + componentPos.getSize().getWidth() / 2;
+                int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
 
                 // if the ideal position is less than 0 just use 0
                 if(idealX > 0) {
@@ -1203,21 +1215,21 @@ public class Dialog extends Form {
                     }
                 }
             }
-            if(componentPos.getY() < availableHeight / 2) {
+            if(rect.getY() < availableHeight / 2) {
                 // popup downwards
-                y = componentPos.getY() + componentPos.getSize().getHeight();
+                y = rect.getY() + rect.getSize().getHeight();
                 int height = Math.min(prefHeight, availableHeight - y);
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup upwards
-                int height = Math.min(prefHeight, availableHeight - (availableHeight - componentPos.getY()));
-                y = componentPos.getY() - height;
+                int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
+                y = rect.getY() - height;
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
             if(height < availableHeight) {
-                int idealY = componentPos.getY() - height / 2 + componentPos.getSize().getHeight() / 2;
+                int idealY = rect.getY() - height / 2 + rect.getSize().getHeight() / 2;
 
                 // if the ideal position is less than 0 just use 0
                 if(idealY > 0) {
@@ -1231,9 +1243,9 @@ public class Dialog extends Form {
             }
             
             
-            if(prefWidth > componentPos.getX()) {
+            if(prefWidth > rect.getX()) {
                 // popup right
-                x = componentPos.getX() + componentPos.getSize().getWidth();
+                x = rect.getX() + rect.getSize().getWidth();
                 if(x + prefWidth > availableWidth){
                     x = availableWidth - prefWidth;
                 }
@@ -1242,8 +1254,8 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup left
-                width = Math.min(prefWidth, availableWidth - (availableWidth - componentPos.getX()));
-                x = componentPos.getX() - width;
+                width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
+                x = rect.getX() - width;
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             }
         }
