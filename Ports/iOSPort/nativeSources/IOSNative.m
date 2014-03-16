@@ -1765,20 +1765,30 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(JAVA_OBJECT in
     return returnString;
 }
 
-MPMoviePlayerController* moviePlayerInstance;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+    __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSURL* u = [NSURL URLWithString:toNSString(str)];
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         [pool release];
     });
-    MPMoviePlayerController* mp = moviePlayerInstance;
-    moviePlayerInstance = nil;
-    return mp;
+    return moviePlayerInstance;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String(JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+    __block MPMoviePlayerViewController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSURL* u = [NSURL URLWithString:toNSString(str)];
+        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+        [pool release];
+    });
+    return moviePlayerInstance;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
+    __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
@@ -1799,12 +1809,33 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(JA
         [moviePlayerInstance play];
         [pool release];
     });
-    MPMoviePlayerController* mp = moviePlayerInstance;
-    moviePlayerInstance = nil;
-    return mp;
+    return moviePlayerInstance;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY(JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
+    __block MPMoviePlayerViewController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+        
+        [d writeToFile:path atomically:YES];
+        NSURL *u = [NSURL fileURLWithPath:path];
+        
+        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+        [moviePlayerInstance retain];
+        [pool release];
+    });
+    return moviePlayerInstance;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(JAVA_OBJECT instanceObject, long nsData) {
+    __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSData* d = (NSData*)nsData;
@@ -1823,11 +1854,28 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(JAV
         [moviePlayerInstance play];
         [pool release];
     });
-    MPMoviePlayerController* mp = moviePlayerInstance;
-    moviePlayerInstance = nil;
-    return mp;
+    return moviePlayerInstance;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long(JAVA_OBJECT instanceObject, long nsData) {
+    __block MPMoviePlayerViewController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSData* d = (NSData*)nsData;
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+        
+        [d writeToFile:path atomically:YES];
+        NSURL *u = [NSURL fileURLWithPath:path];
+        
+        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+        [moviePlayerInstance retain];
+        [pool release];
+    });
+    return moviePlayerInstance;
+}
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(JAVA_OBJECT instanceObject,
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
@@ -2059,10 +2107,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(JAVA_OBJECT i
 }
 
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        MPMoviePlayerController* m = (MPMoviePlayerController*) peer;
-        [[CodenameOne_GLViewController instance] presentModalViewController:m animated:YES];
+        MPMoviePlayerViewController* m = (MPMoviePlayerViewController*) peer;
+        [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:m];
         [pool release];
     });
 }
