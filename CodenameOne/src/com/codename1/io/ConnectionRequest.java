@@ -659,6 +659,9 @@ public class ConnectionRequest implements IOProgressListener {
         if(Display.isInitialized() &&
                 Dialog.show("Exception", err.toString() + ": for URL " + url + "\n" + err.getMessage(), "Retry", "Cancel")) {
             retry();
+        } else {
+            retrying = false;
+            killed = true;
         }
     }
 
@@ -680,6 +683,9 @@ public class ConnectionRequest implements IOProgressListener {
         if(Display.isInitialized() &&
                 Dialog.show("Error", code + ": " + message, "Retry", "Cancel")) {
             retry();
+        } else {
+            retrying = false;
+            killed = true;
         }
     }
 

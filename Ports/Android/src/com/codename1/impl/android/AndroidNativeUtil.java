@@ -24,10 +24,14 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.os.Bundle;
+import android.view.View;
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * This is a utility class for common native usages
@@ -141,5 +145,41 @@ public class AndroidNativeUtil {
                 act.restoreIntentResultListener();
             }
         });
+    }
+    
+    private static HashMap<Class, BitmapViewRenderer> viewRendererMap;
+    
+    public static Bitmap renderViewOnBitmap(final View v, int w, int h) {
+        if(viewRendererMap != null) {
+            BitmapViewRenderer br = viewRendererMap.get(v.getClass());
+            if(br != null) {                
+                return br.renderViewOnBitmap(v, w, h);
+            }
+        }
+        final Bitmap nativeBuffer = Bitmap.createBitmap(
+                        w, h, Bitmap.Config.ARGB_8888);
+        AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Canvas canvas = new Canvas(nativeBuffer);
+                    v.draw(canvas);
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+        });
+        return nativeBuffer;
+    }
+    
+    public static void registerViewRenderer(Class viewClass, BitmapViewRenderer b) {
+        if(viewRendererMap == null) {
+            viewRendererMap = new HashMap<Class, BitmapViewRenderer>();
+        }
+        viewRendererMap.put(viewClass, b);
+    }
+    
+    public static interface BitmapViewRenderer {
+        public Bitmap renderViewOnBitmap(View v, int w, int h);
     }
 }

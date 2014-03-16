@@ -1549,17 +1549,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(isVideo) {
                 if(nativePlayer) {
                     if(uri != null) {
-                        moviePlayerPeer = nativeInstance.createVideoComponent(uri);
+                        moviePlayerPeer = nativeInstance.createNativeVideoComponent(uri);
                     } else {
                         try {
                             long val = getNSData(stream);
                             if(val > 0) {
-                                moviePlayerPeer = nativeInstance.createVideoComponentNSData(val);
+                                moviePlayerPeer = nativeInstance.createNativeVideoComponentNSData(val);
                                 Util.cleanup(stream);
                             } else {
                                 byte[] data = Util.readInputStream(stream);
                                 Util.cleanup(stream);
-                                moviePlayerPeer = nativeInstance.createVideoComponent(data);
+                                moviePlayerPeer = nativeInstance.createNativeVideoComponent(data);
                             }
                         } catch (IOException ex) {
                             ex.printStackTrace();

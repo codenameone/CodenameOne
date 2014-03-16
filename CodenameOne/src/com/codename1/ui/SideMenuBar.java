@@ -320,7 +320,15 @@ public class SideMenuBar extends MenuBar {
      */
     protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
-            if (x - initialDragX > Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
+            if (parent instanceof Dialog || getCommandCount() == 0) {
+                return DRAG_REGION_NOT_DRAGGABLE;
+            }
+            if (parent.getCommandCount() == 1) {
+                if (parent.getCommand(0) == parent.getBackCommand()) {
+                    return DRAG_REGION_NOT_DRAGGABLE;
+                }
+            }
+            if (x - initialDragX < Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant("sideSwipeActivationInt", 15)) {
                 return DRAG_REGION_LIKELY_DRAG_X;
             }
         }
@@ -1355,6 +1363,39 @@ public class SideMenuBar extends MenuBar {
         public void setEnabled(boolean b) {
             cmd.setEnabled(b);
         }
+        
+        class ShowWaiter implements Runnable, ActionListener {
+            private final Object LOCK = new Object();
+            
+            ShowWaiter() {
+                parent.addShowListener(this);
+            }
+            
+            public void run() {
+                if(Display.getInstance().isEdt()) {
+                    ActionEvent e = new ActionEvent(cmd);
+                    parent.dispatchCommand(cmd, e);
+                    return;
+                }
+
+                synchronized(LOCK) {
+                    while (Display.getInstance().getCurrent() != parent) {
+                        try {
+                            LOCK.wait(40);
+                        } catch (Exception ex) {
+                        }
+                    }
+                }
+                Display.getInstance().callSerially(this);
+            }
+
+            public void actionPerformed(ActionEvent evt) {
+                synchronized(LOCK) {
+                    LOCK.notify();
+                }
+            }
+            
+        }
 
         public void actionPerformed(final ActionEvent evt) {
             if (transitionRunning) {
@@ -1365,25 +1406,8 @@ public class SideMenuBar extends MenuBar {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
                 public void run() {
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-
-                        public void run() {
-                            while (Display.getInstance().getCurrent() != parent) {
-                                try {
-                                    Thread.sleep(40);
-                                } catch (Exception ex) {
-                                }
-                            }
-                        }
-                    });
-
-                    Display.getInstance().callSerially(new Runnable() {
-
-                        public void run() {
-                            ActionEvent e = new ActionEvent(cmd);
-                            parent.dispatchCommand(cmd, e);
-                        }
-                    });
+                    parent.addShowListener(pointerDragged);
+                    new Thread(new ShowWaiter()).start();
                 }
             });
 

@@ -289,7 +289,7 @@ public class NetworkManager {
                         if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
                             // there may be a race condition where the dialog hasn't yet appeared but the
                             // network request completed
-                            while(Display.getInstance().getCurrent() != currentRequest.getDisposeOnCompletion()) {
+                            while(Display.getInstance().getCurrent() != currentRequest.getDisposeOnCompletion() && !currentRequest.isKilled()) {
                                 try {
                                     Thread.sleep(10);
                                 } catch (InterruptedException ex) {

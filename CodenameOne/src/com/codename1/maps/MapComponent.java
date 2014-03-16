@@ -176,6 +176,7 @@ public class MapComponent extends Container {
                 public void actionPerformed(ActionEvent evt) {
                     zoomOut();
                     repaint();
+                    fireMapListenerEvent();
                 }
             });
             buttonsbar.addComponent(out);
@@ -186,6 +187,7 @@ public class MapComponent extends Container {
                 public void actionPerformed(ActionEvent evt) {
                     zoomIn();
                     repaint();
+                    fireMapListenerEvent();
                 }
             });
             buttonsbar.addComponent(in);
@@ -299,7 +301,6 @@ public class MapComponent extends Container {
             }
         }
         super.repaint();
-        fireMapListenerEvent();
     }
 
     /**
@@ -312,7 +313,6 @@ public class MapComponent extends Container {
         pressedy = y;
         draggedx = x;
         draggedy = y;
-        fireMapListenerEvent();
     }
 
     /**
@@ -354,7 +354,6 @@ public class MapComponent extends Container {
         } else {
             super.pointerDragged(x, y);
         }
-        fireMapListenerEvent();
     }
 
     private double distance(int[] x, int[] y) {
@@ -459,6 +458,7 @@ public class MapComponent extends Container {
                 // workaround for rounding error in scale/clipping
                 getComponentForm().repaint();
             }
+            fireMapListenerEvent();
             return;
         }
         Coord scale = _map.scale(_zoom);
@@ -484,6 +484,7 @@ public class MapComponent extends Container {
             }
         }
         super.repaint();
+        fireMapListenerEvent();
     }
 
     /**
@@ -547,6 +548,7 @@ public class MapComponent extends Container {
             _needTiles = true;
         }
         super.repaint();
+        fireMapListenerEvent();
     }
 
     private void paintmap(Graphics g) {

@@ -2238,16 +2238,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         private View v;
         private AndroidImplementation.AndroidRelativeLayout layoutWrapper = null;
-        private Paint clear = new Paint();
-
+        private int currentVisible = View.INVISIBLE;
+        private boolean lightweightMode;
 
         public AndroidPeer(View vv) {
             super(vv);
             this.v = vv;
-            clear.setColor(0xAA000000);
-            clear.setStyle(Style.FILL);
             v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                     MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        }
+
+        @Override
+        protected Image generatePeerImage() {
+            try {
+                Image image = new AndroidImplementation.NativeImage(AndroidNativeUtil.renderViewOnBitmap(v, getWidth(), getHeight()));
+                return image;
+            } catch(Throwable t) {
+                t.printStackTrace();
+                return Image.createImage(5, 5);
+            }
+        }
+        
+        protected boolean shouldRenderPeerImage() {
+            return lightweightMode || !isInitialized();
+        }
+
+        protected void setLightweightMode(boolean l) {
+            doSetVisibility(!l);
+            if (lightweightMode == l) {
+                return;
+            }
+            lightweightMode = l;
         }
 
         @Override
@@ -2259,7 +2280,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         void doSetVisibility(final boolean visible) {
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    v.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+                    currentVisible = visible ? View.VISIBLE : View.INVISIBLE;
+                    v.setVisibility(currentVisible);
                     if (visible) {
                         v.bringToFront();
                     }
@@ -2273,7 +2295,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private void doSetVisibilityInternal(final boolean visible) {
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    v.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+                    currentVisible = visible ? View.VISIBLE : View.INVISIBLE;
+                    v.setVisibility(currentVisible);
                     if (visible) {
                         v.bringToFront();
                     }
@@ -2317,11 +2340,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 nativePeers.add(this);
             }
             init();
+            setPeerImage(null);
         }
         
         public void init(){
-            final boolean [] added = new boolean[1];
-            activity.runOnUiThread(new Runnable() {
+            runOnUiThreadAndBlock(new Runnable() {
                 public void run() {
                     if (layoutWrapper == null) {
                         /**
@@ -2330,7 +2353,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                          */
                         layoutWrapper = new AndroidImplementation.AndroidRelativeLayout(activity, AndroidImplementation.AndroidPeer.this, v);
                         layoutWrapper.setBackgroundDrawable(null);
-                        v.setVisibility(View.INVISIBLE);
+                        v.setVisibility(currentVisible);
                         v.setFocusable(AndroidImplementation.AndroidPeer.this.isFocusable());
                         v.setFocusableInTouchMode(true);
                         ArrayList<View> viewList = new ArrayList<View>();
@@ -2381,17 +2404,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     if(AndroidImplementation.this.relativeLayout != null){
                         AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
-                    }
-                    added[0] = true;
-                }
-            });
-
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                public void run() {
-                    while (!added[0]) {
-                        try {
-                            Thread.sleep(5);
-                        } catch(InterruptedException err) {}
                     }
                 }
             });
@@ -3126,6 +3138,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             try {
                                 Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse(url));
                                 activity.startActivity(dialer);
+                            } catch(Throwable t) {}
+                        }
+                        return true;
+                    }
+                    // this will fail if dial permission isn't declared
+                    if(url.startsWith("mailto:")) {
+                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                            try {
+                                Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.parse(url));        
+                                activity.startActivity(emailIntent);
                             } catch(Throwable t) {}
                         }
                         return true;

@@ -2701,7 +2701,7 @@ public class Component implements Animation, StyleListener {
     /**
      * This method returns the dragging speed based on the latest dragged
      * events
-     * @param yAxis indicates what axis speed is required
+     * @param vertical indicates what axis speed is required
      * @return the dragging speed
      */
     protected float getDragSpeed(boolean vertical) {
@@ -2709,8 +2709,9 @@ public class Component implements Animation, StyleListener {
     }
     
     /**
-     * Returns the Component Style allowing us to manipulate the look of the 
-     * component
+     * Returns the current Component Style allowing code to draw the current component, you
+     * should normally use getUnselected/Pressed/DisabledStyle() and not this method since
+     * it will return different values based on component state.
      * 
      * @return the component Style object
      */

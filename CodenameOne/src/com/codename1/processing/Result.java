@@ -277,7 +277,6 @@ public class Result {
      *
      * @param content JSON content input stream
      * @return Result a result evaluator object
-     * @throws IOException thrown if null content is passed.
      */
     public static Result fromContent(Map content)
             throws IllegalArgumentException {

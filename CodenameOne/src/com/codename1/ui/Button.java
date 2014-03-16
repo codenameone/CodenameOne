@@ -536,12 +536,13 @@ public class Button extends Label {
      * @inheritDoc
      */
     public void pointerDragged(int x, int y) {
-        if(Display.getInstance().shouldRenderSelection(this)) {
+        // this releases buttons on drag instead of keeping them pressed making them harder to click
+        /*if(Display.getInstance().shouldRenderSelection(this)) {
             if(state != STATE_ROLLOVER) {
                 state=STATE_ROLLOVER;
                 repaint();
             }
-        }
+        }*/
         super.pointerDragged(x, y);
     }
 
