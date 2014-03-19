@@ -2305,6 +2305,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         protected void deinitialize() {
+            Image i = generatePeerImage();
+            setPeerImage(i);
             super.deinitialize();
             synchronized (nativePeers) {
                 nativePeers.remove(this);
