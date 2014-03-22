@@ -365,10 +365,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 final String t = actualType;
                 final String b = is.readUTF();
                 long s = is.readLong();
-                if (t.equals(type)) {
+                if(t != null && "3".equals(t)) {                                
+                    String[] m = b.split(";");
+                    v.add(m[0]);
+                } else if(t != null && "2".equals(t)){
+                    continue;
+                }else{
                     v.add(b);
                 }
-
             }
             String [] retVal = new String[v.size()];
             for (int j = 0; j < retVal.length; j++) {
