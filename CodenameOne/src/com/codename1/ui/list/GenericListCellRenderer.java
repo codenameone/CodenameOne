@@ -147,8 +147,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 ((Button)e[iter]).addActionListener(mon);
             }
             String n = e[iter].getName();
-            if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
-                placeholders.put(n, (EncodedImage)((Label)e[iter]).getIcon());
+            if(n != null) {
+                if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
+                    placeholders.put(n, (EncodedImage)((Label)e[iter]).getIcon());
+                }
             }
         }
     }

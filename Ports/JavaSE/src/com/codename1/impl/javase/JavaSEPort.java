@@ -6444,7 +6444,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             try {
                 ServerSocket serverSocketInstance = new ServerSocket(param);
                 socketInstance = serverSocketInstance.accept();
-                return socketInstance;
+                return this;
             } catch(Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();

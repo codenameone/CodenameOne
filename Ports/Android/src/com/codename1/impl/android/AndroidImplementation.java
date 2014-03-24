@@ -3269,6 +3269,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     WebSettings s = web.getSettings();
+                    if(key.equalsIgnoreCase("useragent")) {
+                        s.setUserAgentString((String)value);
+                        return;
+                    }
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
                         if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {

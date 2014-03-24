@@ -492,7 +492,7 @@ public class SideMenuBar extends MenuBar {
      * Opens the menu if it is currently closed
      */
     public void openMenu(String direction) {
-        openMenu(direction, -1, 300, true);
+        openMenu(direction, -1, getUIManager().getThemeConstant("sideMenuAnimSpeedInt", 300), true);
     }
 
     /**
@@ -504,7 +504,7 @@ public class SideMenuBar extends MenuBar {
             //replace transtions to perform the Form shift
             out = parent.getTransitionOutAnimator();
             in = parent.getTransitionInAnimator();
-            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(300, false, -1, direction));
+            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(getUIManager().getThemeConstant("sideMenuAnimSpeedInt", 300), false, -1, direction));
             if(transition) {
                 parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));
                 menu.show();
@@ -960,7 +960,7 @@ public class SideMenuBar extends MenuBar {
                     if (isRTLValue) {
                         end = getWidth();
                     }
-                    final Motion motion = Motion.createEaseInOutMotion(start, end, 300);
+                    final Motion motion = Motion.createEaseInOutMotion(start, end, getUIManager().getThemeConstant("sideMenuAnimSpeedInt", 300));
                     motion.start();
                     manualMotionLock = true;
                     sideSwipePotential = false;

@@ -41,6 +41,7 @@ public class AutoCompleteTextField extends TextField {
     private ActionListener listener = new FormPointerListener();
     private ListCellRenderer completionRenderer;
     private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
+    private String pickedText;
     
     /**
      * Constructor with completion suggestions
@@ -98,9 +99,10 @@ public class AutoCompleteTextField extends TextField {
     @Override
     public void setText(String text) {
         super.setText(text);
-        if (text == null) {
+        if (text == null || pickedText == text) {
             return;
         }
+        pickedText = null;
         if(filterImpl(text)) {
             updateFilterList();
         } 
@@ -242,7 +244,8 @@ public class AutoCompleteTextField extends TextField {
         l.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                setParentText((String) l.getSelectedItem());
+                pickedText = (String) l.getSelectedItem();
+                setParentText(pickedText);
                 
                 // relaunch text editing if we are still editing
                 if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {

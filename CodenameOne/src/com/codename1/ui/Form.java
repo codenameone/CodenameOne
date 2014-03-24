@@ -233,6 +233,8 @@ public class Form extends Container {
      * damage themeing/functionality of the Codename One application in some platforms
      * 
      * @return the container containing the title
+     * @deprecated this method was exposed to allow some hacks, you are advised not to use it. 
+     * There are some alternatives such as command behavior (thru Display or the theme constants)
      */
     public Container getTitleArea() {
         return titleArea;

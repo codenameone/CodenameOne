@@ -1753,7 +1753,10 @@ public abstract class CodenameOneImplementation {
      * @return true if the drag should propagate into Codename One
      */
     protected boolean hasDragStarted(final int x, final int y) {
-
+        // can happen if a user dragged before init, this happens on iOS during splash screen
+        if(getCurrentForm() == null) {
+            return false;
+        }
         if (dragActivationCounter == 0) {
             dragActivationX = x;
             dragActivationY = y;
