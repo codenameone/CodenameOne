@@ -2409,6 +2409,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                     }
                     if(AndroidImplementation.this.relativeLayout != null){
+                        // not sure why this happens but we got an exception where add view was called with
+                        // a layout that was already added...
+                        if(layoutWrapper.getParent() != null) {
+                            ((ViewGroup)layoutWrapper.getParent()).removeView(layoutWrapper);
+                        }
                         AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
                     }
                 }
@@ -4129,7 +4134,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(args != null) {
             Boolean b = (Boolean)args.get("persist");
             if(b != null && b.booleanValue()) {
-                notification.defaults |= Notification.FLAG_ONGOING_EVENT;
+                notification.defaults |= Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR;
             }
             
             Integer notId = (Integer)args.get("id");
