@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
@@ -330,6 +331,13 @@ public class ContainerList extends Container {
         return super.setPropertyValue(name, value);
     }
 
+    @Override
+    public Rectangle getSelectedRect() {
+        Component cmp = getComponentAt(getSelectedIndex());
+        return cmp.getSelectedRect();
+    }
+
+    
 
     /**
      * This class is an internal implementation detail
