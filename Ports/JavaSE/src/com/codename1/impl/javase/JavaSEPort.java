@@ -1656,6 +1656,32 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(performanceMonitor);
+            
+            JMenuItem clean = new JMenuItem("Clean Storage");
+            clean.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
+                    if(!home.exists()){
+                        return;
+                    }
+                    if(JOptionPane.showConfirmDialog(frm,
+                            "Are you sure you want to Clean all Storage under "
+                                    + home.getAbsolutePath() + " ?", 
+                            "Clean Storage", 
+                            JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION){
+                    File [] files = home.listFiles();
+                    for (int i = 0; i < files.length; i++) {
+                        File file = files[i];
+                        file.delete();
+                    }
+                }
+                }
+            });
+            simulatorMenu.add(clean);
+            
+            
 
             JMenu skinMenu = createSkinsMenu(frm, null);
 
