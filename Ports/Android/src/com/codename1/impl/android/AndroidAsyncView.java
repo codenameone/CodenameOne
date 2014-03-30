@@ -70,39 +70,38 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private int clipX, clipY, clipW, clipH;
     private final AndroidGraphics graphics;
     private final AndroidGraphics internalGraphics;
-    //private final AndroidImplementation implementation;
+    private final AndroidImplementation implementation;
 
     public AndroidAsyncView(Activity activity, AndroidImplementation implementation) {
         super(activity);
         setId(2001);
-        //this.implementation = implementation;
+        this.implementation = implementation;
         graphics = new AsyncGraphics(implementation);
         internalGraphics = new AndroidGraphics(implementation, null);
-        cn1View = new CodenameOneView(activity, this, implementation, true);
+        cn1View = new CodenameOneView(activity, this, implementation, false);
+        setWillNotCacheDrawing(true);
+        setWillNotDraw(false);
         setBackgroundDrawable(null);
     }
 
     @Override
     protected void onDraw(Canvas c) {
-        //c.saveLayer(null, layerPaint, 0);
+        boolean paintOnBuffer = implementation.isEditingText() || InPlaceEditView.isKeyboardShowing() || implementation.nativePeers.size() > 0;
+        
         internalGraphics.setCanvasNoSave(c);
-        //AndroidGraphics g = new AndroidGraphics(implementation, c);
-        /*if(clipW > 0) {
-            Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "Draw x: " + clipX + " y: " + clipY + " w: " + clipW + " h: " + clipH + " clip rect: " + c.getClipBounds() + " rendering: " + renderingOperations.size());
-            //internalGraphics.setClip(clipX, clipY, clipW, clipH);
-        } else {
-            Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "Draw drawing full screen: " + renderingOperations.size());
-        }*/
-        //Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "On draw drawing " + renderingOperations.size() + " elements with clipX: " + clipX + " clipY: " + clipY + " clipW: " + clipW + " clipH: " + clipH);
-        for(AsyncOp o : renderingOperations) {
-            o.executeWithClip(internalGraphics);
+        AndroidGraphics g = internalGraphics;
+        if(paintOnBuffer){
+            g = cn1View.getGraphics();
         }
-        //c.restore();
+        for(AsyncOp o : renderingOperations) {
+            o.executeWithClip(g);
+        }
         renderingOperations.clear();
         
-        // paint child views
-        dispatchDraw(c);
-        //c.drawBitmap(cn1View.bitmap, c.getClipBounds(), c.getClipBounds(), null);
+        if(paintOnBuffer){
+            cn1View.d(c);
+        }
+        
     }
     
     @Override
