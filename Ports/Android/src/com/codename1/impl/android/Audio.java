@@ -50,7 +50,8 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     private int lastDuration;
     private Activity activity;
     private boolean buffering;
-
+    private boolean disposeOnComplete = true;
+    
     private static Vector currentPlayingAudio = new Vector();
     private static PhoneStateListener phoneStateListener;
     
@@ -76,10 +77,6 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
                 }
                 stream = null;
             }
-            if (onComplete != null) {
-                Display.getInstance().callSerially(onComplete);
-                onComplete = null;
-            }
             removeFromCurrentPlaying();
             System.gc();
         }
@@ -99,14 +96,21 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
             public void onCompletion(MediaPlayer arg0) {
-                run();
+                if(disposeOnComplete){
+                    run();
+                }else{
+                    if (onComplete != null) {
+                        Display.getInstance().callSerially(onComplete);
+                        onComplete = null;
+                    }
+                }
             }
         });
         player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
 
             public boolean onError(MediaPlayer arg0, int arg1, int arg2) {
                 run();
-                return false;
+                return true;
             }
         });
     }
@@ -273,9 +277,22 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     }
 
     public void setVariable(String key, Object value) {
+        if(key != null){
+            if(key.equals("disposeOnComplete")){
+                if(value != null){
+                    String v= value.toString();
+                    disposeOnComplete = v.equalsIgnoreCase("true");
+                }
+            }
+        }
     }
 
     public Object getVariable(String key) {
+        if(key != null){
+            if(key.equals("disposeOnComplete")){
+                return "" + disposeOnComplete;
+            }
+        }
         return null;
     }
 
