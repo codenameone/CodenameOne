@@ -99,7 +99,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     public void setText(String text) {
         super.setText(text);
-        if (text == null || pickedText == text) {
+        if (text == null || (pickedText != null && pickedText.equals(text))) {
             return;
         }
         pickedText = null;

@@ -83,6 +83,13 @@ public class OnOffSwitch extends Container {
         }
         return super.calcPreferredSize();
     }
+
+    /**
+     * @inheritDoc
+     */
+    protected void resetFocusable() {
+        setFocusable(true);
+    }
     
     private void initialize() {
         iosMode = UIManager.getInstance().isThemeConstant("onOffIOSModeBool", false);

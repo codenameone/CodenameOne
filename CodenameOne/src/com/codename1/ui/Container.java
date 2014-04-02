@@ -133,8 +133,15 @@ public class Container extends Component {
      */
     public void setLeadComponent(Component lead) {
         leadComponent = lead;
-        if(isInitialized()) {
-            initLead();
+        if(lead == null) {
+            // clear the lead component from the hierarchy
+            setFocusable(false);
+            hasLead = false;
+            enableFocusAndDeinitLead(this);
+        } else {
+            if(isInitialized()) {
+                initLead();
+            }
         }
     }
 
@@ -217,6 +224,17 @@ public class Container extends Component {
             }
             cu.setFocusable(false);
             cu.hasLead = true;
+        }
+    }
+
+    private void enableFocusAndDeinitLead(Container c) {
+        for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
+            Component cu = c.getComponentAt(iter);
+            if(cu instanceof Container) {
+                disableFocusAndInitLead((Container)cu);
+            }
+            cu.resetFocusable();
+            cu.hasLead = false;
         }
     }
 

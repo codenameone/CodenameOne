@@ -4868,7 +4868,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void rename(String file, String newName) {
-        new File(unfile(file)).renameTo(new File(new File(file).getParentFile(), newName));
+        File f = new File(unfile(file));
+        f.renameTo(new File(f.getParentFile(), newName));
     }
 
     /**

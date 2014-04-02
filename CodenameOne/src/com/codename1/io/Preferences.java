@@ -33,6 +33,11 @@ import java.util.Hashtable;
 public class Preferences {
     private static Hashtable p;
     
+    /**
+     * Block instantiation of preferences 
+     */
+    Preferences() {}
+    
     private static Hashtable get() {
         if(p == null) {
             if(Storage.getInstance().exists("CN1Preferences")) {

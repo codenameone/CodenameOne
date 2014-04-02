@@ -157,6 +157,13 @@ public class Button extends Label {
     /**
      * @inheritDoc
      */
+    protected void resetFocusable() {
+        setFocusable(true);
+    }
+
+    /**
+     * @inheritDoc
+     */
     void focusGainedInternal() {
         super.focusGainedInternal();
         if(state != STATE_PRESSED) {

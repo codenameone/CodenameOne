@@ -74,6 +74,13 @@ public class ImageViewer extends Component {
     /**
      * @inheritDoc
      */
+    protected void resetFocusable() {
+        setFocusable(true);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public String[] getPropertyNames() {
         return new String[] {"eagerLock", "image", "imageList", "swipePlaceholder"};
     }

@@ -1770,6 +1770,13 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Restores the state of the focusable flag to its default state
+     */
+    protected void resetFocusable() {
+        setFocusable(false);
+    }
+    
+    /**
      * A simple setter to determine if this Component can get focused
      * 
      * @param focusable indicate whether this component can get focused

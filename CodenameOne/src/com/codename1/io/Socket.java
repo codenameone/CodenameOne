@@ -68,7 +68,11 @@ public class Socket {
                     sc.connectionEstablished(new SocketInputStream(connection, sc), new SocketOutputStream(connection, sc));
                 } else {
                     sc.setConnected(false);
-                    sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
+                    if(connection == null) {
+                        sc.connectionError(-1, "Failed to connect");
+                    } else {
+                        sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
+                    }
                 }
             }
         }, "Connection to " + host).start();
