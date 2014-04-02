@@ -302,7 +302,7 @@ class MapContent implements StructuredContent {
                 target.add(new MapContent(o, new MapContent(source)));
             }
         }
-        for (Iterator e = source.keySet().iterator(); e.hasNext();) {
+        for (Iterator e = source.values().iterator(); e.hasNext();) {
             Object o = e.next();
             if (o instanceof List) {
                 _findByName(target, (List) o, name);
