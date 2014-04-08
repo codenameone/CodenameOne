@@ -4063,7 +4063,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void execute(String url) {
         try {
             if(url.startsWith("file:")) {
-                url = "file://" + unfile(url);
+                url = "file://" + unfile(url).replace('\\', '/');
             }
             Desktop.getDesktop().browse(new URI(url));
         } catch (Exception ex) {
@@ -4781,7 +4781,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private String unfile(String file) {
         if(file.startsWith("file://home")) {
-            return System.getProperty("user.home") + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
+            return System.getProperty("user.home").replace('\\', '/') + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
         }
         if (file.startsWith("file://")) {
             return file.substring(7);
@@ -4823,7 +4823,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public long getFileLastModified(String file) {
-        return new File(file).lastModified();
+        return new File(unfile(file)).lastModified();
     }
     
     /**
@@ -6419,6 +6419,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int size = getInput().read(arr);
                 if(size == arr.length) {
                     return arr;
+                }
+                if(size < 0) {
+                    return null;
                 }
                 return shrink(arr, size);
             } catch(IOException err) {
