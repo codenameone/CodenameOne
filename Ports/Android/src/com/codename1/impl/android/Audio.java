@@ -98,12 +98,11 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
             public void onCompletion(MediaPlayer arg0) {
                 if(disposeOnComplete){
                     run();
-                }else{
-                    if (onComplete != null) {
-                        Display.getInstance().callSerially(onComplete);
-                        onComplete = null;
-                    }
                 }
+                if (onComplete != null) {
+                    Display.getInstance().callSerially(onComplete);
+                }
+                
             }
         });
         player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
