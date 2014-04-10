@@ -2842,6 +2842,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
+        if(key.equalsIgnoreCase("useragent")) {
+            nativeInstance.setBrowserUserAgent(datePickerResult, (String)value);
+            return;
+        }
     }
 
     @Override
@@ -3532,6 +3536,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     private String unfile(String file) {
         if(file.startsWith("file:/")) {
             file = file.substring(5);
+            if(file.startsWith("//")) {
+                file = file.substring(1);
+            }
         }
         return file;
     }
@@ -3554,6 +3561,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
+        file = unfile(file);
         return new BufferedOutputStream(new NSDataOutputStream(file), file);
     }
 
@@ -3561,9 +3569,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
-        if(file.startsWith("file:/")) {
-            file = file.substring(5);
-        }
+        file = unfile(file);
         return new BufferedInputStream(new NSDataInputStream(file), file);
     }
 
@@ -3571,13 +3577,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean exists(String file) {
-        if(file.startsWith("file:")) {
-            int slash = file.indexOf('/');
-            while(file.charAt(slash + 1) == '/') {
-                slash++;
-            }
-            file = file.substring(slash - 1);
-        }
+        file = unfile(file);
         return nativeInstance.fileExists(file);
     }
 
@@ -3585,6 +3585,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void rename(String file, String newName) {
+        file = unfile(file);
         if(newName.indexOf('/') < 0) {
             // good this is a relative filename, prepend file
             if(file.endsWith("/")) {
@@ -4310,6 +4311,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         });
         if(datePickerResult == -1) {
+            // there is no cancel option in the phone device
+            if(!isTablet()) {
+                return currentValue;
+            }
             return null;
         }
         if(type == Display.PICKER_TYPE_STRINGS) {

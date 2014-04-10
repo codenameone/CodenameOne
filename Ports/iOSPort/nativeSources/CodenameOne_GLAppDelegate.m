@@ -59,6 +59,8 @@ extern UIView *editingComponent;
     }
     com_codename1_impl_ios_IOSImplementation_callback__();
 #ifdef INCLUDE_CN1_PUSH
+    [[UIApplication sharedApplication] cancelAllLocalNotifications];
+    [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(userInfo == nil || apsInfo == nil) {

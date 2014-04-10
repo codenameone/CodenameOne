@@ -192,6 +192,8 @@ public final class IOSNative {
     native String getBrowserTitle(long browserPeer);
 
     native String getBrowserURL(long browserPeer);
+
+    native void setBrowserUserAgent(long browserPeer, String ua);
     
     native long createVideoComponent(String url);
     native long createVideoComponent(byte[] video);

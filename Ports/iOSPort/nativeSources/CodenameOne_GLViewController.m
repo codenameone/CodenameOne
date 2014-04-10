@@ -52,6 +52,8 @@ extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 BOOL vkbAlwaysOpen = NO;
+BOOL viewDidAppearRepaint = YES;
+NSMutableArray* touchesArray = nil;
 
 int nextPowerOf2(int val) {
     int i;
@@ -996,9 +998,29 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 #endif
 
+bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     [self becomeFirstResponder];
+    if(viewDidAppearRepaint) {
+        if(animated) {
+            // postpone this to the next edt cycle to prevent a black screen
+            dispatch_async(dispatch_get_main_queue(), ^{
+                repaintUI();
+            });
+        }
+    }
+    if(touchesArray != nil) {
+        [touchesArray removeAllObjects];
+    }
+    int currentWidth = (int)self.view.bounds.size.width * scaleValue;
+    if(currentWidth != displayWidth) {
+    [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+        displayWidth = currentWidth;
+        displayHeight = (int)self.view.bounds.size.height * scaleValue;
+        screenSizeChanged(displayWidth, displayHeight);
+    }
+
     //replaceViewDidAppear
 }
 
@@ -1403,7 +1425,6 @@ int keyboardHeight;
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
 }
 
-bool lockDrawing;
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
     if(firstTime) {
         return;
@@ -1869,14 +1890,19 @@ bool lockDrawing;
 }
 
 static BOOL skipNextTouch = NO;
+
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    if(touchesArray == nil) {
+        touchesArray = [[NSMutableArray alloc] init];
+    }
     UITouch* touch = [touches anyObject];
+    NSArray *ts = [touches allObjects];
+    [touchesArray addObjectsFromArray:ts];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
     if([touches count] > 1) {
-        NSArray *ts = [touches allObjects];
         for(int iter = 0 ; iter < [ts count] ; iter++) {
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
@@ -1923,12 +1949,13 @@ static BOOL skipNextTouch = NO;
         return;
     }
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSArray *ts = [touches allObjects];
+    [touchesArray removeObjectsInArray:ts];
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
     if([touches count] > 1) {
-        NSArray *ts = [touches allObjects];
         for(int iter = 0 ; iter < [ts count] ; iter++) {
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
@@ -1952,12 +1979,18 @@ static BOOL skipNextTouch = NO;
         return;
     }
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSArray *ts = [touches allObjects];
+    [touchesArray removeObjectsInArray:ts];
+    if([touchesArray count] > 0) {
+        [pool release];
+        return;
+    }
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
+    NSLog(@"Released %i fingers", [touches count]);
     if([touches count] > 1) {
-        NSArray *ts = [touches allObjects];
         for(int iter = 0 ; iter < [ts count] ; iter++) {
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
@@ -1981,22 +2014,23 @@ static BOOL skipNextTouch = NO;
     }
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     UITouch* touch = [touches anyObject];
-    int xArray[[touches count]];
-    int yArray[[touches count]];
+    int xArray[[touchesArray count]];
+    int yArray[[touchesArray count]];
     CGPoint point = [touch locationInView:self.view];
-    if([touches count] > 1) {
-        NSArray *ts = [touches allObjects];
-        for(int iter = 0 ; iter < [ts count] ; iter++) {
-            UITouch* currentTouch = [ts objectAtIndex:iter];
+    if([touchesArray count] > 1) {
+        for(int iter = 0 ; iter < [touchesArray count] ; iter++) {
+            UITouch* currentTouch = [touchesArray objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
+            NSLog(@"Dragging x: %i y: %i id: %i", xArray[iter], yArray[iter], currentTouch);
         }
+        pointerDraggedC(xArray, yArray, [touchesArray count]);
     } else {
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
+        pointerDraggedC(xArray, yArray, [touches count]);
     }
-    pointerDraggedC(xArray, yArray, [touches count]);
     [pool release];
 }
 
@@ -2216,6 +2250,7 @@ extern SKPayment *paymentInstance;
 
 extern int stringPickerSelection;
 extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
+extern JAVA_LONG defaultDatePickerDate;
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
     if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
@@ -2255,13 +2290,21 @@ UIPopoverController* popoverControllerInstance;
         popoverControllerInstance = nil;
         if(currentDatePickerDate == nil) {
             if(pickerStringArray == nil) {
-                com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+                if(defaultDatePickerDate != 0) {
+                    com_codename1_impl_ios_IOSImplementation_datePickerResult___long(defaultDatePickerDate);
+                    defaultDatePickerDate = 0;
+                    currentDatePickerDate = nil;
+                } else {
+                    com_codename1_impl_ios_IOSImplementation_datePickerResult___long(-1);
+                }
             } else {
                 com_codename1_impl_ios_IOSImplementation_datePickerResult___long(stringPickerSelection);
+                defaultDatePickerDate = nil;
                 pickerStringArray = nil;
             }
         } else {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long([currentDatePickerDate timeIntervalSince1970] * 1000);
+            defaultDatePickerDate = nil;
             currentDatePickerDate = nil;
         }
     }
