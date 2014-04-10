@@ -200,7 +200,9 @@ class MMAPIPlayer implements PlayerListener, Media{
                 playing = new Vector();
             }
             synchronized(MMAPIPlayer.class) {
-                playing.addElement(this);
+                if(!playing.contains(this)){
+                    playing.addElement(this);
+                }
             }
             nativePlayer.start();
         } catch (MediaException ex) {
