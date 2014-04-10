@@ -4191,6 +4191,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }else{
             shareIntent.setType(mimeType);
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(image)));
+            shareIntent.putExtra(Intent.EXTRA_TEXT, text);
         }
         activity.startActivity(Intent.createChooser(shareIntent, "Share with..."));
     }
