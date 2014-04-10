@@ -37,60 +37,56 @@ import javax.microedition.media.PlayerListener;
 import javax.microedition.media.control.VolumeControl;
 
 /**
- * Simple abstraction to the player API in MMAPI used by the MIDP and Blackberry ports.
- * This class is public only because the blackberry port relies on it and is in a different
- * package, it is not meant for general use and is an implementation detail subject to change!
- * 
+ * Simple abstraction to the player API in MMAPI used by the MIDP and Blackberry
+ * ports. This class is public only because the blackberry port relies on it and
+ * is in a different package, it is not meant for general use and is an
+ * implementation detail subject to change!
+ *
  * this class might be changed at any moment it is an implementation detail
+ *
  * @author Shai Almog
  */
-public class MMAPIPlayer implements PlayerListener, Media{
+public class MMAPIPlayer implements PlayerListener, Media {
+
     private static int volume = -1;
     private boolean deleted;
     private int lastTime;
     Player nativePlayer;
-    private static Vector playing;
     private InputStream sourceStream;
     private Runnable onComplete;
     private boolean disposeOnComplete = true;
 
     private MMAPIPlayer(Player p) {
         this.nativePlayer = p;
-        if(volume > -1){
+        if (volume > -1) {
             setVolume(volume);
-        }else{
+        } else {
             setVolume(100);
         }
     }
 
     public int getVolume() {
-        if(volume > -1) {
+        if (volume > -1) {
             return volume;
         }
-        synchronized(MMAPIPlayer.class) {
-            if(playing != null && playing.size() > 0) {
-                MMAPIPlayer current = (MMAPIPlayer)playing.elementAt(0);
-                VolumeControl volc = (VolumeControl) current.nativePlayer.getControl("VolumeControl");
-                if(volc != null) {
-                    return volc.getLevel();
-                }
+        try {
+            VolumeControl volc = (VolumeControl) nativePlayer.getControl("VolumeControl");
+            if (volc != null) {
+                return volc.getLevel();
             }
+        } catch (Exception e) {
         }
         return -1;
     }
 
     public void setVolume(int v) {
         volume = v;
-        if(playing != null) {
-            synchronized(MMAPIPlayer.class) {
-                for(int iter = 0 ; iter < playing.size() ; iter++) {
-                    MMAPIPlayer current = (MMAPIPlayer)playing.elementAt(iter);
-                    VolumeControl volc = (VolumeControl) current.nativePlayer.getControl("VolumeControl");
-                    if(volc != null) {
-                        volc.setLevel(v);
-                    }
-                }
+        try {
+            VolumeControl volc = (VolumeControl) nativePlayer.getControl("VolumeControl");
+            if (volc != null) {
+                volc.setLevel(v);
             }
+        } catch (Exception e) {
         }
     }
 
@@ -99,7 +95,7 @@ public class MMAPIPlayer implements PlayerListener, Media{
      */
     public static MMAPIPlayer createPlayer(String uri, Runnable onCompletion) throws IOException {
         try {
-            Player p = Manager.createPlayer((String)uri);
+            Player p = Manager.createPlayer((String) uri);
             p.realize();
             MMAPIPlayer m = new MMAPIPlayer(p);
             m.bindPlayerCleanupOnComplete(p, null, onCompletion);
@@ -118,7 +114,7 @@ public class MMAPIPlayer implements PlayerListener, Media{
             m.bindPlayerCleanupOnComplete(p, stream, onCompletion);
             return m;
         } catch (MediaException ex) {
-            if("audio/mpeg".equals(mimeType)) {
+            if ("audio/mpeg".equals(mimeType)) {
                 return createPlayer(stream, "audio/mp3", onCompletion);
             }
 
@@ -128,9 +124,9 @@ public class MMAPIPlayer implements PlayerListener, Media{
     }
 
     private void bindPlayerCleanupOnComplete(final Player p, final InputStream i, final Runnable onComplete) {
-        if(volume > -1) {
+        if (volume > -1) {
             VolumeControl v = (VolumeControl) p.getControl("VolumeControl");
-            if(v != null) {
+            if (v != null) {
                 v.setLevel(volume);
             }
         }
@@ -139,26 +135,24 @@ public class MMAPIPlayer implements PlayerListener, Media{
         p.addPlayerListener(this);
     }
 
-
     public void cleanup() {
-        if(deleted) {
+        if (deleted) {
             return;
         }
         deleted = true;
         try {
-            synchronized(MMAPIPlayer.class) {
-                playing.removeElement(this);
-            }
             try {
                 nativePlayer.stop();
-            } catch(Throwable t) {}
+            } catch (Throwable t) {
+            }
             nativePlayer.close();
             nativePlayer = null;
-        } catch(Throwable t) {}
+        } catch (Throwable t) {
+        }
     }
 
     public void prepare() {
-        if(deleted){
+        if (deleted) {
             return;
         }
         try {
@@ -168,18 +162,12 @@ public class MMAPIPlayer implements PlayerListener, Media{
             throw new RuntimeException(ex.toString());
         }
     }
-    
+
     public void play() {
-        if(deleted){
+        if (deleted) {
             return;
         }
         try {
-            if(playing == null) {
-                playing = new Vector();
-            }
-            synchronized(MMAPIPlayer.class) {
-                playing.addElement(this);
-            }
             nativePlayer.start();
         } catch (MediaException ex) {
             ex.printStackTrace();
@@ -188,11 +176,11 @@ public class MMAPIPlayer implements PlayerListener, Media{
     }
 
     public void pause() {
-        if(deleted){
+        if (deleted) {
             return;
         }
         try {
-            if(nativePlayer != null) {
+            if (nativePlayer != null) {
                 nativePlayer.stop();
             }
         } catch (MediaException ex) {
@@ -204,18 +192,18 @@ public class MMAPIPlayer implements PlayerListener, Media{
     public int getTime() {
         try {
             // this allows us to get the time even on a closed player
-            if(nativePlayer == null || deleted) {
+            if (nativePlayer == null || deleted) {
                 return lastTime;
             }
-            lastTime = (int)(nativePlayer.getMediaTime() / 1000);
+            lastTime = (int) (nativePlayer.getMediaTime() / 1000);
             return lastTime;
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             return lastTime;
         }
     }
 
     public void setTime(int time) {
-        if(deleted){
+        if (deleted) {
             return;
         }
         try {
@@ -226,31 +214,32 @@ public class MMAPIPlayer implements PlayerListener, Media{
     }
 
     public int getDuration() {
-        if(nativePlayer == null || deleted) {
+        if (nativePlayer == null || deleted) {
             return 1000;
         }
-        return (int)(nativePlayer.getDuration() / 1000);
+        return (int) (nativePlayer.getDuration() / 1000);
     }
 
     public void playerUpdate(Player player, String event, Object eventData) {
-        if(deleted) {
+        if (deleted) {
             return;
         }
-        if(PlayerListener.ERROR.equals(event)) {
-            lastTime = (int)(nativePlayer.getMediaTime() / 1000);
+        if (PlayerListener.ERROR.equals(event)) {
+            lastTime = (int) (nativePlayer.getMediaTime() / 1000);
             cleanup();
         }
-        if(PlayerListener.END_OF_MEDIA.equals(event)) {            
-            lastTime = (int)(nativePlayer.getMediaTime() / 1000);
-            if(disposeOnComplete){
+        if (PlayerListener.END_OF_MEDIA.equals(event)) {
+            lastTime = (int) (nativePlayer.getMediaTime() / 1000);
+            if (disposeOnComplete) {
                 cleanup();
-                if(sourceStream != null) {
+                if (sourceStream != null) {
                     try {
                         sourceStream.close();
-                    } catch(Throwable t) {}
+                    } catch (Throwable t) {
+                    }
                 }
             }
-            if(onComplete != null) {
+            if (onComplete != null) {
                 onComplete.run();
             }
         }
@@ -281,12 +270,12 @@ public class MMAPIPlayer implements PlayerListener, Media{
     public boolean isPlaying() {
         return nativePlayer.getState() == Player.STARTED;
     }
-    
+
     public void setVariable(String key, Object value) {
-        if(key != null){
-            if(key.equals("disposeOnComplete")){
-                if(value != null){
-                    String v= value.toString();
+        if (key != null) {
+            if (key.equals("disposeOnComplete")) {
+                if (value != null) {
+                    String v = value.toString();
                     disposeOnComplete = v.equalsIgnoreCase("true");
                 }
             }
@@ -294,8 +283,8 @@ public class MMAPIPlayer implements PlayerListener, Media{
     }
 
     public Object getVariable(String key) {
-        if(key != null){
-            if(key.equals("disposeOnComplete")){
+        if (key != null) {
+            if (key.equals("disposeOnComplete")) {
                 return "" + disposeOnComplete;
             }
         }
