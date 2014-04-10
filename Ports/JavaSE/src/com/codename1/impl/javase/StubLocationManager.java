@@ -41,27 +41,35 @@ class StubLocationManager extends LocationManager {
     private Timer timer;
     private TimerTask task;
     private Location loc = new Location();
-    
+
     private static StubLocationManager instance = new StubLocationManager();
-    
+
     private StubLocationManager() {
         //new york
         loc.setLongitude(-74.005973);
         loc.setLatitude(40.714353);
     }
 
-    public static LocationManager getLocationManager(){
+    public static LocationManager getLocationManager() {
         return instance;
     }
-    
+
     @Override
-    public Location getCurrentLocation() throws IOException {       
+    public Location getCurrentLocation() throws IOException {
+        if (JavaSEPort.locSimulation != null) {
+            loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
+            loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+        }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
     }
-    
+
     @Override
-    public Location getLastKnownLocation(){        
+    public Location getLastKnownLocation() {
+        if (JavaSEPort.locSimulation != null) {
+            loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
+            loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+        }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
     }
@@ -69,7 +77,7 @@ class StubLocationManager extends LocationManager {
     @Override
     protected void bindListener() {
         setStatus(AVAILABLE);
-        final LocationListener l =  getLocationListener();
+        final LocationListener l = getLocationListener();
         task = new TimerTask() {
 
             @Override
@@ -79,9 +87,18 @@ class StubLocationManager extends LocationManager {
                         Location loc;
                         try {
                             loc = getCurrentLocation();
-                            loc.setLongitude(loc.getLongitude() + 0.001);
-                            loc.setLatitude(loc.getLatitude() + + 0.001);                    
+                            if (JavaSEPort.locSimulation == null) {
+                                loc.setLongitude(loc.getLongitude() + 0.001);
+                                loc.setLatitude(loc.getLatitude() + +0.001);                                
+                            }else{
+                                int s = JavaSEPort.locSimulation.getState();
+                                if(s != StubLocationManager.super.getStatus()){
+                                    l.providerStateChanged(s);
+                                    setStatus(s);
+                                }
+                            }
                             l.locationUpdated(loc);
+                            
                         } catch (IOException ex) {
                             Logger.getLogger(StubLocationManager.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -100,5 +117,15 @@ class StubLocationManager extends LocationManager {
         timer = null;
         task = null;
     }
-    
+
+    @Override
+    public int getStatus() {
+        if (JavaSEPort.locSimulation != null) {
+            int s = JavaSEPort.locSimulation.getState();
+            setStatus(s);
+            return s;
+        }
+        return super.getStatus();
+    }
+
 }

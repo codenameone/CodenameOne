@@ -304,6 +304,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private String[] platformOverrides = new String[0];
     private static NetworkMonitor netMonitor;
     private static PerformanceMonitor perfMonitor;
+    static LocationSimulation locSimulation;
     private static boolean blockMonitors;
     private static boolean fxExists = false;
     private JFrame window;
@@ -1567,6 +1568,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new ComponentTreeInspector();
                 }
             });
+            
+            JMenuItem locactionSim = new JMenuItem("Location Simulation");
+            locactionSim.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    if(!fxExists){
+                        System.err.println("This simulation requires jdk 7");
+                        return;
+                    }
+                    locSimulation = new LocationSimulation();
+
+                }
+            });
+            simulatorMenu.add(locactionSim);
+            
             simulatorMenu.add(componentTreeInspector);
             
             JMenuItem cloudObjects = new JMenuItem("Cloud Objects Viewer");
