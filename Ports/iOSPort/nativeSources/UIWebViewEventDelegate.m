@@ -25,6 +25,7 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_events_BrowserNavigationCallback.h"
 #include "xmlvm.h"
+#import "CodenameOne_GLViewController.h"
 
 extern int connections;
 
@@ -55,9 +56,17 @@ extern int connections;
 }
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+#ifndef NEW_CODENAME_ONE_VM
     JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback__(c);
+#else
+    JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback___R_com_codename1_ui_events_BrowserNavigationCallback(c);
+#endif
     if(navigateCallback != NULL) {
+#ifndef NEW_CODENAME_ONE_VM
         BOOL result = (*(JAVA_BOOLEAN (*)(JAVA_OBJECT, JAVA_OBJECT)) *(((java_lang_Object*)navigateCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String])(navigateCallback, xmlvm_create_java_string([request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
+#else
+        JAVA_BOOLEAN result = virtual_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String_R_boolean(navigateCallback, xmlvm_create_java_string([request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
+#endif
         if(result) {
            com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(request.URL.absoluteString.UTF8String));
         }

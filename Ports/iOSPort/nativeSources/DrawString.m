@@ -23,6 +23,7 @@
 #import "DrawString.h"
 #import "CodenameOne_GLViewController.h"
 #import "DrawStringTextureCache.h"
+#include "xmlvm.h"
 
 @implementation DrawString
 -(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos s:(NSString*)s f:(UIFont*)f {
@@ -31,9 +32,11 @@
     x = xpos;
     y = ypos;
     str = s;
-    [str retain];
     font = f;
+#ifndef CN1_USE_ARC
+    [str retain];
     [font retain];
+#endif
     return self;
 }
 
@@ -115,11 +118,13 @@
     GLErrorLog;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
     [str release];
     [font release];
     [super dealloc];
 }
+#endif
 
 -(NSString*)getName {
     return @"DrawString";

@@ -23,6 +23,7 @@
 #import "AudioPlayer.h"
 #include "java_lang_Runnable.h"
 #include "com_codename1_ui_Display.h"
+#include "xmlvm.h"
 
 static float volume = -1;
 AudioPlayer* currentlyPlaying = nil;
@@ -48,7 +49,11 @@ AudioPlayer* currentlyPlaying = nil;
                                                          name:AVPlayerItemDidPlayToEndTimeNotification
                                                        object:[avPlayerInstance currentItem]];
         } else {
+#ifndef CN1_USE_ARC
             playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
+#else
+            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:nil];
+#endif
             if(playerInstance != nil)
             {
                 playerInstance.delegate = self;
@@ -66,7 +71,11 @@ AudioPlayer* currentlyPlaying = nil;
     self = [super init];
     if (self) {
         runnableCallback = callback;
+#ifndef CN1_USE_ARC
         playerInstance = [[AVAudioPlayer alloc] initWithData:data error:&errorInfo];
+#else
+        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:nil];
+#endif
         if(playerInstance != nil)
         {
             playerInstance.delegate = self;
@@ -87,14 +96,20 @@ AudioPlayer* currentlyPlaying = nil;
 
 - (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(NSError *)error {
     if(runnableCallback != 0) {
+#ifdef NEW_CODENAME_ONE_VM
+        virtual_java_lang_Runnable_run__((JAVA_OBJECT)runnableCallback);
+#else
         (*(void (*)(JAVA_OBJECT)) *(((java_lang_Object*)runnableCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_java_lang_Runnable_run__])(runnableCallback);
+#endif
     }
 }
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
+#ifndef CN1_USE_ARC
     if(playerInstance != nil) {
         [self release];
     }
+#endif
     if(runnableCallback != 0) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
         com_codename1_ui_Display_callSerially___java_lang_Runnable(o, runnableCallback);
@@ -135,7 +150,9 @@ AudioPlayer* currentlyPlaying = nil;
 - (void)playAudio {
     currentlyPlaying = self;
     if(playerInstance != nil) {
+#ifndef CN1_USE_ARC
         [self retain];
+#endif
         [playerInstance play];
     } else if(avPlayerInstance != nil){
         [avPlayerInstance play];
@@ -197,15 +214,21 @@ AudioPlayer* currentlyPlaying = nil;
         currentlyPlaying = nil;
     }
     if(playerInstance != nil) {
+#ifndef CN1_USE_ARC
         [playerInstance release];
+#endif
         playerInstance = nil;
     } else {
         if(avPlayerInstance != nil){
+#ifndef CN1_USE_ARC
             [avPlayerInstance release];
+#endif
             avPlayerInstance = nil;
         }
     }
+#ifndef CN1_USE_ARC
     [super dealloc];
+#endif
 }
 
 @end

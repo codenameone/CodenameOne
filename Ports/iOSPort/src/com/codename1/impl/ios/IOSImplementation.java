@@ -65,7 +65,7 @@ import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
+//import java.io.PrintWriter;
 import java.io.Writer;
 import java.text.DateFormat;
 import java.text.NumberFormat;
@@ -82,6 +82,7 @@ import com.codename1.media.MediaManager;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.plaf.Style;
+import com.codename1.util.StringUtil;
 import java.io.ByteArrayOutputStream;
 
 /**
@@ -1208,7 +1209,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean locationUpdating;
 
         protected void finalize() throws Throwable {
-            super.finalize();
+            //super.finalize();
             if(peer != 0) {
                 nativeInstance.releasePeer(peer);
             }
@@ -2835,7 +2836,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setBrowserPage(PeerComponent browserPeer, String html, String baseUrl) {
         if(baseUrl != null && baseUrl.startsWith("jar://")) {
-            baseUrl = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + baseUrl.substring(6);
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            baseUrl = "file://localhost" + str + baseUrl.substring(6);
         }
         nativeInstance.setBrowserPage(get(browserPeer), html, baseUrl);
     }
@@ -2852,7 +2854,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         url = unfile(url);
         if(url.startsWith("jar://")) {
-            url = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + url.substring(6);
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            url = "file://localhost" + str + url.substring(6);
         } 
         nativeInstance.setBrowserURL(get(browserPeer), url);
     }
@@ -3372,11 +3375,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         // iOS has a bug where it concates identical headers using a comma
         // but since cookies use a comma in their expires header we need to 
         // join them back together...
-        String[] tokenized = s.split(",");
-        if(tokenized.length > 1) {
+        List<String> stringList = StringUtil.tokenize(s, ",");
+        //String[] tokenized = s.split(",");
+        if(stringList.size() > 1) {
             List<String> result = new ArrayList<String>();
             String loaded = null;
-            for(String current : tokenized) {
+            for(String current : stringList) {
                 if(loaded != null) {
                     result.add(loaded + current);
                     loaded = null;
@@ -3393,8 +3397,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             String[] resultArr = new String[result.size()];
             result.toArray(resultArr);
             return resultArr;
-        }
-        return tokenized;
+        } 
+        String[] resultArr = new String[stringList.size()];
+        stringList.toArray(resultArr);
+        return resultArr;
     }
 
     /**
@@ -3610,8 +3616,8 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void printStackTraceToStream(Throwable t, Writer o) {
-        PrintWriter p = new PrintWriter(o);
-        t.printStackTrace(p);
+        //PrintWriter p = new PrintWriter(o);
+        //t.printStackTrace(p);
     }
 
     /**

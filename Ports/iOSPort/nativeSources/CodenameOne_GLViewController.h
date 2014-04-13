@@ -36,7 +36,7 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
-#define INCLUDE_ZOOZ
+//#define INCLUDE_ZOOZ
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
 #endif
@@ -50,9 +50,21 @@
 #import "MPAdView.h"
 #endif
 
+#include "xmlvm.h"
+
+#ifdef CN1_USE_ARC
+#define POOL_BEGIN() 
+#define POOL_END()
+#define BRIDGE_CAST __bridge 
+#else
+#define BRIDGE_CAST
+#define POOL_BEGIN() NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+#define POOL_END() [pool release];
+#endif
+
 //ADD_INCLUDE
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate 
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif
@@ -66,12 +78,18 @@
     
     BOOL animating;
     NSInteger animationFrameInterval;
+
+#ifdef CN1_USE_ARC
+    __unsafe_unretained GLUIImage* currentMutableImage;
+    __unsafe_unretained CADisplayLink *displayLink;
+#else
+    GLUIImage* currentMutableImage;
     CADisplayLink *displayLink;
+#endif
 
     NSMutableArray* currentTarget;
     NSMutableArray* upcomingTarget;
     BOOL painted;
-    GLUIImage* currentMutableImage;
     BOOL drawTextureSupported;
     BOOL keyboardIsShown;
     BOOL modifiedViewHeight;
@@ -110,5 +128,6 @@
 + (void)initialize;
 
 +(CodenameOne_GLViewController*)instance;
+-(void)upcomingAddClip:(ExecutableOp*)op;
 
 @end

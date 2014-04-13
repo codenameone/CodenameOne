@@ -22,6 +22,8 @@
  */
 #import "NetworkConnectionImpl.h"
 #import <UIKit/UIKit.h>
+#include "xmlvm.h"
+#include "CodenameOne_GLViewController.h"
 
 int connections = 0;
 @implementation NetworkConnectionImpl
@@ -49,8 +51,10 @@ int connections = 0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];
+#ifndef CN1_USE_ARC
     [request retain];
-    return self;
+#endif
+    return (BRIDGE_CAST void*)self;
 }
 
 - (void)connect {
@@ -93,7 +97,9 @@ int connections = 0;
     NSHTTPURLResponse* urlRes = (NSHTTPURLResponse*)response;
     responseCode = [urlRes statusCode];
     allHeaderFields = [urlRes allHeaderFields];
+#ifndef CN1_USE_ARC
     [allHeaderFields retain];
+#endif
 }
 
 extern void connectionComplete(void* peer);
@@ -103,7 +109,7 @@ extern void connectionReceivedData(void* peer, NSData* data);
 extern void connectionError(void* peer, NSString* message);
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
-    connectionError(self, [error localizedDescription]);
+    connectionError((BRIDGE_CAST void*)self, [error localizedDescription]);
     connections--;
     if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
@@ -111,11 +117,11 @@ extern void connectionError(void* peer, NSString* message);
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
-    connectionReceivedData(self, data);
+    connectionReceivedData((BRIDGE_CAST void*)self, data);
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
-    connectionComplete(self);
+    connectionComplete((BRIDGE_CAST void*)self);
     connections--;
     if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
@@ -132,6 +138,7 @@ extern void connectionError(void* peer, NSString* message);
 }
 
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
     if(allHeaderFields != nil) {
         [allHeaderFields release];
@@ -142,6 +149,7 @@ extern void connectionError(void* peer, NSString* message);
     [request release];
 	[super dealloc];
 }
+#endif
 
 
 @end

@@ -21,7 +21,10 @@
  * need additional information or have any questions.
  */
 
+#include "xmlvm.h"
+#ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
+#endif
 #import <UIKit/UIKit.h>
 
 //#define INCLUDE_FACEBOOK
@@ -34,7 +37,7 @@ extern JAVA_OBJECT fromNSString(NSString* str);
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJECT me, JAVA_OBJECT instance) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        POOL_BEGIN();
         FBSession* s = [FBSession activeSession];
         if(s == nil || !s.isOpen) {
             [FBSession openActiveSessionWithReadPermissions:@[@"basic_info"] allowLoginUI:YES
@@ -49,7 +52,7 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJE
                 }
             }];
         }
-        [pool release];
+        POOL_END();
     });
 }
 
@@ -65,10 +68,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(JAVA_OBJECT m
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(JAVA_OBJECT me) {
     __block JAVA_OBJECT str = JAVA_NULL;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        POOL_BEGIN();
         NSString *accessToken = [[[FBSession activeSession] accessTokenData] accessToken];
         str = fromNSString(accessToken);
-        [pool release];
+        POOL_END();
     });
     return str;
 }

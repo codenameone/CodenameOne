@@ -22,6 +22,7 @@
  */
 #import "DrawLine.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 @implementation DrawLine
 
@@ -51,10 +52,11 @@
     GLErrorLog;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
-
+#endif
 
 -(NSString*)getName {
     return @"DrawLine";

@@ -89,9 +89,13 @@ extern UIView *editingComponent;
 }
 
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
-    java_lang_String* str1 = fromNSString([url absoluteString]);
-    java_lang_String* str2 = fromNSString(sourceApplication);
+    JAVA_OBJECT str1 = fromNSString([url absoluteString]);
+    JAVA_OBJECT str2 = fromNSString(sourceApplication);
+#ifdef NEW_CODENAME_ONE_VM
+    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(str1, str2);
+#else
     return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(str1, str2);
+#endif
 }
 
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
@@ -114,7 +118,9 @@ extern UIView *editingComponent;
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
         [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
         [editingComponent release];
+#endif
         editingComponent = nil;
     }
     /*
@@ -150,13 +156,13 @@ extern UIView *editingComponent;
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
     NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
                 stringByReplacingOccurrencesOfString:@" " withString:@""];
-    java_lang_String* str = fromNSString(tokenAsString);
+    JAVA_OBJECT str = fromNSString(tokenAsString);
     com_codename1_impl_ios_IOSImplementation_pushRegistered___java_lang_String(str);
 }
  
 - (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
 	NSLog(@"Failed to get token, error: %@", error);
-    java_lang_String* str = fromNSString([error localizedDescription]);
+    JAVA_OBJECT str = fromNSString([error localizedDescription]);
     com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(str);
 }
 
@@ -181,12 +187,14 @@ extern void repaintUI();
     repaintUI();
 }
 
+#ifndef CN1_USE_ARC
 - (void)dealloc
 {
     [_window release];
     [_viewController release];
     [super dealloc];
 }
+#endif
 
 //GL_APP_DELEGATE_BODY
 @end

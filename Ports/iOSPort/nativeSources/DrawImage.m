@@ -1,5 +1,6 @@
 #import "DrawImage.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 @implementation DrawImage
 -(id)initWithArgs:(int)a xpos:(int)xpos ypos:(int)ypos i:(GLUIImage*)i w:(int)w h:(int)h {
@@ -9,7 +10,9 @@
     width = w;
     height = h;
     img = i;
+#ifndef CN1_USE_ARC
     [img retain];
+#endif
     return self;
 }
 
@@ -71,8 +74,10 @@
 }
 
 -(void)dealloc {
+#ifndef CN1_USE_ARC
     [img release];
-	[super dealloc];
+    [super dealloc];
+#endif
 }
 
 -(NSString*)getName {

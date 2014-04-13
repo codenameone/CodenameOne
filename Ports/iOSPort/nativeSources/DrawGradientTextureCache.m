@@ -22,6 +22,7 @@
  */
 #import "DrawGradientTextureCache.h"
 #import "ExecutableOp.h"
+#include "xmlvm.h"
 
 @implementation DrawGradientTextureCache
 
@@ -30,7 +31,9 @@ static NSMutableArray* pendingDeleteGradients = nil;
 static int MAX_CACHE_SIZE = 5;
 
 -(id)initWithGradient:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(GLuint)tA {
+#ifndef CN1_USE_ARC
     lastAccess = [[NSDate date] retain];
+#endif
     textureName = tA;
     type = typeA;
     startColor = startColorA;
@@ -53,12 +56,16 @@ static int MAX_CACHE_SIZE = 5;
         cachedGradients = [[NSMutableArray alloc] init];
         pendingDeleteGradients = [[NSMutableArray alloc] init];
         [cachedGradients addObject:d];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
         return;
     }
     if([cachedGradients count] < MAX_CACHE_SIZE) {
         [cachedGradients addObject:d];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
     } else {
         // need to pick an element in the array to remove
         DrawGradientTextureCache* oldest = d;
@@ -70,7 +77,9 @@ static int MAX_CACHE_SIZE = 5;
         [pendingDeleteGradients addObject:oldest];
         [cachedGradients removeObject:oldest];
         [cachedGradients addObject:d];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
     }
 }
 
@@ -96,24 +105,34 @@ static int MAX_CACHE_SIZE = 5;
     DrawGradientTextureCache* tmp = [[DrawGradientTextureCache alloc] initWithGradient:typeA startColorA:startColorA endColorA:endColorA widthA:widthA heightA:heightA relativeXA:relativeXA relativeYA:relativeYA relativeSizeA:relativeSizeA tA:0];
     for(DrawGradientTextureCache* d in cachedGradients) {
         if([tmp isEqual:d]) {
+#ifndef CN1_USE_ARC
             [d->lastAccess release];
+#endif
             d->lastAccess = [NSDate date];
+#ifndef CN1_USE_ARC
             [d->lastAccess retain];
             [tmp release];
+#endif
             //NSLog(@"Gradient cache hit size %i!", [cachedGradients count]);
             return d->textureName;
         }
     }
     //NSLog(@"Gradient cache miss size %i for typeA:%i startColorA:%i endColorA:%i widthA:%i heightA:%i relativeXA:%f relativeYA:%f relativeSizeA:%f!", [cachedGradients count], typeA, startColorA, endColorA, widthA, heightA, relativeXA, relativeYA, relativeSizeA);
+#ifndef CN1_USE_ARC
     [tmp release];
+#endif
     return 0;
 }
 
 -(void)dealloc {
+#ifndef CN1_USE_ARC
     [lastAccess release];
+#endif
     glDeleteTextures(1, &textureName);
     GLErrorLog;
+#ifndef CN1_USE_ARC
     [super dealloc];
+#endif
 }
 
 @end

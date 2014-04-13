@@ -8,6 +8,9 @@
 
 #import "ScanCodeImpl.h"
 //#import "QRCodeReaderOC.h"
+#include "com_codename1_impl_ios_IOSImplementation.h"
+#include "xmlvm.h"
+
 
 @implementation ScanCodeImpl
 #if !TARGET_IPHONE_SIMULATOR

@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #import "ExecutableOp.h"
+#include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
 #import <mach/mach.h>
 #import <mach/mach_host.h>
@@ -62,9 +63,11 @@ static BOOL blockDrawing = NO;
 -(void)execute {
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
+#endif
 
 +(natural_t) get_free_memory {
     mach_port_t host_port;

@@ -22,6 +22,7 @@
  */
 #import "FillRect.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 @implementation FillRect
 -(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos w:(int)w h:(int)h {
@@ -55,9 +56,11 @@
     GLErrorLog;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
+#endif
 
 -(NSString*)getName {
     return @"FillRect";

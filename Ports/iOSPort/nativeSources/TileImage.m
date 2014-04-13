@@ -22,6 +22,7 @@
  */
 #import "TileImage.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     GLfloat* vtx = malloc(8 * sizeof(GLfloat));
@@ -47,7 +48,9 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     width = w;
     height = h;
     img = i;
+#ifndef CN1_USE_ARC
     [img retain];
+#endif
     return self;
 }
 
@@ -99,10 +102,12 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     GLErrorLog;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
     [img release];
 	[super dealloc];
 }
+#endif
 
 -(NSString*)getName {
     return @"TileImage";

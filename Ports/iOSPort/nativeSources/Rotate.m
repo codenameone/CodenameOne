@@ -23,6 +23,7 @@
 #import "Rotate.h"
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 float currentRotate = 1;
 float currentRotateX = 1;
@@ -47,10 +48,11 @@ float currentRotateY = 1;
     GLErrorLog;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
-
+#endif
 
 -(NSString*)getName {
     return @"Rotate";

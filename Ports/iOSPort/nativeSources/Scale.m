@@ -23,6 +23,7 @@
 #import "Scale.h"
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 float currentScaleX = 1;
 float currentScaleY = 1;
@@ -43,10 +44,11 @@ float currentScaleY = 1;
     [ClipRect updateClipToScale];
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
-
+#endif
 
 -(NSString*)getName {
     return @"Scale";

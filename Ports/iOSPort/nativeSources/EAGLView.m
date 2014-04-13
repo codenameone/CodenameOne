@@ -26,11 +26,12 @@
 #import "ExecutableOp.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "xmlvm.h"
 
-
-extern void stringEdit(int finished, int cursorPos, const char* text);
+extern void stringEdit(int finished, int cursorPos, NSString* text);
 extern UIView *editingComponent;
 extern BOOL vkbAlwaysOpen;
+extern void repaintUI();
 
 @interface EAGLView (PrivateMethods)
 - (void)createFramebuffer;
@@ -48,6 +49,7 @@ extern BOOL vkbAlwaysOpen;
 }
 
 extern BOOL isRetina();
+extern BOOL isRetinaBug();
 
 //The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
 - (id)initWithCoder:(NSCoder*)coder
@@ -77,9 +79,10 @@ extern BOOL isRetina();
 - (void)dealloc
 {
     [self deleteFramebuffer];
+#ifndef CN1_USE_ARC
     [context release];
-    
     [super dealloc];
+#endif    
 }
 
 - (void)setContext:(EAGLContext *)newContext
@@ -87,8 +90,10 @@ extern BOOL isRetina();
     if (context != newContext) {
         [self deleteFramebuffer];
         
+#ifndef CN1_USE_ARC
         [context release];
         context = [newContext retain];
+#endif
         
         [EAGLContext setCurrentContext:nil];
     }
@@ -215,7 +220,9 @@ extern BOOL isRetina();
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
             [editingComponent release];
+#endif
             editingComponent = nil;
         }
         repaintUI();
@@ -238,7 +245,9 @@ extern BOOL isRetina();
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
             [editingComponent release];
+#endif
             editingComponent = nil;
         }
         repaintUI();
@@ -296,7 +305,9 @@ extern int currentlyEditingMaxLength;
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
             [editingComponent release];
+#endif
             editingComponent = nil;
         }
         repaintUI();

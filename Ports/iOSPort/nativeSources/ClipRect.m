@@ -109,9 +109,11 @@ static CGRect drawingRect;
     }
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
+#endif
 
 -(NSString*)getName {
     return @"ClipRect";

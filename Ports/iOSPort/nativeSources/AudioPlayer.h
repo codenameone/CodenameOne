@@ -25,7 +25,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 
-@interface AudioPlayer : NSObject {
+@interface AudioPlayer : NSObject<AVAudioPlayerDelegate> {
     AVAudioPlayer* playerInstance;
     AVPlayer* avPlayerInstance;
     NSError* errorInfo;

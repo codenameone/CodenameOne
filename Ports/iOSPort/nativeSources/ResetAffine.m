@@ -22,6 +22,7 @@
  */
 #import "ResetAffine.h"
 #import "CodenameOne_GLViewController.h"
+#include "xmlvm.h"
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
 
@@ -52,9 +53,11 @@ extern float currentScaleY;
     currentScaleY = 1;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
 	[super dealloc];
 }
+#endif
 
 
 -(NSString*)getName {

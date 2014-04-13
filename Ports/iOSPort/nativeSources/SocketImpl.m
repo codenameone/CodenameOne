@@ -1,15 +1,17 @@
 #import "SocketImpl.h"
 #include <ifaddrs.h>
 #include <arpa/inet.h>
+#include "xmlvm.h"
+#import "CodenameOne_GLViewController.h"
 
 @implementation SocketImpl
 
 -(BOOL)connect:(NSString*)host port:(int)port {
     CFReadStreamRef readStream;
     CFWriteStreamRef writeStream;
-    CFStreamCreatePairWithSocketToHost(NULL, host, port, &readStream, &writeStream);
-    inputStream = (NSInputStream *)readStream;
-    outputStream = (NSOutputStream *)writeStream;
+    CFStreamCreatePairWithSocketToHost(NULL, (BRIDGE_CAST CFStringRef)host, port, &readStream, &writeStream);
+    inputStream = (BRIDGE_CAST NSInputStream *)readStream;
+    outputStream = (BRIDGE_CAST NSOutputStream *)writeStream;
     [inputStream setDelegate:self];
     [outputStream setDelegate:self];
     [inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];

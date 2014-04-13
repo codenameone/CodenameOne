@@ -23,6 +23,7 @@
 #import "GLUIImage.h"
 #import "CodenameOne_GLViewController.h"
 #import <UIKit/UIKit.h>
+#include "xmlvm.h"
 
 extern int nextPowerOf2(int val);
 
@@ -30,7 +31,9 @@ extern int nextPowerOf2(int val);
 -(id)initWithImage:(UIImage*)i {
     img = i;
     name = nil;
+#ifndef CN1_USE_ARC
     [img retain];
+#endif
     textureName = 0;
     textureWidth = -1;
     textureHeight = -1;
@@ -98,10 +101,14 @@ extern int nextPowerOf2(int val);
 
 -(void)setImage:(UIImage*)i {
     if(img != nil) {
+#ifndef CN1_USE_ARC
         [img release];
+#endif
     }
     img = i;
+#ifndef CN1_USE_ARC
     [img retain];
+#endif
     if(textureName != 0) {
         glDeleteTextures(1, &textureName);
         textureName = 0;
@@ -110,13 +117,17 @@ extern int nextPowerOf2(int val);
 
 -(void)setName:(NSString*)s {
     name = s;
+#ifndef CN1_USE_ARC
     [name retain];
+#endif
 }
 
 -(void)dealloc {
     if(name != nil) {
         //NSLog(@"Deleting image name %@", name); 
+#ifndef CN1_USE_ARC
         [name release];
+#endif
     }
     if(textureName != 0) {
         int tname = textureName;
@@ -133,7 +144,9 @@ extern int nextPowerOf2(int val);
             });
         }
     }
+#ifndef CN1_USE_ARC
     [img release];
-	[super dealloc];
+    [super dealloc];
+#endif
 }
 @end

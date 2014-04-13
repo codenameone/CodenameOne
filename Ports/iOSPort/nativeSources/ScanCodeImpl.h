@@ -16,6 +16,8 @@
 @interface ScanCodeImpl
 #if !TARGET_IPHONE_SIMULATOR
 : UIViewController<ZBarReaderDelegate>//, ZXingDelegate>
+#else
+: NSObject
 #endif
 
 @end

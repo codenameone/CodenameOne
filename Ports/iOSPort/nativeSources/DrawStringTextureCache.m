@@ -22,16 +22,21 @@
  */
 #import "DrawStringTextureCache.h"
 #import "ExecutableOp.h"
+#include "xmlvm.h"
 
 
 @implementation DrawStringTextureCache
 static int MAX_CACHE_SIZE = 100;
 -(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
     str = s;
-    [str retain];
-    lastAccess = [[NSDate date] retain];
     font = f;
+#ifndef CN1_USE_ARC
+    [str retain];
     [font retain];
+    lastAccess = [[NSDate date] retain];
+#else
+    lastAccess = [NSDate date];
+#endif
     textureName = t;
     color = c;
     alpha = a;
@@ -50,12 +55,16 @@ static NSMutableArray* pendingDeleteStrings = nil;
         cachedStrings = [[NSMutableArray alloc] init];
         [cachedStrings addObject:d];
         pendingDeleteStrings = [[NSMutableArray alloc] init];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
         return;
     }
     if([cachedStrings count] < MAX_CACHE_SIZE) {
         [cachedStrings addObject:d];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
     } else {
         // need to pick an element in the array to remove
         DrawStringTextureCache* oldest = d;
@@ -67,7 +76,9 @@ static NSMutableArray* pendingDeleteStrings = nil;
         [pendingDeleteStrings addObject:oldest];
         [cachedStrings removeObject:oldest];
         [cachedStrings addObject:d];
+#ifndef CN1_USE_ARC
         [d release];
+#endif
     }
 }
 
@@ -89,17 +100,24 @@ static NSMutableArray* pendingDeleteStrings = nil;
     DrawStringTextureCache* tmp = [[DrawStringTextureCache alloc] initWithString:s f:f t:0 c:c a:a];
     for(DrawStringTextureCache* d in cachedStrings) {
         if([tmp isEqual:d]) {
+#ifndef CN1_USE_ARC
             [d->lastAccess release];
+#endif
             d->lastAccess = [NSDate date];
+#ifndef CN1_USE_ARC
             [d->lastAccess retain];
             [tmp release];
+#endif
             return d->textureName;
         }
     }
+#ifndef CN1_USE_ARC
     [tmp release];
+#endif
     return 0;
 }
 
+#ifndef CN1_USE_ARC
 -(void)dealloc {
     [str release];
     [font release];
@@ -108,5 +126,10 @@ static NSMutableArray* pendingDeleteStrings = nil;
     GLErrorLog;
     [super dealloc];
 }
-
+#else
+-(void)dealloc {
+    glDeleteTextures(1, &textureName);
+    GLErrorLog;
+}
+#endif
 @end
