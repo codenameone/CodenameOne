@@ -31,6 +31,7 @@ import net.rim.device.api.ui.Field;
 import net.rim.device.api.ui.Keypad;
 import net.rim.device.api.ui.Manager;
 import net.rim.device.api.ui.MenuItem;
+import net.rim.device.api.ui.UiApplication;
 import net.rim.device.api.ui.container.MainScreen;
 
 /**
@@ -143,6 +144,12 @@ public class VideoMainScreen extends MainScreen implements Media {
     protected boolean keyDown(int keycode, int time) {
         if (Keypad.key(keycode) == Keypad.KEY_ESCAPE) {
             cleanup();
+            impl.app.invokeLater(new Runnable() {
+
+                public void run() {
+                    UiApplication.getUiApplication().popScreen(VideoMainScreen.this);
+                }
+            });
             impl.confirmControlView();
             return true;
         }

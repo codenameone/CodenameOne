@@ -1729,61 +1729,65 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
 
         public void run() {
-            switch (i) {
-                case INVOKE_LATER_confirmControlView:
-                    if (app.getActiveScreen() != canvas) {
-                        app.pushScreen(canvas);
-                    }
-                    break;
-
-                case INVOKE_LATER_finishEdit:
-                    finishEdit(val);
-                    break;
-
-                case INVOKE_LATER_initComponent:
-                    canvas.add(fld);
-                    break;
-
-                case INVOKE_LATER_deinitialize:
-                    canvas.delete(fld);
-                    break;
-
-                case INVOKE_LATER_showNativeScreen:
-                    if (app.getActiveScreen() != fld) {
-                        app.pushScreen((Screen) fld);
-                    }
-                    break;
-
-                case INVOKE_AND_WAIT_calcPreferredSize:
-                    dim.setWidth(getFieldWidth(fld));
-                    dim.setHeight(getFieldHeight(fld));
-                    break;
-
-                case INVOKE_AND_WAIT_setFocus:
-                    try {
-                        // Not sure why an exception is thrown here during a touch event... 
-                        if (val) {
-                            fld.setFocus();
-                        } else {
-                            nullFld.setFocus();
+            try {
+                switch (i) {
+                    case INVOKE_LATER_confirmControlView:
+                        if (app.getActiveScreen() != canvas) {
+                            app.pushScreen(canvas);
                         }
-                    } catch (Throwable t) {
-                        //t.printStackTrace();
-                    }
-                    break;
-                case INVOKE_LATER_dirty:
-                    if (fld.getScreen() == canvas) {
-                        fld.setDirty(true);
-                        canvas.updateRIMLayout();
-                    }
-                    break;
-                case INVOKE_LATER_startMedia:
-                    try {
-                        v.start();
-                    } catch (MediaException ex) {
-                        ex.printStackTrace();
-                    }
-                    break;
+                        break;
+
+                    case INVOKE_LATER_finishEdit:
+                        finishEdit(val);
+                        break;
+
+                    case INVOKE_LATER_initComponent:
+                        canvas.add(fld);
+                        break;
+
+                    case INVOKE_LATER_deinitialize:
+                        canvas.delete(fld);
+                        break;
+
+                    case INVOKE_LATER_showNativeScreen:
+                        if (app.getActiveScreen() != fld) {
+                            app.pushScreen((Screen) fld);
+                        }
+                        break;
+
+                    case INVOKE_AND_WAIT_calcPreferredSize:
+                        dim.setWidth(getFieldWidth(fld));
+                        dim.setHeight(getFieldHeight(fld));
+                        break;
+
+                    case INVOKE_AND_WAIT_setFocus:
+                        try {
+                            // Not sure why an exception is thrown here during a touch event... 
+                            if (val) {
+                                fld.setFocus();
+                            } else {
+                                nullFld.setFocus();
+                            }
+                        } catch (Throwable t) {
+                            //t.printStackTrace();
+                        }
+                        break;
+                    case INVOKE_LATER_dirty:
+                        if (fld.getScreen() == canvas) {
+                            fld.setDirty(true);
+                            canvas.updateRIMLayout();
+                        }
+                        break;
+                    case INVOKE_LATER_startMedia:
+                        try {
+                            v.start();
+                        } catch (MediaException ex) {
+                            ex.printStackTrace();
+                        }
+                        break;
+                }
+                
+            } catch (Exception e) {
             }
         }
     }
