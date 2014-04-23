@@ -67,7 +67,7 @@ public class GridBagLayout extends Layout {
     public void addLayoutComponent(Object constraints, Component comp, Container c) {
         GridBagConstraints cons;
         if (constraints != null) {
-            if (!GridBagConstraints.class.isInstance(constraints)) {
+            if (!(constraints instanceof GridBagConstraints)) {
                 throw new IllegalArgumentException("AddLayoutComponent: constraint object must be GridBagConstraints"); //$NON-NLS-1$
             }
             cons = (GridBagConstraints) constraints;

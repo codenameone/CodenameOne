@@ -709,41 +709,24 @@ public class EditableResources extends Resources implements TreeModel {
                                     private final ArrayList<String> entries2 = new ArrayList<String>();
                                     @Override
                                     public int compare(ComponentEntry o1, ComponentEntry o2) {
-                                        if(renderers.contains(o1.getName())) {
-                                            return -1;
-                                        }
-                                        if(renderers.contains(o2.getName())) {
-                                            return 1;
-                                        }
-                                        
                                         entries1.clear();
                                         entries2.clear();
-                                        
                                         o1.findEmbeddedDependencies(entries1);
                                         o2.findEmbeddedDependencies(entries2);
-                                        if(entries1.size() == 0) {
-                                            if(entries2.size() == 0) {
-                                                return 0;
-                                            }
-                                            return -1;
-                                        } else {
-                                            if(entries2.size() == 0) {
-                                                return 1;
-                                            }
-                                        }
-                                        for(String e : entries1) {
-                                            if(e.equals(o2.getName())) {
-                                                return 1;
-                                            }
-                                        }
-                                        for(String e : entries2) {
-                                            if(e.equals(o1.getName())) {
+                                        if (entries1.size() == entries2.size()) {
+                                            if (renderers.contains(o1.getName())) {
                                                 return -1;
                                             }
+                                            if (renderers.contains(o2.getName())) {
+                                                return 1;
+                                            }
+                                            return 0;
+                                        } else if (entries1.size() > entries2.size()) {
+                                            return 1;
+                                        } else {
+                                            return -1;
                                         }
-                                        return 0;
-                                    }
-                                    
+                                    }                                    
                                 });
                                 for(ComponentEntry uiXMLData : guiElements) {
                                     UIBuilderOverride uib = new UIBuilderOverride();

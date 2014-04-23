@@ -526,6 +526,10 @@ public class SideMenuBar extends MenuBar {
     }
 
     private void addOpenButton(Command cmd, boolean checkCommands) {
+        // might be reached for a dialog
+        if(openButton == null) {
+            return;
+        }
         if (parent != null && getCommandCount() > 0 && openButton.getParent() == null) {
             Container titleArea = parent.getTitleArea();
             titleArea.removeAll();

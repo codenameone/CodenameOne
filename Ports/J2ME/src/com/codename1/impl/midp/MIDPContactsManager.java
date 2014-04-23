@@ -49,44 +49,47 @@ public class MIDPContactsManager {
     }
 
     public String[] getAllContacts(boolean withNumbers) {
-
-        PIM pim = PIM.getInstance();
-        PIMList clist = null;
-        Enumeration contacts = null;
         try {
-            clist = pim.openPIMList(PIM.CONTACT_LIST, PIM.READ_ONLY);
-            contacts = clist.items();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            PIM pim = PIM.getInstance();
+            PIMList clist = null;
+            Enumeration contacts = null;
+            try {
+                clist = pim.openPIMList(PIM.CONTACT_LIST, PIM.READ_ONLY);
+                contacts = clist.items();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
-        Vector contactsIDs = new Vector();
-        while (contacts.hasMoreElements()) {
-            Contact c = (Contact) contacts.nextElement();
-            if (clist.isSupportedField(Contact.UID) && c.countValues(Contact.UID) > 0) {
-                String uid = c.getString(Contact.UID, 0);
-                if (withNumbers) {
-                    if (clist.isSupportedField(Contact.TEL) && c.countValues(Contact.TEL) > 0) {
+            Vector contactsIDs = new Vector();
+            while (contacts.hasMoreElements()) {
+                Contact c = (Contact) contacts.nextElement();
+                if (clist.isSupportedField(Contact.UID) && c.countValues(Contact.UID) > 0) {
+                    String uid = c.getString(Contact.UID, 0);
+                    if (withNumbers) {
+                        if (clist.isSupportedField(Contact.TEL) && c.countValues(Contact.TEL) > 0) {
+                            contactsIDs.addElement(uid);
+                        }
+                    } else {
                         contactsIDs.addElement(uid);
                     }
-                } else {
-                    contactsIDs.addElement(uid);
                 }
             }
-        }
-        try {
-            clist.close();
-        } catch (PIMException ex) {
-            ex.printStackTrace();
-        }
+            try {
+                clist.close();
+            } catch (PIMException ex) {
+                ex.printStackTrace();
+            }
 
-        String[] ids = new String[contactsIDs.size()];
-        for (int i = 0; i < contactsIDs.size(); i++) {
-            String id = (String) contactsIDs.elementAt(i);
-            ids[i] = id;
+            String[] ids = new String[contactsIDs.size()];
+            for (int i = 0; i < contactsIDs.size(); i++) {
+                String id = (String) contactsIDs.elementAt(i);
+                ids[i] = id;
+            }
+            return ids;
+        } catch(Throwable t) {
+            t.printStackTrace();
+            return null;
         }
-        return ids;
-
     }
 
     public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {

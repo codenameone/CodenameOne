@@ -202,6 +202,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    public int getDeviceDensity() {
+        if(defaultPixelMilliRatio != null) {
+            if(defaultPixelMilliRatio.doubleValue() == 10) {
+                return Display.DENSITY_MEDIUM;
+            }
+            if(defaultPixelMilliRatio.doubleValue() == 20) {
+                return Display.DENSITY_VERY_HIGH;
+            }
+        }
+        return super.getDeviceDensity();
+    }
+    
     /**
      * @return the defaultPixelMilliRatio
      */
@@ -6383,9 +6395,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(is == null) {
                 if(socketInstance != null) {
                     is = socketInstance.getInputStream();
-                } else {
-
-                }
+                } 
             }
             return is;
         }
@@ -6449,6 +6459,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private byte[] shrink(byte[] arr, int size) {
+            if(size == -1) {
+                return null;
+            }
             byte[] n = new byte[size];
             System.arraycopy(arr, 0, n, 0, size);
             return n;

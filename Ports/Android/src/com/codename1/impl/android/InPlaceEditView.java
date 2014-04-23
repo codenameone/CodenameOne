@@ -36,6 +36,7 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.text.method.DigitsKeyListener;
 import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.util.SparseArray;
@@ -316,6 +317,10 @@ public class InPlaceEditView extends FrameLayout {
         
         if (textArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
+            if(Display.getInstance().getProperty("andAddComma", "false").equals("true") && 
+                    (codenameOneInputType & TextArea.DECIMAL) == TextArea.DECIMAL) {
+                mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
+            }
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);

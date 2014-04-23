@@ -100,10 +100,15 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         if(lastLocation != null){
             return lastLocation;
         }
-        String provider = findProvider(true);
-        android.location.Location location = locationManager.getLastKnownLocation(provider);
-        if (location != null) {
-            return convert(location);
+        try {
+            String provider = findProvider(true);
+            android.location.Location location = locationManager.getLastKnownLocation(provider);
+            if (location != null) {
+                return convert(location);
+            }
+        } catch(Exception err) {
+            err.printStackTrace();
+            throw new IOException(err);
         }
         throw new IOException("cannot retrieve location try later");
     }

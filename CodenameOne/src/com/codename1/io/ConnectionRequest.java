@@ -95,6 +95,23 @@ public class ConnectionRequest implements IOProgressListener {
         cookieHeader = aCookieHeader;
     }
 
+    /**
+     * @return the cookiesEnabledDefault
+     */
+    public static boolean isCookiesEnabledDefault() {
+        return cookiesEnabledDefault;
+    }
+
+    /**
+     * @param aCookiesEnabledDefault the cookiesEnabledDefault to set
+     */
+    public static void setCookiesEnabledDefault(boolean aCookiesEnabledDefault) {
+        if(!aCookiesEnabledDefault) {
+            setUseNativeCookieStore(false);
+        }
+        cookiesEnabledDefault = aCookiesEnabledDefault;
+    }
+
     private EventDispatcher actionListeners;
 
     /**
@@ -145,6 +162,8 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean readResponseForErrors;
     private String responseContentType;
     private boolean redirecting;
+    private static boolean cookiesEnabledDefault = true;
+    private boolean cookiesEnabled = cookiesEnabledDefault;
 
     private String destinationFile;
     private String destinationStorage;
@@ -328,21 +347,23 @@ public class ConnectionRequest implements IOProgressListener {
             }
             timeSinceLastUpdate = System.currentTimeMillis();
             responseCode = impl.getResponseCode(connection);
-            
-            String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
-            if(cookies != null && cookies.length > 0){
-                Vector cook = new Vector();
-                for(int iter = 0 ; iter < cookies.length ; iter++) {
-                    Cookie coo = parseCookieHeader(cookies[iter]);
-                    if(coo != null) {
-                        cook.addElement(coo);
+
+            if(isCookiesEnabled()) {
+                String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
+                if(cookies != null && cookies.length > 0){
+                    Vector cook = new Vector();
+                    for(int iter = 0 ; iter < cookies.length ; iter++) {
+                        Cookie coo = parseCookieHeader(cookies[iter]);
+                        if(coo != null) {
+                            cook.addElement(coo);
+                        }
                     }
+                    Cookie [] arr = new Cookie[cook.size()];
+                    for (int i = 0; i < arr.length; i++) {
+                        arr[i] = (Cookie) cook.elementAt(i);
+                    }
+                    impl.addCookie(arr);
                 }
-                Cookie [] arr = new Cookie[cook.size()];
-                for (int i = 0; i < arr.length; i++) {
-                    arr[i] = (Cookie) cook.elementAt(i);
-                }
-                impl.addCookie(arr);
             }
             
             if(responseCode - 200 < 0 || responseCode - 200 > 100) {
@@ -1550,5 +1571,22 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void setDestinationStorage(String destinationStorage) {
         this.destinationStorage = destinationStorage;
+    }
+
+    /**
+     * @return the cookiesEnabled
+     */
+    public boolean isCookiesEnabled() {
+        return cookiesEnabled;
+    }
+
+    /**
+     * @param cookiesEnabled the cookiesEnabled to set
+     */
+    public void setCookiesEnabled(boolean cookiesEnabled) {
+        this.cookiesEnabled = cookiesEnabled;
+        if(!cookiesEnabled) {
+            setUseNativeCookieStore(false);
+        }
     }
 }

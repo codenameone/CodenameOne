@@ -231,7 +231,7 @@ public class Container extends Component {
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
             if(cu instanceof Container) {
-                disableFocusAndInitLead((Container)cu);
+                enableFocusAndDeinitLead((Container)cu);
             }
             cu.resetFocusable();
             cu.hasLead = false;

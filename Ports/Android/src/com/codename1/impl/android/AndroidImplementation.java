@@ -5571,6 +5571,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         private byte[] shrink(byte[] arr, int size) {
+            if(size == -1) {
+                return null;
+            }
             byte[] n = new byte[size];
             System.arraycopy(arr, 0, n, 0, size);
             return n;

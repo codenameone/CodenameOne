@@ -189,7 +189,12 @@ public class DefaultListModel<T> implements ListModel<T> {
         dataListener.removeListener(l);
     }
     
-    private void fireDataChangedEvent(final int status, final int index){
+    /**
+     * Broadcast a change event to all listeners
+     * @param status the status of the event
+     * @param index the index changed
+     */
+    protected void fireDataChangedEvent(final int status, final int index){
         dataListener.fireDataChangeEvent(index, status);
     }
 

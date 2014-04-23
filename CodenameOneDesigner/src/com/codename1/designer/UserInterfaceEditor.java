@@ -814,7 +814,7 @@ public class UserInterfaceEditor extends BaseForm {
                                         UserInterfaceEditor.this.res, UserInterfaceEditor.this.view,
                                         new Hashtable(h), prefix, theme);
                                 a.setKeyValues(uiid, prefix);
-                                if(JOptionPane.showConfirmDialog(UserInterfaceEditor.this, a, "Style", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) ==
+                                if(ModifiableJOptionPane.showConfirmDialog(UserInterfaceEditor.this, a, "Style") ==
                                     JOptionPane.OK_OPTION) {
                                     Hashtable tmp = new Hashtable(h);
                                     a.updateThemeHashtable(tmp);
