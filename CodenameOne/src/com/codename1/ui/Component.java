@@ -226,6 +226,7 @@ public class Component implements Animation, StyleListener {
     private int destScrollY = -1;
     private int lastScrollY;
     private int lastScrollX;
+    private boolean shouldGrabScrollEvents;
 
     /**
      * Indicates if the component is in the initialized state, a component is initialized
@@ -2312,8 +2313,10 @@ public class Component implements Animation, StyleListener {
             getParent().scrollRectToVisible(draggedx - getParent().getAbsoluteX(), draggedy - getParent().getAbsoluteY(), getWidth() + 40, getHeight() + 40, getParent());
             return;
         }
-        boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
-        boolean shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
+        if(!dragActivated){
+            boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
+            shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
+        }
         
         if (isScrollable() && isSmoothScrolling() && shouldGrabScrollEvents) {
             if (!dragActivated) {

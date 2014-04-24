@@ -88,6 +88,7 @@ public abstract class CodenameOneImplementation {
     private Hashtable radialGradientCache;
 
     private boolean builtinSoundEnabled = true;
+    private boolean dragStarted = false;
     private int dragActivationCounter = 0;
     private int dragActivationX = 0;
     private int dragActivationY = 0;
@@ -1722,7 +1723,9 @@ public abstract class CodenameOneImplementation {
      * @param y the position of the event
      */
     protected void pointerDragged(final int[] x, final int[] y) {
-        if (hasDragStarted(x, y)) {
+        
+        if (dragStarted || hasDragStarted(x, y)) {
+            dragStarted = true;
             Display.getInstance().pointerDragged(x, y);
         }
     }
@@ -1887,6 +1890,7 @@ public abstract class CodenameOneImplementation {
                 pointerDragged(x, y);
             }
         }
+        dragStarted = false;        
         dragActivationCounter = 0;
         Display.getInstance().pointerReleased(x, y);
     }
