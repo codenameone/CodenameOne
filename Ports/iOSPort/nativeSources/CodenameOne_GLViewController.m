@@ -1210,7 +1210,7 @@ bool lockDrawing;
     self.displayLink = nil;
     
     const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-    drawTextureSupported = strstr(extensions, "OES_draw_texture") != 0;
+    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
     //NSLog(@"Draw texture extension %i", (int)drawTextureSupported);
     
     // register for keyboard notifications
@@ -2057,6 +2057,7 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)foldKeyboard:(CGPoint) point {
+    POOL_BEGIN();
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
              editCompoentY + editCompoentH >= point.y)) {
@@ -2082,6 +2083,7 @@ static BOOL skipNextTouch = NO;
             //return;
         }
     }
+    POOL_END();
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -2130,7 +2132,7 @@ static BOOL skipNextTouch = NO;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    NSLog(@"Released %i fingers", [touches count]);
+    //NSLog(@"Released %i fingers", [touches count]);
     if([touches count] > 1) {
         for(int iter = 0 ; iter < [ts count] ; iter++) {
             UITouch* currentTouch = [ts objectAtIndex:iter];
@@ -2274,7 +2276,7 @@ extern JAVA_OBJECT productsArrayPending;
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
         JAVA_ARRAY pArray = (JAVA_ARRAY)productsArrayPending;
-        JAVA_OBJECT* data = pArray->data;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->data;
 #endif
         NSArray* arr = response.products;
         int count = arr.count;
@@ -2517,7 +2519,7 @@ UIPopoverController* popoverControllerInstance;
     return toNSString(data[row]);
 #else 
     JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
-    JAVA_OBJECT* o = (JAVA_OBJECT*)arr->data;
+    JAVA_ARRAY_OBJECT* o = (JAVA_ARRAY_OBJECT*)arr->data;
     return toNSString(o[row]);
 #endif
 }

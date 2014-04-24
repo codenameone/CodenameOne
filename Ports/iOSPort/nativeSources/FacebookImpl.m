@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 
+#import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"

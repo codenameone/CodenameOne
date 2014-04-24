@@ -242,7 +242,7 @@ const char* stringToUTF8(JAVA_OBJECT str) {
     org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 
-    JAVA_INT len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    JAVA_ARRAY_INT len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     char* cs = XMLVM_ATOMIC_MALLOC(len + 1);
     memcpy(cs, data, len);
     cs[len] = '\0';
@@ -360,7 +360,7 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else 
-    JAVA_INT* data = (JAVA_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
 #endif
     Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl(n1, data, n3, n4, n5, n6);
     POOL_END();
@@ -373,9 +373,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_
     org_xmlvm_runtime_XMLVMArray* intArray = n1;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_INT* data = (JAVA_INT*)((JAVA_ARRAY)n1)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n1)->data;
 #endif
-    JAVA_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl(data, n2, n3);
+    JAVA_ARRAY_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl(data, n2, n3);
     POOL_END();
     return i;
 }
@@ -411,7 +411,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(J
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_INT* data2 = (JAVA_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
 #endif
     data2[0] = (int)img.size.width;
     data2[1] = (int)img.size.height;
@@ -680,7 +680,7 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
     org_xmlvm_runtime_XMLVMArray* byteArray = n3;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_BYTE* data = (JAVA_BYTE*)((JAVA_ARRAY)n3)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)n3)->data;
 #endif
     loadResourceFile(stringToUTF8(n1), 0, stringToUTF8(n2), 0, data);
     POOL_END();
@@ -796,9 +796,9 @@ void pointerDragged(int* x, int* y, int length) {
         com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
 #else
         JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(length);
-        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_INT));
+        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
         JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(length);
-        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_INT));
+        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
         com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(get_static_com_codename1_impl_ios_IOSImplementation_instance(), xArray, yArray);
 #endif
     }
@@ -816,9 +816,9 @@ void pointerReleased(int* x, int* y, int length) {
         com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
 #else
         JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(length);
-        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_INT));
+        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
         JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(length);
-        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_INT));
+        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
         com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(get_static_com_codename1_impl_ios_IOSImplementation_instance(), xArray, yArray);
 #endif
     }
@@ -1128,7 +1128,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     org_xmlvm_runtime_XMLVMArray* strArray = files;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
 #else 
-    JAVA_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)files)->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)files)->data;
 #endif
     
     int count = nsArr.count;
@@ -1400,7 +1400,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         org_xmlvm_runtime_XMLVMArray* intArray = response;
         JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-        JAVA_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
+        JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
 #endif
         data[0] = (JAVA_INT)s.width;
         data[1] = (JAVA_INT)s.height;
@@ -1447,7 +1447,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(JAV
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
     __block JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_INT* data = (JAVA_INT*)((JAVA_ARRAY)arr)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data;
 #endif
     __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -2060,7 +2060,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int recipientCount = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)recipients)->data;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)recipients)->data;
         int recipientCount = ((JAVA_ARRAY)recipients)->length;
 #endif
         for(int iter = 0 ; iter < recipientCount ; iter++) {
@@ -2084,9 +2084,9 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
             org_xmlvm_runtime_XMLVMArray* mimeArray = attachmentMimeType;
             JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)mimeArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-            JAVA_OBJECT* attachmentData = (JAVA_OBJECT*)((JAVA_ARRAY)attachment)->data;
+            JAVA_ARRAY_OBJECT* attachmentData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)attachment)->data;
             int attachmentCount = ((JAVA_ARRAY)attachment)->length;
-            JAVA_OBJECT* mimeData = (JAVA_OBJECT*)((JAVA_ARRAY)attachmentMimeType)->data;
+            JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)attachmentMimeType)->data;
 #endif
 
             for(int iter = 0 ; iter < attachmentCount ; iter++) {
@@ -2639,7 +2639,7 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(JAVA
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
     int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_INT* data = (JAVA_INT*)((JAVA_ARRAY)intArray)->data;    
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)intArray)->data;    
     int size = ((JAVA_ARRAY)intArray)->length;
 #endif
     ABAddressBookRef addressBook = getAddressBook();
@@ -3298,7 +3298,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
         int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;    
         int count = ((JAVA_ARRAY)args)->length;
 #endif
 
@@ -3326,7 +3326,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
         int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)args)->data;    
         int count = ((JAVA_ARRAY)args)->length;
 #endif
 
@@ -3417,7 +3417,7 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int count = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else 
-    JAVA_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)skus)->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)skus)->data;
     int count = ((JAVA_ARRAY)skus)->length;
 #endif
     
