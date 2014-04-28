@@ -404,6 +404,7 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         setSoftKeyCodes(mid);
 
         if(mid.getAppProperty("forceBackCommand") != null) {
+            canvas.setCommandListener((CommandListener) canvas);
             canvas.addCommand(MIDP_BACK_COMMAND);
         }
         
