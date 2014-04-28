@@ -1606,7 +1606,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * Exits the application...
      */
     public void exitApplication() {
-        System.exit(0);
+        android.os.Process.killProcess(android.os.Process.myPid()); 
     }
 
     @Override
