@@ -62,6 +62,15 @@
 #define POOL_END() [pool release];
 #endif
 
+#ifndef CN1_THREAD_STATE_SINGLE_ARG
+#define CN1_THREAD_STATE_SINGLE_ARG 
+#define CN1_THREAD_STATE_MULTI_ARG 
+#define CN1_THREAD_STATE_PASS_ARG 
+#define CN1_THREAD_STATE_PASS_SINGLE_ARG
+#define CN1_THREAD_GET_STATE_PASS_ARG 
+#define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG 
+#endif
+
 //ADD_INCLUDE
 
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate

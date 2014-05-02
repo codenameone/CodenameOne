@@ -55,11 +55,11 @@ void audioRouteChangeListenerCallback (void *inUserData, AudioSessionPropertyID 
 	CFNumberGetValue(routeChangeReasonRef, kCFNumberSInt32Type, &routeChangeReason);
     
 	if (routeChangeReason == kAudioSessionRouteChangeReason_OldDeviceUnavailable) {
-            com_codename1_impl_ios_IOSImplementation_headphonesDisconnected__();
+            com_codename1_impl_ios_IOSImplementation_headphonesDisconnected__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
             return;
 	}
 	if (routeChangeReason == kAudioSessionRouteChangeReason_NewDeviceAvailable) {
-            com_codename1_impl_ios_IOSImplementation_headphonesConnected__();
+            com_codename1_impl_ios_IOSImplementation_headphonesConnected__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
             return;
 	}
 }

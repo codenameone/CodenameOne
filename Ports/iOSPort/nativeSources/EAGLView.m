@@ -216,7 +216,7 @@ extern BOOL isRetinaBug();
             stringEdit(YES, -2, ((UITextField*)editingComponent).text);
         }
         if(vkbAlwaysOpen) {
-            com_codename1_impl_ios_IOSImplementation_foldKeyboard__();
+            com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
@@ -241,7 +241,7 @@ extern BOOL isRetinaBug();
             stringEdit(YES, -2, ((UITextField*)editingComponent).text);
         }
         if(vkbAlwaysOpen) {
-            com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+            com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
@@ -258,7 +258,7 @@ extern BOOL isRetinaBug();
 -(void)textViewDidChange:(UITextView *)textView {
     if(editingComponent.hidden) {
         editingComponent.hidden = NO;
-        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__();
+        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
     if([editingComponent isKindOfClass:[UITextView class]]) {
         stringEdit(NO, -1, ((UITextView*)editingComponent).text);
@@ -270,7 +270,7 @@ extern BOOL isRetinaBug();
 -(void)textFieldDidChange {
     if(editingComponent.hidden) {
         editingComponent.hidden = NO;
-        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__();
+        com_codename1_impl_ios_IOSImplementation_showTextEditorAgain__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
     if([editingComponent isKindOfClass:[UITextView class]]) {
         stringEdit(NO, -1, ((UITextView*)editingComponent).text);
@@ -299,9 +299,9 @@ extern int currentlyEditingMaxLength;
             stringEdit(YES, -2, ((UITextField*)editingComponent).text);
         }
         //if there is one then goto the edit next textarea
-        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+        //com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         if(vkbAlwaysOpen) {
-            com_codename1_impl_ios_TextEditUtil_editNextTextArea__();
+            com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];

@@ -42,7 +42,7 @@ extern int connections;
 
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
      if ([error code] != NSURLErrorCancelled) {
-        com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(c, [error code]);
+        com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(CN1_THREAD_GET_STATE_PASS_ARG c, [error code]);
      }
      connections--;
      if(connections < 1) {
@@ -59,20 +59,20 @@ extern int connections;
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback__(c);
 #else
-    JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback___R_com_codename1_ui_events_BrowserNavigationCallback(c);
+    JAVA_OBJECT navigateCallback = com_codename1_ui_BrowserComponent_getBrowserNavigationCallback___R_com_codename1_ui_events_BrowserNavigationCallback(CN1_THREAD_GET_STATE_PASS_ARG c);
 #endif
     if(navigateCallback != NULL) {
 #ifndef NEW_CODENAME_ONE_VM
         BOOL result = (*(JAVA_BOOLEAN (*)(JAVA_OBJECT, JAVA_OBJECT)) *(((java_lang_Object*)navigateCallback)->tib->itableBegin)[XMLVM_ITABLE_IDX_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String])(navigateCallback, xmlvm_create_java_string([request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
 #else
-        JAVA_BOOLEAN result = virtual_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String_R_boolean(navigateCallback, xmlvm_create_java_string([request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
+        JAVA_BOOLEAN result = virtual_com_codename1_ui_events_BrowserNavigationCallback_shouldNavigate___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG navigateCallback, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG [request.URL.absoluteString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding].UTF8String));
 #endif
         if(result) {
-           com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(request.URL.absoluteString.UTF8String));
+           com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
         }
         return result;
     } else {
-        com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(request.URL.absoluteString.UTF8String));
+        com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
         return YES;
     }
 }
@@ -82,7 +82,7 @@ extern int connections;
      if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
      }
-     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(c, xmlvm_create_java_string(webView.request.URL.absoluteString.UTF8String));
+     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.request.URL.absoluteString.UTF8String));
 }
 
 @end

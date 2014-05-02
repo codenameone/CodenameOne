@@ -32,7 +32,7 @@
         // ADD: dismiss the controller (NB dismiss from the *reader*!)
         [reader dismissModalViewControllerAnimated: YES];
         
-        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(fromNSString(symbol.data), fromNSString(symbol.typeName));        
+        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(symbol.data), fromNSString(symbol.typeName));        
 }
 #endif
 

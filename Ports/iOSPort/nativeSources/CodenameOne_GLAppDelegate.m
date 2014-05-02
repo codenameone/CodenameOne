@@ -47,17 +47,17 @@ extern UIView *editingComponent;
     self.window.rootViewController = self.viewController;
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     if(url != nil) {
-        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__();
-        JAVA_OBJECT key = fromNSString(@"AppArg");
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
         JAVA_OBJECT value;
         if([url isFileURL]) {
-            value = fromNSString(url.path);
+            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url.path);
         } else {
-            value = fromNSString([url absoluteString]);
+            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
         }
-        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(o, key, value);
+        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
     }
-    com_codename1_impl_ios_IOSImplementation_callback__();
+    com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifdef INCLUDE_CN1_PUSH
     [[UIApplication sharedApplication] cancelAllLocalNotifications];
     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
@@ -70,12 +70,12 @@ extern UIView *editingComponent;
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
         NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), nil);
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil);
     }
     if( [userInfo valueForKey:@"meta"] != NULL)
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), fromNSString(@"2"));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"));
     }
 #endif
 
@@ -89,12 +89,12 @@ extern UIView *editingComponent;
 }
 
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
-    JAVA_OBJECT str1 = fromNSString([url absoluteString]);
-    JAVA_OBJECT str2 = fromNSString(sourceApplication);
+    JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
+    JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
 #ifdef NEW_CODENAME_ONE_VM
-    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(str1, str2);
+    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else
-    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(str1, str2);
+    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #endif
 }
 
@@ -109,7 +109,7 @@ extern UIView *editingComponent;
      Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
      Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__();
+    com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     //[self.viewController stopAnimation];
 }
 
@@ -127,7 +127,7 @@ extern UIView *editingComponent;
      Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
      If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__();
+    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
@@ -135,7 +135,7 @@ extern UIView *editingComponent;
     /*
      Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__();
+    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
@@ -144,26 +144,26 @@ extern UIView *editingComponent;
      Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
      */
     //[self.viewController startAnimation];
-    com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__();
+    com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application
 {
-    com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__();
+    com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 #ifdef INCLUDE_CN1_PUSH
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
     NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
                 stringByReplacingOccurrencesOfString:@" " withString:@""];
-    JAVA_OBJECT str = fromNSString(tokenAsString);
-    com_codename1_impl_ios_IOSImplementation_pushRegistered___java_lang_String(str);
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG tokenAsString);
+    com_codename1_impl_ios_IOSImplementation_pushRegistered___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str);
 }
  
 - (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
 	NSLog(@"Failed to get token, error: %@", error);
-    JAVA_OBJECT str = fromNSString([error localizedDescription]);
-    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(str);
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
+    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str);
 }
 
 - (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo {
@@ -171,12 +171,12 @@ extern UIView *editingComponent;
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
 	NSString* alertValue = [[userInfo valueForKey:@"aps"] valueForKey:@"alert"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), nil);
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil);
     }
     if( [userInfo valueForKey:@"meta"] != NULL)
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(fromNSString(alertValue), fromNSString(@"2"));
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"));
     }
 }
 #endif

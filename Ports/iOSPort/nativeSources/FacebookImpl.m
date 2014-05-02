@@ -36,7 +36,7 @@
 
 extern JAVA_OBJECT fromNSString(NSString* str);
 
-void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJECT me, JAVA_OBJECT instance) {
+void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         FBSession* s = [FBSession activeSession];
@@ -57,7 +57,7 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJE
     });
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     __block JAVA_BOOLEAN val = FALSE;
     dispatch_sync(dispatch_get_main_queue(), ^{
         FBSession* s = [FBSession activeSession];
@@ -66,7 +66,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(JAVA_OBJECT m
     return val;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(JAVA_OBJECT me) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     __block JAVA_OBJECT str = JAVA_NULL;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -77,7 +77,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(JAVA_OBJECT me) 
     return str;
 }
 
-void com_codename1_impl_ios_IOSNative_facebookLogout__(JAVA_OBJECT me) {
+void com_codename1_impl_ios_IOSNative_facebookLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         [FBSession.activeSession closeAndClearTokenInformation];
     });
@@ -85,17 +85,17 @@ void com_codename1_impl_ios_IOSNative_facebookLogout__(JAVA_OBJECT me) {
 
 #else
 
-void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(JAVA_OBJECT me, JAVA_OBJECT instance) {
+void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(JAVA_OBJECT me) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_NULL;
 }
 
-void com_codename1_impl_ios_IOSNative_facebookLogout__(JAVA_OBJECT me) {
+void com_codename1_impl_ios_IOSNative_facebookLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 }
 #endif
