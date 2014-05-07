@@ -40,6 +40,23 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class JSONParser implements JSONParseCallback {
+
+    /**
+     * Indicates that the parser will generate long objects and not just doubles for numeric values
+     * @return the useLongsDefault
+     */
+    public static boolean isUseLongs() {
+        return useLongsDefault;
+    }
+
+    /**
+     * Indicates that the parser will generate long objects and not just doubles for numeric values
+     * @param aUseLongsDefault the useLongsDefault to set
+     */
+    public static void setUseLongs(boolean aUseLongsDefault) {
+        useLongsDefault = aUseLongsDefault;
+    }
+
     static class ReaderClass {
         char[] buffer;
         int buffOffset;
@@ -65,6 +82,7 @@ public class JSONParser implements JSONParseCallback {
 
     }
 
+    private static boolean useLongsDefault;
     private boolean modern;
     private Map<String, Object> state;
     private java.util.List<Object> parseStack;
@@ -230,7 +248,16 @@ public class JSONParser implements JSONParseCallback {
                         case '}':
                             if (currentToken.length() > 0) {
                                 try {
-                                    callback.numericToken(Double.parseDouble(currentToken.toString()));
+                                    String ct = currentToken.toString();
+                                    if(useLongsDefault) {
+                                        if(ct.indexOf('.') > -1) {
+                                            callback.numericToken(Double.parseDouble(ct));
+                                        } else {
+                                            callback.numericToken(Long.parseLong(ct));
+                                        }
+                                    } else {
+                                        callback.numericToken(Double.parseDouble(ct));
+                                    }
                                     if (lastKey != null) {
                                         callback.keyValue(lastKey, currentToken.toString());
                                         lastKey = null;
@@ -255,7 +282,16 @@ public class JSONParser implements JSONParseCallback {
                         case ']':
                             if (currentToken.length() > 0) {
                                 try {
-                                    callback.numericToken(Double.parseDouble(currentToken.toString()));
+                                    String ct = currentToken.toString();
+                                    if(useLongsDefault) {
+                                        if(ct.indexOf('.') > -1) {
+                                            callback.numericToken(Double.parseDouble(ct));
+                                        } else {
+                                            callback.numericToken(Long.parseLong(ct));
+                                        }
+                                    } else {
+                                        callback.numericToken(Double.parseDouble(ct));
+                                    }
                                     if (lastKey != null) {
                                         callback.keyValue(lastKey, currentToken.toString());
                                         lastKey = null;
@@ -284,7 +320,16 @@ public class JSONParser implements JSONParseCallback {
                         case ',':
                             if (currentToken.length() > 0) {
                                 try {
-                                    callback.numericToken(Double.parseDouble(currentToken.toString()));
+                                    String ct = currentToken.toString();
+                                    if(useLongsDefault) {
+                                        if(ct.indexOf('.') > -1) {
+                                            callback.numericToken(Double.parseDouble(ct));
+                                        } else {
+                                            callback.numericToken(Long.parseLong(ct));
+                                        }
+                                    } else {
+                                        callback.numericToken(Double.parseDouble(ct));
+                                    }
                                     if (lastKey != null) {
                                         callback.keyValue(lastKey, currentToken.toString());
                                         lastKey = null;
@@ -463,6 +508,18 @@ public class JSONParser implements JSONParseCallback {
             currentKey = null;
         } else {
             getStackVec().add(new Double(tok));
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void longToken(long tok) {
+        if (isStackHash()) {
+            getStackHash().put(currentKey, new Double(tok));
+            currentKey = null;
+        } else {
+            getStackVec().add(new Long(tok));
         }
     }
 

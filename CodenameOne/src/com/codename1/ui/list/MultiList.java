@@ -23,6 +23,7 @@
 package com.codename1.ui.list;
 
 import com.codename1.components.MultiButton;
+import com.codename1.ui.Image;
 import com.codename1.ui.List;
 import java.util.Hashtable;
 
@@ -34,6 +35,8 @@ import java.util.Hashtable;
 public class MultiList extends List {
     private MultiButton sel;
     private MultiButton unsel;
+    private Image placeholder;
+    
     /**
      * Constructor for the GUI builder
      */
@@ -88,7 +91,7 @@ public class MultiList extends List {
             "uiid1", "uiid2", "uiid3", "uiid4", "iconName", "iconUiid", "iconPosition",
             "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
             "invertFirstTwoEntries", "checkBox", "radioButton", 
-            "maskName"
+            "maskName", "Placeholder"
         };
     }
 
@@ -115,7 +118,8 @@ public class MultiList extends List {
            Boolean.class,
            Boolean.class,
            Boolean.class,
-           String.class
+           String.class,
+           Image.class // placeholder
        };
     }
     
@@ -123,6 +127,9 @@ public class MultiList extends List {
      * @inheritDoc
      */
     public Object getPropertyValue(String name) {
+        if(name.equals("placeholder")) {
+            return placeholder;
+        }
         return unsel.getPropertyValue(name);
     }
     
@@ -130,6 +137,17 @@ public class MultiList extends List {
      * @inheritDoc
      */
     public String setPropertyValue(String name, Object value) {
+        if(name.equals("placeholder")) {
+            this.placeholder = (Image)value;
+            if(unsel != null) {
+                unsel.setIcon(placeholder);
+                sel.setIcon(placeholder);
+            }
+            if(getRenderer() instanceof GenericListCellRenderer) {
+                ((GenericListCellRenderer)getRenderer()).updateIconPlaceholders();
+            }
+            return null;
+        }
         unsel.setPropertyValue(name, value);
         String v = sel.setPropertyValue(name, value);
         if(isInitialized()) {

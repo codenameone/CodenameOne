@@ -62,6 +62,11 @@ public interface JSONParseCallback {
     public void numericToken(double tok);
 
     /**
+     * Submits a numeric token from the JSON data
+     */
+    public void longToken(long tok);
+
+    /**
      * This method is called when a string key/value pair is detected within the json
      * it is essentially redundant when following string/numeric token.
      *

@@ -495,7 +495,14 @@ public class List<T> extends Component {
             throw new IllegalArgumentException("Selection index is negative:" + index);
         }
         model.setSelectedIndex(index);
-        if (scrollToSelection && isInitialized()) {
+        if(!isInitialized()) {
+            Form f = getComponentForm();
+            if(f == null) {
+                return;
+            }
+            f.revalidate();
+        }
+        if (scrollToSelection/* && isInitialized() */) {
             selectElement(index);
         }
     }

@@ -3315,7 +3315,7 @@ public class Component implements Animation, StyleListener {
                         scrollPosition = relativeY;
                     }
                 }
-                if (isSmoothScrolling()) {
+                if (isSmoothScrolling() && isInitialized()) {
                     initialScrollY = getScrollY();
                     destScrollY = scrollPosition;
                     initScrollMotion();

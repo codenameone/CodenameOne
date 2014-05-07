@@ -196,11 +196,11 @@ public class VServAds extends FullScreenAdService {
             adComponent.getStyle().setOpacity(0xff);
             ImageDownloadService imd = new ImageDownloadService(imageURL, adComponent);
             NetworkManager.getInstance().addToQueueAndWait(imd);
-            adComponent.addActionListener(new ActionListener() {
+            /*adComponent.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     Display.getInstance().execute(getAdDestination());
                 }
-            });
+            });*/
             return adComponent;
         } else {
             WebBrowser wb = new WebBrowser();

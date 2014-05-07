@@ -386,7 +386,11 @@ public class Result {
         if (s == null) {
             return 0;
         }
-        return (int) Double.parseDouble(s);
+        if(s.indexOf('.') > -1) {
+            return (int) Double.parseDouble(s);
+        } else {
+            return Integer.parseInt(s);
+        }
     }
 
     /**

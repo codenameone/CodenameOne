@@ -298,4 +298,10 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         this.imageKey = imageKey;
     }
 
+    /**
+     * @inheritDoc
+     */
+    public void longToken(long tok) {
+    }
+
 }

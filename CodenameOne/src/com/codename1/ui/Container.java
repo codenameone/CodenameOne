@@ -998,7 +998,12 @@ public class Container extends Component {
      */
     protected void paintGlass(Graphics g) {
     }
-
+    
+    void paintGlassImpl(Graphics g) {    
+        super.paintGlassImpl(g);
+        paintGlass(g);
+    }
+    
     void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above) {
 
         if (layout.isOverlapSupported() && components.contains(cmp)) {

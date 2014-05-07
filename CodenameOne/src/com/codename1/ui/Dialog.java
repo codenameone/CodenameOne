@@ -889,7 +889,7 @@ public class Dialog extends Form {
                     b.setUIID(uiid);
                 }
                 largest = Math.max(b.getPreferredW(), largest);
-                if(lineColor != null) {
+                if(lineColor != null && lineColor.length() > 0) {
                     int color = Integer.parseInt(lineColor, 16);
                     Border brd = null;
                     if(iter < cmds.length - 1) {

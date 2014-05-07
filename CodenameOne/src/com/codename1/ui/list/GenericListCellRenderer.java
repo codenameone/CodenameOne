@@ -140,6 +140,25 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(unselectedEntries);
     }
 
+    /**
+     * Updates the placeholder instances, this is useful for changing the URLImage placeholder in runtime as
+     * might happen in the designer
+     */
+    public void updateIconPlaceholders() {
+        updateIconPlaceholders(selectedEntries);
+        updateIconPlaceholders(unselectedEntries);
+    }
+    
+    private void updateIconPlaceholders(Component[] e) {
+        for(int iter = 0 ; iter < e.length ; iter++) {
+            String n = e[iter].getName();
+            if(n != null) {
+                if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
+                    placeholders.put(n, (EncodedImage)((Label)e[iter]).getIcon());
+                }
+            }
+        }
+    }
     
     private void addSelectedEntriesListener(Component[] e) {
         for(int iter = 0 ; iter < e.length ; iter++) {
