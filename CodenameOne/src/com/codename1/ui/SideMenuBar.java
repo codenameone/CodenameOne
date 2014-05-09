@@ -173,7 +173,7 @@ public class SideMenuBar extends MenuBar {
         int count = t.getComponentCount();
         for (int iter = 0; iter < count; iter++) {
             Component current = t.getComponentAt(iter);
-            if ("TitleCommand".equals(current.getUIID())) {
+            if(current.getClientProperty("TitleCommand") != null){
                 t.removeComponent(current);
                 t.revalidate();
             }
@@ -340,27 +340,27 @@ public class SideMenuBar extends MenuBar {
         if (rightCommands != null) {
             for (int i = 0; i < rightCommands.size(); i++) {
                 Command rightCommand = (Command) rightCommands.get(i);
-                
+                String uiid = (String)rightCommand.getClientProperty("uiid");
+                if(uiid == null){
+                    uiid = "TitleCommand";
+                }
                 Layout l = parent.getTitleArea().getLayout();
                 if (l instanceof BorderLayout) {
+                    Button b = new Button(rightCommand);
+                    b.setUIID(uiid);
+                    b.putClientProperty("TitleCommand", Boolean.TRUE);
                     BorderLayout bl = (BorderLayout) l;
                     Component east = bl.getEast();
                     if (east == null) {
-                        Button b = new Button(rightCommand);
-                        b.setUIID("TitleCommand");
                         parent.getTitleArea().addComponent(BorderLayout.EAST, b);
                     } else {
                         if (east instanceof Container) {
                             Container cnt = (Container) east;
-                            Button b = new Button(rightCommand);
-                            b.setUIID("TitleCommand");
                             cnt.addComponent(b);
                         } else {
                             east.getParent().removeComponent(east);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(east);
-                            Button b = new Button(rightCommand);
-                            b.setUIID("TitleCommand");
                             buttons.addComponent(b);
                             parent.getTitleArea().addComponent(BorderLayout.EAST, buttons);
                         }
@@ -377,27 +377,28 @@ public class SideMenuBar extends MenuBar {
         if (leftCommands != null) {
             for (int i = 0; i < leftCommands.size(); i++) {
                 Command leftCommand = (Command) leftCommands.get(i);
+                String uiid = (String)leftCommand.getClientProperty("uiid");
+                if(uiid == null){
+                    uiid = "TitleCommand";
+                }
                 
                 Layout l = parent.getTitleArea().getLayout();
                 if (l instanceof BorderLayout) {
+                    Button b = new Button(leftCommand);
+                    b.setUIID(uiid);
+                    b.putClientProperty("TitleCommand", Boolean.TRUE);
                     BorderLayout bl = (BorderLayout) l;
                     Component west = bl.getWest();
                     if (west == null) {
-                        Button b = new Button(leftCommand);
-                        b.setUIID("TitleCommand");
                         parent.getTitleArea().addComponent(BorderLayout.WEST, b);
                     } else {
                         if (west instanceof Container) {
                             Container cnt = (Container) west;
-                            Button b = new Button(leftCommand);
-                            b.setUIID("TitleCommand");
                             cnt.addComponent(b);
                         } else {
                             west.getParent().removeComponent(west);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(west);
-                            Button b = new Button(leftCommand);
-                            b.setUIID("TitleCommand");
                             buttons.addComponent(b);
                             parent.getTitleArea().addComponent(BorderLayout.WEST, buttons);
                         }
