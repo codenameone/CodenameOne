@@ -33,6 +33,7 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
+#include "java_lang_Throwable.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
 #import <MediaPlayer/MediaPlayer.h>
@@ -3891,10 +3892,10 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         POOL_BEGIN();
         ZooZ *zooz = [ZooZ sharedInstance];
         zooz.sandbox = sandbox;//set this if working in Sandbox mode
-        ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:toNSString(invoiceNumber) delegate:[CodenameOne_GLViewController instance]];
-        req.currencyCode = toNSString(currency);
+        ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:toNSString(CN1_THREAD_GET_STATE_PASS_ARG invoiceNumber) delegate:[CodenameOne_GLViewController instance]];
+        req.currencyCode = toNSString(CN1_THREAD_GET_STATE_PASS_ARG currency);
 //        req.payerDetails.email = @"test@test.com";
-        [zooz openPayment:req forAppKey:toNSString(appKey)];
+        [zooz openPayment:req forAppKey:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appKey)];
         POOL_END();
     });
 #endif
@@ -4908,4 +4909,15 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode___R_boolean(CN1_TH
     return com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  thisObj, JAVA_OBJECT writer, JAVA_OBJECT exception) {
+    struct obj__java_lang_Throwable* th = (struct obj__java_lang_Throwable*)exception;
+    if(th->java_lang_Throwable_stack == JAVA_NULL) {
+        java_lang_Throwable_fillInStack__(threadStateData, exception);
+    }
+    virtual_java_io_Writer_write___java_lang_String(threadStateData, writer, th->java_lang_Throwable_stack);
+}
+
+#else
+JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+}
 #endif

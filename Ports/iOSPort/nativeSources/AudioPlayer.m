@@ -20,7 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+
 #import "AudioPlayer.h"
+#import "CodenameOne_GLViewController.h"
 #include "java_lang_Runnable.h"
 #include "com_codename1_ui_Display.h"
 #include "xmlvm.h"

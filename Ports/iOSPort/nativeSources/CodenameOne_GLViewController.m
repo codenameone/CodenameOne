@@ -45,6 +45,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
 #include "com_codename1_ui_Component.h"
+#include "java_lang_System.h"
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -1473,6 +1474,7 @@ int keyboardHeight;
 #ifndef NEW_CODENAME_ONE_VM
     GC_gcollect_and_unmap();
 #else
+    java_lang_System_gc__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
 
     // Release any cached data, images, etc. that aren't in use.
@@ -2354,7 +2356,7 @@ extern SKPayment *paymentInstance;
 -(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ 
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
-    com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(tid), amount);
+    com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG tid), amount);
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();
     });
@@ -2375,7 +2377,7 @@ extern SKPayment *paymentInstance;
 }
 -(void)openPaymentRequestFailed: (ZooZPaymentRequest *)request withErrorCode:
 (int)errorCode andErrorMessage: (NSString *)errorMessage{
-    com_codename1_impl_ios_ZoozPurchase_paymentCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(errorMessage));
+    com_codename1_impl_ios_ZoozPurchase_paymentCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errorMessage));
     //Some error occurred with opening the request to ZooZ servers, usually a network issue or wrong credentials issue
     dispatch_async(dispatch_get_main_queue(), ^{
         repaintUI();

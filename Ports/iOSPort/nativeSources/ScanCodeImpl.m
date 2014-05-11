@@ -7,6 +7,7 @@
 //
 
 #import "ScanCodeImpl.h"
+#import "CodenameOne_GLViewController.h"
 //#import "QRCodeReaderOC.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
@@ -32,7 +33,7 @@
         // ADD: dismiss the controller (NB dismiss from the *reader*!)
         [reader dismissModalViewControllerAnimated: YES];
         
-        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(symbol.data), fromNSString(symbol.typeName));        
+        com_codename1_impl_ios_IOSImplementation_scanCompleted___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG symbol.data), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG symbol.typeName));
 }
 #endif
 
