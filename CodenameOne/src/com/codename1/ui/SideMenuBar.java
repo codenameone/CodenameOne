@@ -195,6 +195,27 @@ public class SideMenuBar extends MenuBar {
             parent.removePointerPressedListener(pointerPressed);
         }
     }
+    
+    /**
+     * Creates the Side Menu open button.
+     * @return a Button instance to place on the TitleArea
+     */ 
+    protected Button createOpenButton(){
+        Button ob = new Button();
+        ob.setUIID("MenuButton");
+        UIManager uim = parent.getUIManager();
+        Image i = (Image) uim.getThemeImageConstant("sideMenuImage");
+        if (i != null) {
+            ob.setIcon(i);
+        } else {
+            ob.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+        }
+        Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
+        if (p != null) {
+            ob.setPressedIcon(p);
+        }
+        return ob;
+    }
 
     /**
      * @inheritDoc
@@ -207,19 +228,7 @@ public class SideMenuBar extends MenuBar {
         if (parent instanceof Dialog) {
             return;
         }
-        openButton = new Button();
-        openButton.setUIID("MenuButton");
-        UIManager uim = parent.getUIManager();
-        Image i = (Image) uim.getThemeImageConstant("sideMenuImage");
-        if (i != null) {
-            openButton.setIcon(i);
-        } else {
-            openButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
-        }
-        Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
-        if (p != null) {
-            openButton.setPressedIcon(p);
-        }
+        openButton = createOpenButton();
         openButton.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -227,6 +236,7 @@ public class SideMenuBar extends MenuBar {
             }
         });
         addOpenButton(null, true);
+        UIManager uim = parent.getUIManager();
 
         if (uim.isThemeConstant("sideMenuFoldedSwipeBool", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
             pointerDragged = new ActionListener() {
