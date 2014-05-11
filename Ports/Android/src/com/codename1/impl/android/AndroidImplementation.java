@@ -4137,7 +4137,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(args != null) {
             Boolean b = (Boolean)args.get("persist");
             if(b != null && b.booleanValue()) {
-                notification.defaults |= Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR;
+                notification.defaults |= Notification.FLAG_ONGOING_EVENT;
+                notification.defaults |= Notification.FLAG_NO_CLEAR;
             }
             
             Integer notId = (Integer)args.get("id");

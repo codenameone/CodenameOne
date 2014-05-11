@@ -158,6 +158,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public final static boolean IS_MAC;
 
+    private static final boolean isWindows;
+    private static String fontFaceSystem;
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
@@ -165,7 +167,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             IS_MAC = false;
         }
+        isWindows = File.separatorChar == '\\';        
         System.setProperty("apple.laf.useScreenMenuBar", "true");
+        
+        if(isWindows) {
+            fontFaceSystem = "ArialUnicodeMS";
+        } else {
+            fontFaceSystem = "Arial";
+        }
+        
     }
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
@@ -278,7 +288,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int medianFontSize = 15;
     private static int smallFontSize = 11;
     private static int largeFontSize = 19;
-    private static String fontFaceSystem = "Arial";
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
@@ -1024,8 +1033,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                         scrollWheeling = true;
                         Form f = getCurrentForm();
                         if(f != null){
-                            f.pointerPressed(x, y);
-                            f.pointerDragged(x, y + units / 4);
+                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if(cmp != null && cmp.isFocusable()) {
+                                cmp.setFocusable(false);
+                                f.pointerPressed(x, y);
+                                f.pointerDragged(x, y + units / 4);
+                                cmp.setFocusable(true);
+                            } else {
+                                f.pointerPressed(x, y);
+                                f.pointerDragged(x, y + units / 4);
+                            }
                         }
                     }
                 });
@@ -1033,7 +1050,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            f.pointerDragged(x, y + units / 4 * 2);
+                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if(cmp != null && cmp.isFocusable()) {
+                                cmp.setFocusable(false);
+                                f.pointerDragged(x, y + units / 4 * 2);
+                                cmp.setFocusable(true);
+                            } else {
+                                f.pointerDragged(x, y + units / 4 * 2);
+                            }
                         }
                     }
                 });
@@ -1041,7 +1065,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            f.pointerDragged(x, y + units / 4 * 3);
+                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if(cmp != null && cmp.isFocusable()) {
+                                cmp.setFocusable(false);
+                                f.pointerDragged(x, y + units / 4 * 3);
+                                cmp.setFocusable(true);
+                            } else {
+                                f.pointerDragged(x, y + units / 4 * 3);
+                            }
                         }
                     }
                 });
@@ -1049,8 +1080,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            f.pointerDragged(x, y + units);
-                            f.pointerReleased(x, y + units);
+                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if(cmp != null && cmp.isFocusable()) {
+                                cmp.setFocusable(false);
+                                f.pointerDragged(x, y + units);
+                                f.pointerReleased(x, y + units);
+                                cmp.setFocusable(true);
+                            } else {
+                                f.pointerDragged(x, y + units);
+                                f.pointerReleased(x, y + units);
+                            }
                         }
                         scrollWheeling = false;
                     }
@@ -4325,6 +4364,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         return tablet;
     }
 
+    public boolean isDesktop() {
+        return portraitSkin == null;
+    }
+    
     public static void setTablet(boolean b) {
         tablet = b;
     }
@@ -5167,7 +5210,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Util.copy(fis, fos);
                         Util.cleanup(fis);
                         Util.cleanup(fos);
-                        result = new com.codename1.ui.events.ActionEvent(tmp.getAbsolutePath());
+                        result = new com.codename1.ui.events.ActionEvent("file:/" + tmp.getAbsolutePath().replace('\\', '/'));
                     } catch(IOException err) {
                         err.printStackTrace();
                     }
@@ -5218,6 +5261,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.isVideo = isVideo;
             this.frm = f;
             try {
+                File fff = new File(uri);
+                if(fff.exists()) {
+                    uri = fff.toURI().toURL().toExternalForm();
+                }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {

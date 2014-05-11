@@ -264,7 +264,11 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
      * @inheritDoc
      */
     public void setSelectedIndex(int index) {
-        underlying.setSelectedIndex(getFilterOffset(index));
+        if(index < 0) {
+            underlying.setSelectedIndex(index);
+        } else {
+            underlying.setSelectedIndex(getFilterOffset(index));
+        }
     }
 
     /**

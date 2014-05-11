@@ -621,5 +621,5 @@ class Spinner extends List {
             super.repaint();        
         }
     }
-    
+
 }

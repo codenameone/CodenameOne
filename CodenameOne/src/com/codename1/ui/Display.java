@@ -1094,7 +1094,7 @@ public final class Display {
         }
     }
 
-/**
+    /**
      * Invokes runnable and blocks the current thread, if the current thread is the
      * edt it will still be blocked however a separate thread would be launched
      * to perform the duties of the EDT while it is blocked. Once blocking is finished
@@ -2870,7 +2870,23 @@ public final class Display {
     public boolean isTablet() {
         return impl.isTablet();
     }
-
+    
+    /**
+     * Returns true if this is a desktop application
+     * @return true if this is a desktop application
+     */
+    public boolean isDesktop() {
+        return impl.isDesktop();
+    }
+    
+    /**
+     * Returns true if the device has dialing capabilities
+     * @return false if it cannot dial
+     */
+    public boolean canDial() {
+        return impl.canDial();
+    }
+    
     /**
      * On most platforms it is quite fast to draw on a mutable image and then render that
      * image, however some platforms have much slower mutable images in comparison to just

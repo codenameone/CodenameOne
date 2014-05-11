@@ -942,7 +942,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void setPost(boolean post) {
         if(this.post != post && requestArguments != null && requestArguments.size() > 0) {
-            throw new IllegalStateException("Request method (post/get) can't be modified one arguments have been assigned to the request");
+            throw new IllegalStateException("Request method (post/get) can't be modified once arguments have been assigned to the request");
         }
         this.post = post;
         if(this.post) {

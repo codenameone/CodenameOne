@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
 
@@ -382,7 +382,7 @@ public class JSONParser implements JSONParseCallback {
      */
     public Map<String, Object> parseJSON(Reader i) throws IOException {
         modern = true;
-        state = new HashMap<String, Object>();
+        state = new LinkedHashMap<String, Object>();
         parseStack = new ArrayList<Object>();
         currentKey = null;
         parse(i, this);
@@ -427,7 +427,7 @@ public class JSONParser implements JSONParseCallback {
         } else {
             Map newOne;
             if(modern) {
-                newOne = new HashMap();
+                newOne = new LinkedHashMap();
             } else {
                 newOne = new Hashtable();
             }

@@ -46,7 +46,6 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
     };
     
     private boolean markToday;
-    private long today;
     private String originalUIID;
     private boolean date;
     private int type;
@@ -67,7 +66,6 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
     
     void setMarkToday(boolean markToday, long today) {
         this.markToday = markToday;
-        this.today = today;
     }
 
     /**
@@ -115,9 +113,13 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
         if(date) {
             Date d = (Date)value;
             if(markToday) {
-                long l = d.getTime();
-                long day = 24 * 60 * 60000;
-                if(l / day == today / day) {
+                Calendar cl = Calendar.getInstance();
+                cl.setTime(new Date());
+                int dm = cl.get(Calendar.DAY_OF_MONTH);
+                int m = cl.get(Calendar.MONTH);
+                int year = cl.get(Calendar.YEAR);
+                cl.setTime(d);
+                if(dm == cl.get(Calendar.DAY_OF_MONTH) && year == cl.get(Calendar.YEAR) && m == cl.get(Calendar.MONTH)) {
                     if(originalUIID == null) {
                         originalUIID = getUIID();
                         setUIID("TODAY");

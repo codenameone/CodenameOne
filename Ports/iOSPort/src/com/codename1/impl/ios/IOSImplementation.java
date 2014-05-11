@@ -3616,8 +3616,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void printStackTraceToStream(Throwable t, Writer o) {
-        //PrintWriter p = new PrintWriter(o);
-        //t.printStackTrace(p);
+        nativeInstance.printStackTraceToStream(t, o);
     }
 
     /**

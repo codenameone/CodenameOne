@@ -936,7 +936,7 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                             public void skippedEntity(String name) throws SAXException {
                             }
                         });
-                        xmlReader.parse(new InputSource(f));
+                        xmlReader.parse(new InputSource(new InputStreamReader(f,"UTF-8")));
                     } else {
                         if(files[0].getName().toLowerCase().endsWith("csv")) {
                             CSVParserOptions po = new CSVParserOptions(this);

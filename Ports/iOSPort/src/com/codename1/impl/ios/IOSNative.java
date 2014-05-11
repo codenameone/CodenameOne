@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
 import com.codename1.payment.Product;
+import java.io.Writer;
 import java.util.Vector;
 
 /**
@@ -408,4 +409,5 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+    public native void printStackTraceToStream(Throwable t, Writer o);
 }

@@ -34,6 +34,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -231,6 +232,27 @@ public abstract class FullScreenAdService {
      */
     public void setAllowSkipping(boolean allowSkipping) {
         this.allowSkipping = allowSkipping;
+    }
+    
+    void unlock(final ActionListener callback) {
+        AdForm adf = (AdForm)Display.getInstance().getCurrent();
+        synchronized(LOCK) {
+            adf.blocked = false;
+            LOCK.notify();
+        }
+
+        // move to the next screen so the ad will be shown and so we 
+        // can return to the next screen and not this screen
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                // prevent a potential race condition with the locking
+                if(Display.getInstance().getCurrent() instanceof AdForm) {
+                    Display.getInstance().callSerially(this);
+                    return;
+                }
+                callback.actionPerformed(null);
+            }
+        });
     }
     
     class AdForm extends Form {

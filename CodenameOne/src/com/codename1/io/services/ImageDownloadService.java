@@ -197,6 +197,7 @@ public class ImageDownloadService extends ConnectionRequest {
     public ImageDownloadService(String url, ActionListener l) {
         init(url);
         addResponseListener(l);
+        setDuplicateSupported(true);
     }
 
     private void init(String url) {
@@ -222,6 +223,7 @@ public class ImageDownloadService extends ConnectionRequest {
         this.targetKey = targetKey;
         this.targetOffset = targetOffset;
         init(url);
+        setDuplicateSupported(true);
     }
 
     /**
@@ -239,6 +241,7 @@ public class ImageDownloadService extends ConnectionRequest {
         this.targetKey = targetKey;
         this.targetOffset = targetOffset;
         init(url);
+        setDuplicateSupported(true);
     }
 
     /**
@@ -251,6 +254,7 @@ public class ImageDownloadService extends ConnectionRequest {
     public ImageDownloadService(String url, Label parentLabel) {
         init(url);
         this.parentLabel = parentLabel;
+        setDuplicateSupported(true);
     }
 
     /**

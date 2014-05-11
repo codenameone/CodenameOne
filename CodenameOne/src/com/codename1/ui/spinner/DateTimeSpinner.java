@@ -44,7 +44,7 @@ public class DateTimeSpinner extends TimeSpinner {
      * Default constructor
      */
     public DateTimeSpinner() {
-        off = TimeZone.getDefault().getRawOffset() * -1;
+        off = 0;
     }
     
     void initSpinner() {

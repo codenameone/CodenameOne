@@ -3466,6 +3466,22 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Returns true if this is a desktop application
+     * @return true if this is a desktop application
+     */
+    public boolean isDesktop() {
+        return false;
+    }
+    
+    /**
+     * Returns true if the device has dialing capabilities
+     * @return false if it cannot dial
+     */
+    public boolean canDial() {
+        return !isTablet() && !isDesktop();
+    }
+    
+    /**
      * Allows an implementation to modify setting thread priority, some implementations
      * don't handle thread priorities well
      * 
