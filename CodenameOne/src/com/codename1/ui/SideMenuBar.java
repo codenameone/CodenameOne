@@ -171,11 +171,22 @@ public class SideMenuBar extends MenuBar {
     protected void removeAllCommands() {
         Container t = parent.getTitleArea();
         int count = t.getComponentCount();
+        Component [] cmps = new Component[count];
+        for (int i = 0; i < count; i++) {
+            cmps[i] = t.getComponentAt(i);            
+        }
         for (int iter = 0; iter < count; iter++) {
-            Component current = t.getComponentAt(iter);
+            Component current = cmps[iter];
             if(current.getClientProperty("TitleCommand") != null){
+                Button b = (Button)current;
                 t.removeComponent(current);
                 t.revalidate();
+                if(rightCommands != null){
+                    rightCommands.remove(b.getCommand());
+                }
+                if(leftCommands != null){
+                    leftCommands.remove(b.getCommand());
+                }
             }
         }
         super.removeAllCommands();
