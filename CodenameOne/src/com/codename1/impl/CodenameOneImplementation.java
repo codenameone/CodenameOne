@@ -5025,6 +5025,23 @@ public abstract class CodenameOneImplementation {
     public void dismissNotification(Object o) {
     }
     
+    
+    /**
+     * Returns true if the underlying OS supports numeric badges on icons. Notice this is only available on iOS
+     * and only when push notification is enabled
+     * @return true if the underlying OS supports numeric badges
+     */
+    public boolean isBadgingSupported() {
+        return false;
+    }
+
+    /**
+     * Sets the number that appears on the application icon in iOS 
+     * @param number number to show on the icon
+     */
+    public void setBadgeNumber(int number) {
+    }    
+    
     /**
      * Returns the UDID for devices that support it
      * 

@@ -3070,6 +3070,23 @@ public final class Display {
     }
     
     /**
+     * Returns true if the underlying OS supports numeric badges on icons. Notice this is only available on iOS
+     * and only when push notification is enabled
+     * @return true if the underlying OS supports numeric badges
+     */
+    public boolean isBadgingSupported() {
+        return impl.isBadgingSupported();
+    }
+
+    /**
+     * Sets the number that appears on the application icon in iOS 
+     * @param number number to show on the icon
+     */
+    public void setBadgeNumber(int number) {
+        impl.setBadgeNumber(number);
+    }
+    
+    /**
      * Gets all contacts from the address book of the device
      * @param withNumbers if true returns only contacts that has a number
      * @return array of contacts unique ids
