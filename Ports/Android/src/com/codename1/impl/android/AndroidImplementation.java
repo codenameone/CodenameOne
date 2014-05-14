@@ -4407,6 +4407,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         protected Dimension calcPreferredSize() {
             return new Dimension(nativeVideo.getWidth(), nativeVideo.getHeight());
         }
+        
+        @Override
+        public void setWidth(int width) {
+            super.setWidth(width);
+            if(nativeVideo != null){
+                activity.runOnUiThread(new Runnable() {
+
+                    public void run() {
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
+                        layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
+                        nativeVideo.setLayoutParams(layout);
+                        nativeVideo.getHolder().setSizeFromLayout();
+                    }
+                });
+            }
+        }
+
+        @Override
+        public void setHeight(int height) {
+            super.setHeight(height);
+            if(nativeVideo != null){
+                activity.runOnUiThread(new Runnable() {
+
+                    public void run() {
+                        //RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
+                        layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
+                        nativeVideo.setLayoutParams(layout);
+                        nativeVideo.getHolder().setSizeFromLayout();
+                    }
+                });
+                
+            }
+        }
 
         @Override
         public void setNativePlayerMode(boolean nativePlayer) {
