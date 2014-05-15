@@ -2,6 +2,7 @@
 #ifdef DETECT_HEADPHONE
 #import "HeadphonesDetector.h"
 #import "AudioToolbox/AudioToolbox.h"
+#import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
 static HeadphonesDetector *headphonesDetector;

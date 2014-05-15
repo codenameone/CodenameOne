@@ -2948,6 +2948,18 @@ void com_codename1_impl_ios_IOSNative_deregisterPush__(CN1_THREAD_STATE_MULTI_AR
 #endif
 }
 
+void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT number) {
+#ifdef INCLUDE_CN1_PUSH2
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if(number == 0) {
+            [[UIApplication sharedApplication] cancelAllLocalNotifications];
+        }
+        [UIApplication sharedApplication].applicationIconBadgeNumber = number;
+    });
+#endif
+}
+
+
 UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
     UIImage* scaledInstance = nil;
     const size_t originalWidth = img.size.width;

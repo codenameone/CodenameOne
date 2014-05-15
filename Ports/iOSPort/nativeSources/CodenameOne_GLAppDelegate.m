@@ -64,6 +64,7 @@ extern UIView *editingComponent;
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(userInfo == nil || apsInfo == nil) {
+        //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
     NSLog(@"Received notification on start: %@", userInfo);
@@ -140,6 +141,10 @@ extern UIView *editingComponent;
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
 {
+#ifdef INCLUDE_CN1_PUSH
+    [[UIApplication sharedApplication] cancelAllLocalNotifications];
+    [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+#endif
     /*
      Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
      */
