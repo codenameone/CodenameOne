@@ -46,11 +46,11 @@ class SpinnerDateModel implements ListModel {
     private static final long DAY = 24 * 60 * 60 * 1000;
 
     void setValue(Date value) {
-        currentValue = value.getTime() + TimeZone.getDefault().getRawOffset() + 4 * 60 * 60 * 1000;
+        currentValue = value.getTime() - value.getTime() % DAY + 12 * 60 * 60000;
     }
 
     Object getValue() {
-        return new Date(currentValue);
+        return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
     }
 
     /**
@@ -63,14 +63,16 @@ class SpinnerDateModel implements ListModel {
     public SpinnerDateModel(long min, long max, long currentValue) {
         this.max = max;
         this.min = min;
-        this.currentValue = currentValue;
+        this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
+        System.out.println("Date is: " + new Date(currentValue));
+        System.out.println("Date plus offset is: " + new Date(currentValue + TimeZone.getDefault().getRawOffset() + 4 * 60 * 60 * 1000) + " raw offset is: " + TimeZone.getDefault().getRawOffset());
     }
 
     /**
      * @inheritDoc
      */
     public Object getItemAt(int index) {
-        return new Date(min + DAY * index);
+        return new Date(min + DAY * index + 12 * 60 * 60000);
     }
 
 

@@ -1118,7 +1118,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //Decode with inSampleSize
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
                 o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
-                o2.inSampleSize = scale;
+
+                String sampleSize = Display.getInstance().getProperty("android.sampleSize", null);
+                if(sampleSize != null) {
+                    o2.inSampleSize = Integer.parseInt(sampleSize);
+                } else {
+                    o2.inSampleSize = scale;
+                }
                 o2.inPurgeable = true;
                 o2.inInputShareable = true;
                 fis = new FileInputStream(path);
@@ -4137,8 +4143,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(args != null) {
             Boolean b = (Boolean)args.get("persist");
             if(b != null && b.booleanValue()) {
-                notification.defaults |= Notification.FLAG_ONGOING_EVENT;
-                notification.defaults |= Notification.FLAG_NO_CLEAR;
+                notification.flags |= Notification.FLAG_ONGOING_EVENT;
+                notification.flags |= Notification.FLAG_NO_CLEAR;
             }
             
             Integer notId = (Integer)args.get("id");
@@ -4794,6 +4800,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public com.codename1.ui.util.ImageIO getImageIO() {
         if (imIO == null) {
             imIO = new com.codename1.ui.util.ImageIO() {
+                
+                @Override
+                public Dimension getImageSize(String imageFilePath) throws IOException {
+                    BitmapFactory.Options o = new BitmapFactory.Options();
+                    o.inJustDecodeBounds = true;
+                    o.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+                    FileInputStream fis = new FileInputStream(imageFilePath);
+                    BitmapFactory.decodeStream(fis, null, o);
+                    fis.close();
+
+                    return new Dimension(o.outWidth, o.outHeight);
+                }
+                
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;

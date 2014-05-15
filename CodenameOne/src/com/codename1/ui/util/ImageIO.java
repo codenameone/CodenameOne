@@ -27,6 +27,7 @@ import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
+import com.codename1.ui.geom.Dimension;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,7 +96,68 @@ public abstract class ImageIO {
         Util.cleanup(in);
     }
 
-
+    /**
+     * Returns the image size in pixels
+     * @param imageFilePath the path to the image
+     * @return the size in pixels
+     */
+    public Dimension getImageSize(String imageFilePath) throws IOException {
+        Image img = Image.createImage(imageFilePath);
+        Dimension d = new Dimension(img.getWidth(), img.getHeight());
+        img.dispose();
+        return d;
+    }
+    
+    /**
+     * Scales an image on disk while maintaining an aspect ratio, the appropriate aspect size will be 
+     * picked based on the status of scaleToFill
+     * @param imageFilePath the path to the image
+     * @param preferredOutputPath the url where the image will be saved
+     * @param format the format for the image either FORMAT_JPEG or FORMAT_PNG
+     * @param width the desired width, either width or height will be respected based on aspect dimensions 
+     * @param height the desired height, either width or height will be respected based on aspect dimensions
+     * @param quality the quality for JPEG scaling
+     * @param onlyDownscale will not scale if the resolution to scale will be higher in this case will return the imageFilePath
+     * @param scaleToFill when set to true will pick the larger value so the resulting image will be at least as big as width x height, when set to false
+     * will create an image that is no bigger than width x height
+     * @return the url for the scaled image or the url of the unscaled image
+     * @throws IOException if the operation fails
+     */
+    public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException{
+        Dimension d = getImageSize(imageFilePath);
+        if(onlyDownscale) {
+            if(scaleToFill) {
+                if(d.getHeight() <= height || d.getWidth() <= width) {
+                    return imageFilePath;
+                }
+            } else {
+                if(d.getHeight() <= height && d.getWidth() <= width) {
+                    return imageFilePath;
+                }
+            }
+        }
+        
+        float ratio = ((float)d.getWidth()) / ((float)d.getHeight());
+        int heightBasedOnWidth = (int)(((float)width) / ratio);
+        int widthBasedOnHeight = (int)(((float)height) * ratio);
+        if(scaleToFill) {
+            if(heightBasedOnWidth >= width) {
+                height = heightBasedOnWidth;
+            } else {
+                width = widthBasedOnHeight;
+            }
+        } else {
+            if(heightBasedOnWidth > width) {
+                width = widthBasedOnHeight;
+            } else {
+                height = heightBasedOnWidth;
+            }
+        }
+        OutputStream im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
+        save(imageFilePath, im, format, width, height, quality);
+        return preferredOutputPath;
+    }
+    
     /**
      * Saves an image object to the given format
      * 

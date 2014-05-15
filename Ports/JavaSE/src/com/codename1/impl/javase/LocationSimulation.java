@@ -8,6 +8,7 @@ package com.codename1.impl.javase;
 import java.awt.BorderLayout;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.prefs.Preferences;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -123,6 +124,9 @@ public class LocationSimulation extends javax.swing.JFrame {
                                                 String[] ccs = cc.split(",");
                                                 double newlat = Double.parseDouble(ccs[0].trim());
                                                 double newlon = Double.parseDouble(ccs[1].trim());
+                                                Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+                                                p.putDouble("lastGoodLat", newlat);
+                                                p.putDouble("lastGoodLon", newlon);
                                                 lang.setText("" + newlat);
                                                 longi.setText("" + newlon);
                                             } catch (ClassCastException cce) {

@@ -31,6 +31,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.prefs.Preferences;
 
 /**
  *
@@ -46,8 +47,11 @@ class StubLocationManager extends LocationManager {
 
     private StubLocationManager() {
         //new york
-        loc.setLongitude(-74.005973);
-        loc.setLatitude(40.714353);
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        double lat = p.getDouble("lastGoodLat", 40.714353);
+        double lon = p.getDouble("lastGoodLon", -74.005973);
+        loc.setLongitude(lon);
+        loc.setLatitude(lat);
     }
 
     public static LocationManager getLocationManager() {
@@ -120,12 +124,15 @@ class StubLocationManager extends LocationManager {
 
     @Override
     public int getStatus() {
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         if (JavaSEPort.locSimulation != null) {
             int s = JavaSEPort.locSimulation.getState();
             setStatus(s);
+            p.putInt("lastGoodLocationStat", s);
             return s;
+        } else {
+            return p.getInt("lastGoodLocationStat" ,super.getStatus());
         }
-        return super.getStatus();
     }
 
 }

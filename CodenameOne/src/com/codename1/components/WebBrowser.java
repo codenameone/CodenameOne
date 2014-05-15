@@ -62,130 +62,138 @@ public class WebBrowser extends Container {
      */
     public WebBrowser() {
         super(new BorderLayout());
-        if (BrowserComponent.isNativeBrowserSupported()) {
-            isNative = true;
-            BrowserComponent b = new BrowserComponent();
-            b.addWebEventListener("onStart", new ActionListener() {
+        try {
+            if (BrowserComponent.isNativeBrowserSupported()) {
+                isNative = true;
+                BrowserComponent b = new BrowserComponent();
+                b.addWebEventListener("onStart", new ActionListener() {
 
-                public void actionPerformed(ActionEvent evt) {
-                    onStart((String) evt.getSource());
-                }
-            });
-
-            b.addWebEventListener("onLoad", new ActionListener() {
-
-                public void actionPerformed(ActionEvent evt) {
-                    onLoad((String) evt.getSource());
-                }
-            });
-            b.addWebEventListener("onError", new ActionListener() {
-
-                public void actionPerformed(ActionEvent evt) {
-                    onError((String) evt.getSource(), evt.getKeyEvent());
-                }
-            });
-            internal = b;
-        } else {
-            isNative = false;
-            HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
-
-                protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
-                        final IOCallback callback, final Object[] response) {
-                    return new ConnectionRequest() {
-
-                        protected void buildRequestBody(OutputStream os) throws IOException {
-                            if (isPost()) {
-                                if (docInfo.getParams() != null) {
-                                    String enc = docInfo.getEncoding();
-                                    if(enc.indexOf('/') > -1) {
-                                        if(enc.indexOf("charset=") > -1) {
-                                            enc = enc.substring(enc.indexOf("charset=") + 8);
-                                        } else {
-                                            enc = DocumentInfo.ENCODING_UTF8;
-                                        }
-                                    }
-                                    OutputStreamWriter w = new OutputStreamWriter(os, enc);
-                                    w.write(docInfo.getParams());
-                                    w.flush();
-                                }
-                            }
-                        }
-
-                        protected void handleIOException(IOException err) {
-                            if (callback == null) {
-                                response[0] = err;
-                            }
-                            super.handleIOException(err);
-                        }
-
-                        protected boolean shouldAutoCloseResponse() {
-                            return callback != null;
-                        }
-
-                        protected void readResponse(InputStream input) throws IOException {
-                            if (callback != null) {
-                                callback.streamReady(input, docInfo);
-                            } else {
-                                response[0] = input;
-                                synchronized (LOCK) {
-                                    LOCK.notify();
-                                }
-                            }
-                        }
-
-                        protected void handleErrorResponseCode(int code, String message) {
-                            onError(message, code);
-                        }
-
-                        protected void handleException(Exception err) {
-                            System.out.println("Error occured");
-                            err.printStackTrace();
-                            if(loading != null){
-                                loading.unInstall();
-                            }
-                        }
-
-                        public boolean onRedirect(String url) {
-                            onStart(url);
-                            if(((HTMLComponent)internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED){
-                                return true;
-                            }
-                            return super.onRedirect(url);                            
-                        }
-                        
-                        
-                    };
-
-                }
-            });
-            h.setIgnoreCSS(true);
-            h.setHTMLCallback(new DefaultHTMLCallback() {
-                                
-                public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
-                    Form f = htmlC.getComponentForm();
-                    if(f != null){
-                        if(status == STATUS_REQUESTED || (loading == null && status == STATUS_CONNECTED)){
-                            loading = new Loading(f);
-                            loading.install();
-                        }else{
-                            if(loading != null && ( status == STATUS_DISPLAYED || 
-                                    status == STATUS_ERROR || status == STATUS_CANCELLED)){
-                                loading.unInstall();
-                            }
-                        }
+                    public void actionPerformed(ActionEvent evt) {
+                        onStart((String) evt.getSource());
                     }
-                    if (status == STATUS_REQUESTED && url != null) {
-                        onStart(url);
-                    } else if (status == STATUS_DISPLAYED && url != null) {
-                        onLoad(url);
-                    } else if (status == STATUS_ERROR) {
-                        onError("error on page", -1);
-                    }
-                }
-            });
+                });
 
-            internal = h;
+                b.addWebEventListener("onLoad", new ActionListener() {
+
+                    public void actionPerformed(ActionEvent evt) {
+                        onLoad((String) evt.getSource());
+                    }
+                });
+                b.addWebEventListener("onError", new ActionListener() {
+
+                    public void actionPerformed(ActionEvent evt) {
+                        onError((String) evt.getSource(), evt.getKeyEvent());
+                    }
+                });
+                internal = b;
+                addComponent(BorderLayout.CENTER, internal);
+                return;
+            } 
+        } catch(Throwable t) {
+            // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
+            t.printStackTrace();
         }
+        
+        isNative = false;
+        HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
+
+            protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
+                    final IOCallback callback, final Object[] response) {
+                return new ConnectionRequest() {
+
+                    protected void buildRequestBody(OutputStream os) throws IOException {
+                        if (isPost()) {
+                            if (docInfo.getParams() != null) {
+                                String enc = docInfo.getEncoding();
+                                if(enc.indexOf('/') > -1) {
+                                    if(enc.indexOf("charset=") > -1) {
+                                        enc = enc.substring(enc.indexOf("charset=") + 8);
+                                    } else {
+                                        enc = DocumentInfo.ENCODING_UTF8;
+                                    }
+                                }
+                                OutputStreamWriter w = new OutputStreamWriter(os, enc);
+                                w.write(docInfo.getParams());
+                                w.flush();
+                            }
+                        }
+                    }
+
+                    protected void handleIOException(IOException err) {
+                        if (callback == null) {
+                            response[0] = err;
+                        }
+                        super.handleIOException(err);
+                    }
+
+                    protected boolean shouldAutoCloseResponse() {
+                        return callback != null;
+                    }
+
+                    protected void readResponse(InputStream input) throws IOException {
+                        if (callback != null) {
+                            callback.streamReady(input, docInfo);
+                        } else {
+                            response[0] = input;
+                            synchronized (LOCK) {
+                                LOCK.notify();
+                            }
+                        }
+                    }
+
+                    protected void handleErrorResponseCode(int code, String message) {
+                        onError(message, code);
+                    }
+
+                    protected void handleException(Exception err) {
+                        System.out.println("Error occured");
+                        err.printStackTrace();
+                        if(loading != null){
+                            loading.unInstall();
+                        }
+                    }
+
+                    public boolean onRedirect(String url) {
+                        onStart(url);
+                        if(((HTMLComponent)internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED){
+                            return true;
+                        }
+                        return super.onRedirect(url);                            
+                    }
+
+
+                };
+
+            }
+        });
+        h.setIgnoreCSS(true);
+        h.setHTMLCallback(new DefaultHTMLCallback() {
+
+            public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
+                Form f = htmlC.getComponentForm();
+                if(f != null){
+                    if(status == STATUS_REQUESTED || (loading == null && status == STATUS_CONNECTED)){
+                        loading = new Loading(f);
+                        loading.install();
+                    }else{
+                        if(loading != null && ( status == STATUS_DISPLAYED || 
+                                status == STATUS_ERROR || status == STATUS_CANCELLED)){
+                            loading.unInstall();
+                        }
+                    }
+                }
+                if (status == STATUS_REQUESTED && url != null) {
+                    onStart(url);
+                } else if (status == STATUS_DISPLAYED && url != null) {
+                    onLoad(url);
+                } else if (status == STATUS_ERROR) {
+                    onError("error on page", -1);
+                }
+            }
+        });
+
+        internal = h;
+
         addComponent(BorderLayout.CENTER, internal);
     }
 

@@ -3430,6 +3430,9 @@ public final class Display {
      * @return code scanner instance
      */
     public CodeScanner getCodeScanner() {
+        if(!hasCamera()) {
+            return null;
+        }
         return impl.getCodeScanner();
     }
  

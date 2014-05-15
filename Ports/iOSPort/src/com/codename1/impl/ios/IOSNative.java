@@ -321,6 +321,7 @@ public final class IOSNative {
     native void registerPush();
 
     native void deregisterPush();
+    native void setBadgeNumber(int number);
 
     native long createImageFile(long imagePeer, boolean jpeg, int width, int height, float quality);
     native int getNSDataSize(long nsData);
