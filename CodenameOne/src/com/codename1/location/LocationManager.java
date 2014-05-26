@@ -197,4 +197,20 @@ public abstract class LocationManager {
      */
     protected abstract void clearListener();
     
+    /**
+     * Returns true if the platform is able to detect if the GPS is on or off.
+     * see also isGPSEnabled()
+     * @return true if platform is able to detect GPS on/off
+     */ 
+    public boolean isGPSDetectionSupported(){
+        return false;
+    }
+    
+    /**
+     * Returns GPS on/off state if isGPSDetectionSupported() returns true
+     * @return true if GPS is on
+     */ 
+    public boolean isGPSEnabled(){
+        throw new RuntimeException("GPS Detection is not supported");
+    }
 }

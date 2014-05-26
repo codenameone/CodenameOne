@@ -99,4 +99,21 @@ public class FacebookConnect {
     public void logout() {
         throw new RuntimeException("Native facebook unsupported");
     }
+    
+    /**
+     * Asks for publish permissions, this call might suspend the application which might 
+     * trigger repeated invocations of stop()/start().
+     */ 
+    public void askPublishPermissions(LoginCallback lc){
+        throw new RuntimeException("Native facebook unsupported");
+    }
+    
+    /**
+     * Returns true if the current session already has publish permissions
+     * @return 
+     */
+    public boolean hasPublishPermissions(){
+        throw new RuntimeException("Native facebook unsupported");    
+    }
+    
 }
