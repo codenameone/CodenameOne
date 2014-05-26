@@ -80,24 +80,24 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             enabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
             if (provider != null && enabled) {
                 providerName = provider.getName();
-            }else {
+            } else {
                 providerName = locationManager.getBestProvider(criteria, true);
             }
         }
-        
+
         if (providerName == null) {
             // If GPS provider, then create and start GPS listener
             provider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
             enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
             if (provider != null && enabled) {
                 providerName = provider.getName();
-            } 
+            }
         }
         return providerName;
     }
 
     public Location getCurrentLocation() throws IOException {
-        if(lastLocation != null){
+        if (lastLocation != null) {
             return lastLocation;
         }
         try {
@@ -106,7 +106,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             if (location != null) {
                 return convert(location);
             }
-        } catch(Exception err) {
+        } catch (Exception err) {
             err.printStackTrace();
             throw new IOException(err);
         }
@@ -252,7 +252,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     }
 
     private void setLocationManagerStatus(final int status) {
-        
+
         int current = getStatus();
         if (current != status) {
             setStatus(status);
@@ -271,4 +271,13 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
         }
     }
+
+    public boolean isGPSDetectionSupported() {
+        return true;
+    }
+
+    public boolean isGPSEnabled() {
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
 }
