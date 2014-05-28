@@ -45,6 +45,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
@@ -145,6 +146,8 @@ public class ImageDownloadService extends ConnectionRequest {
     private Image placeholder;
     private static boolean defaultMaintainAspectRatio;
     private boolean maintainAspectRatio = defaultMaintainAspectRatio;
+   
+    private static EventDispatcher onErrorListeners;
     
     /**
      * This method is invoked when an image finished downloading and should be set to an offset in the list
@@ -377,6 +380,54 @@ public class ImageDownloadService extends ConnectionRequest {
         i.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(i);
     }
+    
+    /**
+     * @inheritDoc
+     */
+    protected void handleException(Exception err) {
+        if(onErrorListeners != null) {
+            NetworkEvent ne = new NetworkEvent(this, err);
+            onErrorListeners.fireActionEvent(ne);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected void handleErrorResponseCode(int code, String message) {
+        if(onErrorListeners != null) {
+            NetworkEvent ne = new NetworkEvent(this, code, message);
+            onErrorListeners.fireActionEvent(ne);
+        }
+    }
+    
+    /**
+     * Binds an error listener that will fire an instance of NetworkEvent with an error
+     * for a specific fetch operation if applicable
+     * @param listener the listener
+     */
+    public static void addErrorListener(ActionListener listener) {
+        if(onErrorListeners == null) {
+            onErrorListeners = new EventDispatcher();
+        }
+        onErrorListeners.addListener(listener);
+    }
+    
+    /**
+     * Unbinds an error listener that will fire an instance of NetworkEvent with an error
+     * for a specific fetch operation if applicable
+     * @param listener the listener
+     */
+    public static void removeErrorListener(ActionListener listener) {
+        if(onErrorListeners == null) {
+            return;
+        }
+        onErrorListeners.removeListener(listener);
+        if(!onErrorListeners.hasListeners()) {
+            onErrorListeners = null;
+        }
+    }
+    
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives, it will cache the file locally as a file

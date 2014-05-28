@@ -250,16 +250,16 @@ public class Command implements ActionListener{
     }
 
     /**
-     * Indicates whether this command causes the dialog to dispose implicitly
+     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
      */
-    void setDisposesDialog(boolean disposesDialog) {
+    public void setDisposesDialog(boolean disposesDialog) {
         this.disposesDialog = disposesDialog;
     }
     
     /**
-     * Indicates whether this command causes the dialog to dispose implicitly
+     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
      */
-    boolean isDisposesDialog() {
+    public boolean isDisposesDialog() {
         return disposesDialog;
     }
 

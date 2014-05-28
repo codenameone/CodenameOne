@@ -779,7 +779,7 @@ public class ConnectionRequest implements IOProgressListener {
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();
                 Object requestVal = requestArguments.get(key);
-                if(requestVal instanceof String[]) {
+                if(Util.instanceofObjArray(requestVal)) {
                     String[] val = (String[])requestVal;
                     for(int iter = 0 ; iter < val.length - 1; iter++) {
                         b.append(key);
