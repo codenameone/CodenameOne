@@ -705,9 +705,13 @@ public final class Display {
      * the paint and key handling events
      */
     public void callSerially(Runnable r){
-        synchronized(lock) {
-            pendingSerialCalls.add(r);
-            lock.notifyAll();
+        if(codenameOneRunning) {
+            synchronized(lock) {
+                pendingSerialCalls.add(r);
+                lock.notifyAll();
+            }
+        } else {
+            r.run();
         }
     }
 

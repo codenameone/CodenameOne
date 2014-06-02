@@ -779,26 +779,26 @@ public class ConnectionRequest implements IOProgressListener {
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();
                 Object requestVal = requestArguments.get(key);
-                if(Util.instanceofObjArray(requestVal)) {
-                    String[] val = (String[])requestVal;
-                    for(int iter = 0 ; iter < val.length - 1; iter++) {
-                        b.append(key);
-                        b.append("=");
-                        b.append(val[iter]);
-                        b.append("&");
-                    }
+                if(requestVal instanceof String) {
+                    String value = (String)requestVal;
                     b.append(key);
                     b.append("=");
-                    b.append(val[val.length - 1]);
+                    b.append(value);
                     if(e.hasMoreElements()) {
                         b.append("&");
                     }
                     continue;
                 }
-                String value = (String)requestVal;
+                String[] val = (String[])requestVal;
+                for(int iter = 0 ; iter < val.length - 1; iter++) {
+                    b.append(key);
+                    b.append("=");
+                    b.append(val[iter]);
+                    b.append("&");
+                }
                 b.append(key);
                 b.append("=");
-                b.append(value);
+                b.append(val[val.length - 1]);
                 if(e.hasMoreElements()) {
                     b.append("&");
                 }
@@ -821,26 +821,26 @@ public class ConnectionRequest implements IOProgressListener {
             while(e.hasMoreElements()) {
                 String key = (String)e.nextElement();
                 Object requestVal = requestArguments.get(key);
-                if(requestVal instanceof String[]) {
-                    String[] valArray = (String[])requestVal;
-                    for(int iter = 0 ; iter < valArray.length - 1; iter++) {
-                        val.append(key);
-                        val.append("=");
-                        val.append(valArray[iter]);
-                        val.append("&");
-                    }
+                if(requestVal instanceof String) {
+                    String value = (String)requestVal;
                     val.append(key);
                     val.append("=");
-                    val.append(valArray[valArray.length - 1]);
+                    val.append(value);
                     if(e.hasMoreElements()) {
                         val.append("&");
                     }
                     continue;
                 }
-                String value = (String)requestVal;
+                String[] valArray = (String[])requestVal;
+                for(int iter = 0 ; iter < valArray.length - 1; iter++) {
+                    val.append(key);
+                    val.append("=");
+                    val.append(valArray[iter]);
+                    val.append("&");
+                }
                 val.append(key);
                 val.append("=");
-                val.append(value);
+                val.append(valArray[valArray.length - 1]);
                 if(e.hasMoreElements()) {
                     val.append("&");
                 }

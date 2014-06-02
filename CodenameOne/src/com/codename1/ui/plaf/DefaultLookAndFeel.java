@@ -1545,7 +1545,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             cmp.getComponentForm().registerAnimated(new Animation() {
 
                 int counter = 0;
-                Image i = Resources.getSystemResource().getImage("refresh-icon.png");
+                Image i;
+                
+                {
+                    i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
+                    if(i == null) {
+                        i = Resources.getSystemResource().getImage("refresh-icon.png");
+                    }
+                }
  
                 public boolean animate() {
                     counter++;
