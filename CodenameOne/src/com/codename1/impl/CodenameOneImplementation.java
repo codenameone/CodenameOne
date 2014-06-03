@@ -1219,7 +1219,9 @@ public abstract class CodenameOneImplementation {
      * by {@link #popClip}.
      * @param graphics The native graphics context.
      */
-    public abstract void pushClip(Object graphics);
+    public void pushClip(Object graphics){
+        
+    }
     
     
     
@@ -1229,7 +1231,11 @@ public abstract class CodenameOneImplementation {
      * @param graphics The native graphics context.
      * @return The clip that was popped off the top of the clip stack.
      */
-    public abstract Shape popClip(Object graphics);
+    public Shape popClip(Object graphics){
+        // NOt implemented yet... need to implement.
+        
+        return null;
+    }
     
     
     // ----- END CLIP STACK METHODS
