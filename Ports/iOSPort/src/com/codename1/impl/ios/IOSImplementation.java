@@ -39,7 +39,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
-import java.io.ByteArrayInputStream;
 import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
@@ -51,7 +50,6 @@ import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
-import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -65,10 +63,7 @@ import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.io.Writer;
-import java.text.DateFormat;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -88,6 +83,7 @@ import com.codename1.ui.geom.Matrix;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
+import com.codename1.util.StringUtil;
 import java.io.ByteArrayOutputStream;
 
 /**
@@ -1811,7 +1807,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean locationUpdating;
 
         protected void finalize() throws Throwable {
-            super.finalize();
+            //super.finalize();
             if(peer != 0) {
                 nativeInstance.releasePeer(peer);
             }
@@ -3969,20 +3965,26 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setBrowserPage(PeerComponent browserPeer, String html, String baseUrl) {
         if(baseUrl != null && baseUrl.startsWith("jar://")) {
-            baseUrl = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + baseUrl.substring(6);
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            baseUrl = "file://localhost" + str + baseUrl.substring(6);
         }
         nativeInstance.setBrowserPage(get(browserPeer), html, baseUrl);
     }
 
     @Override
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
+        if(key.equalsIgnoreCase("useragent")) {
+            nativeInstance.setBrowserUserAgent(datePickerResult, (String)value);
+            return;
+        }
     }
 
     @Override
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         url = unfile(url);
         if(url.startsWith("jar://")) {
-            url = "file://localhost" + nativeInstance.getResourcesDir().replace(" ", "%20") + url.substring(6);
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            url = "file://localhost" + str + url.substring(6);
         } 
         nativeInstance.setBrowserURL(get(browserPeer), url);
     }
@@ -4504,11 +4506,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         // iOS has a bug where it concates identical headers using a comma
         // but since cookies use a comma in their expires header we need to 
         // join them back together...
-        String[] tokenized = s.split(",");
-        if(tokenized.length > 1) {
+        List<String> stringList = StringUtil.tokenize(s, ",");
+        if(stringList.size() > 1) {
             List<String> result = new ArrayList<String>();
             String loaded = null;
-            for(String current : tokenized) {
+            for(String current : stringList) {
                 if(loaded != null) {
                     result.add(loaded + current);
                     loaded = null;
@@ -4526,7 +4528,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             result.toArray(resultArr);
             return resultArr;
         }
-        return tokenized;
+        String[] resultArr = new String[stringList.size()];
+        stringList.toArray(resultArr);
+        return resultArr;
     }
 
     /**
@@ -4668,6 +4672,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     private String unfile(String file) {
         if(file.startsWith("file:/")) {
             file = file.substring(5);
+            if(file.startsWith("//")) {
+                 file = file.substring(1);
+            }
         }
         return file;
     }
@@ -4690,6 +4697,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
+        file = unfile(file);
         return new BufferedOutputStream(new NSDataOutputStream(file), file);
     }
 
@@ -4697,9 +4705,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
-        if(file.startsWith("file:/")) {
-            file = file.substring(5);
-        }
+        file = unfile(file);
         return new BufferedInputStream(new NSDataInputStream(file), file);
     }
 
@@ -4707,13 +4713,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean exists(String file) {
-        if(file.startsWith("file:")) {
-            int slash = file.indexOf('/');
-            while(file.charAt(slash + 1) == '/') {
-                slash++;
-            }
-            file = file.substring(slash - 1);
-        }
+        file = unfile(file);
         return nativeInstance.fileExists(file);
     }
 
@@ -4721,6 +4721,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void rename(String file, String newName) {
+        file = unfile(file);
         if(newName.indexOf('/') < 0) {
             // good this is a relative filename, prepend file
             if(file.endsWith("/")) {
@@ -5445,6 +5446,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         });
         if(datePickerResult == -1) {
+            // there is no cancel option in the phone device
+            if(!isTablet()) {
+                return currentValue;
+            }
             return null;
         }
         if(type == Display.PICKER_TYPE_STRINGS) {
