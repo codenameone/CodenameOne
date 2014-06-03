@@ -179,6 +179,8 @@ public final class IOSNative {
 
     native void setBrowserURL(long browserPeer, String url);
     
+    native void setBrowserUserAgent(long browserPeer, String ua);
+    
     native void browserBack(long browserPeer);
     native void browserStop(long browserPeer);
 
