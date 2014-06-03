@@ -49,7 +49,10 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Matrix;
+import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayInputStream;
@@ -478,7 +481,7 @@ public abstract class CodenameOneImplementation {
             }
 
             paintOverlay(wrapper);
-
+            Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
             flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
         }
     }
@@ -1154,6 +1157,21 @@ public abstract class CodenameOneImplementation {
         Dimension d = rect.getSize();
         setClip(graphics, rect.getX(), rect.getY(), d.getWidth(), d.getHeight());
     }
+    
+    /*
+    public void setClipShape(Object graphics, Shape shape){
+        if ( shape.isRectangle() ){
+            setClipRect(graphics, (Rectangle)shape);
+        } else {
+            throw new RuntimeException("Only rectangle clips supported in this port");
+        }
+    }
+    
+    public Shape getClipShape(Object graphics){
+        return this.getClipRect(graphics);
+    }
+    */
+   
 
     /**
      * Installs a new clipping rectangle
@@ -1191,6 +1209,30 @@ public abstract class CodenameOneImplementation {
      * @param rect rectangle representing the new clipping area
      */
     public abstract void clipRect(Object graphics, int x, int y, int width, int height);
+    
+    // ----- BEGIN CLIP STACK METHODS ---  ADDED TO HELP SUPPORT TRANSFORMATIONS
+    // in the clip.
+    
+    
+    /**
+     * Pushes the current clip onto the clip stack so that it can be retrieved later
+     * by {@link #popClip}.
+     * @param graphics The native graphics context.
+     */
+    public abstract void pushClip(Object graphics);
+    
+    
+    
+    
+    /**
+     * Pops the clip from the top of the clip stack and sets it as the current clip.
+     * @param graphics The native graphics context.
+     * @return The clip that was popped off the top of the clip stack.
+     */
+    public abstract Shape popClip(Object graphics);
+    
+    
+    // ----- END CLIP STACK METHODS
 
     /**
      * Draws a line between the 2 X/Y coordinates
@@ -1336,6 +1378,222 @@ public abstract class CodenameOneImplementation {
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
     }
     
+    
+    // METHODS FOR DEALING WITH 2-D Paths
+    
+    public Image createImage(Shape shape, Stroke stroke, int color){
+        
+        return null;
+    }
+    
+    
+    
+    /**
+     * Creates a platform-specific alpha mask for a shape.  This is used to cache 
+     * masks in the {@link com.codename1.ui.GeneralPath} class.  On iOS the alpha
+     * mask is an OpenGL texture ID (not a raster of alpha pixels), but other platforms 
+     * may use different representations if they like.
+     * 
+     * <p>The {@link com.codename1.ui.Graphics#drawAlphaMask} method
+     * is used to draw a mask on the graphics context and this will ultimately call {@link #drawAlphaMask}
+     * which can be platform specific also.
+     * </p>
+     * @param shape The shape that will have an alpha mask created.
+     * @param stroke The stroke settings for stroking the outline of the mask.  Leave null to produce a fill 
+     * mask.
+     * @return The platform specific alpha mask object or null if it is not supported or failed.
+     * @see #deleteAlphaMask
+     * @see #drawAlphaMask
+     * @see #isAlphaMaskSupported
+     * @see com.codename1.ui.Graphics#drawAlphaMask 
+     * @see com.codename1.ui.GeneralPath#getAlphaMask
+     */
+    public Object _createAlphaMask(Shape shape, Stroke stroke){
+        return null;
+    }
+    
+    /**
+     * Deletes an alpha mask that was created with {@link #createAlphaMask}.
+     * @param texture The alpha mask to be deleted.
+     * @see #createAlphaMask
+     * @see #isAlphaMaskSupported
+     */
+    public void _deleteAlphaMask(Object texture){}
+    
+    /**
+     * Draws the given alpha mask (created by {@link #createAlphaMask} to the given graphics context.
+     * @param graphics The graphics context to which to draw the alpha mask.
+     * @param mask The mask to be drawn.
+     * @see #createAlphaMask
+     * @see #deleteAlphaMask
+     * @see #isAlphaMaskSupported
+     * @see com.codename1.ui.Graphics#drawAlphaMask 
+     * @see com.codename1.ui.GeneralPath#getAlphaMask
+     */
+    public void _drawAlphaMask(Object graphics, Object mask){}
+    
+    /**
+     * Checks to see if alpha masks are supported.  If alpha masks are supported, then {@link com.codename1.ui.Graphics#drawShape}
+     * will try to first convert the shape to a platform-specific alpha mask (which can be cached) and then draw the alpha mask.
+     * @param graphics The graphics context.
+     * @return True if alpha masks are supported.
+     * @see #createAlphaMask
+     * @see #deleteAlphaMask
+     * @see #drawAlphaMask
+     * @see com.codename1.ui.Graphics#drawAlphaMask 
+     * @see com.codename1.ui.GeneralPath#getAlphaMask
+     */
+    public boolean _isAlphaMaskSupported(Object graphics){
+        return false;
+    }
+    
+    /**
+     * Draws outline of shape on the given graphics context.
+     * <p>The last 4 parameters specify a bounding box for drawing the Shape.  The shape's bounds will
+     * be made to fit this box exactly for drawing.  This allows for resizing the shape on the GPU
+     * if graphics acceleration is supported.</p>
+     * @param graphics the graphics context
+     * @param shape the shape to draw.
+     * @param lineWidth The line width (in pixels)
+     * @param capStyle The cap style.  0=BUTT, 1=ROUND, 2=SQUARE
+     * @param miterStyle The join style.  0=MITER, 1=ROUND, 2=BEVEL
+     * @param miterLimit ??
+     * @param x The x coordinate of the bounding rectangle where shape will be drawn.
+     * @param y The y coordinate of the bounding rectangle where shape will be drawn.
+     * @param w The width of the bounding rectangle where shape will be drawn.
+     * @param h The height of the bounding rectangle where shape will be drawn.
+     * @see isShapeSupported() to determine of the graphics context supports drawing
+     * shapes.
+     */
+    public void drawShape(Object graphics, Shape shape, Stroke stroke){}
+    
+    /**
+     * Fills the given shape in the specified graphics context using the graphics context's 
+     * currently selected color and alpha.
+     * @param graphics
+     * @param shape
+     * @param x
+     * @param y
+     * @param w
+     * @param h 
+     * @see drawShape To learn what x, y, w, and h do.
+     */
+    public void fillShape(Object graphics, Shape shape){}
+    
+    /**
+     * Sets the transformation matrix to be applied to all drawing operations. If 
+     * originX, originY are non-zero, then the the transformation will first be translated
+     * to the origin, then applied, and then translated back.
+     * 
+     * <p>If isTransformSupported() returns false, then this method won't do anything.</p>
+     * <p>If isPerspectiveTransformSupported() returns false, then this method will only 
+     * deal with 2D transformation matrices (i.e. the upper left 3x3 matrix of the provided
+     * transformation matrix.</p>
+     * @param graphics 
+     * @param m The transformation matrix.  Can be 3x3 or 4x4.
+     * @param originX The x-coordinate of the origin for transformations.  
+     * @param originY The y-coordinate of teh origin for transformations.
+     * 
+     * @see isTransformSupported() To check if this graphics context supports transformations.
+     * @see isPerspectiveTransformSupported() To check if this graphics context
+     * supports perspective/3D transformations. 
+     */
+    public void setTransform(Object graphics, Matrix m){
+        
+    }
+    
+    /**
+     * Gets the current transformation matrix.  This will populate the provided 
+     * matrix with the data of the current transformation.
+     * @param graphics
+     * @param m The transformation matrix that will be filled with the current matrix data. (Out parameter)
+     * @see isTransformSupported()
+     * @see isPerspectiveTransformSupported()
+     */
+    public Matrix getTransform(Object graphics){
+        return Matrix.makeIdentity();
+    }
+    
+    /**
+     * Checks if matrix transformations are supported in the provided graphics context.
+     * @param graphics
+     * @return True if matrix transformations are supported by this graphics context.
+     * 
+     * @see setTransform()
+     * @see getTransform()
+     * @see isPerspectiveTransformSupported()
+     */
+    public boolean isTransformSupported(Object graphics){
+        return false;
+    }
+    
+    
+    /*
+    public void matrix2DRotate(Matrix m, float a, float x, float y){
+        
+    }
+    
+    public void matrix3DRotate(Matrix m, float a, float x, float y, float z){
+        
+    }
+    
+    public void matrix2DTranslate(Matrix m, float x, float y){
+        
+    }
+    
+    public void matrix3DTranslate(Matrix m, float x, float y, float z){
+        
+    }
+    
+    public void matrix2DScale(Matrix m, float x, float y){
+        
+    }
+    
+    public void matrix3DScale(Matrix m, float x, float y, float z){
+        
+    }
+    
+    
+    public void matrix3DSetOrtho(Matrix m, float left, float right, float bottom, float top, float near, float far){
+        
+    }
+    
+    public void matrix3DSetPerspective(Matrix m, float fovy, float aspect, float zNear, float zFar){
+        
+    }
+    */
+    
+    
+    /**
+     * Checks if 3d/perspective transformations are supported in the provided graphics context.
+     * @param graphics
+     * @return 
+     * 
+     * @see setTransform()
+     * @see getTransform()
+     * @see isTransformSupported()
+     * 
+     */
+    public boolean isPerspectiveTransformSupported(Object graphics){
+        return false;
+    }
+    
+    
+    
+    
+    /**
+     *  Checks if drawing shapes is supported by the provided graphics context.
+     * @param graphics
+     * @return 
+     * 
+     */
+    public boolean isShapeSupported(Object graphics){
+        return false;
+    }
+    
+
+    // END METHODS FOR DEALING WITH 2-D Paths
+    
     /**
      * Allows an implementation to optimize image tiling rendering logic
      * 
@@ -1409,10 +1667,12 @@ public abstract class CodenameOneImplementation {
         int clipY = getClipY(nativeGraphics);
         int clipWidth = getClipWidth(nativeGraphics);
         int clipHeight = getClipHeight(nativeGraphics);
+        //pushClip(nativeGraphics);
         clipRect(nativeGraphics, x, y, imageWidth, imageHeight);
         if (getClipWidth(nativeGraphics) > 0 && getClipHeight(nativeGraphics) > 0) {
             drawImage(nativeGraphics, img, x - imageX, y - imageY);
         }
+        popClip(nativeGraphics);
         setClip(nativeGraphics, clipX, clipY, clipWidth, clipHeight);
     }
 

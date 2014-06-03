@@ -42,13 +42,13 @@
         x1, y1,
         x2, y2,
     };
-    glEnableClientState(GL_VERTEX_ARRAY);
+    _glEnableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
     GLErrorLog;
-    glDrawArrays(GL_LINES, 0, 2);
+    _glDrawArrays(GL_LINES, 0, 2);
     GLErrorLog;
-    glDisableClientState(GL_VERTEX_ARRAY);
+    _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
 }
 

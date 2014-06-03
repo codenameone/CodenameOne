@@ -47,12 +47,12 @@
     };
     
     GLErrorLog;
-    glVertexPointer(2, GL_FLOAT, 0, vertexes);
-    glEnableClientState(GL_VERTEX_ARRAY);
+    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    _glEnableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    _glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     GLErrorLog;
-    glDisableClientState(GL_VERTEX_ARRAY);
+    _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
 }
 

@@ -1286,6 +1286,7 @@ public class Component implements Animation, StyleListener {
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
         int clipH = g.getClipHeight();
+        //g.pushClip();
         Container parent = getParent();
         int translateX = 0;
         int translateY = 0;
@@ -1324,6 +1325,7 @@ public class Component implements Animation, StyleListener {
         paintGlassImpl(g);
         
         g.setClip(clipX, clipY, clipW, clipH);
+        //g.popClip();
     }
 
     /**

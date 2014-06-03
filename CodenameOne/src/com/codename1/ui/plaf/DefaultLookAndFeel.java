@@ -1151,7 +1151,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-
+        //g.pushClip();
         g.clipRect(x, cy, textSpaceW, ch);
 
         if (l.isTickerRunning()) {
@@ -1166,6 +1166,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int drawnW = drawLabelText(g, l, text, x, y, textSpaceW);
 
         g.setClip(cx, cy, cw, ch);
+        //g.popClip();
 
         return drawnW;
     }
@@ -1359,6 +1360,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             int ch = g.getClipHeight();
             int clipx = ta.getX() + style.getPadding(ta.isRTL(), Component.LEFT);
             int clipw = ta.getWidth() - style.getPadding(ta.isRTL(), Component.LEFT) - style.getPadding(ta.isRTL(), Component.RIGHT);
+            //g.pushClip();
             g.clipRect(clipx, cy, clipw, ch);
 
             switch(ta.getVerticalAlignment()) {
@@ -1373,6 +1375,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     break;
             }
             g.setClip(cx, cy, cw, ch);
+            //g.popClip();
             
         } else {
             drawTextArea(g, ta);

@@ -42,12 +42,12 @@
         x + width, y + height,
         x + 1, y + height,
     };
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    _glEnableClientState(GL_VERTEX_ARRAY);
+    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
     GLErrorLog;
-    glDrawArrays(GL_LINE_LOOP, 0, 4);
+    _glDrawArrays(GL_LINE_LOOP, 0, 4);
     GLErrorLog;
-    glDisableClientState(GL_VERTEX_ARRAY);
+    _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
 }
 

@@ -97,6 +97,11 @@ public final class IOSNative {
 
     native void rotateGlobal(float angle);
     native void rotateGlobal(float angle, int x, int y);
+    /*
+    native void translateGlobal(int x, int y);
+    native int getTranslateXGlobal();
+    native int getTranslateYGlobal();
+    */
 
     native void shearGlobal(float x, float y);
 
@@ -193,8 +198,6 @@ public final class IOSNative {
     native String getBrowserTitle(long browserPeer);
 
     native String getBrowserURL(long browserPeer);
-
-    native void setBrowserUserAgent(long browserPeer, String ua);
     
     native long createVideoComponent(String url);
     native long createVideoComponent(byte[] video);
@@ -410,5 +413,62 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+
+    
+    // Paths
+    native long nativePathStrokerCreate(long consumerOutPtr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+    native void nativePathStrokerCleanup(long ptr);
+    native void nativePathStrokerReset(long ptr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+    native long nativePathStrokerGetConsumer(long ptr);
+    
+    native long nativePathRendererCreate(int pix_boundsX, int pix_boundsY,
+                           int pix_boundsWidth, int pix_boundsHeight,
+                           int windingRule);
+    native void nativePathRendererSetup(int subpixelLgPositionsX, int subpixelLgPositionsY);
+    native void nativePathRendererCleanup(long ptr);
+    native void nativePathRendererReset(long ptr, int pix_boundsX, int pix_boundsY,
+                           int pix_boundsWidth, int pix_boundsHeight,
+                           int windingRule);
+    native void nativePathRendererGetOutputBounds(long ptr, int[] bounds);
+    native long nativePathRendererGetConsumer(long ptr);
+    native long nativePathRendererCreateTexture(long ptr);
+    native int[] nativePathRendererToARGB(long ptr, int color);
+    native void nativeDeleteTexture(long textureID);
+    
+    native void nativePathConsumerMoveTo(long ptr, float x, float y);
+    native void nativePathConsumerLineTo(long ptr, float x, float y);
+    native void nativePathConsumerQuadTo(long ptr, float xc, float yc, float x1, float y1);
+    native void nativePathConsumerCurveTo(long ptr, float xc1, float yc1, float xc2, float yc2, float x1, float y1);
+    native void nativePathConsumerClose(long ptr);
+    native void nativePathConsumerDone(long ptr);
+   
+    
+    native void nativeDrawPath(int color, int alpha, long ptr);
+    native void nativeSetTransform( 
+            float a0, float a1, float a2, float a3, 
+            float b0, float b1, float b2, float b3,
+            float c0, float c1, float c2, float c3,
+            float d0, float d1, float d2, float d3,
+            int originX, int originY
+    );
+    
+    
+    native boolean nativeIsTransformSupportedGlobal();
+    native boolean nativeIsShapeSupportedGlobal();
+    native boolean nativeIsPerspectiveTransformSupportedGlobal();
+    native boolean nativeIsAlphaMaskSupportedGlobal();
+    
+    
+    native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
+    
+    
+    
+    // End paths
+
+    native void setNativeClippingMaskGlobal(long textureName, int x, int y, int width, int height);
+
+    
+
     public native void printStackTraceToStream(Throwable t, Writer o);
+
 }

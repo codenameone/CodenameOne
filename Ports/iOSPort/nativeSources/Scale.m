@@ -37,11 +37,18 @@ float currentScaleY = 1;
 }
 
 -(void)execute {
-    glScalef(x, y, 0);
-    currentScaleX = x;
-    currentScaleY = y;
+#ifdef USE_ES2
+    GLKMatrix4 scale = GLKMatrix4MakeScale(x, y, 0);
+    glSetTransformES2(GLKMatrix4Multiply(glGetTransformES2(), scale));
+    
+#else
+    _glScalef(x, y, 0);
+    
     GLErrorLog;
     [ClipRect updateClipToScale];
+#endif
+    currentScaleX = x;
+    currentScaleY = y;
 }
 
 #ifndef CN1_USE_ARC

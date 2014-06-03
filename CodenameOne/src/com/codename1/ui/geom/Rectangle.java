@@ -29,11 +29,12 @@ package com.codename1.ui.geom;
  * 
  * @author Chen Fishbein
  */
-public class Rectangle {
+public class Rectangle implements Shape {
 
     private int x;
     private int y;
     private Dimension size;
+    private GeneralPath path;
 
     /** 
      * Creates a new instance of Rectangle 
@@ -89,6 +90,7 @@ public class Rectangle {
         this.y = y;
         this.size.setWidth(w);
         this.size.setHeight(h);
+        path = null;
     }
     
     /**
@@ -97,6 +99,7 @@ public class Rectangle {
      */
     public int getWidth() {
         return size.getWidth();
+        
     }
     
     /**
@@ -105,6 +108,7 @@ public class Rectangle {
      */
     public void setWidth(int w) {
         size.setWidth(w);
+        path=null;
     }
 
     /**
@@ -113,6 +117,7 @@ public class Rectangle {
      */
     public void setHeight(int h) {
         size.setHeight(h);
+        path=null;
     }
 
     /**
@@ -164,6 +169,7 @@ public class Rectangle {
      */
     public void setX(int x) {
         this.x = x;
+        path=null;
     }
 
     /**
@@ -173,6 +179,7 @@ public class Rectangle {
      */
     public void setY(int y) {
         this.y = y;
+        path=null;
     }
 
     /**
@@ -411,5 +418,35 @@ public class Rectangle {
                 (tw < tx || tw > rx) &&
                 (th < ty || th > ry));
 
+    }
+
+    public PathIterator getPathIterator(Matrix m) {
+        if ( path == null ){
+            path = new GeneralPath();
+            path.moveTo(x, y);
+            path.lineTo(x+size.getWidth(), y);
+            path.lineTo(x+size.getWidth(), y+size.getHeight());
+            path.lineTo(x, y+size.getHeight());
+            path.closePath();
+            
+        }
+        return path.getPathIterator(m);
+        
+    }
+    
+    public PathIterator getPathIterator(){
+        return getPathIterator(null);
+    }
+
+    public Rectangle getBounds() {
+        return this;
+    }
+    
+    public float[] getBounds2D(){
+        return new float[]{getX(), getY(), getWidth(), getHeight()};
+    }
+    
+    public boolean isRectangle(){
+        return true;
     }
 }

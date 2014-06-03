@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#import "CN1ES2compat.h"
 #import <UIKit/UIKit.h>
 
 #import <OpenGLES/EAGL.h>
@@ -36,10 +37,11 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
-//#define INCLUDE_ZOOZ
+#define NOT_INCLUDE_ZOOZ
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
 #endif
+
 
 //#define INCLUDE_MOPUB
 #ifdef INCLUDE_MOPUB

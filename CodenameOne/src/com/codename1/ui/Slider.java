@@ -307,9 +307,10 @@ public class Slider extends Label {
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
         int clipH = g.getClipHeight();
+        //g.pushClip();
         int width = getWidth();
         int height = getHeight();
-
+        
         int y = getY();
         if(infinite) {
             int blockSize = getWidth() / 5;
@@ -332,6 +333,7 @@ public class Slider extends Label {
         paintingFull = false;
 
         g.setClip(clipX, clipY, clipW, clipH);
+        //g.popClip();
         if(thumbImage != null && !infinite) {
             if(!vertical) {
                 int xPos = getX() + width - thumbImage.getWidth() / 2;

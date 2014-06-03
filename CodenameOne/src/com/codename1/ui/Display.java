@@ -856,6 +856,7 @@ public final class Display {
             }
         }
         ani.paint(codenameOneGraphics);
+        
         impl.flushGraphics();
 
         if(transitionDelay > 0) {

@@ -29,6 +29,9 @@
 #import "DrawLine.h"
 #import "DrawRect.h"
 #import "DrawString.h"
+#import "DrawPath.h"
+#import "DrawTextureAlphaMask.h"
+#import "SetTransform.h"
 #import "DrawImage.h"
 #import "TileImage.h"
 #import "GLUIImage.h"
@@ -45,6 +48,10 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
 #include "com_codename1_ui_Component.h"
+#import "CN1ES2compat.h"
+#ifdef USE_ES2
+#import <GLKit/GLKit.h>
+#endif
 #include "java_lang_System.h"
 
 extern void repaintUI();
@@ -433,6 +440,8 @@ BOOL isIOS7() {
 }
 
 
+
+
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* buffer, int width, int height) {
     size_t bufferLength = width * height * 4;
@@ -444,6 +453,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
     CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
     
     CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB();
+    
     if(colorSpaceRef == NULL) {
         NSLog(@"Error allocating color space");
         CGDataProviderRelease(provider);
@@ -514,6 +524,25 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
     return (BRIDGE_CAST void*) [[GLUIImage alloc] initWithImage:image];
 }
 
+void* Java_com_codename1_impl_ios_createImageFromAlphaMask(JAVA_BYTE* buffer, int width, int height, int color)
+{
+    size_t obufferLength = width * height * 4;
+    size_t obitsPerComponent = 8;
+    size_t obitsPerPixel = 32;
+    size_t obytesPerRow = 4 * width;
+    
+    
+    uint32_t* opixels = (uint32_t*)malloc(obufferLength);
+    
+    
+    size_t ibufferLength = width * height;
+    for ( size_t i=0; i<ibufferLength; i++){
+        opixels[i] = color & (((uint32_t)buffer[i]) << 6);
+    }
+    void* out = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl(opixels, width, height);
+    free(opixels);
+    return out;
+}
 
 void* Java_com_codename1_impl_ios_IOSImplementation_scaleImpl
 (void* peer, int width, int height) {
@@ -656,6 +685,57 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
+}
+
+// START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
+void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl
+(Renderer * renderer, int color, int alpha, int x, int y, int w, int h)
+{
+
+    DrawPath *f = [[DrawPath alloc] initWithArgs:renderer color:color alpha:alpha];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+        // add to pipeline here
+
+}
+
+
+void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h)
+{
+
+    DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+    
+}
+
+// END ES2 ADDITION -------------------------------------------------------------------------------------------------
+void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
+                                                                                                                                                       JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                       JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                       JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                       JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                     JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                   )
+{
+#ifdef USE_ES2
+//    dispatch_async(dispatch_get_main_queue(), ^{
+        GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                      b0,b1,b2,b3,
+                                      c0,c1,c2,c3,
+                                      d0,d1,d2,d3);
+        
+        SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+//    });
 #endif
 }
 
@@ -803,6 +883,17 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
     [f release];
 #endif
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl finished");
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalImpl(JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+{
+#ifdef USE_ES2
+    ClipRect* f = [[ClipRect alloc] initWithArgs:x ypos:y w:w h:h f:0 texture:textureName];
+    [[CodenameOne_GLViewController instance] upcomingAddClip:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
@@ -1182,12 +1273,15 @@ bool lockDrawing;
     }
     sharedSingleton = self;
     [self initVars];
+#ifdef USE_ES2
+    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+#else
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    
+
     if (!aContext) {
         aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
     }
-    
+#endif
     if (!aContext)
         NSLog(@"Failed to create ES context");
     else if (![EAGLContext setCurrentContext:aContext])
@@ -1203,9 +1297,10 @@ bool lockDrawing;
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
     
-    if ([context API] == kEAGLRenderingAPIOpenGLES2)
-        [self loadShaders];
-    
+//    if ([context API] == kEAGLRenderingAPIOpenGLES2)
+//        [self loadShaders];
+        
+
     animating = FALSE;
     animationFrameInterval = 1;
     self.displayLink = nil;
@@ -1305,9 +1400,9 @@ bool lockDrawing;
         
         GLErrorLog;
         
-        glScalef(xScale, -1, 1);
+        _glScalef(xScale, -1, 1);
         GLErrorLog;
-        glTranslatef(0, -he, 0);
+        _glTranslatef(0, -he, 0);
         GLErrorLog;
         
         [dr execute];
@@ -1315,10 +1410,10 @@ bool lockDrawing;
         [gl release];
 #endif
         
-        glTranslatef(0, he, 0);
+        _glTranslatef(0, he, 0);
         GLErrorLog;
         
-        glScalef(xScale, -1, 1);
+        _glScalef(xScale, -1, 1);
         GLErrorLog;
         
         [(EAGLView *)self.view presentFramebuffer];
@@ -1679,9 +1774,9 @@ int keyboardHeight;
         if([currentTarget count] > 0) {
             [ClipRect setDrawRect:rect];
             //NSLog(@"Clipping rect to: %i, %i, %i %i", (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height );
-            glScalef(1, -1, 1);
+            _glScalef(1, -1, 1);
             GLErrorLog;
-            glTranslatef(0, -displayHeight, 0);
+            _glTranslatef(0, -displayHeight, 0);
             GLErrorLog;
             
             /*if(((int)rect.size.width) != displayWidth || ((int)rect.size.height) != displayHeight) {
@@ -1707,9 +1802,9 @@ int keyboardHeight;
 #ifndef CN1_USE_ARC
             [cp release];
 #endif
-            glTranslatef(0, displayHeight, 0);
+        	_glTranslatef(0, displayHeight, 0);
             GLErrorLog;
-            glScalef(1, -1, 1);
+            _glScalef(1, -1, 1);
             GLErrorLog;
             
             [DrawGradientTextureCache flushDeleted];

@@ -20,8 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#import "CN1ES2compat.h"
 #import "ResetAffine.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef USE_ES2
+#import "SetTransform.h"
+#endif
 #include "xmlvm.h"
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
@@ -29,25 +33,40 @@ extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
 extern float currentScaleX;
 extern float currentScaleY;
+//extern int effectiveTranslationX;
+//extern int effectiveTranslationY;
+//extern int currentTranslationX;
+//extern int currentTranslationY;
 
 @implementation ResetAffine
 
 -(id)init {
+#ifdef USE_ES2
+    [SetTransform currentTransform:GLKMatrix4Identity];
+#endif
+    
     return self;
 }
 
 -(void)execute {
-    glLoadIdentity();
+    //_glMatrixMode(GL_PROJECTION);
+    //GLErrorLog;
+#ifdef USE_ES2
+    SetTransform *f = [[SetTransform alloc] initWithArgs:GLKMatrix4Identity originX:0 originY:0];
+    [f execute];
+    [f release];
+#endif
+    _glLoadIdentity();
     GLErrorLog;
-    glOrthof(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), -1, 1);
+    _glOrthof(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), -1, 1);
     GLErrorLog;
-    glMatrixMode(GL_MODELVIEW);
+    _glMatrixMode(GL_MODELVIEW);
     GLErrorLog;
-    glLoadIdentity();
+    _glLoadIdentity();
     GLErrorLog;
-    glScalef(1, -1, 1);
+    _glScalef(1, -1, 1);
     GLErrorLog;
-    glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
+    _glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
     GLErrorLog;
     currentScaleX = 1;
     currentScaleY = 1;

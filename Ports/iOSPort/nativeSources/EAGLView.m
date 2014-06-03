@@ -116,6 +116,7 @@ extern BOOL isRetinaBug();
         GLErrorLog;
         glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
         GLErrorLog;
+
         [context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer *)self.layer];
         GLErrorLog;
         glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &framebufferWidth);
@@ -130,7 +131,42 @@ extern BOOL isRetinaBug();
             NSLog(@"Failed to make complete framebuffer object %x", glCheckFramebufferStatus(GL_FRAMEBUFFER));
         //NSLog(@"Created framebuffer: %i %i", (int)framebufferWidth, (int)framebufferHeight);
         glClearColor(0, 0, 0, 1.0f);
+#if USE_ES2
+        
+        
+        GLuint stencil;
+        glGenRenderbuffersOES(1, &stencil);
+        GLErrorLog;
+        glBindRenderbuffer(GL_RENDERBUFFER_OES, stencil);
+        GLErrorLog;
+        glRenderbufferStorageOES(GL_RENDERBUFFER_OES, GL_STENCIL_INDEX8_OES, framebufferWidth, framebufferHeight);
+        GLErrorLog;
+        glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES, GL_STENCIL_ATTACHMENT_OES,
+                                     GL_RENDERBUFFER_OES, stencil);
+        GLErrorLog;
+        /*
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, framebufferWidth, framebufferHeight);
+        GLErrorLog;
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+        GLErrorLog;
+
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+        */
+         glClearStencil(0x0);
+        GLErrorLog;
+        glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+        GLErrorLog;
+        //glClearStencil(0x1);
+        //GLErrorLog;
+         
+        
+        
+        
+#else
+        
         glClear(GL_COLOR_BUFFER_BIT);
+#endif
+        
     }
 }
 
@@ -182,25 +218,25 @@ extern BOOL isRetinaBug();
         
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         GLErrorLog;
-        glDisable(GL_DEPTH_TEST);
+        _glDisable(GL_DEPTH_TEST);
         GLErrorLog;
         
         glViewport(0, 0, framebufferWidth, framebufferHeight);
         GLErrorLog;
-        glMatrixMode(GL_PROJECTION);
+        _glMatrixMode(GL_PROJECTION);
         GLErrorLog;
-        glLoadIdentity();
+        _glLoadIdentity();
         GLErrorLog;
-        glOrthof(0, framebufferWidth, 0, framebufferHeight, -1, 1);
+        _glOrthof(0, framebufferWidth, 0, framebufferHeight, -1, 1);
         //NSLog(@"glOrtho %i, %i  bounds.size.height: %i", framebufferWidth, framebufferHeight, (int)self.bounds.size.height);
         GLErrorLog;
-        glMatrixMode(GL_MODELVIEW);
+        _glMatrixMode(GL_MODELVIEW);
         GLErrorLog;
-        glLoadIdentity();
+        _glLoadIdentity();
         GLErrorLog;
-        glEnable(GL_BLEND);
+        _glEnable(GL_BLEND);
         GLErrorLog;
-        glDisable(GL_ALPHA_TEST);
+        _glDisable(GL_ALPHA_TEST);
         GLErrorLog;
     }
 }

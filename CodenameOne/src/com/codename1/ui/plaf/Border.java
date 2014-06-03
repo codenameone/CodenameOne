@@ -1238,6 +1238,7 @@ public class Border {
                 int clipY = g.getClipY();
                 int clipWidth = g.getClipWidth();
                 int clipHeight = g.getClipHeight();
+                //g.pushClip();
                 Image topLeft = images[4];
                 Image topRight = images[5];
                 Image bottomLeft = images[6];
@@ -1257,7 +1258,8 @@ public class Border {
                 Image bottomRight = images[7];
 
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
-
+                //g.popClip();
+                //g.pushClip();
                 x = xParameter;
                 y = yParameter;
                 width = widthParameter;
@@ -1274,6 +1276,7 @@ public class Border {
                 drawImageBorderColumnScale(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height);
 
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
+                //g.popClip();
                 break;
             }
             case TYPE_IMAGE_HORIZONTAL: {
@@ -1281,6 +1284,7 @@ public class Border {
                 int clipY = g.getClipY();
                 int clipWidth = g.getClipWidth();
                 int clipHeight = g.getClipHeight();
+                //g.pushClip();
                 Image left = images[0];
                 Image right = images[1];
                 Image center = images[2];
@@ -1299,6 +1303,7 @@ public class Border {
                     g.drawImage(center, xCount, y);
                 }
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
+                //g.popClip();
                 break;
             }
             case TYPE_IMAGE_VERTICAL: {
@@ -1306,6 +1311,7 @@ public class Border {
                 int clipY = g.getClipY();
                 int clipWidth = g.getClipWidth();
                 int clipHeight = g.getClipHeight();
+                //g.pushClip();
                 Image top = images[0];
                 Image bottom = images[1];
                 Image center = images[2];
@@ -1319,6 +1325,7 @@ public class Border {
                     g.drawImage(center, x, yCount);
                 }
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
+                //g.popClip();
                 break;
             }
         }
@@ -1579,36 +1586,44 @@ public class Border {
 
                 if (top != null) {
                     Rectangle clip = saveClip(g);
+                    //g.pushClip();
                     topThickness = top.thickness;
                     g.clipRect(x, y, width, topThickness);
                     top.paint(g, x, y, width, height, c); //top.paint(g, c);
                     restoreClip(g, clip);
+                    //g.popClip();
                 }
 
                 if (bottom != null) {
                     Rectangle clip = saveClip(g);
+                    //g.pushClip();
                     bottomThickness = bottom.thickness;
                     g.clipRect(x, y + height - bottomThickness, width, bottomThickness);
                     bottom.paint(g, x, y, width, height, c); //bottom.paint(g, c);
                     restoreClip(g, clip);
+                    //g.popClip();
                 }
 
                 if ((drawLeft) && (left != null)) {
                     Rectangle clip = saveClip(g);
+                    //g.pushClip();
                     g.clipRect(x, y + topThickness,
                             left.thickness,
                             height - topThickness - bottomThickness);
                     left.paint(g, x, y, width, height, c); //left.paint(g, c);
                     restoreClip(g, clip);
+                    //g.popClip();
                 }
                 if ((drawRight) && (right != null)) {
                     Rectangle clip = saveClip(g);
+                    //g.pushClip();
                     g.clipRect(x + width - right.thickness,
                             y + topThickness,
                             right.thickness,
                             height - topThickness - bottomThickness);
                     right.paint(g, x, y, width, height, c); //right.paint(g, c);
                     restoreClip(g, clip);
+                    //g.popClip();
                 }
                 break;
             case TYPE_IMAGE:
@@ -1653,6 +1668,7 @@ public class Border {
             int cy = g.getClipY();
             int cw = g.getClipWidth();
             int ch = g.getClipHeight();
+            //g.pushClip();
             g.clipRect(currentX, y, currentWidth - left.getWidth(), center.getHeight());
             if(arrow != null) {
                 int destX = currentX + currentWidth;
@@ -1663,6 +1679,7 @@ public class Border {
                 imagePosition = Math.max(imagePosition, left.getWidth());
                 imagePosition = Math.min(imagePosition, destX - x - arrow.getWidth() - right.getWidth());
                 g.setClip(cx, cy, cw, ch);
+                //g.popClip();
                 if(farEdge) {
                     g.drawImage(arrow, x + imagePosition, y + center.getHeight() - arrow.getHeight());
                 } else {
@@ -1670,6 +1687,7 @@ public class Border {
                 }
             } else {
                 g.tileImage(center, currentX, y, currentWidth, center.getHeight());
+                //g.popClip();
             }
         }
     }
@@ -1682,6 +1700,7 @@ public class Border {
             int cy = g.getClipY();
             int cw = g.getClipWidth();
             int ch = g.getClipHeight();
+            //g.pushClip();
             g.clipRect(x, currentY, center.getWidth(), currentHeight - top.getHeight());
             if(arrow != null) {
                 int destY = currentY + currentHeight;
@@ -1692,6 +1711,7 @@ public class Border {
                 imagePosition = Math.max(imagePosition, top.getHeight());
                 imagePosition = Math.min(imagePosition, destY - y - arrow.getHeight() - bottom.getHeight());
                 g.setClip(cx, cy, cw, ch);
+                //g.popClip();
                 if(farEdge) {
                     g.drawImage(arrow, x + center.getWidth() - arrow.getWidth(), y + imagePosition);
                 } else {
@@ -1699,6 +1719,7 @@ public class Border {
                 }
             } else {
                 g.tileImage(center, x, currentY, center.getWidth(), currentHeight);
+                //g.popClip();
             }
         } 
     }

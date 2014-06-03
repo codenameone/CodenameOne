@@ -55,8 +55,9 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
 }
 
 -(void)execute {
-    glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
-    glEnable(GL_TEXTURE_2D);
+    _glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
+    glActiveTexture(GL_TEXTURE0);
+    _glEnable(GL_TEXTURE_2D);
     GLErrorLog;
     int imageWidth = (int)[[img getImage] size].width;
     int imageHeight = (int)[[img getImage] size].height;
@@ -74,31 +75,31 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GLErrorLog;
-    glEnableClientState(GL_VERTEX_ARRAY);
+    _glEnableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    _glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     GLErrorLog;
-    glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
+    _glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
     GLErrorLog;
 
     for (int xPos = 0; xPos <= width; xPos += imageWidth) {
         for (int yPos = 0; yPos < height; yPos += imageHeight) {
             GLfloat* vertexes = createVertexArray(x + xPos, y + yPos, imageWidth, imageHeight);
-            glVertexPointer(2, GL_FLOAT, 0, vertexes);
+            _glVertexPointer(2, GL_FLOAT, 0, vertexes);
             GLErrorLog;
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            _glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
             GLErrorLog;
             free(vertexes);
         }
     }    
     
-    glDisableClientState(GL_VERTEX_ARRAY);
+    _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    _glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    glDisable(GL_TEXTURE_2D);
+    _glDisable(GL_TEXTURE_2D);
     GLErrorLog;
 }
 

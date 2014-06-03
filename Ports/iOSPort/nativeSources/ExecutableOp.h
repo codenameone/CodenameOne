@@ -27,10 +27,10 @@ extern int nextPowerOf2(int val);
 
 #define GLErrorLog logGlErrorAt(__FILE__, __LINE__)
 
-#define GlColorFromRGB(rgbValue,alphaColor) glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
+#define GlColorFromRGB(rgbValue,alphaColor) _glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
 ((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0); GLErrorLog;
 
-#define GlColorFromARGB(rgbValue) glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
+#define GlColorFromARGB(rgbValue) _glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
 ((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, (((rgbValue >> 24) & 0xff) /255.0)); GLErrorLog;
 
 

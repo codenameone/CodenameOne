@@ -45,11 +45,11 @@
     GLuint textureName = [DrawGradientTextureCache checkCache:type startColorA:startColor endColorA:endColor widthA:width heightA:height relativeXA:relativeX relativeYA:relativeY relativeSizeA:relativeSize];
     int p2w = nextPowerOf2(width);
     int p2h = nextPowerOf2(height);
-    glEnableClientState(GL_VERTEX_ARRAY);
+    _glEnableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    _glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     GLErrorLog;
-    glEnable(GL_TEXTURE_2D);
+    _glEnable(GL_TEXTURE_2D);
     GLErrorLog;
     if(textureName == 0) {
         glGenTextures(1, &textureName);
@@ -105,7 +105,7 @@
         free(imageData);
         [DrawGradientTextureCache cache:type startColorA:startColor endColorA:endColor widthA:width heightA:height relativeXA:relativeX relativeYA:relativeY relativeSizeA:relativeSize tA:textureName];
     }    
-    glColor4f(1, 1, 1 ,1);
+    _glColor4f(1, 1, 1 ,1);
     glBindTexture(GL_TEXTURE_2D, textureName);
     GLErrorLog;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -126,22 +126,22 @@
         1, 0,
     };
     
-    glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
+    _glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
     GLErrorLog;
-    glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
     GLErrorLog;
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    _glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     GLErrorLog;
     
-    glDisableClientState(GL_VERTEX_ARRAY);
+    _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    _glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
     //glDisableClientState(GL_NORMAL_ARRAY);
     GLErrorLog;
-    glDisable(GL_TEXTURE_2D);
+    _glDisable(GL_TEXTURE_2D);
     GLErrorLog;
 }
 

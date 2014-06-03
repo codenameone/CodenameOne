@@ -23,7 +23,10 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.geom.Matrix;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
 
 /**
@@ -235,6 +238,22 @@ public final class Graphics {
      */
     public void setClip(int x, int y, int width, int height) {
         impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+    }
+    
+    /**
+     * Pushes the current clip onto the clip stack.  It can later be restored 
+     * using {@link #popClip}.
+     */
+    public void pushClip(){
+        impl.pushClip(nativeGraphics);
+    }
+    
+    /**
+     * Pops the top clip from the clip stack and sets it as the current clip.
+     * @return The shape of the clip that was popped of the stack.
+     */
+    public Shape popClip(){
+        return impl.popClip(nativeGraphics);
     }
 
     /**
@@ -542,7 +561,152 @@ public final class Graphics {
             drawImage(img, x, y);
         }
     }
-
+    
+    
+    //--------------------------------------------------------------------------
+    // START SHAPE DRAWING STUFF
+    //--------------------------------------------------------------------------
+    
+ 
+    /**
+     * Draws a outline shape inside the specified bounding box.  The bounding box will resize the shape to fit in its dimensions.
+     * <p>This is not supported on
+     * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
+     * context supports drawing shapes.</p>
+     * @param shape The shape to be drawn.
+     * 
+     * @see #setStroke
+     * @see #isShapeSupported
+     */
+    public void drawShape(Shape shape, Stroke stroke){
+        if ( xTranslate != 0 || yTranslate != 0 ){
+            GeneralPath p = new GeneralPath();
+            Matrix t = Matrix.makeTranslation(xTranslate, yTranslate, 0);
+            p.append(shape.getPathIterator(t), true);
+            shape = p;
+        }
+        
+        if ( isShapeSupported()){
+            impl.drawShape(nativeGraphics, shape, stroke);
+        }
+       
+    }
+    
+    
+    
+    /**
+     * Fills the given shape using the current alpha and color settings.
+     *  <p>This is not supported on
+     * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
+     * context supports drawing shapes.</p>
+     * @param shape The shape to be filled.
+     * 
+     * @see #isShapeSupported
+     */
+    public void fillShape(Shape shape){
+        if ( xTranslate != 0 || yTranslate != 0 ){
+            GeneralPath p = new GeneralPath();
+            Matrix t = Matrix.makeTranslation(xTranslate, yTranslate, 0);
+            p.append(shape.getPathIterator(t), true);
+            shape = p;
+        }
+        
+        if ( isShapeSupported() ){
+            impl.fillShape(nativeGraphics, shape);
+        }
+    }
+    
+    /**
+     * Checks to see if {@link com.codename1.ui.geom.Matrix} transforms are supported by this graphics context.
+     * @return {@literal true} if this graphics context supports {@link com.codename1.ui.geom.Matrix} transforms. 
+     * <p>Note that this method only confirms that 2D transforms are supported.  If you need to perform 3D 
+     * transformations, you should use the {@link #isPerspectiveTransformSupported} method.</p>
+     * @see #setTransform
+     * @see #getTransform
+     * @see #isPerspectiveTransformSupported
+     */
+    public boolean isTransformSupported(){
+        return impl.isTransformSupported(nativeGraphics);
+    }
+    
+    /**
+     * Checks to see if perspective (3D) {@link com.codename1.ui.geom.Matrix} transforms are supported by this graphics
+     * context.  If 3D transforms are supported, you can use a 4x4 transformation {@link com.codename1.ui.geom.Matrix}
+     * via {@link #setTransform} to perform 3D transforms.
+     * 
+     * <p>Note: It is possible for 3D transforms to not be supported but Affine (2D) 
+     * transforms to be supported.  In this case you would be limited to a 3x3 transformation
+     * matrix in {@link #setTransform}.  You can check for 2D transformation support using the {@link #isTransformSupported} method.</p>
+     * 
+     * @return {@literal true} if Perspective (3D) transforms are supported.  {@literal false} otherwise.
+     * @see #isTransformSupported
+     * @see #setTransform
+     * @see #getTransform
+     */
+    public boolean isPerspectiveTransformSupported(){
+        return impl.isPerspectiveTransformSupported(nativeGraphics);
+    }
+    
+    /**
+     * Checks to see if this graphics context supports drawing shapes (i.e. {@link #drawShape}
+     * and {@link #fillShape} methods. If this returns {@literal false}, and you call {@link #drawShape} or {@link #fillShape}, then
+     * nothing will be drawn.
+     * @return {@literal true} If {@link #drawShape} and {@link #fillShape} are supported.  
+     * @see #drawShape
+     * @see #fillShape
+     */
+    public boolean isShapeSupported(){
+        return impl.isShapeSupported(nativeGraphics);
+    }
+    
+    
+    
+    /**
+     * Sets the transformation {@link com.codename1.ui.geom.Matrix} to apply to drawing in this graphics context.
+     * In order to use this for 2D/Affine transformations you should first check to 
+     * make sure that transforms are supported by calling the {@link #isTransformSupported}
+     * method.  For 3D/Perspective transformations, you should first check to
+     * make sure that 3D/Perspective transformations are supported by calling the 
+     * {@link #isPerspectiveTransformSupported}.
+     * 
+     * <p>Transformations are applied with {@literal (0,0)} as the origin.  So rotations and
+     * scales are anchored at this point on the screen.  You can use a different
+     * anchor point by either embedding it in the transformation matrix (i.e. pre-transform the {@link com.codename1.ui.geom.Matrix} to anchor at a different point)
+     * or use the {@link #setTransform(com.codename1.ui.geom.Matrix,int,int)} variation that allows you to explicitly set the 
+     * anchor point.</p>
+     * @param matrix The transformation {@link com.codename1.ui.geom.Matrix} to use for drawing.  2D/Affine transformations
+     * can be achieved using a 3x3 transformation {@link com.codename1.ui.geom.Matrix}.  3D/Perspective transformations
+     * can be achieved using a 4x3 transformation {@link com.codename1.ui.geom.Matrix}.
+     * 
+     * @see #isTransformSupported
+     * @see #isPerspectiveTransformSupported
+     * @see #setTransform(com.codename1.ui.geom.Matrix,int,int)
+     */
+    public void setTransform(Matrix matrix){
+        if ( isTransformSupported()){
+            impl.setTransform(nativeGraphics, matrix);
+        }
+    }
+    
+    /**
+     * Gets the transformation matrix that is currently applied to this graphics context.
+     * @return The current transformation matrix.
+     * @see #setTransform
+     */
+    public Matrix getTransform(){
+        if ( isTransformSupported() ){
+            return impl.getTransform(nativeGraphics);
+        } else {
+            return Matrix.makeIdentity();
+        }
+        
+    }
+    
+    
+    
+    //--------------------------------------------------------------------------
+    // END SHAPE DRAWING METHODS
+    //--------------------------------------------------------------------------
     /**
      * Draws a filled triangle with the given coordinates
      * 

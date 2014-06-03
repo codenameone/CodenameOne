@@ -182,7 +182,7 @@ class CustomFont extends Font {
         int clipY = g.getClipY();
         int clipWidth = g.getClipWidth();
         int clipHeight = g.getClipHeight();
-
+        //g.pushClip();
         int i = charsets.indexOf(character);
         if(i > -1) {
             initColor(g);
@@ -195,6 +195,7 @@ class CustomFont extends Font {
 
         // restore the clip
         g.setClip(clipX, clipY, clipWidth, clipHeight);
+        //g.popClip();
     }
 
     /**
@@ -238,7 +239,6 @@ class CustomFont extends Font {
         int clipY = g.getClipY();
         int clipWidth = g.getClipWidth();
         int clipHeight = g.getClipHeight();
-
         if(clipY <= y + getHeight() && clipY + clipHeight >= y) {
             char c;
             for ( int i = 0; i < length; i++ ) {
@@ -248,12 +248,15 @@ class CustomFont extends Font {
                     continue;
                 }
                 // draw region is flaky on some devices, use setClip instead
+                //g.pushClip();
                 g.clipRect(x, y, charWidth[position], imageHeight);
                 if(g.getClipWidth() > 0 && g.getClipHeight() > 0) {
                     g.drawImage(cache, x - cutOffsets[position], y);
                 }
                 x += charWidth[position];
+                //g.popClip();
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
+                
             }
         }
     }

@@ -55,6 +55,7 @@ class DatabaseImpl extends Database {
 
     public void finalize() {
         try {
+            super.finalize();
             close();
         } catch(Throwable t) {
         }
@@ -196,6 +197,7 @@ class DatabaseImpl extends Database {
 
         public void finalize() {
             try {
+                super.finalize();
                 close();
             } catch(Throwable t) {
             }

@@ -22,12 +22,21 @@
  */
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
-
+#import "CN1ES2compat.h"
+#ifdef USE_ES2
+#import <GLKit/GLKit.h>
+#endif
 
 @interface Rotate : ExecutableOp {
+#ifdef USE_ES2
+    GLKMatrix4 m;
+    float bar;
+#endif
     int x;
     int y;
     float angle;
+    float foo;
+
 }
 
 -(id)initWithArgs:(float)ang xx:(int)xx yy:(int)yy;
