@@ -1678,7 +1678,7 @@ public abstract class CodenameOneImplementation {
         if (getClipWidth(nativeGraphics) > 0 && getClipHeight(nativeGraphics) > 0) {
             drawImage(nativeGraphics, img, x - imageX, y - imageY);
         }
-        popClip(nativeGraphics);
+        //popClip(nativeGraphics);
         setClip(nativeGraphics, clipX, clipY, clipWidth, clipHeight);
     }
 
