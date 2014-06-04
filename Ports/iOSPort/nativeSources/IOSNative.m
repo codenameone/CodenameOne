@@ -457,7 +457,7 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_
 }
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalImpl(JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h);
-void com_codename1_impl_ios_IOSNative_setNativeClippingMaskGlobal___long_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+void com_codename1_impl_ios_IOSNative_setNativeClippingMaskGlobal___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_boolean]
     POOL_BEGIN();
@@ -4417,12 +4417,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerCreate___long_float_
     
 }
 //native void nativePathStrokerCleanup(long ptr);
-void com_codename1_impl_ios_IOSNative_nativePathStrokerCleanup___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+void com_codename1_impl_ios_IOSNative_nativePathStrokerCleanup___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     Stroker_destroy((Stroker*)ptr);
 }
 //native void nativePathStrokerReset(long ptr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
-void com_codename1_impl_ios_IOSNative_nativePathStrokerReset___long_float_int_int_float(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit)
+void com_codename1_impl_ios_IOSNative_nativePathStrokerReset___long_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit)
 {
     Stroker_reset((Stroker*)ptr, lineWidth, capStyle, joinStyle, miterLimit);
 }
@@ -4453,7 +4453,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_in
     
 }
 //native void nativePathRendererSetup(int subpixelLgPositionsX, int subpixelLgPositionsY);
-void com_codename1_impl_ios_IOSNative_nativePathRendererSetup___int_int(JAVA_OBJECT instanceObject, JAVA_INT subpixelLgPositionsX, JAVA_INT subpixelLgPositionsY)
+void com_codename1_impl_ios_IOSNative_nativePathRendererSetup___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT subpixelLgPositionsX, JAVA_INT subpixelLgPositionsY)
 {
     if ( !rendererIsSetup ){
         rendererIsSetup = YES;
@@ -4462,23 +4462,27 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererSetup___int_int(JAVA_OBJ
     }
 }
 //native void nativePathRendererCleanup(long ptr);
-void com_codename1_impl_ios_IOSNative_nativePathRendererCleanup___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+void com_codename1_impl_ios_IOSNative_nativePathRendererCleanup___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     Renderer_destroy((Renderer*)ptr);
 }
 //native void nativePathRendererReset(long ptr, int pix_boundsX, int pix_boundsY,
 //                                    int pix_boundsWidth, int pix_boundsHeight,
 //                                    int windingRule);
-void com_codename1_impl_ios_IOSNative_nativePathRendererReset___long_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_INT pix_boundsX, JAVA_INT pix_boundsY, JAVA_INT pix_boundsWidth, JAVA_INT pix_boundsHeight, JAVA_INT windingRule)
+void com_codename1_impl_ios_IOSNative_nativePathRendererReset___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_INT pix_boundsX, JAVA_INT pix_boundsY, JAVA_INT pix_boundsWidth, JAVA_INT pix_boundsHeight, JAVA_INT windingRule)
 {
     Renderer_reset((Renderer*)ptr, pix_boundsX, pix_boundsY, pix_boundsWidth, pix_boundsHeight, windingRule);
 }
 //native void nativePathRendererGetOutputBounds(long ptr, int[] bounds);
-void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_OBJECT bounds)
+void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_OBJECT bounds)
 {
     Renderer* renderer = (Renderer*)ptr;
+#ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)bounds;
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)arr->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else 
+    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*) ((JAVA_ARRAY)bounds)->data;
+#endif
     Renderer_getOutputBounds(renderer, iArr);
 }
 //native long nativePathRendererGetConsumer(long ptr);
@@ -4490,37 +4494,37 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long(
 }
 
 //native void nativePathConsumerMoveTo(long ptr, double x, double y);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerMoveTo___long_float_float(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerMoveTo___long_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
 {
     //NSLog(@"In moveTo %g,%g", x,y);
     ((PathConsumer*)ptr)->moveTo((PathConsumer*)ptr,x,y);
     //NSLog(@"Finished moveTo");
 }
 //native void nativePathConsumerLineTo(long ptr, double x, double y);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerLineTo___long_float_float(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerLineTo___long_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
 {
     //NSLog(@"In lineto %g,%g", x, y);
     ((PathConsumer*)ptr)->lineTo((PathConsumer*)ptr, (jfloat)x,(jfloat)y);
 }
 //native void nativePathConsumerQuadTo(long ptr, double xc, double yc, double x1, double y1);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerQuadTo___long_float_float_float_float(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT xc, JAVA_FLOAT yc, JAVA_FLOAT x1, JAVA_FLOAT y1)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerQuadTo___long_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT xc, JAVA_FLOAT yc, JAVA_FLOAT x1, JAVA_FLOAT y1)
 {
     ((PathConsumer*)ptr)->quadTo((PathConsumer*)ptr,(jfloat)xc,(jfloat)yc,(jfloat)x1,(jfloat)y1);
 }
 //native void nativePathConsumerCurveTo(long ptr, double xc1, double yc1, double xc2, double yc2, double x1, double y1);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerCurveTo___long_float_float_float_float_float_float(JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT xc1, JAVA_FLOAT yc1, JAVA_FLOAT xc2, JAVA_FLOAT yc2, JAVA_FLOAT x1, JAVA_FLOAT y1)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerCurveTo___long_float_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT xc1, JAVA_FLOAT yc1, JAVA_FLOAT xc2, JAVA_FLOAT yc2, JAVA_FLOAT x1, JAVA_FLOAT y1)
 {
     ((PathConsumer*)ptr)->curveTo((PathConsumer*)ptr,xc1,yc1,xc2,yc2,x1,y1);
 }
 
 //native void nativePathConsumerClose(long ptr);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerClose___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     //NSLog(@"Closing path");
     ((PathConsumer*)ptr)->closePath((PathConsumer*)ptr);
 }
 //native void nativePathConsumerDone(long ptr);
-void com_codename1_impl_ios_IOSNative_nativePathConsumerDone___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+void com_codename1_impl_ios_IOSNative_nativePathConsumerDone___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     ((PathConsumer*)ptr)->pathDone((PathConsumer*)ptr);
 }
@@ -4528,7 +4532,7 @@ void com_codename1_impl_ios_IOSNative_nativePathConsumerDone___long(JAVA_OBJECT 
 //native void nativeDrawPath(int color, int alpha, long ptr)
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl(Renderer* renderer, int color, int alpha);
 
-void com_codename1_impl_ios_IOSNative_nativeDrawPath___int_int_long(JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_LONG ptr)
+void com_codename1_impl_ios_IOSNative_nativeDrawPath___int_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_LONG ptr)
 {
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl((Renderer*)ptr, color, alpha);
     
@@ -4536,14 +4540,14 @@ void com_codename1_impl_ios_IOSNative_nativeDrawPath___int_int_long(JAVA_OBJECT 
 }
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h);
-void com_codename1_impl_ios_IOSNative_drawTextureAlphaMask___long_int_int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT color, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+void com_codename1_impl_ios_IOSNative_drawTextureAlphaMask___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT color, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
     Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl((GLuint)textureName, color, alpha, x, y, w, h);
     
     
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG textureName)
+void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         GLuint tex = (GLuint)textureName;
@@ -4584,8 +4588,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     };
     
     //jbyte* maskArray = malloc(sizeof(jbyte)*ac.width*ac.height);
+#ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimension(__CLASS_byte, ac.width*ac.height);
-    
+
     //NSLog(@"Mask width %d height %d",
     //      ac.width,
     //      ac.height
@@ -4594,8 +4599,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     Renderer_produceAlphas(renderer, &ac);
     
     org_xmlvm_runtime_XMLVMArray* idata = XMLVMArray_createSingleDimension(__CLASS_int, ac.width*ac.height);
-    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT)idata->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)idata->fields.org_xmlvm_runtime_XMLVMArray.array_;
     JAVA_ARRAY_BYTE* bArr = (JAVA_ARRAY_BYTE*)ac.alphas;
+#else
+    JAVA_OBJECT data = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
+    ac.alphas = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)data)->data;
+
+    Renderer_produceAlphas(renderer, &ac);
+    JAVA_OBJECT idata = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
+    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)((JAVA_ARRAY)idata)->data;
+    JAVA_ARRAY_BYTE* bArr = (JAVA_ARRAY_BYTE*)ac.alphas;
+#endif
     
     JAVA_INT len = ac.width*ac.height;
     for ( JAVA_INT i=0; i<len; i++){
@@ -4727,7 +4741,7 @@ extern void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___fl
                                                                                                                                                                                       JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
                                                                                                                                                                                       JAVA_INT originX, JAVA_INT originY
                                                                                                                                                                                       );
-void com_codename1_impl_ios_IOSNative_nativeSetTransform___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
+void com_codename1_impl_ios_IOSNative_nativeSetTransform___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                    JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
                                                                                                                                                                    JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
                                                                                                                                                                    JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
@@ -4788,47 +4802,47 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 
 // Start Shapes (ES2)
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerCreate___long_float_int_int_float_R_long(JAVA_OBJECT instanceObject, JAVA_LONG consumerOutPtr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit)
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerCreate___long_float_int_int_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG consumerOutPtr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit)
 {
-    return com_codename1_impl_ios_IOSNative_nativePathStrokerCreate___long_float_int_int_float( instanceObject, JAVA_LONG consumerOutPtr,  lineWidth,  capStyle,  joinStyle,  miterLimit);
+    return com_codename1_impl_ios_IOSNative_nativePathStrokerCreate___long_float_int_int_float( instanceObject, consumerOutPtr,  lineWidth,  capStyle,  joinStyle,  miterLimit);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerGetConsumer___long_R_long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerGetConsumer___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     return com_codename1_impl_ios_IOSNative_nativePathStrokerGetConsumer___long( instanceObject,  ptr);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_int_int_int_R_long(JAVA_OBJECT instanceObject, JAVA_INT pix_boundsX, JAVA_INT pix_boundsY, JAVA_INT pix_boundsWidth, JAVA_INT pix_boundsHeight, JAVA_INT windingRule)
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT pix_boundsX, JAVA_INT pix_boundsY, JAVA_INT pix_boundsWidth, JAVA_INT pix_boundsHeight, JAVA_INT windingRule)
 {
     return com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_int_int_int( instanceObject,  pix_boundsX,  pix_boundsY,  pix_boundsWidth,  pix_boundsHeight,  windingRule);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long_R_long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     return com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long(instanceObject, ptr);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int_R_int_1ARRAY(JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int_R_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
     return com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(instanceObject, renderer, color);
 }
 
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long_R_long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
     return com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(instanceObject, renderer);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsTransformSupportedGlobal___R_boolean(JAVA_OBJECT instanceObject){
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsTransformSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject){
     return com_codename1_impl_ios_IOSNative_nativeIsTransformSupportedGlobal__(instanceObject);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsPerspectiveTransformSupportedGlobal___R_boolean(JAVA_OBJECT instanceObject)
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsPerspectiveTransformSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return com_codename1_impl_ios_IOSNative_nativeIsPerspectiveTransformSupportedGlobal__(instanceObject);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsShapeSupportedGlobal___R_boolean(JAVA_OBJECT instanceObject)
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsShapeSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return com_codename1_impl_ios_IOSNative_nativeIsShapeSupportedGlobal__(instanceObject);
 }
@@ -4840,7 +4854,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted___R_boolean(CN1_THREAD_S
     return com_codename1_impl_ios_IOSNative_isPainted__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal___R_boolean(JAVA_OBJECT instanceObject)
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__(instanceObject);
 }

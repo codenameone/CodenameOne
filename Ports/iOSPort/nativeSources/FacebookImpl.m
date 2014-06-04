@@ -28,8 +28,12 @@
 #endif
 #import <UIKit/UIKit.h>
 
+JAVA_BOOLEAN publishPermission = 0;
+
 //#define INCLUDE_FACEBOOK
 #ifdef INCLUDE_FACEBOOK
+#include "com_codename1_social_FacebookConnect.h"
+#include "com_codename1_social_LoginCallback.h"
 #include "com_codename1_social_FacebookImpl.h"
 #import "FBSession.h"
 
@@ -83,6 +87,56 @@ void com_codename1_impl_ios_IOSNative_facebookLogout__(CN1_THREAD_STATE_MULTI_AR
     });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback(JAVA_OBJECT me, JAVA_OBJECT callback) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        FBSession* s = [FBSession activeSession];
+        if(s != nil && s.isOpen) {
+            NSArray *permissions = @[@"publish_actions"];
+            [s requestNewPublishPermissions:permissions
+                            defaultAudience:FBSessionDefaultAudienceEveryone
+                          completionHandler:^(FBSession *session,
+                                              NSError *error) {
+                              if(callback != JAVA_NULL) {
+                                  if(error == nil) {
+                                      (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
+                                      //com_codename1_social_LoginCallback_loginSuccessful__(callback);
+                                      publishPermission = 1;
+                                  } else {
+                                      //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
+                                      (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
+                                  }
+                              }
+                          }];
+        } else {
+            [FBSession openActiveSessionWithPublishPermissions:[NSArray arrayWithObjects:@"publish_actions",
+                                                                nil] defaultAudience:FBSessionDefaultAudienceEveryone allowLoginUI:YES completionHandler:^(FBSession *session,
+                FBSessionState state, NSError *error) {
+                    if(error) {
+                        if(callback != JAVA_NULL) {
+                            //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
+                            (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
+                        }
+                        return;
+                    }
+                    if (FBSession.activeSession.isOpen) {
+                        if(callback != JAVA_NULL) {
+                            (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
+                            //com_codename1_social_LoginCallback_loginSuccessful__(callback);
+                        }
+                        publishPermission = 1;
+                    }
+                }];
+        }
+        POOL_END();
+    });
+    return publishPermission;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions__(JAVA_OBJECT me) {
+    return publishPermission;
+}
+
 #else
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
@@ -97,5 +151,23 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE
 }
 
 void com_codename1_impl_ios_IOSNative_facebookLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback(JAVA_OBJECT me, JAVA_OBJECT callback) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions__(JAVA_OBJECT me) {
+    return 0;
+}
+#endif
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_hasPublishPermissions__(me);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT callback) {
+    return com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback(me, callback);
 }
 #endif

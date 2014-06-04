@@ -26,6 +26,7 @@
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
+//GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
 extern UIView *editingComponent;
@@ -93,10 +94,12 @@ extern UIView *editingComponent;
     JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
 #ifdef NEW_CODENAME_ONE_VM
-    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
+    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else
-    return com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
+    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #endif
+    //FACEBOOK_URL_BIND
+    return b;
 }
 
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
@@ -150,6 +153,7 @@ extern UIView *editingComponent;
      */
     //[self.viewController startAnimation];
     com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    //DELEGATE_applicationDidBecomeActive
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application
