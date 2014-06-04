@@ -435,11 +435,13 @@ public class ConnectionRequest implements IOProgressListener {
             output = null;
             connection = null;
         }
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                postResponse();
-            }
-        });
+        if(!isKilled()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    postResponse();
+                }
+            });
+        }
     }
     
     /**
@@ -697,8 +699,10 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         if(responseCodeListeners != null) {
-            NetworkEvent n = new NetworkEvent(this, code, message);
-            responseCodeListeners.fireActionEvent(n);
+            if(!isKilled()) {
+                NetworkEvent n = new NetworkEvent(this, code, message);
+                responseCodeListeners.fireActionEvent(n);
+            }
             return;
         }
         if(Display.isInitialized() &&
@@ -736,20 +740,33 @@ public class ConnectionRequest implements IOProgressListener {
      * @throws IOException when a read input occurs
      */
     protected void readResponse(InputStream input) throws IOException  {
+        if(isKilled()) {
+            return;
+        }
         if(destinationFile != null) {
             OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
             Util.copy(input, o);
             Util.cleanup(o);
+            
+            // was the download killed while we downloaded
+            if(isKilled()) {
+                FileSystemStorage.getInstance().delete(destinationFile);
+            }
         } else {
             if(destinationStorage != null) {
                 OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
                 Util.copy(input, o);
                 Util.cleanup(o);
+            
+                // was the download killed while we downloaded
+                if(isKilled()) {
+                    Storage.getInstance().deleteStorageFile(destinationStorage);
+                }
             } else {
                 data = Util.readInputStream(input);
             }
         }
-        if(hasResponseListeners()) {
+        if(hasResponseListeners() && !isKilled()) {
             fireResponseListener(new NetworkEvent(this, data));
         }
     }
@@ -1236,7 +1253,9 @@ public class ConnectionRequest implements IOProgressListener {
      * @inheritDoc
      */
     public void ioStreamUpdate(Object source, int bytes) {
-        NetworkManager.getInstance().fireProgressEvent(this, progress, getContentLength(), bytes);
+        if(!isKilled()) {
+            NetworkManager.getInstance().fireProgressEvent(this, progress, getContentLength(), bytes);
+        }
     }
 
     /**

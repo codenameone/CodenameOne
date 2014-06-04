@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
 import com.codename1.payment.Product;
+import com.codename1.social.LoginCallback;
 import java.io.Writer;
 import java.util.Vector;
 
@@ -400,6 +401,9 @@ public final class IOSNative {
     public native boolean isFacebookLoggedIn();
     public native String getFacebookToken();
     public native void facebookLogout();
+    public native boolean askPublishPermissions(LoginCallback lc);    
+    public native boolean hasPublishPermissions();
+        
     
     public native boolean isAsyncEditMode();
     public native void setAsyncEditMode(boolean b);

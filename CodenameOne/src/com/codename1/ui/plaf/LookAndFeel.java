@@ -1323,20 +1323,29 @@ public abstract class LookAndFeel {
                 float aspect = ((float)tensileGlowTopImage.getWidth()) / ((float)Display.getInstance().getDisplayWidth());
                 int newHeight = (int)(((float)tensileGlowTopImage.getHeight()) * aspect);
                 if(top) {
-                    g.drawImage(tensileHighlightTopImage, absX, absY, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
+                    // this is a pull to refresh operation
+                    if(t.isAlwaysTensile()) {
+                        return;
+                    }
+                    g.drawImage(tensileHighlightTopImage, absX, absY, t.getWidth(), tensileHighlightTopImage.getHeight());
                     g.setAlpha(opacity / 3);
-                    g.drawImage(tensileGlowTopImage, absX, absY, Display.getInstance().getDisplayWidth(), newHeight);
+                    g.drawImage(tensileGlowTopImage, absX, absY, t.getWidth(), newHeight);
                     g.setAlpha(a);
                 } else {
-                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - tensileHighlightBottomImage.getHeight()), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());
+                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - tensileHighlightBottomImage.getHeight()), t.getWidth(), tensileHighlightBottomImage.getHeight());
                     g.setAlpha(opacity / 3);
-                    g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() +(t.getHeight() - newHeight), Display.getInstance().getDisplayWidth(), newHeight);
+                    g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() +(t.getHeight() - newHeight), t.getWidth(), newHeight);
                     g.setAlpha(a);
                 }
             } else {
                 int a = g.getAlpha();
                 g.setAlpha(opacity);
                 if(top) {
+                    // this is a pull to refresh operation
+                    if(t.isAlwaysTensile()) {
+                        g.setAlpha(a);
+                        return;
+                    }
                     g.drawImage(tensileHighlightTopImage, absX, absY, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());
                 } else {
                     g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + t.getHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());

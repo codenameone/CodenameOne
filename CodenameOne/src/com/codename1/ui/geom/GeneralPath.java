@@ -27,6 +27,7 @@ import com.codename1.ui.geom.Matrix;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
+import com.codename1.util.MathUtil;
 import java.util.Arrays;
 
 /**
@@ -1091,7 +1092,7 @@ public final class GeneralPath implements Shape {
         double n = - a / 3.0;
 
         if (R2 < Q3) {
-            double t = Math.acos(R / Math.sqrt(Q3)) / 3.0;
+            double t = MathUtil.acos(R / Math.sqrt(Q3)) / 3.0;
             double p = 2.0 * Math.PI / 3.0;
             double m = -2.0 * Math.sqrt(Q);
             res[rc++] = m * Math.cos(t) + n;
@@ -1099,7 +1100,7 @@ public final class GeneralPath implements Shape {
             res[rc++] = m * Math.cos(t - p) + n;
         } else {
 //          Debug.println("R2 >= Q3 (" + R2 + "/" + Q3 + ")");
-            double A = Math.pow(Math.abs(R) + Math.sqrt(R2 - Q3), 1.0 / 3.0);
+            double A = MathUtil.pow(Math.abs(R) + Math.sqrt(R2 - Q3), 1.0 / 3.0);
             if (R > 0.0) {
                 A = -A;
             }

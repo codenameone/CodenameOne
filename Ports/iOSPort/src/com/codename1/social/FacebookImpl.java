@@ -81,4 +81,23 @@ public class FacebookImpl extends FacebookConnect {
     public void logout() {
         nativeInterface.facebookLogout();
     }
+
+    @Override
+    public void askPublishPermissions(final LoginCallback lc){
+        if(!isLoggedIn()) {
+            setCallback(new LoginCallback() {
+                public void loginSuccessful() {
+                    askPublishPermissions(lc);
+                }
+            });
+            login();
+            return;
+        }
+        nativeInterface.askPublishPermissions(lc);
+    }
+    
+    @Override
+    public boolean hasPublishPermissions(){
+        return nativeInterface.hasPublishPermissions();
+    }
 }

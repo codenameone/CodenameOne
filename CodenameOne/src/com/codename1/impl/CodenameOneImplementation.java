@@ -1400,14 +1400,6 @@ public abstract class CodenameOneImplementation {
      * if graphics acceleration is supported.</p>
      * @param graphics the graphics context
      * @param shape the shape to draw.
-     * @param lineWidth The line width (in pixels)
-     * @param capStyle The cap style.  0=BUTT, 1=ROUND, 2=SQUARE
-     * @param miterStyle The join style.  0=MITER, 1=ROUND, 2=BEVEL
-     * @param miterLimit ??
-     * @param x The x coordinate of the bounding rectangle where shape will be drawn.
-     * @param y The y coordinate of the bounding rectangle where shape will be drawn.
-     * @param w The width of the bounding rectangle where shape will be drawn.
-     * @param h The height of the bounding rectangle where shape will be drawn.
      * @see isShapeSupported() to determine of the graphics context supports drawing
      * shapes.
      */
@@ -1418,10 +1410,6 @@ public abstract class CodenameOneImplementation {
      * currently selected color and alpha.
      * @param graphics
      * @param shape
-     * @param x
-     * @param y
-     * @param w
-     * @param h 
      * @see drawShape To learn what x, y, w, and h do.
      */
     public void fillShape(Object graphics, Shape shape){}
@@ -1437,8 +1425,6 @@ public abstract class CodenameOneImplementation {
      * transformation matrix.</p>
      * @param graphics 
      * @param m The transformation matrix.  Can be 3x3 or 4x4.
-     * @param originX The x-coordinate of the origin for transformations.  
-     * @param originY The y-coordinate of teh origin for transformations.
      * 
      * @see isTransformSupported() To check if this graphics context supports transformations.
      * @see isPerspectiveTransformSupported() To check if this graphics context
@@ -1452,7 +1438,6 @@ public abstract class CodenameOneImplementation {
      * Gets the current transformation matrix.  This will populate the provided 
      * matrix with the data of the current transformation.
      * @param graphics
-     * @param m The transformation matrix that will be filled with the current matrix data. (Out parameter)
      * @see isTransformSupported()
      * @see isPerspectiveTransformSupported()
      */

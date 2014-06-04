@@ -151,11 +151,12 @@ public class SideMenuBar extends MenuBar {
      */
     public static void closeCurrentMenu(final Runnable callback) {
         Form f = Display.getInstance().getCurrent();
-        SideMenuBar b = (SideMenuBar) f.getClientProperty("cn1$sideMenuParent");
+        final SideMenuBar b = (SideMenuBar) f.getClientProperty("cn1$sideMenuParent");
         if (b != null && !b.transitionRunning) {
             b.parent.addShowListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     callback.run();
+                    b.parent.removeShowListener(this);
                 }
             });
             b.closeMenu();

@@ -42,6 +42,7 @@ public class AutoCompleteTextField extends TextField {
     private ListCellRenderer completionRenderer;
     private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
     private String pickedText;
+    private int minimumLength;
     
     /**
      * Constructor with completion suggestions
@@ -118,7 +119,7 @@ public class AutoCompleteTextField extends TextField {
         if (f != null && popup.getParent() == null) {
             addPopup();
         }
-        boolean v = filter.getSize() > 0;
+        boolean v = filter.getSize() > 0 && getText().length() > minimumLength;
         if(v != popup.isVisible()) {
             popup.setVisible(v);
             f.repaint();
@@ -142,7 +143,7 @@ public class AutoCompleteTextField extends TextField {
     private boolean filterImpl(String text) {
         boolean res = filter(text);
         if(filter != null && popup != null) {
-            boolean v = filter.getSize() > 0;
+            boolean v = filter.getSize() > 0 && text.length() > minimumLength;
             if(v != popup.isVisible()) {
                 popup.setVisible(v);
                 if(!v) {
@@ -268,6 +269,26 @@ public class AutoCompleteTextField extends TextField {
             }
             f.revalidate();
         }
+    }
+
+    /**
+     * Indicates the minimum length of text in the field in order for a popup to show
+     * the default is 0 where a popup is shown immediately for all text length if the number
+     * is 2 a popup will only appear when there are two characters or more.
+     * @return the minimumLength
+     */
+    public int getMinimumLength() {
+        return minimumLength;
+    }
+
+    /**
+     * Indicates the minimum length of text in the field in order for a popup to show
+     * the default is 0 where a popup is shown immediately for all text length if the number
+     * is 2 a popup will only appear when there are two characters or more.
+     * @param minimumLength the minimumLength to set
+     */
+    public void setMinimumLength(int minimumLength) {
+        this.minimumLength = minimumLength;
     }
 
     class FormPointerListener implements ActionListener {
