@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.ui.geom;
+package com.codename1.impl.ios;
 
 
 
@@ -43,6 +43,13 @@ package com.codename1.ui.geom;
  */
 public final class Matrix {
     
+    public static final int TYPE_UNKNOWN = -1;
+    public static final int TYPE_IDENTITY = 0;
+    public static final int TYPE_TRANSLATION = 1;
+    public static final int TYPE_ROTATION = 2;
+    public static final int TYPE_SCALE = 3;
+    
+    
     public static final int M00=0;
     public static final int M01=4;
     public static final int M02=8;
@@ -60,7 +67,8 @@ public final class Matrix {
     public static final int M32=11;
     public static final int M33=15;
 
-public final float[] data;
+    public final float[] data;
+    private int type = TYPE_UNKNOWN;
     private Factory factory;
 
     public static class Factory {
@@ -83,7 +91,10 @@ public final float[] data;
         }
 
         public Matrix makeIdentity() {
-            return makeMatrix(null);
+            Matrix out = makeMatrix(null);
+            out.factory = this;
+            out.type = TYPE_IDENTITY;
+            return out;
         }
 
         public Matrix makeRotation(float angle, float x, float y, float z) {
@@ -91,6 +102,7 @@ public final float[] data;
             MatrixUtil.setRotateM(m, 0, (float) (angle * 180f / Math.PI), x, y, z);
             Matrix out = makeMatrix(m);
             out.factory = this;
+            out.type = TYPE_ROTATION;
             return out;
         }
         
@@ -99,6 +111,8 @@ public final float[] data;
         public Matrix makeTranslation(float x, float y, float z) {
             Matrix m = makeIdentity();
             MatrixUtil.translateM(m.data, 0, x, y, z);
+            m.factory = this;
+            m.type = TYPE_TRANSLATION;
             return m;
         }
 
@@ -131,6 +145,8 @@ public final float[] data;
         }
     }
 
+    
+    
     public static Matrix make(float[] data) {
         return Factory.getDefault().makeMatrix(data);
     }
@@ -168,14 +184,29 @@ public final float[] data;
         MatrixUtil.setRotateM(factory.sTemp, 0, (float) (a * 180f / Math.PI), x, y, z);
         MatrixUtil.multiplyMM(factory.sTemp, 16, data, 0, factory.sTemp, 0);
         System.arraycopy(factory.sTemp, 16, data, 0, 16);
+        if ( type == TYPE_IDENTITY ){
+            type = TYPE_ROTATION;
+        } else {
+            type = TYPE_UNKNOWN;
+        }
     }
 
     public void translate(float x, float y, float z) {
         MatrixUtil.translateM(data, 0, x, y, z);
+        if ( type == TYPE_IDENTITY || type == TYPE_TRANSLATION ){
+            type = TYPE_TRANSLATION;
+        } else {
+            type = TYPE_UNKNOWN;
+        }
     }
 
     public void scale(float x, float y, float z) {
         MatrixUtil.scaleM(data, 0, x, y, z);
+        if ( type == TYPE_IDENTITY || type == TYPE_SCALE ){
+            type = TYPE_SCALE;
+        } else {
+            type = TYPE_UNKNOWN;
+        }
     }
 
     public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
@@ -216,6 +247,8 @@ public final float[] data;
        
 
     }
+    
+    
 
     public String toString() {
         //StringBuilder sb = new StringBuilder();
@@ -272,6 +305,12 @@ public final float[] data;
         //Log.p("Exiting Matrix constructor");
     }
 
+    public void concatenate(Matrix m){
+        //MatrixUtil.setRotateM(factory.sTemp, 0, (float) (a * 180f / Math.PI), x, y, z);
+        MatrixUtil.multiplyMM(factory.sTemp, 16, data, 0, m.data, 0);
+        System.arraycopy(factory.sTemp, 16, data, 0, 16);
+        type = TYPE_UNKNOWN;
+    }
     /**
      * Resets the transformation to the identify matrix
      */

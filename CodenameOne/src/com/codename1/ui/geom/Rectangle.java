@@ -23,6 +23,8 @@
  */
 package com.codename1.ui.geom;
 
+import com.codename1.ui.Transform;
+
 /**
  * Represents a Rectangle position (x, y) and {@link Dimension} (width, height),
  * this is useful for measuring coordinates within the application.
@@ -420,7 +422,10 @@ public class Rectangle implements Shape {
 
     }
 
-    public PathIterator getPathIterator(Matrix m) {
+    /**
+     * {@inheritDoc}
+     */
+    public PathIterator getPathIterator(Transform m) {
         if ( path == null ){
             path = new GeneralPath();
             path.moveTo(x, y);
@@ -434,18 +439,30 @@ public class Rectangle implements Shape {
         
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public PathIterator getPathIterator(){
         return getPathIterator(null);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public Rectangle getBounds() {
         return this;
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public float[] getBounds2D(){
         return new float[]{getX(), getY(), getWidth(), getHeight()};
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public boolean isRectangle(){
         return true;
     }

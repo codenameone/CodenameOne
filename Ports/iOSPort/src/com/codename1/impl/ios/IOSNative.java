@@ -477,4 +477,12 @@ public final class IOSNative {
 
     public native void printStackTraceToStream(Throwable t, Writer o);
 
+    native void fillConvexPolygonGlobal(float[] points, int color, int alpha);
+
+    native void drawConvexPolygonGlobal(float[] points, int color, int alpha, float lineWidth, int joinStyle, int capStyle, float miterLimit);
+
+    native void setNativeClippingPolygonGlobal(float[] points);
+
+    
+
 }

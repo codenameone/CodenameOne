@@ -22,7 +22,7 @@
  */
 package com.codename1.ui.geom;
 
-import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
 
 /**
  * An interface that can be implemented by any class that wants to be drawable
@@ -40,7 +40,14 @@ public interface Shape {
      * 
      */
     public PathIterator getPathIterator();
-    public PathIterator getPathIterator(Matrix transform);
+    
+    /**
+     * Gets an iterator where all points are transformed by the provided transform.
+     * <p>Note: If {@link com.codename1.ui.Transform#isSupported()} is false, then using this iterator will throw a Runtime Exception.</p>
+     * @param transform
+     * @return A PathIterator where points are transformed by the provided transform.
+     */
+    public PathIterator getPathIterator(Transform transform);
     
     /**
      * Returns the bounding rectangle for the shape.  This should be the smallest rectangle
@@ -48,9 +55,35 @@ public interface Shape {
      * @return A {@link Rectangle} that comprises the bounds of the shape.
      */
     public Rectangle getBounds();
+    
+    /**
+     * Gets the bounds of the shape as a 4-element array representing the (x,y,width,height)
+     * tuple.
+     * @return [x, y, width, height] bounds of this shape. 
+     */
     public float[] getBounds2D();
     
+    /**
+     * Checks if this shape is a rectangle.  A Shape is a rectangle if it is a closed quadrilateral
+     * composed of two vertical lines and two horizontal lines.  If all points have integer coordinates,
+     * and this returns true, then getBounds() should return an equivalent rectangle to the shape itself.
+     * @return True if shape is a rectangle.
+     */
     public boolean isRectangle();
+    
+    /**
+     * Checks if the shape contains the given point.
+     * @param x The x-coordinate of the point to test.
+     * @param y The y-coordinate of the point to test.
+     * @return True if (x, y) is inside the shape.
+     */
     public boolean contains(int x, int y);
+    
+    /**
+     * Returns the shape formed by the intersection of this shape and the provided 
+     * rectangle.
+     * @param rect A rectangle with which to form an intersection.
+     * @return The shape formed by intersecting the current shape with the provided rectangle.
+     */
     public Shape intersection(Rectangle rect);
 }

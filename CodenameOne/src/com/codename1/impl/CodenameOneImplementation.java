@@ -49,8 +49,6 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.geom.Matrix;
-import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
@@ -1392,7 +1390,7 @@ public abstract class CodenameOneImplementation {
         return null;
     }
     
-    
+
     /**
      * Draws outline of shape on the given graphics context.
      * <p>The last 4 parameters specify a bounding box for drawing the Shape.  The shape's bounds will
@@ -1400,6 +1398,7 @@ public abstract class CodenameOneImplementation {
      * if graphics acceleration is supported.</p>
      * @param graphics the graphics context
      * @param shape the shape to draw.
+	 * @param stroke The stroke to use for drawing the contour.
      * @see isShapeSupported() to determine of the graphics context supports drawing
      * shapes.
      */
@@ -1430,7 +1429,7 @@ public abstract class CodenameOneImplementation {
      * @see isPerspectiveTransformSupported() To check if this graphics context
      * supports perspective/3D transformations. 
      */
-    public void setTransform(Object graphics, Matrix m){
+    public void setTransform(Object graphics, Transform transform){
         
     }
     
@@ -1441,8 +1440,8 @@ public abstract class CodenameOneImplementation {
      * @see isTransformSupported()
      * @see isPerspectiveTransformSupported()
      */
-    public Matrix getTransform(Object graphics){
-        return Matrix.makeIdentity();
+    public Transform getTransform(Object graphics){
+        return Transform.makeIdentity();
     }
     
     /**
@@ -1459,40 +1458,6 @@ public abstract class CodenameOneImplementation {
     }
     
     
-    /*
-    public void matrix2DRotate(Matrix m, float a, float x, float y){
-        
-    }
-    
-    public void matrix3DRotate(Matrix m, float a, float x, float y, float z){
-        
-    }
-    
-    public void matrix2DTranslate(Matrix m, float x, float y){
-        
-    }
-    
-    public void matrix3DTranslate(Matrix m, float x, float y, float z){
-        
-    }
-    
-    public void matrix2DScale(Matrix m, float x, float y){
-        
-    }
-    
-    public void matrix3DScale(Matrix m, float x, float y, float z){
-        
-    }
-    
-    
-    public void matrix3DSetOrtho(Matrix m, float left, float right, float bottom, float top, float near, float far){
-        
-    }
-    
-    public void matrix3DSetPerspective(Matrix m, float fovy, float aspect, float zNear, float zFar){
-        
-    }
-    */
     
     
     /**
@@ -4830,6 +4795,253 @@ public abstract class CodenameOneImplementation {
         }
         return packageName;
     }
+
+    // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
+    
+    /**
+     * Checks if the Transform class can be used on this platform.  This is similar to
+     * {@link #isTransformSupported(java.lang.Object)} but it is more general as it only verifies 
+     * that transforms can be performed, but not necessarily that they will be respected
+     * by any particular graphics context.
+     * @return True if this platform supports transforms.
+     * @see #isTransformSupported(java.lang.Object) 
+     */
+    public boolean isTransformSupported(){
+        return false;
+    }
+    
+    /**
+     * Checks of the Transform class can be used on this platform to perform perspective transforms. 
+     *  This is similar to
+     * {@link #isPerspectiveTransformSupported(java.lang.Object)} but it is more general as it only verifies 
+     * that transforms can be performed, but not necessarily that they will be respected
+     * by any particular graphics context.
+     * @return True if this platform supports perspective transforms.
+     */
+    public boolean isPerspectiveTransformSupported(){
+        return false;
+    }
+    
+    /**
+     * Makes a new native translation transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param translateX The x-coordinate of the translation.
+     * @param translateY The y-coordinate of the translation.
+     * @param translateZ The z-coordinate of the translation.
+     * @return A native transform object encapsulating the specified translation.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a new native scale transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param scaleX The x-scale factor of the transform.
+     * @param scaleY The y-scale factor of the transform.
+     * @param scaleZ The z-scale factor of the transform.
+     * @return A native transform object encapsulating the specified scale.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a new native rotation transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param angle The angle to rotate.
+     * @param x The x-component of the vector around which to rotate.
+     * @param y The y-component of the vector around which to rotate.
+     * @param z The z-component of the vector around which to rotate.
+     * @return A native transform object encapsulating the specified rotation.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformRotation(float angle, float x, float y, float z) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a new perspective transform. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
+     * @param fovy The y field of view angle.
+     * @param aspect The aspect ratio.
+     * @param zNear The nearest visible z coordinate.
+     * @param zFar The farthest z coordinate.
+     * @return A native transform object encapsulating the given perspective.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a new orthographic projection transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
+     * @param left x-coordinate that is the left edge of the view.
+     * @param right The x-coordinate that is the right edge of the view.
+     * @param bottom The y-coordinate that is the bottom edge of the view.
+     * @param top The y-coordinate that is the top edge of the view.
+     * @param near The nearest visible z-coordinate.
+     * @param far The farthest visible z-coordinate.
+     * @return A native transform with the provided orthographic projection.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param eyeX The x-coordinate of the camera's eye.
+     * @param eyeY The y-coordinate of the camera's eye.
+     * @param eyeZ The z-coordinate of the camera's eye.
+     * @param centerX The center x coordinate of the view.
+     * @param centerY The center y coordinate of the view.
+     * @param centerZ The center z coordinate of the view.
+     * @param upX The x-coordinate of the up vector for the camera.
+     * @param upY The y-coordinate of the up vector for the camera.
+     * @param upZ The z-coordinate of the up vector for the camera.
+     * @return A native transform with the provided camera's view perspective.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Rotates the provided  transform.
+     * @param nativeTransform The transform to rotate. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param angle The angle to rotate.
+     * @param x The x-coordinate of the vector around which to rotate.
+     * @param y The y-coordinate of the vector around which to rotate.
+     * @param z  The z-coordinate of the vector around which to rotate.
+     * @see #isTransformSupported()
+     */
+    public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
+       throw new RuntimeException("Transforms not supported");
+    }
+
+    
+    /**
+     * Translates the transform by the specified amounts.  
+     * with the specified translation.
+     * @param nativeTransform The native transform to translate. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param x The x translation.
+     * @param y The y translation.
+     * @param z The z translation.
+     * @see #isTransformSupported()
+     */
+    public void transformTranslate(Object nativeTransform, float x, float y, float z) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Scales the provided transform by the provide scale factors. 
+     * @param nativeTransform Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param x The x-scale factor
+     * @param y The y-scale factor
+     * @param z The z-scale factor
+     * @see #isTransformSupported()
+     */
+    public void transformScale(Object nativeTransform, float x, float y, float z) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Gets the inverse transformation for the provided transform.
+     * @param nativeTransform The native transform of which to make the inverse.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @return The inverse transform as a native transform object.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformInverse(Object nativeTransform) {
+       throw new RuntimeException("Transforms not supported");
+    }
+    
+    /**
+     * Makes a new identity native transform. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @return An identity native transform.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformIdentity(){
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Copies the setting of one transform into another.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param src The source native transform.
+     * @param dest The destination native transform.
+     * @see #isTransformSupported()
+     */
+    public void copyTransform(Object src, Object dest) {
+       throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Concatenates two transforms and sets the first transform to be the result of the concatenation.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param t1 The left native transform.  The result will also be stored in this transform.
+     * @param t2 The right native transform.  The result will also be stored in this transform.
+     * @see #isTransformSupported()
+     */
+    public void concatenateTransform(Object t1, Object t2) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    
+    /**
+     * Transforms a point and stores the result in a provided array.
+     * @param nativeTransform The native transform to use for the transformation. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * @param in A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
+     * @param out A 2 or 3 element array (length should match {@var in}) to store the result of the transformation.
+     * @see #isTransformSupported()
+     */
+    public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
+   
+    
+    
+    // END TRANSFORMATION METHODS--------------------------------------------------------------------
+    
     
     class RPush implements Runnable {
         public void run() {

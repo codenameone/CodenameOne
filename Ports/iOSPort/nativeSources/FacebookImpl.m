@@ -170,4 +170,5 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions___R_boolean(
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT callback) {
     return com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback(me, callback);
 }
+
 #endif

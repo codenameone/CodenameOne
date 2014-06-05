@@ -26,6 +26,7 @@ package com.codename1.ui;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Util;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -615,7 +616,8 @@ public class Image {
             return new Image(Display.getInstance().getImplementation().createMutableImage(width, height, fillColor));
         }
     }
-        
+
+
     /**
      * creates an image from a given byte array data
      * 

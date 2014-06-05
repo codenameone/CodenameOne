@@ -25,6 +25,7 @@
 #import "FillRect.h"
 #ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"
+#import "FillPolygon.h"
 #endif
 
 static int clipX, clipY, clipW, clipH;
@@ -41,6 +42,26 @@ static CGRect drawingRect;
 {
     return [self initWithArgs:xpos ypos:ypos w:w h:h f:f texture:0];
 }
+-(id)initWithPolygon:(JAVA_FLOAT*)xIn y:(JAVA_FLOAT*)yIn length:(int)len
+{
+    texture = 0;
+    x = -1;
+    y = -1;
+    width = -1;
+    height = -1;
+    numPoints = len;
+    
+    size_t size = sizeof(JAVA_FLOAT)*len;
+    xPoints = malloc(size);
+    yPoints = malloc(size);
+    
+    memcpy(xPoints, xIn, size);
+    memcpy(yPoints, yIn, size);
+    
+    
+    return self;
+}
+
 
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f texture:(GLuint)tex{
     x = xpos;
@@ -48,7 +69,8 @@ static CGRect drawingRect;
     width = w;
     height = h;
     texture = tex;
-    
+    numPoints = 0;
+
     firstClip = !f;
     return self;
 }
@@ -71,10 +93,9 @@ static CGRect drawingRect;
 
 -(void)execute {
 #ifdef USE_ES2
-    if ( texture != 0 ){
+    if ( texture != 0 || numPoints > 0 ){
         clipX = x; clipY=y; clipW=width; clipH=height;
-         glClearStencil(0x0);
-        
+        glClearStencil(0x0);
         glEnable(GL_STENCIL_TEST);
         //glDisable(GL_STENCIL_TEST);
         _glDisable(GL_SCISSOR_TEST);
@@ -87,9 +108,14 @@ static CGRect drawingRect;
         
         GLKMatrix4 transform = glGetTransformES2();
         glSetTransformES2(GLKMatrix4Identity);
-        DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:texture color:0xffffff alpha:0xff x:x y:y w:width h:height];
+        ExecutableOp *f;
+        if ( texture != 0 ){
+            f = [[DrawTextureAlphaMask alloc] initWithArgs:texture color:0xffffff alpha:0xff x:x y:y w:width h:height];
+        } else {
+            f = [[FillPolygon alloc] initWithArgs:xPoints y:yPoints num:numPoints color:0xffffff alpha: 0xff];
+        }
         [f execute];
-        
+
 #ifndef CN1_USE_ARC
         [f release];
 #endif
@@ -182,6 +208,10 @@ static CGRect drawingRect;
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {
+    if ( numPoints > 0 ){
+        free(xPoints);
+        free(yPoints);
+    }
 	[super dealloc];
 }
 #endif

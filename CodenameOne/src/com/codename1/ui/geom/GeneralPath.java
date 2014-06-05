@@ -22,11 +22,8 @@
  */
 package com.codename1.ui.geom;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.ui.geom.Matrix;
-import com.codename1.ui.geom.PathIterator;
-import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.geom.Shape;
+
+import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
 import java.util.Arrays;
 
@@ -146,7 +143,7 @@ public final class GeneralPath implements Shape {
          */
         GeneralPath p;
 
-        Matrix transform;
+        Transform transform;
 
         /**
          * Constructs a new GeneralPath.Iterator for given general path
@@ -200,7 +197,7 @@ public final class GeneralPath implements Shape {
                 for (int i = 0; i <= count; i += 2) {
                     buf[0] = coords[i];
                     buf[1] = coords[i + 1];
-                    transform.transformCoord(buf, buf);
+                    transform.transformPoint(buf, buf);
                     coords[i] = buf[0];
                     coords[i + 1] = buf[1];
                 }
@@ -622,27 +619,42 @@ public final class GeneralPath implements Shape {
     }
 
     /**
-     * Creates a PathIterator for iterating along the segments of the path.
-     *
-     * @return
+     * {@inheritDoc}
      */
     public PathIterator getPathIterator() {
         return new Iterator(this);
     }
 
-    public PathIterator getPathIterator(Matrix m) {
+    /**
+     * {@inheritDoc}
+     */
+    public PathIterator getPathIterator(Transform m) {
         Iterator out = (Iterator) getPathIterator();
         out.transform = m;
         return out;
     }
     
-    public Shape createTransformedShape(Matrix m){
+    /**
+     * Returns a shape formed by transforming the current shape with the provided
+     * transform.  
+     * <p>Note: If {@link com.codename1.ui.Transform#isSupported} is false, this may throw a RuntimeException.</p>
+     * @param m The transform to be used to transform the shape.
+     * @return The transformed shape.
+     */
+    public Shape createTransformedShape(Transform m){
         
         GeneralPath out = new GeneralPath();
         out.append(getPathIterator(m), false);
         return out;
     }
 
+    /**
+     * Resets this path to be the intersection of itself with the given shape.  Note that only 
+     * {@link com.codename1.ui.geom.Rectangle}s are current supported.  If you pass any other
+     * shape, it will throw a RuntimeException.
+     * <p>Note: If {@link com.codename1.ui.TransformisSupported} is false, this will throw a Runtime Exception</p>
+     * @param shape The shape to intersect with the current shape.
+     */
     public void intersect(Shape shape) {
         //Log.p("Start intersect");
         if ( !(shape instanceof Rectangle) ){
@@ -655,6 +667,9 @@ public final class GeneralPath implements Shape {
         //Log.p("End intersect");
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public Shape intersection(Rectangle rect){
         return ShapeUtil.intersection(rect, this);
     }
@@ -671,10 +686,16 @@ public final class GeneralPath implements Shape {
         return ShapeUtil.isInsideEvenOdd(cross);
     }
 
+    /**
+     * Checks if the given point is contained in the current shape.
+     */
     public boolean contains(float x, float y) {
        return isInside(ShapeUtil.crossShape(this, x, y));
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public boolean contains(int x, int y){
         return contains((float)x, (float)y);
     }
@@ -1092,6 +1113,7 @@ public final class GeneralPath implements Shape {
         double n = - a / 3.0;
 
         if (R2 < Q3) {
+
             double t = MathUtil.acos(R / Math.sqrt(Q3)) / 3.0;
             double p = 2.0 * Math.PI / 3.0;
             double m = -2.0 * Math.sqrt(Q);
@@ -1100,7 +1122,9 @@ public final class GeneralPath implements Shape {
             res[rc++] = m * Math.cos(t - p) + n;
         } else {
 //          Debug.println("R2 >= Q3 (" + R2 + "/" + Q3 + ")");
+
             double A = MathUtil.pow(Math.abs(R) + Math.sqrt(R2 - Q3), 1.0 / 3.0);
+
             if (R > 0.0) {
                 A = -A;
             }
