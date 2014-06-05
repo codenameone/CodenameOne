@@ -1273,6 +1273,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    /**
+     * Returns true if the underlying OS supports opening the native navigation
+     * application
+     * @return true if the underlying OS supports launch of native navigation app
+     */
+    public boolean isOpenNativeNavigationAppSupported(){
+        return true;
+    }
+    
+    /**
+     * Opens the native navigation app in the given coordinate.
+     * @param latitude 
+     * @param longitude 
+     */ 
+    public void openNativeNavigationApp(double latitude, double longitude){    
+        execute("google.navigation:ll=" + latitude+ "," + longitude);
+    }
+    
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {
         Bitmap bitmap = Bitmap.createBitmap(width, height,
