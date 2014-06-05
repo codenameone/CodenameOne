@@ -3577,6 +3577,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isOpenNativeNavigationAppSupported(){
+        return true;
+    }
+    
+    @Override
+    public void openNativeNavigationApp(double latitude, double longitude){    
+        execute("http://maps.apple.com/?ll=" + latitude+ "," + longitude);
+    }
+    
+    @Override
     public void flashBacklight(int duration) {
         nativeInstance.flashBacklight(duration);
     }
