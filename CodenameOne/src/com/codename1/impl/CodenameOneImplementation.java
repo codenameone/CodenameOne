@@ -5233,6 +5233,24 @@ public abstract class CodenameOneImplementation {
     public void setBadgeNumber(int number) {
     }    
     
+
+    /**
+     * Returns true if the underlying OS supports opening the native navigation
+     * application
+     * @return true if the underlying OS supports launch of native navigation app
+     */
+    public boolean isOpenNativeNavigationAppSupported(){
+        return false;
+    }
+    
+    /**
+     * Opens the native navigation app in the given coordinate.
+     * @param latitude 
+     * @param longitude 
+     */ 
+    public void openNativeNavigationApp(double latitude, double longitude){    
+    }
+    
     /**
      * Returns the UDID for devices that support it
      * 

@@ -407,8 +407,7 @@ public final class Graphics {
         if(!(current instanceof CustomFont)) {
             impl.drawString(nativeGraphics, str, x + xTranslate, y + yTranslate);
         } else {
-            char[] data = str.toCharArray();
-            current.drawChars(this, data, 0, data.length, x, y);
+            current.drawString(this, str, x, y);
         }
     }
 

@@ -402,6 +402,18 @@ public class Font {
      * coordinates
      * 
      * @param g the graphics object
+     * @param str the given string 
+     * @param x the x coordinate to draw the string
+     * @param y the y coordinate to draw the string
+     */
+    void drawString(Graphics g, String str, int x, int y) {
+    }
+    
+    /**
+     * Draw the given char array using the current font and color in the x,y 
+     * coordinates
+     * 
+     * @param g the graphics object
      * @param data the given char array 
      * @param offset the offset in the given char array
      * @param length the number of chars to draw

@@ -35,9 +35,9 @@ import java.util.Hashtable;
  */
 class CustomFont extends Font {
     /**
-     * Keep two colors in cache by default to allow faster selection colors
+     * Keep five colors in cache by default to allow faster selection colors
      */
-    private static final int COLOR_CACHE_SIZE = 20;
+    private static final int COLOR_CACHE_SIZE = 5;
     
     private Hashtable colorCache = new Hashtable();
 
@@ -68,14 +68,11 @@ class CustomFont extends Font {
     
     private int[] getImageArray() {
         if(imageArrayRef != null) {
-            int[] a = (int[])Display.getInstance().extractHardRef(imageArrayRef);
-            if(a != null) {
-                return a;
-            }
+            return (int[])imageArrayRef;
         }
         int[] a = cache.getRGBCached();
         
-        imageArrayRef = Display.getInstance().createSoftWeakRef(a);
+        imageArrayRef = a;
         return a;
     }
     
@@ -109,7 +106,7 @@ class CustomFont extends Font {
             imageArray[iter] = ((imageArray[iter] & 0xff0000) << 8);
         }
         cache = Image.createImage(imageArray, imageWidth, imageHeight);
-        imageArrayRef = Display.getInstance().createSoftWeakRef(imageArray);
+        imageArrayRef = imageArray;
     }
     
     /**
@@ -131,13 +128,15 @@ class CustomFont extends Font {
     }
 
     private boolean checkCacheCurrentColor(int newColor) {
+        //TODO: perhaps instead of the need to create new Integers 
+        //use an IntHashTable class I have such class to donate or any other open source class
         Integer currentColor = new Integer(color);
         Integer newColorKey = new Integer(newColor);
         if(colorCache.get(currentColor) == null){
-            colorCache.put(currentColor, Display.getInstance().createSoftWeakRef(cache));
+            colorCache.put(currentColor, cache);
         }
         color = newColor;
-        Object newCache = Display.getInstance().extractHardRef(colorCache.get(newColorKey));
+        Object newCache = colorCache.get(newColorKey);
         if(newCache != null) {
             Image i = (Image)newCache;
             if(i != null) {
@@ -208,6 +207,49 @@ class CustomFont extends Font {
             if(alpha != 0) {
                 alpha = Math.min(alpha + value, 255);
                 imageArray[iter] = ((alpha << 24) & 0xff000000) | color;
+            }
+        }
+    }
+    
+    /**
+     * Draw the given char array using the current font and color in the x,y 
+     * coordinates
+     * 
+     * @param g the graphics object
+     * @param str the given string 
+     * @param x the x coordinate to draw the string
+     * @param y the y coordinate to draw the string
+     */
+    void drawString(Graphics g, String str, int x, int y) {
+        if(Display.getInstance().isBidiAlgorithm()) {
+            for(int i = 0 ; i < str.length() ; i++) {
+                if(Display.getInstance().isRTL(str.charAt(i))) {
+                    str = Display.getInstance().convertBidiLogicalToVisual(str);
+                    break;
+                }
+            }
+        }
+        initColor(g);
+        int clipX = g.getClipX();
+        int clipY = g.getClipY();
+        int clipWidth = g.getClipWidth();
+        int clipHeight = g.getClipHeight();
+
+        if(clipY <= y + getHeight() && clipY + clipHeight >= y) {
+            char c;
+            for ( int i = 0; i < str.length(); i++ ) {
+                c = str.charAt(i);
+                int position = charsets.indexOf(c);
+                if(position < 0) {
+                    continue;
+                }
+                // draw region is flaky on some devices, use setClip instead
+                g.clipRect(x, y, charWidth[position], imageHeight);
+                if(g.getClipWidth() > 0 && g.getClipHeight() > 0) {
+                    g.drawImage(cache, x - cutOffsets[position], y);
+                }
+                x += charWidth[position];
+                g.setClip(clipX, clipY, clipWidth, clipHeight);
             }
         }
     }
