@@ -88,12 +88,12 @@ public class FacebookImpl extends FacebookConnect {
             public void run() {
                 Session s = Session.getActiveSession();
                 if (s == null) {
-                    Log.p("Creating new session");
+                    Log.p("CN1 Creating new session");
                     s = new Session.Builder(AndroidNativeUtil.getActivity()).setApplicationId(Display.getInstance().getProperty("facebook_app_id", "")).build();
                     Session.setActiveSession(s);
                 }
                 if (s.isOpened()) {
-                    Log.p("Login session already open");
+                    Log.p("CN1 Login session already open");
                     loginLock = false;
                     return;
                 }
@@ -127,18 +127,21 @@ public class FacebookImpl extends FacebookConnect {
                                     }
                                 });
                             }
+                            cn.restoreIntentResultListener();
                             return;
                         }
-                        Log.p("Facebook session status callback " + state);
+                        Log.p("CN1 Facebook session status callback " + state);
                         if (state == SessionState.OPENED) {
                             FaceBookAccess.setToken(session.getAccessToken());
                             if (cb != null) {
                                 Display.getInstance().callSerially(new Runnable() {
                                     public void run() {
+                                        Log.p("CN1 Facebook loginSuccessful");
                                         cb.loginSuccessful();
                                     }
                                 });
                             }
+                            cn.restoreIntentResultListener();
                         }
                     }
                 });
@@ -199,7 +202,7 @@ public class FacebookImpl extends FacebookConnect {
 
                         @Override
                         public void loginSuccessful() {
-                            System.out.println("cn1 post on wall login");
+                            Log.p("CN1 askPublishPermissions");
                             askPublishPermissions(lc);
                         }
 
@@ -226,16 +229,31 @@ public class FacebookImpl extends FacebookConnect {
                         Session.NewPermissionsRequest newPermissionsRequest = new Session.NewPermissionsRequest(cn, PUBLISH_PERMISSIONS);
                         newPermissionsRequest.setCallback(new Session.StatusCallback() {
 
-                            public void call(Session session, SessionState state, Exception exception) {
+                            public void call(Session session, SessionState state, final Exception exception) {
+                                
                                 if (exception != null) {
-                                    Log.p("Write Permissions calback exception");
+                                    Log.p("CN1 Write Permissions calback exception");
                                     Log.e(exception);
-                                    lc.loginFailed(exception.getMessage());
+                                    Display.getInstance().callSerially(new Runnable() {
+                                        public void run() {
+                                            lc.loginFailed(exception.getMessage());
+                                        }
+                                    });
+
+                                    cn.restoreIntentResultListener();
                                     return;
                                 }
+                                Log.p("CN1 askPublishPermissions");
                                 //if permissions granted call the method again to 
                                 //post the message on the wall.
-                                lc.loginSuccessful();
+                                if (state == SessionState.OPENED) {
+                                    Display.getInstance().callSerially(new Runnable() {
+                                        public void run() {
+                                            lc.loginSuccessful();
+                                        }
+                                    });
+                                    cn.restoreIntentResultListener();
+                                }
                             }
                         });
                         session.requestNewPublishPermissions(newPermissionsRequest);
