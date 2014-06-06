@@ -1229,10 +1229,10 @@ public abstract class CodenameOneImplementation {
      * @param graphics The native graphics context.
      * @return The clip that was popped off the top of the clip stack.
      */
-    public Shape popClip(Object graphics){
+    public void popClip(Object graphics){
         // NOt implemented yet... need to implement.
         
-        return null;
+        
     }
     
     

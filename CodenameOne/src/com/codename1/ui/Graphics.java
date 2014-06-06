@@ -251,8 +251,8 @@ public final class Graphics {
      * Pops the top clip from the clip stack and sets it as the current clip.
      * @return The shape of the clip that was popped of the stack.
      */
-    public Shape popClip(){
-        return impl.popClip(nativeGraphics);
+    public void popClip(){
+        impl.popClip(nativeGraphics);
     }
 
     /**

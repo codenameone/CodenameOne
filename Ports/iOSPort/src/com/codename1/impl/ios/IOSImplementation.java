@@ -871,8 +871,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((NativeGraphics)graphics).pushClip();
     }
     
-    public Shape popClip(Object graphics){
-        return ((NativeGraphics)graphics).popClip();
+    public void popClip(Object graphics){
+        ((NativeGraphics)graphics).popClip();
     }
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
