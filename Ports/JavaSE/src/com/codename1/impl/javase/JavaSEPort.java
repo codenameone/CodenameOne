@@ -106,6 +106,7 @@ import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
 import java.awt.*;
@@ -115,6 +116,8 @@ import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
+import java.awt.geom.GeneralPath;
+import java.awt.geom.PathIterator;
 import java.io.*;
 import java.net.*;
 import java.sql.DriverManager;
@@ -350,6 +353,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean exposeFilesystem;
     private boolean scrollWheeling;
     
+    
     public static void blockMonitors() {
         blockMonitors = true;
     }
@@ -510,7 +514,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
-
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
@@ -540,7 +543,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public boolean isOpaque() {
             return true;
         }
-
+        
         /*
          * public void update(java.awt.Graphics g) { paint(g);           
         }
@@ -3504,6 +3507,37 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void pushClip(Object graphics) {
+        checkEDT();
+        Graphics2D g2d = getGraphics(graphics);
+        Shape currentClip = g2d.getClip();
+        
+        if ( graphics instanceof NativeScreenGraphics ){
+            NativeScreenGraphics g = (NativeScreenGraphics)graphics;
+            g.clipStack.push(currentClip);  
+        }
+        
+    }
+
+    @Override
+    public void popClip(Object graphics) {
+        checkEDT();
+        Graphics2D g2d = getGraphics(graphics);
+        
+        if ( graphics instanceof NativeScreenGraphics ){
+            NativeScreenGraphics g = (NativeScreenGraphics)graphics;
+            Shape oldClip = g.clipStack.pop();
+            g2d.setClip(oldClip);
+        }
+        
+    }
+    
+    
+
+    
+    
+    
     /**
      * @inheritDoc
      */
@@ -4006,6 +4040,378 @@ public class JavaSEPort extends CodenameOneImplementation {
         return java.awt.Font.decode(lookup.split(";")[0]);
     }
 
+    @Override
+    public boolean isShapeSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return true;
+    }
+
+    
+    
+    @Override
+    public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Shape s = cn1ShapeToAwtShape(shape);
+        nativeGraphics.fill(s);
+        
+    }
+
+    @Override
+    public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Shape s = cn1ShapeToAwtShape(shape);
+        
+        Stroke oldStroke = nativeGraphics.getStroke();
+        BasicStroke bs = new BasicStroke(stroke.getLineWidth(), stroke.getCapStyle() , stroke.getJoinStyle(), stroke.getMiterLimit());
+        nativeGraphics.setStroke(bs);
+       
+        nativeGraphics.draw(s);
+        nativeGraphics.setStroke(oldStroke);
+    }
+
+    // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
+    
+    /**
+     * Checks if the Transform class can be used on this platform.  This is similar to
+     * {@link #isTransformSupported(java.lang.Object)} but it is more general as it only verifies 
+     * that transforms can be performed, but not necessarily that they will be respected
+     * by any particular graphics context.
+     * @return True if this platform supports transforms.
+     * @see #isTransformSupported(java.lang.Object) 
+     */
+    public boolean isTransformSupported(){
+        return true;
+    }
+    
+    /**
+     * Checks of the Transform class can be used on this platform to perform perspective transforms. 
+     *  This is similar to
+     * {@link #isPerspectiveTransformSupported(java.lang.Object)} but it is more general as it only verifies 
+     * that transforms can be performed, but not necessarily that they will be respected
+     * by any particular graphics context.
+     * @return True if this platform supports perspective transforms.
+     */
+    public boolean isPerspectiveTransformSupported(){
+        return false;
+    }
+    
+    /**
+     * Makes a new native translation transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param translateX The x-coordinate of the translation.
+     * @param translateY The y-coordinate of the translation.
+     * @param translateZ The z-coordinate of the translation.
+     * @return A native transform object encapsulating the specified translation.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
+        return AffineTransform.getTranslateInstance(translateX, translateY);
+    }
+
+    /**
+     * Makes a new native scale transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param scaleX The x-scale factor of the transform.
+     * @param scaleY The y-scale factor of the transform.
+     * @param scaleZ The z-scale factor of the transform.
+     * @return A native transform object encapsulating the specified scale.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
+        return AffineTransform.getScaleInstance(scaleX, scaleY);
+    }
+
+    /**
+     * Makes a new native rotation transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param angle The angle to rotate.
+     * @param x The x-component of the vector around which to rotate.
+     * @param y The y-component of the vector around which to rotate.
+     * @param z The z-component of the vector around which to rotate.
+     * @return A native transform object encapsulating the specified rotation.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformRotation(float angle, float x, float y, float z) {
+        return AffineTransform.getRotateInstance(angle, x, y);
+    }
+
+    /**
+     * Makes a new perspective transform. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
+     * @param fovy The y field of view angle.
+     * @param aspect The aspect ratio.
+     * @param zNear The nearest visible z coordinate.
+     * @param zFar The farthest z coordinate.
+     * @return A native transform object encapsulating the given perspective.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a new orthographic projection transform.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
+     * @param left x-coordinate that is the left edge of the view.
+     * @param right The x-coordinate that is the right edge of the view.
+     * @param bottom The y-coordinate that is the bottom edge of the view.
+     * @param top The y-coordinate that is the top edge of the view.
+     * @param near The nearest visible z-coordinate.
+     * @param far The farthest visible z-coordinate.
+     * @return A native transform with the provided orthographic projection.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param eyeX The x-coordinate of the camera's eye.
+     * @param eyeY The y-coordinate of the camera's eye.
+     * @param eyeZ The z-coordinate of the camera's eye.
+     * @param centerX The center x coordinate of the view.
+     * @param centerY The center y coordinate of the view.
+     * @param centerZ The center z coordinate of the view.
+     * @param upX The x-coordinate of the up vector for the camera.
+     * @param upY The y-coordinate of the up vector for the camera.
+     * @param upZ The z-coordinate of the up vector for the camera.
+     * @return A native transform with the provided camera's view perspective.
+     * @see #isPerspectiveTransformSupported()
+     */
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    /**
+     * Rotates the provided  transform.
+     * @param nativeTransform The transform to rotate. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param angle The angle to rotate.
+     * @param x The x-coordinate of the vector around which to rotate.
+     * @param y The y-coordinate of the vector around which to rotate.
+     * @param z  The z-coordinate of the vector around which to rotate.
+     * @see #isTransformSupported()
+     */
+    public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
+       ((AffineTransform)nativeTransform).rotate(angle, x, y);
+    }
+
+    
+    /**
+     * Translates the transform by the specified amounts.  
+     * with the specified translation.
+     * @param nativeTransform The native transform to translate. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param x The x translation.
+     * @param y The y translation.
+     * @param z The z translation.
+     * @see #isTransformSupported()
+     */
+    public void transformTranslate(Object nativeTransform, float x, float y, float z) {
+        ((AffineTransform)nativeTransform).translate(x, y);
+    }
+
+    /**
+     * Scales the provided transform by the provide scale factors. 
+     * @param nativeTransform Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param x The x-scale factor
+     * @param y The y-scale factor
+     * @param z The z-scale factor
+     * @see #isTransformSupported()
+     */
+    public void transformScale(Object nativeTransform, float x, float y, float z) {
+        ((AffineTransform)nativeTransform).scale(x, y);
+    }
+
+    /**
+     * Gets the inverse transformation for the provided transform.
+     * @param nativeTransform The native transform of which to make the inverse.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @return The inverse transform as a native transform object.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformInverse(Object nativeTransform) {
+       try {
+           return ((AffineTransform)nativeTransform).createInverse();
+       } catch ( Exception ex){
+           return null;
+       }
+    }
+    
+    /**
+     * Makes a new identity native transform. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @return An identity native transform.
+     * @see #isTransformSupported()
+     */
+    public Object makeTransformIdentity(){
+        return new AffineTransform();
+    }
+
+    /**
+     * Copies the setting of one transform into another.  Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param src The source native transform.
+     * @param dest The destination native transform.
+     * @see #isTransformSupported()
+     */
+    public void copyTransform(Object src, Object dest) {
+       AffineTransform t1 = (AffineTransform)src;
+       AffineTransform t2 = (AffineTransform)dest;
+       t2.setTransform(t1);
+    }
+
+    /**
+     * Concatenates two transforms and sets the first transform to be the result of the concatenation.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * @param t1 The left native transform.  The result will also be stored in this transform.
+     * @param t2 The right native transform.  The result will also be stored in this transform.
+     * @see #isTransformSupported()
+     */
+    public void concatenateTransform(Object t1, Object t2) {
+        ((AffineTransform)t1).concatenate((AffineTransform)t2);
+    }
+
+    
+    /**
+     * Transforms a point and stores the result in a provided array.
+     * @param nativeTransform The native transform to use for the transformation. Each implementation can decide the format
+     * to use internally for transforms.  This should return a transform in that internal format.
+     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
+     * This is used by the {@link com.codename1.ui.Transform} class.
+     * @param in A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
+     * @param out A 2 or 3 element array (length should match {@var in}) to store the result of the transformation.
+     * @see #isTransformSupported()
+     */
+    public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        AffineTransform t = (AffineTransform)nativeTransform;
+        t.transform(in, 0, out, 0, 2);
+    }
+
+    // END TRANSFORM STUFF
+    @Override
+    public void setTransform(Object graphics, Transform transform) {
+        checkEDT();
+        Graphics2D g = getGraphics(graphics);
+        g.setTransform((AffineTransform)transform.getNativeTransform());
+        setNativeScreenGraphicsTransform(graphics, transform);
+    }
+
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        checkEDT();
+        com.codename1.ui.Transform t = getNativeScreenGraphicsTransform(graphics);
+        if ( t == null ){
+            return Transform.makeIdentity();
+        }
+        return t;
+    }
+    
+    
+    
+    private com.codename1.ui.geom.Shape awtShapeToCn1Shape(Shape shape){
+        com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
+        PathIterator it = shape.getPathIterator(AffineTransform.getScaleInstance(1, 1));
+        p.setWindingRule(it.getWindingRule()==PathIterator.WIND_EVEN_ODD ? com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD : com.codename1.ui.geom.PathIterator.WIND_NON_ZERO);
+        float[] buf = new float[6];
+        while (!it.isDone()){
+            int type = it.currentSegment(buf);
+            switch ( type ){
+                case PathIterator.SEG_MOVETO:
+                    p.moveTo(buf[0], buf[1]);
+                    break;
+                case PathIterator.SEG_LINETO: 
+                    p.lineTo(buf[0], buf[1]);
+                    break;
+                case PathIterator.SEG_QUADTO:
+                    p.quadTo(buf[0], buf[1], buf[2], buf[3]);
+                    break;
+                case PathIterator.SEG_CUBICTO:
+                    p.curveTo(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+                    break;
+                case PathIterator.SEG_CLOSE:
+                    p.closePath();
+                    break;
+                    
+            }
+            it.next();
+        }
+        
+        return p;
+        
+        
+    }
+    
+    
+
+    private Shape cn1ShapeToAwtShape(com.codename1.ui.geom.Shape shape){
+        GeneralPath p = new GeneralPath();
+        com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+        p.setWindingRule(it.getWindingRule()==com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
+        float[] buf = new float[6];
+        while (!it.isDone()){
+            int type = it.currentSegment(buf);
+            switch ( type ){
+                case com.codename1.ui.geom.PathIterator.SEG_MOVETO:
+                    p.moveTo(buf[0], buf[1]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_LINETO: 
+                    p.lineTo(buf[0], buf[1]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_QUADTO:
+                    p.quadTo(buf[0], buf[1], buf[2], buf[3]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_CUBICTO:
+                    p.curveTo(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_CLOSE:
+                    p.closePath();
+                    break;
+                    
+            }
+            it.next();
+        }
+        
+        return p;
+        
+        
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4320,6 +4726,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         BufferedImage sourceImage;
         Graphics2D cachedGraphics;
+        Transform transform;
+        LinkedList<Shape> clipStack = new LinkedList<Shape>();
+    }
+    
+    private void setNativeScreenGraphicsTransform(Object nativeGraphics, com.codename1.ui.Transform transform){
+        if ( nativeGraphics instanceof NativeScreenGraphics ){
+            ((NativeScreenGraphics)nativeGraphics).transform = transform;
+        }
+    }
+    
+    private com.codename1.ui.Transform getNativeScreenGraphicsTransform(Object nativeGraphics){
+        if ( nativeGraphics instanceof NativeScreenGraphics ){
+            return ((NativeScreenGraphics)nativeGraphics).transform;
+        }
+        return null;
     }
 
     public boolean isAffineSupported() {
