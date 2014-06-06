@@ -4419,7 +4419,7 @@ void com_codename1_impl_ios_IOSNative_fillConvexPolygonGlobal___float_1ARRAY_int
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_drawConvexPolygonGlobal___float_1ARRAY_int_int_float_int_int_float(JAVA_OBJECT instanceObject, JAVA_OBJECT points, JAVA_INT color, JAVA_INT alpha, JAVA_FLOAT lineWidth, JAVA_INT joinStyle, JAVA_INT capStyle, JAVA_FLOAT miterLimit)
+void com_codename1_impl_ios_IOSNative_drawConvexPolygonGlobal___float_1ARRAY_int_int_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT points, JAVA_INT color, JAVA_INT alpha, JAVA_FLOAT lineWidth, JAVA_INT joinStyle, JAVA_INT capStyle, JAVA_FLOAT miterLimit)
 {
     
 }
