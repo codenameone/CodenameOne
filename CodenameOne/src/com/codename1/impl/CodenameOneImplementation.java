@@ -479,7 +479,7 @@ public abstract class CodenameOneImplementation {
             }
 
             paintOverlay(wrapper);
-            Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
+            //Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
             flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
         }
     }
