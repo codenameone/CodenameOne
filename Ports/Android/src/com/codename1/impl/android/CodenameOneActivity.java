@@ -452,53 +452,57 @@ public class CodenameOneActivity extends Activity {
 
         menu.clear();
 
-        Form currentForm = Display.getInstance().getCurrent();
-        if (currentForm == null) {
-            return false;
-        }
-
-        int numCommands = currentForm.getCommandCount();
-
-        // If there are no commands, there's nothing to put in the menu
-        if (numCommands == 0) {
-            return false;
-        }
-
-        // Build menu items from commands
-        for (int n = 0; n < numCommands; n++) {
-            Command command = currentForm.getCommand(n);
-            String txt = currentForm.getUIManager().localize(command.getCommandName(), command.getCommandName());
-            MenuItem item = menu.add(Menu.NONE, n, Menu.NONE, txt);
-            
-            Image icon = command.getIcon();
-            if (icon != null) {
-                Bitmap b = (Bitmap) icon.getImage();
-                // Using BitmapDrawable with resources, to use device density (from 1.6 and above).
-                BitmapDrawable d = new BitmapDrawable(getResources(), b);
-                item.setIcon(d);
+        try {
+            Form currentForm = Display.getInstance().getCurrent();
+            if (currentForm == null) {
+                return false;
             }
-            if(!command.isEnabled()) {
-                item.setEnabled(false);
+
+            int numCommands = currentForm.getCommandCount();
+
+            // If there are no commands, there's nothing to put in the menu
+            if (numCommands == 0) {
+                return false;
             }
-            if (android.os.Build.VERSION.SDK_INT >= 11 && command.getClientProperty("android:showAsAction") != null) {
-                String androidShowAsAction = command.getClientProperty("android:showAsAction").toString();
-                // From https://developer.android.com/guide/topics/resources/menu-resource.html
-                // "ifRoom" | "never" | "withText" | "always" | "collapseActionView"
-                if (androidShowAsAction.equalsIgnoreCase("ifRoom")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
-                } else if (androidShowAsAction.equalsIgnoreCase("never")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-                } else if (androidShowAsAction.equalsIgnoreCase("withText")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-                } else if (androidShowAsAction.equalsIgnoreCase("always")) {
-                    item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-                } else if (android.os.Build.VERSION.SDK_INT >= 14 && androidShowAsAction.equalsIgnoreCase("collapseActionView")) {
-                    item.setShowAsAction(8); //MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW
+
+            // Build menu items from commands
+            for (int n = 0; n < numCommands; n++) {
+                Command command = currentForm.getCommand(n);
+                if (command != null) {
+                    String txt = currentForm.getUIManager().localize(command.getCommandName(), command.getCommandName());
+                    MenuItem item = menu.add(Menu.NONE, n, Menu.NONE, txt);
+
+                    Image icon = command.getIcon();
+                    if (icon != null) {
+                        Bitmap b = (Bitmap) icon.getImage();
+                        // Using BitmapDrawable with resources, to use device density (from 1.6 and above).
+                        BitmapDrawable d = new BitmapDrawable(getResources(), b);
+                        item.setIcon(d);
+                    }
+                    if (!command.isEnabled()) {
+                        item.setEnabled(false);
+                    }
+                    if (android.os.Build.VERSION.SDK_INT >= 11 && command.getClientProperty("android:showAsAction") != null) {
+                        String androidShowAsAction = command.getClientProperty("android:showAsAction").toString();
+                        // From https://developer.android.com/guide/topics/resources/menu-resource.html
+                        // "ifRoom" | "never" | "withText" | "always" | "collapseActionView"
+                        if (androidShowAsAction.equalsIgnoreCase("ifRoom")) {
+                            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+                        } else if (androidShowAsAction.equalsIgnoreCase("never")) {
+                            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+                        } else if (androidShowAsAction.equalsIgnoreCase("withText")) {
+                            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+                        } else if (androidShowAsAction.equalsIgnoreCase("always")) {
+                            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+                        } else if (android.os.Build.VERSION.SDK_INT >= 14 && androidShowAsAction.equalsIgnoreCase("collapseActionView")) {
+                            item.setShowAsAction(8); //MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW
+                        }
+                    }
                 }
             }
-            
+        } catch (Throwable t) {
         }
-                
+
         return nativeMenu;
     }
 
