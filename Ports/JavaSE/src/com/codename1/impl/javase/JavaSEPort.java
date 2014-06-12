@@ -3816,6 +3816,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.stringWidth(nativeFont, str);
         }
         checkEDT();
+        if(str == null) {
+            return 0;
+        }
         return (int) Math.ceil(font(nativeFont).getStringBounds(str, canvas.getFRC()).getWidth());
     }
 
@@ -4743,11 +4746,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
 
+    @Override
     public boolean isAffineSupported() {
         checkEDT();
         return true;
     }
 
+    
+    /*@Override
+    public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
+    }
+    
+    @Override
+    public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
+    }
+    
+    @Override
+    public Matrix getTransform(Object graphics){
+        NativeScreenGraphics ng = ((NativeScreenGraphics)graphics;
+        return Matrix.makeIdentity();
+    }
+    
+    @Override
+    public boolean isTransformSupported(Object graphics){
+        checkEDT();
+        return true;
+    }
+
+    @Override
+    public boolean isPerspectiveTransformSupported(Object graphics){
+        checkEDT();
+        return false;
+    }
+    
+    @Override
+    public boolean isShapeSupported(Object graphics){
+        checkEDT();
+        return true;
+    }*/
+    
+    
     public void resetAffine(Object nativeGraphics) {
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
@@ -4832,6 +4870,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public int getKeyboardType() {
         return keyboardType;
+    }
+
+    public Object getStorageData() {
+        return appHomeDir;
     }
 
     private File getStorageDir() {
@@ -5276,11 +5318,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(file.startsWith("file://home")) {
             return System.getProperty("user.home").replace('\\', '/') + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
         }
-        if (file.startsWith("file://")) {
+        if (file.startsWith("file:///")) {
             return file.substring(7);
         }
-        if (file.startsWith("file:/")) {
+        if (file.startsWith("file://")) {
             return file.substring(6);
+        }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
         }
         return file;
     }
@@ -6089,7 +6134,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public com.codename1.ui.util.ImageIO getImageIO() {
         if (imIO == null) {
             imIO = new com.codename1.ui.util.ImageIO() {
-
+                private BufferedImage fixImage(Image img) {
+                    BufferedImage bi = (BufferedImage)img.getImage();
+                    if(bi.getType() != BufferedImage.TYPE_INT_RGB) {
+                        BufferedImage b = new BufferedImage(bi.getWidth(), bi.getHeight(), BufferedImage.TYPE_INT_RGB);
+                        Graphics2D g2d = b.createGraphics();
+                        g2d.drawImage(bi, 0, 0, null);
+                        g2d.dispose();;
+                        return b;
+                    }
+                    return bi;
+                }
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     String f = "png";
@@ -6103,6 +6158,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (height < 0) {
                         height = img.getHeight();
                     }
+                    if(format == FORMAT_JPEG) {
+                        ImageIO.write(fixImage(img), f, response);
+                        return;
+                    }
                     ImageIO.write(((BufferedImage) img.getImage()), f, response);
                 }
 
@@ -6111,6 +6170,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String f = "png";
                     if (format == FORMAT_JPEG) {
                         f = "jpeg";
+                        ImageIO.write(fixImage(img), f, response);
+                        return;
                     }
                     ImageIO.write(((BufferedImage) img.getImage()), f, response);
                 }
@@ -6296,12 +6357,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
+        if(url.startsWith("file:")) {
+            url = "file:/" + unfile(url);
+        }
         if (url.startsWith("jar:")) {
             url = url.substring(6);
             url = this.getClass().getResource(url).toExternalForm();
-        }
-        if(url.startsWith("file:")) {
-            url = "file:/" + unfile(url);
         }
         final String theUrl = url;
         Platform.runLater(new Runnable() {
