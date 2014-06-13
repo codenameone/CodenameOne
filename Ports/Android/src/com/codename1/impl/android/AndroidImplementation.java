@@ -4015,6 +4015,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     break;
                 }
             }
+            //might happen if only the media_rw is of type ROOT_TYPE_SDCARD
+            if(root.contains("media_rw")){
+                //try again without checking the root type
+                for (int i = 0; i < roots.length; i++) {
+                    //media_rw is a protected system lib
+                    if (!roots[i].contains("media_rw")) {
+                        root = roots[i];
+                        break;
+                    }
+                }            
+            }
+            
             String fileUri = root + sep + "tmp" + sep + fileName;
             FileSystemStorage.getInstance().mkdir(root + sep + "tmp");
             try {
