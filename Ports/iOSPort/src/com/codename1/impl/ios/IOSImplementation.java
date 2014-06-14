@@ -877,7 +877,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = ((NativeGraphics)graphics);
+        
         ng.checkControl();
+        ng.clipApplied = false;
         boolean isTransformSupported = ng.isTransformSupported();
         
         if ( isTransformSupported ){
@@ -994,6 +996,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
+        ng.clipApplied = false;
         if ( ng.isTransformSupported() ){
             if ( ng.clip == null ){
                 setClip(graphics, x, y, width, height);
@@ -1650,6 +1653,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setTransform(Object graphics, Transform transform) {
         ((NativeGraphics)graphics).transform = transform;
+        ((NativeGraphics)graphics).transformApplied = false;
         
     }
     
@@ -2853,8 +2857,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean clipApplied;
         Shape clip;
         Transform transform = Transform.makeIdentity();
+        boolean transformApplied = false;
         Shape[] clipStack = new Shape[20];
-        private int clipStackPtr = 0;  
+        private int clipStackPtr = 0; 
+        
         
         /**
          * Used with the ES2 pipeline (or any engine where transforms are supported)
@@ -2883,12 +2889,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         public Shape popClip(){
             Shape s = clipStack[--clipStackPtr];
             //Log.p("Popping clip "+s);
+            clipApplied = false;
             setClipShape(this, s);
             return s;
         }
         
         public void applyClip() {
             if ( isTransformSupported()){
+                if ( clipApplied ){
+                    return;
+                }
                 //Log.p("In applyClip");
                 if ( this.clip == null ){
                     //Log.p("Clip is null");
@@ -3093,8 +3103,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            if ( isTransformSupported() ){
+            if ( !transformApplied && isTransformSupported() ){
                 setNativeTransformGlobal(this.transform);
+                transformApplied = true;
             }
         }
         

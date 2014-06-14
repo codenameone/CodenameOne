@@ -24,6 +24,70 @@
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 
+#ifdef USE_ES2
+extern GLKMatrix4 CN1modelViewMatrix;
+extern GLKMatrix4 CN1projectionMatrix;
+extern GLKMatrix4 CN1transformMatrix;
+extern GLuint CN1activeProgram;
+static GLuint program=0;
+static GLuint vertexShader;
+static GLuint fragmentShader;
+static GLuint modelViewMatrixUniform;
+static GLuint projectionMatrixUniform;
+static GLuint transformMatrixUniform;
+static GLuint colorUniform;
+static GLuint vertexCoordAtt;
+static GLuint textureCoordAtt;
+
+
+static NSString *fragmentShaderSrc =
+@"precision highp float;\n"
+"uniform lowp vec4 uColor;\n"
+
+"void main(){\n"
+"   gl_FragColor = uColor; \n"
+"}\n";
+
+static NSString *vertexShaderSrc =
+@"attribute vec4 aVertexCoord;\n"
+
+"uniform mat4 uModelViewMatrix;\n"
+"uniform mat4 uProjectionMatrix;\n"
+"uniform mat4 uTransformMatrix;\n"
+
+"void main(){\n"
+"   gl_Position = uProjectionMatrix *  uModelViewMatrix * uTransformMatrix * aVertexCoord;\n"
+"}";
+
+static GLuint getOGLProgram(){
+    if ( program == 0  ){
+        program = CN1compileShaderProgram(vertexShaderSrc, fragmentShaderSrc);
+        GLErrorLog;
+        vertexCoordAtt = glGetAttribLocation(program, "aVertexCoord");
+        GLErrorLog;
+        
+        modelViewMatrixUniform = glGetUniformLocation(program, "uModelViewMatrix");
+        GLErrorLog;
+        projectionMatrixUniform = glGetUniformLocation(program, "uProjectionMatrix");
+        GLErrorLog;
+        transformMatrixUniform = glGetUniformLocation(program, "uTransformMatrix");
+        GLErrorLog;
+        
+        colorUniform = glGetUniformLocation(program, "uColor");
+        GLErrorLog;
+        
+        
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        GLErrorLog;
+        
+        
+    }
+    return program;
+}
+
+#endif
+
+
 @implementation FillRect
 -(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos w:(int)w h:(int)h {
     color = c;
@@ -34,7 +98,55 @@
     height = h;
     return self;
 }
+#ifdef USE_ES2
+-(void)execute {
+    //[UIColorFromRGB(color, alpha) set];
+    //CGContextFillRect(context, CGRectMake(x, y, width, height));
+    //GlColorFromRGB(color, alpha);
+    glUseProgram(getOGLProgram());
+    
+    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
+                                       ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
+    GLfloat vertexes[] = {
+        x, y,
+        x + width, y,
+        x, y + height,
+        x + width, y + height
+    };
+    glEnableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
+    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+    GLErrorLog;
+    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+    GLErrorLog;
+    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+    GLErrorLog;
+    glUniform4fv(colorUniform, 1, colorV.v);
+    GLErrorLog;
+    
+    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    //GLErrorLog;
+    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
+    GLErrorLog;
 
+    
+    //GLErrorLog;
+    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    //_glEnableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    //GLErrorLog;
+    //_glDisableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
+    
+    glDisableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
+    //glUseProgram(CN1activeProgram);
+    //GLErrorLog;
+}
+#else
 -(void)execute {
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));    
@@ -55,6 +167,7 @@
     _glDisableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
 }
+#endif
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {

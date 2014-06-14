@@ -1,11 +1,12 @@
 #import "CN1ES2compat.h"
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
+#import <OpenGLES/ES2/gl.h>
 #import <Math.h>
 
-static GLKMatrix4 CN1modelViewMatrix;
-static GLKMatrix4 CN1projectionMatrix;
-static GLKMatrix4 CN1transformMatrix;
+GLKMatrix4 CN1modelViewMatrix;
+GLKMatrix4 CN1projectionMatrix;
+GLKMatrix4 CN1transformMatrix;
 static BOOL CN1ClientState_GL_COLOR_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_EDGE_FLAG_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_FOG_COORD_ARRAY = FALSE;
@@ -14,9 +15,10 @@ static BOOL CN1ClientState_GL_NORMAL_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_SECONDARY_COLOR_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_TEXTURE_COORD_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_VERTEX_ARRAY = FALSE;
+static BOOL CN1ClientState_GL_ALPHA_TEXTURE = FALSE;
 static GLenum CN1matrixMode;
 
-static GLuint CN1activeProgram = NULL;
+GLuint CN1activeProgram = NULL;
 
 // Vertex buffers
 static GLuint CN1TextureMaskVertexBuffer = NULL;
@@ -45,6 +47,7 @@ static GLuint CN1useAlphaMaskTextureUniform = NULL;
 static GLuint CN1useRGBATextureUniform = NULL;
 static BOOL CN1ProgramLoaded = NO;
 
+static BOOL GL_TEXTURE_ENABLED = NO;
 
 
 static GLvoid * CN1vertexPointer;
@@ -103,6 +106,69 @@ static int _printGLPointer(GLenum type, GLint len, GLint size, const GLvoid * po
 
 
 static void CN1updateTransformMatrixES2();
+
+
+
+GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShaderSrc){
+    GLuint program = glCreateProgram();
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+
+    int len = [fragmentShaderSrc length];
+    //NSLog(@"%d", len);
+    const char* fragmentShaderSrcUTF = fragmentShaderSrc.UTF8String;
+    glShaderSource(fragmentShader,1, &fragmentShaderSrcUTF, &len);
+    GLErrorLog;
+    glCompileShader(fragmentShader);
+    GLErrorLog;
+    GLint compileSuccess;
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &compileSuccess);
+    if ( compileSuccess == GL_FALSE ){
+        GLchar message[256];
+        glGetShaderInfoLog(fragmentShader, sizeof(message), 0, &message[0]);
+        NSString *messageString = [NSString stringWithUTF8String:message];
+        NSLog(@"%@", messageString);
+        
+        exit(1);
+    }
+    
+    len = [vertexShaderSrc length];
+    const char* vertexShaderSrcUTF = vertexShaderSrc.UTF8String;
+    glShaderSource(vertexShader, 1, &vertexShaderSrcUTF, &len);
+    GLErrorLog;
+    glCompileShader(vertexShader);
+    GLErrorLog;
+    if ( compileSuccess == GL_FALSE ){
+        GLchar message[256];
+        glGetShaderInfoLog(vertexShader, sizeof(message), 0, &message[0]);
+        NSString *messageString = [NSString stringWithUTF8String:message];
+        NSLog(@"%@", messageString);
+        
+        exit(1);
+    }
+    
+    glAttachShader(program, vertexShader);
+    GLErrorLog;
+    glAttachShader(program, fragmentShader);
+    GLErrorLog;
+    glLinkProgram(program);
+    GLErrorLog;
+    
+    GLint linkSuccess;
+    glGetProgramiv(program, GL_LINK_STATUS, &linkSuccess);
+    GLErrorLog;
+    if ( linkSuccess == GL_FALSE ){
+        GLchar message[256];
+        glGetProgramInfoLog(program, sizeof(message), 0, &message[0]);
+        GLErrorLog;
+        NSString * messageString = [NSString stringWithUTF8String:message];
+        NSLog(@"%@", messageString);
+        exit(1);
+    }
+    
+    return program;
+
+}
 
 static void CN1compileBasicProgram(){
     if ( CN1ProgramLoaded ){
@@ -260,26 +326,26 @@ static void CN1compileBasicProgram(){
     CN1useRGBATextureUniform = glGetUniformLocation(CN1activeProgram, "uUseRGBATexture");
     GLErrorLog;
     
-    glGenBuffers(1, &CN1TextureRGBAVertexBuffer);
-    GLErrorLog;
-    glBindBuffer(GL_ARRAY_BUFFER, CN1TextureRGBAVertexBuffer);
-    GLErrorLog;
-    glVertexAttribPointer(CN1TextureRGBACoordAtt, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*2, 0);
-    GLErrorLog;
-    glGenBuffers(1, &CN1VertexBuffer);
-    GLErrorLog;
-    glBindBuffer(GL_ARRAY_BUFFER, CN1VertexBuffer);
-    GLErrorLog;
-    glVertexAttribPointer(CN1VertexCoordAtt, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*2, 0);
-    GLErrorLog;
+    //glGenBuffers(1, &CN1TextureRGBAVertexBuffer);
+    //GLErrorLog;
+    //glBindBuffer(GL_ARRAY_BUFFER, CN1TextureRGBAVertexBuffer);
+    //GLErrorLog;
+    //glVertexAttribPointer(CN1TextureRGBACoordAtt, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*2, 0);
+    //GLErrorLog;
+    //glGenBuffers(1, &CN1VertexBuffer);
+    //GLErrorLog;
+    //glBindBuffer(GL_ARRAY_BUFFER, CN1VertexBuffer);
+    //GLErrorLog;
+    //glVertexAttribPointer(CN1VertexCoordAtt, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*2, 0);
+    //GLErrorLog;
     //glBufferData(GL_ARRAY_BUFFER, sizeof(texCoords), texCoords, GL_STATIC_DRAW);
     
-    glGenBuffers(1, &CN1VertexColorBuffer);
-    GLErrorLog;
-    glBindBuffer(GL_ARRAY_BUFFER, CN1VertexColorBuffer);
-    GLErrorLog;
-    glVertexAttribPointer(CN1VertexColorCoordAtt, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*4, 0 );
-    GLErrorLog;
+    //glGenBuffers(1, &CN1VertexColorBuffer);
+    //GLErrorLog;
+    //glBindBuffer(GL_ARRAY_BUFFER, CN1VertexColorBuffer);
+    //GLErrorLog;
+    //glVertexAttribPointer(CN1VertexColorCoordAtt, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*4, 0 );
+    //GLErrorLog;
     
     glUseProgram(CN1activeProgram);
     
@@ -293,12 +359,22 @@ static void CN1compileBasicProgram(){
     glUniform1i(CN1TextureMaskUniform, 1);
     glUniform1i(CN1TextureRGBAUniform, 0);
     
-    glBindBuffer(GL_ARRAY_BUFFER, CN1TextureRGBAVertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, _getGLSize(CN1textureRGBPointerType)*4, CN1textureRGBPointer, GL_DYNAMIC_DRAW);
+    //glBindBuffer(GL_ARRAY_BUFFER, CN1TextureRGBAVertexBuffer);
+    //glBufferData(GL_ARRAY_BUFFER, _getGLSize(GL_SHORT)*4, CN1textureRGBPointer, GL_DYNAMIC_DRAW);
     
-    glBindBuffer(GL_ARRAY_BUFFER, CN1VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, _getGLSize(CN1vertexPointerType)*4, CN1vertexPointer, GL_DYNAMIC_DRAW);
+    //glBindBuffer(GL_ARRAY_BUFFER, CN1VertexBuffer);
+    //glBufferData(GL_ARRAY_BUFFER, _getGLSize(GL_FLOAT)*4, CN1vertexPointer, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+static void checkProgram(){
+    CN1compileBasicProgram();
+    GLuint currProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
+    if ( currProgram != CN1activeProgram ){
+        glUseProgram(CN1activeProgram);
+    }
+    
 }
 
 static void CN1updateProjectionMatrixES2(){
@@ -329,46 +405,61 @@ static void CN1updateColorES2(){
 }
 extern void glLoadIdentityES2();
 void glDrawArraysES2(GLenum mode, GLint first, GLsizei count){
-    //glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
-    //glClear(GL_COLOR_BUFFER_BIT);
-    //glEnableVertexAttribArray(CN1VertexCoordAtt);
-    //glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
-    //glEnableVertexAttribArray(CN1TextureMaskCoordAtt);
-    //glEnableVertexAttribArray(CN1VertexCoordAtt);
-    /*
-    GLfloat* vertices = (GLfloat*)CN1vertexPointer;
-    
-    GLKVector3 vecs[] = {
-        GLKVector3Make(vertices[0], vertices[1], 0),
-        GLKVector3Make(vertices[2], vertices[3], 0),
-        GLKVector3Make(vertices[4], vertices[5], 0),
-        GLKVector3Make(vertices[6], vertices[7], 0)
-    };
-    */
-    /*
-    GLKMatrix4 mvp = GLKMatrix4Multiply(CN1projectionMatrix, CN1modelViewMatrix);
-    
-    GLKMatrix4MultiplyAndProjectVector3Array(mvp, vecs, 4);
-    */
-    
-    //NSLog(@"Drawing texture pointer");
-    //_printGLPointer(CN1textureRGBPointerType, count, CN1textureRGBPointerSize, CN1textureRGBPointer);
-    //NSLog(@"Drawing vertex pointer");
-    //_printGLPointer(CN1vertexPointerType, count, CN1vertexPointerSize, CN1vertexPointer);
-    //NSLog(@"Transformation matrix is %@", NSStringFromGLKMatrix4(mvp));
-    //NSLog(@"Transformed vectors are:");
-    //for ( int i=0; i<4; i++){
-    //    NSLog(NSStringFromGLKVector3(vecs[i]));
-   // }
-    //GLKVector4 color = GLKVector4Make(0.5,0.5,0, 1);
-    //glUniform4fv(CN1ColorUniform, 1, color.v);
-    //glEnableVertexAttribArray(CN1VertexCoordAtt);
-    //glUniform1i(CN1useRGBATextureUniform, 0);
+    checkProgram();
     glUniform1i(CN1useVertexColorsUniform, 0);
-    //glUniform1i(CN1useAlphaMaskTextureUniform, 0);
+    CN1updateProjectionMatrixES2();
+    CN1updateModelViewMatrixES2();
+    CN1updateTransformMatrixES2();
+    if ( GL_TEXTURE_ENABLED ){
+        glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
+        glUniform1i(CN1useRGBATextureUniform, 1);
+        glUniform1i(CN1TextureRGBAUniform, 0);
+    } else {
+        glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
+        glUniform1i(CN1useRGBATextureUniform, 0);
+    }
+    if ( CN1ClientState_GL_COLOR_ARRAY ){
+        glEnableVertexAttribArray(CN1VertexColorCoordAtt);
+        glUniform1i(CN1useVertexColorsUniform, 1);
+    } else {
+        glDisableVertexAttribArray(CN1VertexColorCoordAtt);
+        glUniform1i(CN1useVertexColorsUniform, 0);
+    }
     
+    if ( CN1ClientState_GL_TEXTURE_COORD_ARRAY ){
+        glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
+        glUniform1i(CN1useRGBATextureUniform, 1);
+    } else {
+        glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
+        glUniform1i(CN1useRGBATextureUniform, 0);
+    }
     
-
+    if ( CN1ClientState_GL_VERTEX_ARRAY ){
+        glEnableVertexAttribArray(CN1VertexCoordAtt);
+    } else {
+        glDisableVertexAttribArray(CN1VertexCoordAtt);
+    }
+    
+    if ( CN1ClientState_GL_ALPHA_TEXTURE ){
+        glEnableVertexAttribArray(CN1TextureMaskCoordAtt);
+        GLErrorLog;
+        glUniform1i(CN1useAlphaMaskTextureUniform, 1);
+        GLErrorLog;
+        //glEnable(GL_BLEND);
+        GLErrorLog;
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        GLErrorLog;
+    } else {
+        glDisableVertexAttribArray(CN1TextureMaskCoordAtt);
+        GLErrorLog;
+        glUniform1i(CN1useAlphaMaskTextureUniform, 0);
+        GLErrorLog;
+        //glDisable(GL_BLEND);
+        GLErrorLog;
+        //glDisable(GL_LINE_SMOOTH);
+    }
+    
+    CN1updateColorES2();
     glDrawArrays(mode, first, count);
     
 }
@@ -381,12 +472,11 @@ void glMatrixModeES2(GLenum mode){
 void glLoadIdentityES2(){
     //NSLog(@"Loading identity");
     if ( CN1matrixMode == GL_PROJECTION ){
-
         CN1projectionMatrix =GLKMatrix4Identity;
-        CN1updateProjectionMatrixES2();
+        //CN1updateProjectionMatrixES2();
     } else if ( CN1matrixMode == GL_MODELVIEW ){
         CN1modelViewMatrix = GLKMatrix4Identity;//GLKMatrix4Make(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-        CN1updateModelViewMatrixES2();
+        //CN1updateModelViewMatrixES2();
     } else {
          NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
     }
@@ -399,10 +489,10 @@ void glOrthofES2(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLflo
     GLKMatrix4 ortho = GLKMatrix4MakeOrtho(left, right, bottom, top, nearZ, farZ);
     if (CN1matrixMode == GL_PROJECTION ){
         CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, ortho);
-        CN1updateProjectionMatrixES2();
+        //CN1updateProjectionMatrixES2();
     } else if ( CN1matrixMode == GL_MODELVIEW ){
         CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, ortho);
-        CN1updateModelViewMatrixES2();
+        //CN1updateModelViewMatrixES2();
     } else {
         NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
     }
@@ -413,10 +503,10 @@ void glDisableES2(GLenum feature){
         case GL_ALPHA_TEST:
             return;
         case GL_TEXTURE_2D:
-
+            GL_TEXTURE_ENABLED=NO;
             //glDisable(GL_TEXTURE);
-            glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
-            glUniform1i(CN1useRGBATextureUniform, 0);
+            //glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
+            //glUniform1i(CN1useRGBATextureUniform, 0);
             return;
     }
     
@@ -432,9 +522,10 @@ void glEnableES2(GLenum feature){
             //glBindTexture(GL_TEXTURE0, CN1Te)
             //glEnable(GL_TEXTURE);
             //
-            glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
-            glUniform1i(CN1useRGBATextureUniform, 1);
-            glUniform1i(CN1TextureRGBAUniform, 0);
+            GL_TEXTURE_ENABLED = YES;
+            //glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
+            //glUniform1i(CN1useRGBATextureUniform, 1);
+            //glUniform1i(CN1TextureRGBAUniform, 0);
             
             return;
     }
@@ -449,10 +540,10 @@ void glScalefES2(GLfloat xScale, GLfloat yScale, GLfloat zScale){
     GLKMatrix4 scale = GLKMatrix4MakeScale(xScale, yScale, zScale);
     if ( CN1matrixMode == GL_PROJECTION ){
         CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, scale);
-        CN1updateProjectionMatrixES2();
+        //CN1updateProjectionMatrixES2();
     } else {
         CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, scale);
-        CN1updateModelViewMatrixES2();
+        //CN1updateModelViewMatrixES2();
         
     }
     
@@ -463,10 +554,10 @@ void glTranslatefES2(GLfloat x, GLfloat y, GLfloat z){
     //NSLog(@"Translation matrix is %@", NSStringFromGLKMatrix4(translate));
     if ( CN1matrixMode == GL_PROJECTION ){
         CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, translate);
-        CN1updateProjectionMatrixES2();
+        //CN1updateProjectionMatrixES2();
     } else {
         CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, translate);
-        CN1updateModelViewMatrixES2();
+        //CN1updateModelViewMatrixES2();
     }
 }
 
@@ -478,16 +569,16 @@ void glRotatefES2(GLfloat angle, GLfloat x, GLfloat y, GLfloat z){
     GLKMatrix4 rotate = GLKMatrix4MakeRotation(angle, x, y, z);
     if ( CN1matrixMode == GL_PROJECTION ){
         CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, rotate);
-        CN1updateProjectionMatrixES2();
+        //CN1updateProjectionMatrixES2();
     } else {
         CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, rotate);
-        CN1updateModelViewMatrixES2();
+        //CN1updateModelViewMatrixES2();
     }
 }
 
 void glSetTransformES2(GLKMatrix4 t){
     CN1transformMatrix = t;
-    CN1updateTransformMatrixES2();
+    //CN1updateTransformMatrixES2();
 }
 
 GLKMatrix4 glGetTransformES2(){
@@ -496,7 +587,7 @@ GLKMatrix4 glGetTransformES2(){
 
 void glColor4fES2(GLfloat r, GLfloat g, GLfloat b, GLfloat a){
     CN1currentColor = GLKVector4Make(r,g,b,a);
-    CN1updateColorES2();
+    //CN1updateColorES2();
     
 }
 
@@ -504,23 +595,23 @@ void glEnableClientStateES2(GLenum state){
     switch (state){
         case GL_COLOR_ARRAY:
             CN1ClientState_GL_COLOR_ARRAY = TRUE;
-            glEnableVertexAttribArray(CN1VertexColorCoordAtt);
-            glUniform1i(CN1useVertexColorsUniform, 1);
+            //glEnableVertexAttribArray(CN1VertexColorCoordAtt);
+            //glUniform1i(CN1useVertexColorsUniform, 1);
             break;
         case GL_NORMAL_ARRAY:
             CN1ClientState_GL_NORMAL_ARRAY = TRUE;break;
         case GL_TEXTURE_COORD_ARRAY:
             CN1ClientState_GL_TEXTURE_COORD_ARRAY = TRUE;
 
-            glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
-            glUniform1i(CN1useRGBATextureUniform, 1);
-            GLErrorLog;
+            //glEnableVertexAttribArray(CN1TextureRGBACoordAtt);
+            //glUniform1i(CN1useRGBATextureUniform, 1);
+            //GLErrorLog;
             
             break;
         case GL_VERTEX_ARRAY:
             CN1ClientState_GL_VERTEX_ARRAY = TRUE;
-            glEnableVertexAttribArray(CN1VertexCoordAtt);
-            GLErrorLog;
+            //glEnableVertexAttribArray(CN1VertexCoordAtt);
+            //GLErrorLog;
             break;
     }
 }
@@ -529,19 +620,19 @@ void glDisableClientStateES2(GLenum state){
     switch (state){
         case GL_COLOR_ARRAY:
             CN1ClientState_GL_COLOR_ARRAY = FALSE;
-            glDisableVertexAttribArray(CN1VertexColorCoordAtt);
-            glUniform1i(CN1useVertexColorsUniform, 0);
+            //glDisableVertexAttribArray(CN1VertexColorCoordAtt);
+            //glUniform1i(CN1useVertexColorsUniform, 0);
             break;
         case GL_NORMAL_ARRAY:
             CN1ClientState_GL_NORMAL_ARRAY = FALSE;break;
         case GL_TEXTURE_COORD_ARRAY:
             CN1ClientState_GL_TEXTURE_COORD_ARRAY = FALSE;
-            glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
-            glUniform1i(CN1useRGBATextureUniform, 0);
+            //glDisableVertexAttribArray(CN1TextureRGBACoordAtt);
+            //glUniform1i(CN1useRGBATextureUniform, 0);
             break;
         case GL_VERTEX_ARRAY:
-            CN1ClientState_GL_VERTEX_ARRAY = FALSE;
-            glDisableVertexAttribArray(CN1VertexCoordAtt);
+            //CN1ClientState_GL_VERTEX_ARRAY = FALSE;
+            //glDisableVertexAttribArray(CN1VertexCoordAtt);
             break;
     }
 }
@@ -553,6 +644,7 @@ void glTexCoordPointerES2(	GLint size,
                        GLenum type,
                        GLsizei stride,
                           const GLvoid * pointer){
+    checkProgram();
     if ( !CN1TextureRGBAVertexBuffer ){
         glGenBuffers(1, &CN1TextureRGBAVertexBuffer);
     }
@@ -572,6 +664,7 @@ void glVertexPointerES2(	GLint size,
                      GLenum type,
                      GLsizei stride,
                      const GLvoid * pointer){
+    checkProgram();
     if ( !CN1VertexBuffer ){
         glGenBuffers(1, &CN1VertexBuffer);
     }
@@ -594,6 +687,7 @@ void glVertexPointerES2(	GLint size,
 }
 
 void glAlphaMaskTexCoordPointerES2( GLint size, GLenum type, GLsizei stride, const GLvoid *pointer){
+    checkProgram();
     if ( !CN1TextureMaskVertexBuffer ){
         glGenBuffers(1, &CN1TextureMaskVertexBuffer);
     }
@@ -612,16 +706,17 @@ void glAlphaMaskTexCoordPointerES2( GLint size, GLenum type, GLsizei stride, con
 void glEnableCN1StateES2(enum CN1GLenum state){
     switch ( state ){
         case CN1_GL_ALPHA_TEXTURE:
-            glEnableVertexAttribArray(CN1TextureMaskCoordAtt);
-            GLErrorLog;
-            glUniform1i(CN1useAlphaMaskTextureUniform, 1);
-            GLErrorLog;
-            //glEnable(GL_BLEND);
-            GLErrorLog;
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            GLErrorLog;
-            //glEnable(GL_LINE_SMOOTH);
-            //glUniform1i(CN1useRGBATextureUniform, 0);
+            CN1ClientState_GL_ALPHA_TEXTURE = YES;
+            //glEnableVertexAttribArray(CN1TextureMaskCoordAtt);
+            //GLErrorLog;
+            //glUniform1i(CN1useAlphaMaskTextureUniform, 1);
+            //GLErrorLog;
+            
+            //GLErrorLog;
+            //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            //GLErrorLog;
+            
+            
             
             break;
             
@@ -633,18 +728,19 @@ void glEnableCN1StateES2(enum CN1GLenum state){
 void glDisableCN1StateES2(enum CN1GLenum state){
     switch ( state ){
         case CN1_GL_ALPHA_TEXTURE:
-            glDisableVertexAttribArray(CN1TextureMaskCoordAtt);
-            GLErrorLog;
-            glUniform1i(CN1useAlphaMaskTextureUniform, 0);
-            GLErrorLog;
-            //glDisable(GL_BLEND);
-            GLErrorLog;
+            CN1ClientState_GL_ALPHA_TEXTURE = NO;
+            //glDisableVertexAttribArray(CN1TextureMaskCoordAtt);
+            //GLErrorLog;
+            //glUniform1i(CN1useAlphaMaskTextureUniform, 0);
+            //GLErrorLog;
+            
+            //GLErrorLog;
             //glDisable(GL_LINE_SMOOTH);
             break;
         
             
         case CN1_GL_VERTEX_COLORS:
-            glUniform1i(CN1useVertexColorsUniform, 0);
+        //    glUniform1i(CN1useVertexColorsUniform, 0);
             
             break;
     }

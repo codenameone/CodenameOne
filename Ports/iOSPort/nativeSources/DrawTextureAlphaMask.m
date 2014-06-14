@@ -22,6 +22,86 @@
  */
 #import "CN1ES2compat.h"
 #import "DrawTextureAlphaMask.h"
+#ifdef USE_ES2
+extern GLKMatrix4 CN1modelViewMatrix;
+extern GLKMatrix4 CN1projectionMatrix;
+extern GLKMatrix4 CN1transformMatrix;
+extern GLuint CN1activeProgram;
+static GLuint program=0;
+static GLuint vertexShader;
+static GLuint fragmentShader;
+static GLuint modelViewMatrixUniform;
+static GLuint projectionMatrixUniform;
+static GLuint transformMatrixUniform;
+static GLuint textureUniform;
+static GLuint colorUniform;
+static GLuint vertexCoordAtt;
+static GLuint textureCoordAtt;
+static const GLshort textureCoordinates[] = {
+    0, 0,
+    1, 0,
+    0, 1,
+    1, 1,
+};
+
+
+static NSString *fragmentShaderSrc =
+@"precision highp float;\n"
+"uniform lowp vec4 uColor;\n"
+"uniform highp sampler2D uTextureRGBA;\n"
+"varying highp vec2 vTextureRGBACoord;\n"
+
+"void main(){\n"
+//"   gl_FragColor = texture2D(uTextureRGBA, vTextureRGBACoord) * uColor; \n"
+"   gl_FragColor = vec4(uColor.rgb, texture2D(uTextureRGBA, vTextureRGBACoord).a*uColor.a);\n"
+"}\n";
+
+static NSString *vertexShaderSrc =
+@"attribute vec4 aVertexCoord;\n"
+"attribute vec2 aTextureRGBACoord;\n"
+
+"uniform mat4 uModelViewMatrix;\n"
+"uniform mat4 uProjectionMatrix;\n"
+"uniform mat4 uTransformMatrix;\n"
+
+"varying highp vec2 vTextureRGBACoord;\n"
+
+"void main(){\n"
+"   gl_Position = uProjectionMatrix *  uModelViewMatrix * uTransformMatrix * aVertexCoord;\n"
+"   vTextureRGBACoord = aTextureRGBACoord;\n"
+"}";
+
+static GLuint getOGLProgram(){
+    if ( program == 0  ){
+        program = CN1compileShaderProgram(vertexShaderSrc, fragmentShaderSrc);
+        GLErrorLog;
+        vertexCoordAtt = glGetAttribLocation(program, "aVertexCoord");
+        GLErrorLog;
+        
+        textureCoordAtt = glGetAttribLocation(program, "aTextureRGBACoord");
+        GLErrorLog;
+        
+        modelViewMatrixUniform = glGetUniformLocation(program, "uModelViewMatrix");
+        GLErrorLog;
+        projectionMatrixUniform = glGetUniformLocation(program, "uProjectionMatrix");
+        GLErrorLog;
+        transformMatrixUniform = glGetUniformLocation(program, "uTransformMatrix");
+        GLErrorLog;
+        textureUniform = glGetUniformLocation(program, "uTextureRGBA");
+        GLErrorLog;
+        colorUniform = glGetUniformLocation(program, "uColor");
+        GLErrorLog;
+        
+        
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        GLErrorLog;
+        
+        
+    }
+    return program;
+}
+
+#endif
 
 @implementation DrawTextureAlphaMask
 
@@ -36,22 +116,27 @@
     h = pH;
     return self;
 }
+#ifdef USE_ES2
 -(void)execute
 {
     
     if ( textureName == 0 ){
         NSLog(@"Attempt to draw null texture.  Skipping");
     }
+    glUseProgram(getOGLProgram());
+    //GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
+    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
+                                       ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
     
-    GlColorFromRGB(color, alpha);
-    GLErrorLog;
+    //GlColorFromRGB(color, alpha);
+    //GLErrorLog;
     
-    static const GLshort textureCoordinates[] = {
-        0, 0,
-        1, 0,
-        0, 1,
-        1, 1,
-    };
+    //static const GLshort textureCoordinates[] = {
+    //    0, 0,
+    //    1, 0,
+    //    0, 1,
+    //    1, 1,
+    //};
     
     //NSLog(@"Drawing mask %d %d %d %d", x,y,w,h);
     GLfloat vertexes[] = {
@@ -61,7 +146,7 @@
         (GLfloat)(x+w), (GLfloat)(y+h)
     };
     
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, textureName);
     GLErrorLog;
@@ -78,26 +163,63 @@
     GLErrorLog;
 
     
-    _glEnableClientState(GL_VERTEX_ARRAY);
-    GLErrorLog;
+    //_glEnableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
     //_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    _glEnableCN1State(CN1_GL_ALPHA_TEXTURE);
+    //_glEnableCN1State(CN1_GL_ALPHA_TEXTURE);
+    //GLErrorLog;
+    
+    glEnableVertexAttribArray(textureCoordAtt);
     GLErrorLog;
+    
+    glEnableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
     //_glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
-    _glAlphaMaskTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
+    //_glAlphaMaskTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
+    //GLErrorLog;
+    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    //GLErrorLog;
+    
+    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
     GLErrorLog;
-    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    
+    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
     GLErrorLog;
-    _glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
     GLErrorLog;
-    _glDisableClientState(GL_VERTEX_ARRAY);
+    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
     GLErrorLog;
+    
+    glUniform1i(textureUniform, 0);
+    GLErrorLog;
+    glUniform4fv(colorUniform, 1, colorV.v);
+    GLErrorLog;
+    
+    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
+    GLErrorLog;
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    GLErrorLog;
+    //_glDisableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
     //_glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    _glDisableCN1State(CN1_GL_ALPHA_TEXTURE);
-    GLErrorLog;
+    //_glDisableCN1State(CN1_GL_ALPHA_TEXTURE);
+    //GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
     //_glDisable(GL_TEXTURE_2D);
+    //GLErrorLog;
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDisableVertexAttribArray(textureCoordAtt);
+    GLErrorLog;
+    
+    glDisableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
+    glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
 }
+#else 
+-execute{}
+#endif
 @end

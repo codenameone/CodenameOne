@@ -42,6 +42,12 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 #define UIColorFromARGB(rgbValue) [UIColor colorWithRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
 green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue >> 24) & 0xff) /255.0)]
 
+#ifdef USE_ES2
+#define GLKVector4FromRGB(rgbValue,alphaColor) GLKVector4Make(((float)((rgbValue >> 16) & 0xff))/255.0, \
+((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0)
+
+#endif
+
 @interface ExecutableOp : NSObject {
 
 }
