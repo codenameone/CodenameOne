@@ -6737,7 +6737,7 @@ private void whyAreEventsDisabledActionPerformed(java.awt.event.ActionEvent evt)
 
 private void simulateDeviceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_simulateDeviceActionPerformed
     String theme = null;
-    PreviewInSimulator.execute(this, theme, ResourceEditorView.getTemporarySaveOfCurrentFile(), name);
+    PreviewInSimulator.execute(this, theme, ResourceEditorView.getTemporarySaveOfCurrentFile(), name, ResourceEditorView.getBaseDir());
 }//GEN-LAST:event_simulateDeviceActionPerformed
 
 private void codenameOneMediaPlayerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMediaPlayerActionPerformed

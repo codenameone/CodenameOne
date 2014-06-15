@@ -22,6 +22,7 @@
  */
 package com.codename1.designer;
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.Simulator;
 import com.codename1.ui.util.Resources;
 import java.io.File;
@@ -42,7 +43,7 @@ import javax.swing.JOptionPane;
  * @author Shai Almog
  */
 public class PreviewInSimulator {
-    public static void execute(final JComponent parent, final String theme, final File resource, final String selection) {
+    public static void execute(final JComponent parent, final String theme, final File resource, final String selection, final File baseResDir) {
         new Thread() {
             public void run() {                
                 Preferences pref = Preferences.userNodeForPackage(PreviewInSimulator.class);
@@ -53,6 +54,9 @@ public class PreviewInSimulator {
                 }
                 pref.put("previewResource", resource.getAbsolutePath());
                 pref.put("previewSelection", selection);
+                if(baseResDir != null){
+                    pref.put("baseResourceDir", baseResDir.getAbsolutePath());
+                }
                 try {
                     pref.sync();
                 } catch (BackingStoreException ex) {
@@ -132,6 +136,11 @@ public class PreviewInSimulator {
                     Preferences pref = Preferences.userNodeForPackage(PreviewInSimulator.class);
                     String theme = pref.get("previewTheme", null);
                     File resFile = new File(pref.get("previewResource", null));
+                    String baseResDir = pref.get("baseResourceDir", null);
+                    if(baseResDir != null){
+                        JavaSEPort.setBaseResourceDir(new File(baseResDir));
+                    }
+                            
                     String selection = pref.get("previewSelection", null);
                     Resources res = Resources.open(new FileInputStream(resFile));
                     if(theme == null || theme.length() == 0) {

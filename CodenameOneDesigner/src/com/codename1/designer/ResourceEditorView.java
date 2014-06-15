@@ -156,6 +156,8 @@ public class ResourceEditorView extends FrameView {
     private List<String> recentFiles = new ArrayList<String>();
     private static File loadedFile;
     private File fileToLoad;
+    private static File baseResDir;
+    
     private String selectedResource = null;
     private HorizontalList themeList;
     private HorizontalList imageList;
@@ -203,6 +205,10 @@ public class ResourceEditorView extends FrameView {
         return loadedFile;
     }
 
+    public static File getBaseDir(){
+        return baseResDir;
+    }
+    
     public static File getTemporarySaveOfCurrentFile() {
         try {
             File tmp = File.createTempFile("Temp", ".res");
@@ -4107,8 +4113,10 @@ public static void openInIDE(File f, int lineNumber) {
             platformOverrides.setSelectedIndex(0);
             if(selection != null) {
                 try {
-                    JavaSEPortWithSVGSupport.setBaseResourceDir(new File(selection.getParentFile().getParentFile(), "src"));
+                    baseResDir = new File(selection.getParentFile().getParentFile(), "src");
+                    JavaSEPortWithSVGSupport.setBaseResourceDir(baseResDir);
                     loadedFile = selection;
+
                     loadedResources.openFileWithXMLSupport(selection);
                     //loadedResources.openFile(new FileInputStream(selection));
                     File codenameone_settings = new File(selection.getParentFile().getParentFile(), "codenameone_settings.properties");
