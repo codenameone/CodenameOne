@@ -188,7 +188,7 @@ public class Photo extends FBObject {
         created_time = (String) toCopy.get("created_time");
         updated_time = (String) toCopy.get("updated_time");
         String positionStr = (String) toCopy.get("position");
-         if(widthStr != null){
+         if(positionStr != null){
             position = Integer.parseInt(positionStr);
         }
 
