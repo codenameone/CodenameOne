@@ -220,6 +220,6 @@ static GLuint getOGLProgram(){
     GLErrorLog;
 }
 #else 
--execute{}
+-(void)execute {}
 #endif
 @end
