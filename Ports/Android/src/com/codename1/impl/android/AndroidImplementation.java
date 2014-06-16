@@ -328,6 +328,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
+                            Display.getInstance().setProperty("pendingPush", "true");                            
                             Display.getInstance().setProperty("pushType", t);
                             if(t != null && "3".equals(t)) {                                
                                 String[] a = b.split(";");
@@ -336,6 +337,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             } else {
                                 c.push(b);
                             }
+                            Display.getInstance().setProperty("pendingPush", null);                            
                         }
                     });
                 }
@@ -1094,6 +1096,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((Bitmap) nativeImage).getPixels(arr, offset, width, x, y, width,
                 height);
     }
+    
+    private int sampleSizeOverride = -1;
 
     @Override
     public Object createImage(String path) throws IOException {
@@ -1119,11 +1123,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
                 o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-                String sampleSize = Display.getInstance().getProperty("android.sampleSize", null);
-                if(sampleSize != null) {
-                    o2.inSampleSize = Integer.parseInt(sampleSize);
+                if(sampleSizeOverride != -1) {
+                    o2.inSampleSize = sampleSizeOverride;
                 } else {
-                    o2.inSampleSize = scale;
+                    String sampleSize = Display.getInstance().getProperty("android.sampleSize", null);
+                    if(sampleSize != null) {
+                        o2.inSampleSize = Integer.parseInt(sampleSize);
+                    } else {
+                        o2.inSampleSize = scale;
+                    }
                 }
                 o2.inPurgeable = true;
                 o2.inInputShareable = true;
@@ -1148,15 +1156,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         break;
                 }
 
-                if (angle != 0) {
+                if (sampleSizeOverride < 0 && angle != 0) {
                     Matrix mat = new Matrix();
                     mat.postRotate(angle);
                     Bitmap correctBmp = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mat, true);
                     b.recycle();
                     b = correctBmp;
                 }
-                
-                
             } catch (IOException e) {
             }
             return b;
@@ -4162,6 +4168,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
         Notification notification = new Notification(id, tickerText, System.currentTimeMillis());
 
+        notification.defaults |= Notification.DEFAULT_SOUND;
         if (flashLights) {
             notification.defaults |= Notification.DEFAULT_LIGHTS;
             notification.flags |= Notification.FLAG_SHOW_LIGHTS;
@@ -4176,12 +4183,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(b != null && b.booleanValue()) {
                 notification.flags |= Notification.FLAG_ONGOING_EVENT;
                 notification.flags |= Notification.FLAG_NO_CLEAR;
+            } else {
+                notification.flags |= Notification.FLAG_AUTO_CANCEL;
             }
             
             Integer notId = (Integer)args.get("id");
             if(notId != null) {
                 notifyId = notId.intValue();
             }
+        } else {
+            notification.flags |= Notification.FLAG_AUTO_CANCEL;
         }
         
         Intent notificationIntent = new Intent();
@@ -4355,7 +4366,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 curentForm = Display.getInstance().getCurrent();
                 Form f = new Form();
                 f.setLayout(new BorderLayout());
-                f.addComponent(BorderLayout.CENTER, getVideoComponent());
+                Component cmp = getVideoComponent();
+                if(cmp.getParent() != null) {
+                    cmp.getParent().removeComponent(cmp);
+                }
+                f.addComponent(BorderLayout.CENTER, cmp);
                 f.show();
             }
             nativeVideo.start();
@@ -4831,9 +4846,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public com.codename1.ui.util.ImageIO getImageIO() {
         if (imIO == null) {
             imIO = new com.codename1.ui.util.ImageIO() {
-                
                 @Override
                 public Dimension getImageSize(String imageFilePath) throws IOException {
+                    BitmapFactory.Options o = new BitmapFactory.Options();
+                    o.inJustDecodeBounds = true;
+                    o.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+                    FileInputStream fis = new FileInputStream(imageFilePath);
+                    BitmapFactory.decodeStream(fis, null, o);
+                    fis.close();
+
+                    ExifInterface exif = new ExifInterface(imageFilePath);               
+                    
+                    // if the image is in portrait mode
+                    int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+                    if(orientation == ExifInterface.ORIENTATION_ROTATE_90 || orientation == ExifInterface.ORIENTATION_ROTATE_270) {
+                        return new Dimension(o.outHeight, o.outWidth);
+                    }
+                    return new Dimension(o.outWidth, o.outHeight);
+                }
+                
+                private Dimension getImageSizeNoRotation(String imageFilePath) throws IOException {
                     BitmapFactory.Options o = new BitmapFactory.Options();
                     o.inJustDecodeBounds = true;
                     o.inPreferredConfig = Bitmap.Config.ARGB_8888;
@@ -4862,6 +4895,74 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     b.compress(f, (int) (quality * 100), response);
                 }
 
+                @Override
+                public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException{
+                    ExifInterface exif = new ExifInterface(imageFilePath);               
+                    Dimension d = getImageSizeNoRotation(imageFilePath);
+                    if(onlyDownscale) {
+                        if(scaleToFill) {
+                            if(d.getHeight() <= height || d.getWidth() <= width) {
+                                return imageFilePath;
+                            }
+                        } else {
+                            if(d.getHeight() <= height && d.getWidth() <= width) {
+                                return imageFilePath;
+                            }
+                        }
+                    }
+
+                    float ratio = ((float)d.getWidth()) / ((float)d.getHeight());
+                    int heightBasedOnWidth = (int)(((float)width) / ratio);
+                    int widthBasedOnHeight = (int)(((float)height) * ratio);
+                    if(scaleToFill) {
+                        if(heightBasedOnWidth >= width) {
+                            height = heightBasedOnWidth;
+                        } else {
+                            width = widthBasedOnHeight;
+                        }
+                    } else {
+                        if(heightBasedOnWidth > width) {
+                            width = widthBasedOnHeight;
+                        } else {
+                            height = heightBasedOnWidth;
+                        }
+                    }
+                    sampleSizeOverride = Math.max(d.getWidth()/width, d.getHeight()/height);
+                    OutputStream im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
+                    Image i = Image.createImage(imageFilePath);
+                    Image newImage = i.scaled(width, height);
+                    int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+                    int angle = 0;
+                    switch (orientation) {
+                        case ExifInterface.ORIENTATION_ROTATE_90:
+                            angle = 90;
+                            break;
+                        case ExifInterface.ORIENTATION_ROTATE_180:
+                            angle = 180;
+                            break;
+                        case ExifInterface.ORIENTATION_ROTATE_270:
+                            angle = 270;
+                            break;
+                    }
+                    if (angle != 0) {
+                        Matrix mat = new Matrix();
+                        mat.postRotate(angle);
+                        Bitmap b = (Bitmap)newImage.getImage();
+                        Bitmap correctBmp = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mat, true);
+                        b.recycle();
+                        newImage.dispose();
+                        Image tmp = Image.createImage(correctBmp);
+                        newImage = tmp;
+                        save(tmp, im, format, quality);
+                    } else {
+                        save(imageFilePath, im, format, width, height, quality);
+                    }
+                    sampleSizeOverride =  -1;
+                    return preferredOutputPath;
+                }
+
+                @Override
                 public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Image i = Image.createImage(imageFilePath);
                     Image newImage = i.scaled(width, height);
@@ -5135,6 +5236,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(Display.getInstance().getProperty("scanAllCodeTypes", "false").equals("true")) {
                 types = IntentIntegrator.ALL_CODE_TYPES;
             } 
+            if(Display.getInstance().getProperty("android.scanTypes", null) != null) {
+                String[] arr = Display.getInstance().getProperty("android.scanTypes", null).split(";");
+                types = Arrays.asList(arr);
+            } 
+            
             if(!in.initiateScan(types, "ONE_D_MODE")){
                 // restore old activity handling
                  Display.getInstance().callSerially(new Runnable() {

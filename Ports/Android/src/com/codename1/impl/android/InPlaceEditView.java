@@ -278,12 +278,24 @@ public class InPlaceEditView extends FrameLayout {
             nextDown = textArea.getComponentForm().findNextFocusVertical(true);
         } 
         if (textArea.isSingleLineTextArea()) {
-            if(textArea instanceof TextField && ((TextField)textArea).getDoneListener() != null){
-                mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);            
-            } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
-                mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+            if(textArea.getClientProperty("searchField") != null) {
+                mEditText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
             } else {
-                mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+                if(textArea.getClientProperty("sendButton") != null) {
+                    mEditText.setImeOptions(EditorInfo.IME_ACTION_SEND);
+                } else {
+                    if(textArea.getClientProperty("goButton") != null) {
+                        mEditText.setImeOptions(EditorInfo.IME_ACTION_GO);
+                    } else {
+                        if(textArea instanceof TextField && ((TextField)textArea).getDoneListener() != null){
+                            mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);            
+                        } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
+                            mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+                        } else {
+                            mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+                        }
+                    }
+                }
             }
         }
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
