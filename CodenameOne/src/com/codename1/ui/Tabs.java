@@ -89,7 +89,7 @@ public class Tabs extends Container {
     private boolean changeTabContainerStyleOnFocus;
     private int tabsGap = 0;
     private Style originalTabsContainerUnselected, originalTabsContainerSelected;
-    
+    private String tabUIID = "Tab";
     
     /**
      * Creates an empty <code>TabbedPane</code> with a default
@@ -449,7 +449,7 @@ public class Tabs extends Container {
             return;
         }
         final Button b = tab;
-        b.setUIID("Tab");
+        b.setUIID(tabUIID);
 
         if(b.getIcon() == null) {
             Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
@@ -469,7 +469,7 @@ public class Tabs extends Container {
             public void actionPerformed(ActionEvent evt) {
 
                 if(selectedTab != null){
-                    selectedTab.setUIID("Tab");
+                    selectedTab.setUIID(tabUIID);
                     selectedTab.setShouldCalcPreferredSize(true);
                     selectedTab.repaint();
                     int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
@@ -911,6 +911,22 @@ public class Tabs extends Container {
         }
     }
 
+    /**
+     * The UIID for a tab component which defaults to Tab
+     * @return the tabUIID
+     */
+    public String getTabUIID() {
+        return tabUIID;
+    }
+
+    /**
+     * The UIID for a tab component which defaults to Tab
+     * @param tabUIID the tabUIID to set
+     */
+    public void setTabUIID(String tabUIID) {
+        this.tabUIID = tabUIID;
+    }
+
 
     class TabsLayout extends Layout{
 
@@ -1075,7 +1091,7 @@ public class Tabs extends Container {
                             // of weight.
                             dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
                         }
-                    }
+                    } 
                     if (initialX != -1 && contentPane.contains(x, y)) {
                         int diffX = x - lastX;
                         if (diffX != 0 && dragStarted) {
@@ -1127,6 +1143,7 @@ public class Tabs extends Container {
                             if (form != null) {
                                 form.registerAnimatedInternal(Tabs.this);
                             }
+                            evt.consume();
                         }
                     }
                     lastX = -1;

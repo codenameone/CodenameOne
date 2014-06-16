@@ -249,7 +249,6 @@ public final class Graphics {
     
     /**
      * Pops the top clip from the clip stack and sets it as the current clip.
-     * @return The shape of the clip that was popped of the stack.
      */
     public void popClip(){
         impl.popClip(nativeGraphics);
@@ -670,7 +669,7 @@ public final class Graphics {
      * anchor point by either embedding it in the transformation matrix (i.e. pre-transform the {@link com.codename1.ui.geom.Matrix} to anchor at a different point)
      * or use the {@link #setTransform(com.codename1.ui.geom.Matrix,int,int)} variation that allows you to explicitly set the 
      * anchor point.</p>
-     * @param matrix The transformation {@link com.codename1.ui.geom.Matrix} to use for drawing.  2D/Affine transformations
+     * @param transform The transformation {@link com.codename1.ui.geom.Matrix} to use for drawing.  2D/Affine transformations
      * can be achieved using a 3x3 transformation {@link com.codename1.ui.geom.Matrix}.  3D/Perspective transformations
      * can be achieved using a 4x3 transformation {@link com.codename1.ui.geom.Matrix}.
      * 

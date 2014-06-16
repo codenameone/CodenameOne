@@ -1644,7 +1644,7 @@ public class Form extends Container {
         }
         return this;
     }
-
+    
     /**
      * Invoked by display to hide the menu during transition
      * 
@@ -1788,7 +1788,17 @@ public class Form extends Container {
     public void longPointerPress(int x, int y) {
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
-                focused.longPointerPress(x, y);
+                if (focused.hasLead) {
+                    Container leadParent;
+                    if (focused instanceof Container) {
+                        leadParent = ((Container) focused).getLeadParent();
+                    } else {
+                        leadParent = focused.getParent().getLeadParent();
+                    }
+                    leadParent.longPointerPress(x, y);
+                } else {
+                    focused.longPointerPress(x, y);
+                }
             }
         }
     }
@@ -2301,7 +2311,11 @@ public class Form extends Container {
             }
         }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            pointerReleasedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            ActionEvent ev = new ActionEvent(this, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
         }
         if(dragStopFlag) {
             dragStopFlag = false;

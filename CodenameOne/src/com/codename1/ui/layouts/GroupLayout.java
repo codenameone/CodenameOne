@@ -269,7 +269,7 @@ public class GroupLayout extends Layout {
     
 
     /**
-     * Creates a GroupLayout for the specified JComponent.
+     * Creates a GroupLayout for the specified Container.
      *
      * @param host the Container to layout
      * @throws IllegalArgumentException if host is null

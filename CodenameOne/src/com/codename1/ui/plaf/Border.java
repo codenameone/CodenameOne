@@ -1834,4 +1834,41 @@ public class Border {
             }
         }
     }    
+    
+    /**
+     * This method is for internal usage only!
+     */
+    public Object getProperty(String n) {
+        if(n.equals("ThemeColors")) {
+            if(themeColors) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        }
+        if(n.equals("Type")) {
+            return new Integer(type);
+        }
+        if(n.equals("ColorA")) {
+            return new Integer(colorA);
+        }
+        if(n.equals("ColorB")) {
+            return new Integer(colorB);
+        }
+        if(n.equals("ColorC")) {
+            return new Integer(colorC);
+        }
+        if(n.equals("ColorD")) {
+            return new Integer(colorD);
+        }
+        if(n.equals("ArcWidth")) {
+            return new Integer(arcWidth);
+        }
+        if(n.equals("ArcHeight")) {
+            return new Integer(arcHeight);
+        }
+        if(n.equals("Images")) {
+            return images;
+        }
+        return null;
+    }
 }
