@@ -53,7 +53,8 @@ static NSString *fragmentShaderSrc =
 
 "void main(){\n"
 //"   gl_FragColor = texture2D(uTextureRGBA, vTextureRGBACoord) * uColor; \n"
-"   gl_FragColor = vec4(uColor.rgb, texture2D(uTextureRGBA, vTextureRGBACoord).a*uColor.a);\n"
+"   vec4 color = vec4(uColor.rgb, texture2D(uTextureRGBA, vTextureRGBACoord).a*uColor.a);\n"
+"   if ( color.a < .0001 ){ discard;} else {gl_FragColor = color;}\n"
 "}\n";
 
 static NSString *vertexShaderSrc =

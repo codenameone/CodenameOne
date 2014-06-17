@@ -4331,7 +4331,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
         Graphics2D g = getGraphics(graphics);
-        g.setTransform((AffineTransform)transform.getNativeTransform());
+        AffineTransform t = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+        t.concatenate((AffineTransform)transform.getNativeTransform());
+        g.setTransform(t);
+        
         setNativeScreenGraphicsTransform(graphics, transform);
     }
 

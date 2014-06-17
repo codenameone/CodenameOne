@@ -23,6 +23,7 @@
 package com.codename1.ui.geom;
 
 
+import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
 import java.util.Arrays;
@@ -194,7 +195,7 @@ public final class GeneralPath implements Shape {
             System.arraycopy(p.points, pointIndex, coords, 0, count);
             if (transform != null) {
 
-                for (int i = 0; i <= count; i += 2) {
+                for (int i = 0; i < count; i += 2) {
                     buf[0] = coords[i];
                     buf[1] = coords[i + 1];
                     transform.transformPoint(buf, buf);
@@ -443,8 +444,9 @@ public final class GeneralPath implements Shape {
      * {@link PathIterator#SEG_MOVETO} unchanged.
      */
     public void append(PathIterator path, boolean connect) {
+        float coords[] = new float[6];
         while (!path.isDone()) {
-            float coords[] = new float[6];
+            
             switch (path.currentSegment(coords)) {
                 case PathIterator.SEG_MOVETO:
                     if (!connect || typeSize == 0) {

@@ -3112,6 +3112,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void resetAffine() {
             if ( isTransformSupported() ){
                 this.transform.setIdentity();
+                transformApplied = false;
             } else {
                 nativeInstance.resetAffineGlobal();
             }
@@ -3120,6 +3121,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void scale(float x, float y) {
             if ( isTransformSupported() ){
                 this.transform.scale(x, y, 1);
+                transformApplied = false;
             } else {
                 nativeInstance.scaleGlobal(x, y);
             }
@@ -3128,6 +3130,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void rotate(float angle) {
             if ( isTransformSupported() ){
                 this.transform.rotate(angle, 0, 0, 1);
+                transformApplied = false;
             } else {
                 nativeInstance.rotateGlobal(angle);
             }
@@ -3136,6 +3139,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void rotate(float angle, int x, int y) {
             if ( isTransformSupported() ){
                 this.transform.rotate(angle, x, y, 1);
+                transformApplied = false;
             } else {
                 nativeInstance.rotateGlobal(angle, x, y);
             }
