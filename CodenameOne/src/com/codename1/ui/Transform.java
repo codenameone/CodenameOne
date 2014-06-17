@@ -238,7 +238,7 @@ public class Transform {
     /**
      * Makes a new rotation transformation.
      * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     * @param angle The angle of the rotation.
+     * @param angle The angle of the rotation in radians.
      * @param x The x component of the vector around which the rotation occurs.
      * @param y The y component of the vector around which the rotation occurs.
      * @param z The z component of the vector around which the rotation occurs.
@@ -341,7 +341,7 @@ public class Transform {
     /**
      * Rotates the current transform.
      * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     * @param angle The angle to rotate.
+     * @param angle The angle to rotate in radians.
      * @param x The x-coordinate of the vector around which to rotate.
      * @param y The y-coordinate of the vector around which to rotate.
      * @param z  The z-coordinate of the vector around which to rotate.
@@ -357,7 +357,7 @@ public class Transform {
      * Sets the transform to be the provided rotation. This replaces the current transform
      * whereas {@link #rotate()} further rotates the current transform.
      * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     * @param angle The angle to rotate.
+     * @param angle The angle to rotate in radians.
      * @param x The x-coordinate of the vector around which to rotate.
      * @param y The y-coordinate of the vector around which to rotate.
      * @param z  The z-coordinate of the vector around which to rotate.
