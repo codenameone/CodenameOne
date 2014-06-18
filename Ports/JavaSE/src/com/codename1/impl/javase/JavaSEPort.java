@@ -4889,7 +4889,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     setStorageData("CodenameOneStorage");
                 }
             }
-            storageDir = new File(System.getProperty("user.home"), "." + ((String) getStorageData()));
+            storageDir = new File(System.getProperty("user.home"), ((String) getStorageData()));
             storageDir.mkdirs();
         }
         return storageDir;
