@@ -5898,4 +5898,172 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void writeToSocketStream(Object socket, byte[] data) {
         ((SocketImpl)socket).writeToStream(data);
     }
+    
+    //Begin new Graphics Work
+    @Override
+    public boolean isShapeSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
+        Path p = cn1ShapeToAndroidPath(shape);
+        ag.fillPath(p);
+    }
+
+    @Override
+    public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
+        Path p = cn1ShapeToAndroidPath(shape);
+        ag.drawPath(p);
+    }
+
+    // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
+    @Override
+    public boolean isTransformSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isPerspectiveTransformSupported() {
+        return false;
+    }
+
+    @Override
+    public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
+        Matrix m = new Matrix();        
+        m.setTranslate(translateX, translateY);
+        return m;
+    }
+
+    @Override
+    public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
+        Matrix m = new Matrix();
+        m.setScale(scaleX, scaleY);
+        return m;
+    }
+
+    @Override
+    public Object makeTransformRotation(float angle, float x, float y, float z) {
+        Matrix m = new Matrix();
+        m.setRotate((float) Math.toDegrees(angle));
+        return m;
+    }
+
+    @Override
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    @Override
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    @Override
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+
+    @Override
+    public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
+        ((Matrix) nativeTransform).preRotate((float)Math.toDegrees(angle));
+    }
+
+    @Override
+    public void transformTranslate(Object nativeTransform, float x, float y, float z) {
+        ((Matrix) nativeTransform).preTranslate(x, y);
+    }
+
+    @Override
+    public void transformScale(Object nativeTransform, float x, float y, float z) {
+        ((Matrix) nativeTransform).preScale(x, y);
+    }
+
+    @Override
+    public Object makeTransformInverse(Object nativeTransform) {
+        Matrix inverted = new Matrix();
+        if(((Matrix) nativeTransform).invert(inverted)){
+            return inverted;
+        }
+        return null;
+    }
+
+    @Override
+    public Object makeTransformIdentity() {
+        Matrix m = new Matrix();
+        return m;
+    }
+
+    @Override
+    public void copyTransform(Object src, Object dest) {
+        Matrix t1 = (Matrix) src;
+        Matrix t2 = (Matrix) dest;
+        t2.set(t1);
+    }
+
+    @Override
+    public void concatenateTransform(Object t1, Object t2) {
+        ((Matrix) t1).preConcat((Matrix) t2);
+    }
+
+    @Override
+    public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        Matrix t = (Matrix) nativeTransform;
+        t.mapPoints(in, 0, out, 0, 2);
+    }
+
+    @Override
+    public void setTransform(Object graphics, Transform transform) {
+        AndroidGraphics ag = (AndroidGraphics) graphics;
+        ag.setTransform(transform);
+    }
+
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        com.codename1.ui.Transform t = ((AndroidGraphics) graphics).getTransform();
+        if (t == null) {
+            return Transform.makeIdentity();
+        }
+        return t;
+    }
+    // END TRANSFORM STUFF
+
+    private Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape) {
+        Path p = new Path();
+        com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+        //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
+        float[] buf = new float[6];
+        while (!it.isDone()) {
+            int type = it.currentSegment(buf);
+            switch (type) {
+                case com.codename1.ui.geom.PathIterator.SEG_MOVETO:
+                    p.moveTo(buf[0], buf[1]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_LINETO:
+                    p.lineTo(buf[0], buf[1]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_QUADTO:
+                    p.quadTo(buf[0], buf[1], buf[2], buf[3]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_CUBICTO:
+                    p.cubicTo(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+                    break;
+                case com.codename1.ui.geom.PathIterator.SEG_CLOSE:
+                    p.close();
+                    break;
+
+            }
+            it.next();
+        }
+
+        return p;
+    }
+    
 }

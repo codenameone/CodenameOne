@@ -44,6 +44,7 @@ package com.codename1.impl.android;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -51,6 +52,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
+import com.codename1.ui.Transform;
 
 /**
  * #######################################################################
@@ -63,7 +65,8 @@ class AndroidGraphics {
     private Canvas canvas;
     private Paint paint;
     private Paint font;
-
+    private Transform transform;
+    
     private boolean clipFresh;
     private final RectF tmprectF = new RectF();
     private final Rect tmprect = new Rect();
@@ -78,6 +81,7 @@ class AndroidGraphics {
         if(canvas != null) {
             canvas.save();
         }
+        transform = Transform.makeIdentity();
     }
 
 
@@ -115,7 +119,10 @@ class AndroidGraphics {
     }
 
     public void drawImage(Object img, int x, int y) {
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawBitmap((Bitmap) img, x, y, paint);
+        canvas.restore();
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
@@ -130,13 +137,20 @@ class AndroidGraphics {
         dest.bottom = y + h;
         dest.left = x;
         dest.right = x + w;
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawBitmap(b, src, dest, paint);
+        canvas.restore();
     }
 
     public void drawLine(int x1, int y1, int x2, int y2) {
         paint.setStyle(Paint.Style.FILL);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawLine(x1, y1, x2, y2, paint);
+        canvas.restore();
     }
+    
     
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
         if (nPoints <= 1) {
@@ -148,7 +162,10 @@ class AndroidGraphics {
             this.tmppath.lineTo(xPoints[i], yPoints[i]);
         }
         paint.setStyle(Paint.Style.STROKE);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawPath(this.tmppath, paint);
+        canvas.restore();
     }
     
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
@@ -161,21 +178,31 @@ class AndroidGraphics {
             this.tmppath.lineTo(xPoints[i], yPoints[i]);
         }
         paint.setStyle(Paint.Style.FILL);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawPath(this.tmppath, paint);
+        canvas.restore();
     }
     
     public void drawRGB(int[] rgbData, int offset, int x,
             int y, int w, int h, boolean processAlpha) {
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawBitmap(rgbData, offset, w, x, y, w, h,
                 processAlpha, null);
+        canvas.restore();
     }
     
     public void drawRect(int x, int y, int width, int height) {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.STROKE);
         paint.setAntiAlias(false);
-        canvas.drawRect(x, y, x + width, y + height, paint);
+        
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.drawRect(x, y, x + width, y + height, paint);        
         paint.setAntiAlias(antialias);
+        canvas.restore();
     }
     
     public void drawRoundRect(int x, int y, int width,
@@ -183,27 +210,39 @@ class AndroidGraphics {
 
         paint.setStyle(Paint.Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.restore();
     }
 
     public void drawString(String str, int x, int y) {
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawText(str, x, y - font.getFontMetricsInt().ascent, font);
+        canvas.restore();
     }
 
     public void drawArc(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
         paint.setStyle(Paint.Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawArc(this.tmprectF, 360 - startAngle,
                 -arcAngle, false, paint);
+        canvas.restore();
     }
 
     public void fillArc(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
         paint.setStyle(Paint.Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawArc(this.tmprectF, 360 - startAngle,
                 -arcAngle, true, paint);
+        canvas.restore();
     }
     
     public void fillRect(int x, int y, int width, int height) {
@@ -211,8 +250,11 @@ class AndroidGraphics {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
+        canvas.restore();
         
     }
 
@@ -220,7 +262,10 @@ class AndroidGraphics {
             int height, int arcWidth, int arcHeight) {
         paint.setStyle(Paint.Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
         canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.restore();
     }
 
     public int getAlpha() {
@@ -293,4 +338,29 @@ class AndroidGraphics {
     public final void fillBitmap(int color) {
         canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);        
     }
+    
+    public void drawPath(Path p) {
+        paint.setStyle(Paint.Style.STROKE);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.drawPath(p, paint);
+        canvas.restore();
+    }
+    
+    public void fillPath(Path p) {
+        paint.setStyle(Paint.Style.FILL);
+        canvas.save();
+        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.drawPath(p, paint);
+        canvas.restore();
+    }
+    
+    public void setTransform(Transform transform) {
+        this.transform = transform;
+    }
+
+    public Transform getTransform() {
+        return transform;
+    }
+    
 }
