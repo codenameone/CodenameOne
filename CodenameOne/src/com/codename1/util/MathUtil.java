@@ -746,7 +746,7 @@ public abstract class MathUtil {
         j = (int) ((long) Double.doubleToLongBits(z) >>> HI_SHIFT);
         j += (n << 20);
         if ((j >> 20) <= 0) {
-            z = scalbn(z, n); /* subnormal output */
+            z = scalb(z, n); /* subnormal output */
         } else //__HI(z) = j;
         {
             z = Double.longBitsToDouble(((long) j << HI_SHIFT) | (Double.doubleToLongBits(z) & LO_MASK));
@@ -1115,8 +1115,7 @@ public abstract class MathUtil {
             case 0:
                 return z; /* atan(+,+) */
             case 1:
-                z = Double.longBitsToDouble(Double.doubleToLongBits(z) ^ 0x80000000); // __HI(z) ^= 0x80000000;
-                return z; /* atan(-,+) */
+                return -z; /* atan(-,+) */
             case 2:
                 return pi - (z - pi_lo);/* atan(+,-) */
             default: /* case 3 */
@@ -1130,7 +1129,7 @@ public abstract class MathUtil {
      * manipulation rather than by actually performing an
      * exponentiation or a multiplication.
      */
-    public static final double scalbn(double x, int n) {
+    public static final double scalb(double x, int n) {
         int k, hx, lx;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
         lx = (int) (Double.doubleToLongBits(x) & LO_MASK);
@@ -1151,7 +1150,7 @@ public abstract class MathUtil {
         }
         k = k + n;
         if (k > 0x7fe) {
-            return huge * copysign(huge, x); /* overflow  */
+            return huge * copySign(huge, x); /* overflow  */
         }
         if (k > 0) /* normal result */ {
             //__HI(x) = (hx&0x800fffff)|(k<<20);
@@ -1160,9 +1159,9 @@ public abstract class MathUtil {
         }
         if (k <= -54) {
             if (n > 50000) /* in case integer overflow in n+k */ {
-                return huge * copysign(huge, x); /*overflow*/
+                return huge * copySign(huge, x); /*overflow*/
             } else {
-                return tiny * copysign(tiny, x);  /*underflow*/
+                return tiny * copySign(tiny, x);  /*underflow*/
             }
         }
         k += 54;        /* subnormal result */
@@ -1171,18 +1170,41 @@ public abstract class MathUtil {
         return x * twom54;
     }
 
+    /**
+     * Please update your code to use scalb
+     * @param x
+     * @param n
+     * @return scalb(x,n)
+     * @deprecated Please update your code to use scalb
+     */
+    public static final double scalbn(double x, int n) {
+        return scalb(x, n);
+    }
+    
     /*
-     * copysign(double x, double y)
-     * copysign(x,y) returns a value with the magnitude of x and
+     * copySign(double x, double y)
+     * copySign(x,y) returns a value with the magnitude of x and
      * with the sign bit of y.
      */
-    public static final double copysign(final double x, final double y) {
+    public static final double copySign(final double x, final double y) {
         //__HI(x) = (__HI(x)&0x7fffffff)|(__HI(y)&0x80000000);
         // The below is actually about 30% faster than doing greater/less comparisons.
         return Double.longBitsToDouble((Double.doubleToLongBits(x) & 0x7fffffffffffffffL)
                 | (Double.doubleToLongBits(y) & 0x8000000000000000L));
     }
 
+    /**
+     * Please update your code to use copySign
+     * @param x
+     * @param y
+     * @return copySign(x,y)
+     * @deprecated Please update your code to use copySign
+     */
+    public static final double copysign(final double x, final double y) {
+        return copySign(x, y);
+    }
+    
+    
     /*
      * fabs(x) returns the absolute value of x.
      * This is already handled by Java ME.
@@ -1192,4 +1214,90 @@ public abstract class MathUtil {
     //return Double.longBitsToDouble(Double.doubleToLongBits(x) & 0x7fffffffffffffffL);
     }
      */
+
+    /*
+     * use a precalculated value for the ulp of Double.MAX_VALUE
+     */
+    private static final double MAX_ULP = 1.9958403095347198E292;
+
+    /**
+     * Returns the size of an ulp (units in the last place) of the argument.
+     * @param d value whose ulp is to be returned
+     * @return size of an ulp for the argument
+     */
+    public static double ulp(double d) {
+        if (Double.isNaN(d)) {
+            // If the argument is NaN, then the result is NaN.
+            return Double.NaN;
+        }
+
+        if (Double.isInfinite(d)) {
+            // If the argument is positive or negative infinity, then the
+            // result is positive infinity.
+            return Double.POSITIVE_INFINITY;
+        }
+
+        if (d == 0.0) {
+            // If the argument is positive or negative zero, then the result is Double.MIN_VALUE.
+            return Double.MIN_VALUE;
+        }
+
+        d = Math.abs(d);
+        if (d == Double.MAX_VALUE) {
+            // If the argument is ±Double.MAX_VALUE, then the result is equal to 2^971.
+            return MAX_ULP;
+        }
+
+        return nextAfter(d, Double.MAX_VALUE) - d;
+    }
+
+    private static boolean isSameSign(double x, double y) {
+        return copySign(x, y) == x;
+    }
+
+    /**
+     * Returns the next representable floating point number after the first
+     * argument in the direction of the second argument.
+     *
+     * @param start starting value
+     * @param direction value indicating which of the neighboring representable
+     *  floating point number to return
+     * @return The floating-point number next to {@code start} in the
+     * direction of {@direction}.
+     */
+    public static double nextAfter(final double start, final double direction) {
+        if (Double.isNaN(start) || Double.isNaN(direction)) {
+            // If either argument is a NaN, then NaN is returned.
+            return Double.NaN;
+        }
+
+        if (start == direction) {
+            // If both arguments compare as equal the second argument is returned.
+            return direction;
+        }
+
+        final double absStart = Math.abs(start);
+        final double absDir = Math.abs(direction);
+        final boolean toZero = !isSameSign(start, direction) || absDir < absStart;
+
+        if (toZero) {
+            // we are reducing the magnitude, going toward zero.
+            if (absStart == Double.MIN_VALUE) {
+                return copySign(0.0, start);
+            }
+            if (Double.isInfinite(absStart)) {
+                return copySign(Double.MAX_VALUE, start);
+            }
+            return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) - 1L), start);
+        } else {
+            // we are increasing the magnitude, toward +-Infinity
+            if (start == 0.0) {
+                return copySign(Double.MIN_VALUE, direction);
+            }
+            if (absStart == Double.MAX_VALUE) {
+                return copySign(Double.POSITIVE_INFINITY, start);
+            }
+            return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) + 1L), start);
+        }
+    }
 }
