@@ -421,8 +421,6 @@ public class Dialog extends Form {
      * @param bottom space in pixels between the bottom of the screen and the form
      * @param left space in pixels between the left of the screen and the form
      * @param right space in pixels between the right of the screen and the form
-     * @param includeTitle whether the title should hang in the top of the screen or
-     * be glued onto the content pane
      * @return the last command pressed by the user if such a command exists
      */
     public Command show(int top, int bottom, int left, int right) {

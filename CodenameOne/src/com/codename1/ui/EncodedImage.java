@@ -561,19 +561,27 @@ public class EncodedImage extends Image {
         }
         try {
             ImageIO io = ImageIO.getImageIO();
-            if(io != null && io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                // do an image IO scale which is more efficient
-                ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                io.save(new ByteArrayInputStream(getImageData()), bo, ImageIO.FORMAT_PNG, width, height, 0.9f);
-                Util.cleanup(bo);
-                EncodedImage img = EncodedImage.create(bo.toByteArray());
-                img.opaque = opaque;
-                img.opaqueChecked = opaqueChecked;
-                if(width > -1 && height > -1) {
-                    img.width = width;
-                    img.height = height;
+            if(io != null) {
+                String format = ImageIO.FORMAT_PNG;
+                if(isOpaque() || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    if(io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                        format = ImageIO.FORMAT_JPEG;
+                    }
                 }
-                return img;
+                if(io.isFormatSupported(format)) {
+                    // do an image IO scale which is more efficient
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    io.save(new ByteArrayInputStream(getImageData()), bo, format, width, height, 0.9f);
+                    Util.cleanup(bo);
+                    EncodedImage img = EncodedImage.create(bo.toByteArray());
+                    img.opaque = opaque;
+                    img.opaqueChecked = opaqueChecked;
+                    if(width > -1 && height > -1) {
+                        img.width = width;
+                        img.height = height;
+                    }
+                    return img;
+                }
             }
         } catch(IOException err) {
             // normally this shouldn't happen but this will keep falling back to the existing scaled code

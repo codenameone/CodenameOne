@@ -1606,7 +1606,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (pullDown == null) {
             pullDown = new Label(getUIManager().localize("pull.down", "Pull down do refresh..."));
             pullDown.getStyle().setAlignment(Component.CENTER);
-            Image i = Resources.getSystemResource().getImage("refresh-icon.png");
+            Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
+            if(i == null) {
+                i = Resources.getSystemResource().getImage("refresh-icon.png");
+            }
             i = i.rotate(180);
             ((Label) pullDown).setIcon(i);
         }

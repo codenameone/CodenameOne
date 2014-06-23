@@ -248,14 +248,16 @@ public class ImageViewer extends Component {
      */
     @Override
     public void keyReleased(int key) {
-        int gk = Display.getInstance().getGameAction(key);
-        if((gk == Display.GAME_LEFT || gk == Display.GAME_UP) && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
-            new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
-            return;
-        }
-        if(gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
-            new AnimatePanX(2, getImageRight(), getImageRightPos());
-            return;
+        if(swipeableImages != null) {
+            int gk = Display.getInstance().getGameAction(key);
+            if((gk == Display.GAME_LEFT || gk == Display.GAME_UP) && (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos())) {
+                new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
+                return;
+            }
+            if(gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
+                new AnimatePanX(2, getImageRight(), getImageRightPos());
+                return;
+            }
         }
     }
     

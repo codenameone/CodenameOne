@@ -473,8 +473,11 @@ public class Table extends Container {
      * @param drawBorder the drawBorder to set
      */
     public void setDrawBorder(boolean drawBorder) {
-        this.drawBorder = drawBorder;
-        repaint();
+        if(this.drawBorder != drawBorder) {
+            this.drawBorder = drawBorder;
+            updateModel();
+            revalidate();
+        }
     }
 
     /**
@@ -488,8 +491,11 @@ public class Table extends Container {
             throw new IllegalArgumentException("Inner border mode must be one of the INNER_BORDER_* constants");
         }
 
-        this.innerBorder=innerBorder;
-        repaint();
+        if(this.innerBorder != innerBorder) {
+            this.innerBorder=innerBorder;
+            updateModel();
+            revalidate();
+        }
     }
 
     /**
