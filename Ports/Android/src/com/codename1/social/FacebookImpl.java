@@ -43,9 +43,11 @@ import com.facebook.Session;
 import com.facebook.SessionDefaultAudience;
 import com.facebook.SessionLoginBehavior;
 import com.facebook.SessionState;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.StringTokenizer;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -57,7 +59,7 @@ import org.json.JSONObject;
 public class FacebookImpl extends FacebookConnect {
 
     private SessionDefaultAudience defaultAudience = SessionDefaultAudience.FRIENDS;
-    private List<String> permissions = Arrays.asList(new String[]{"user_photos", "friends_photos", "read_stream", "user_relationships", "user_birthday", "friends_birthday", "friends_relationships", "read_mailbox", "user_events", "friends_events", "user_about_me"});
+    private static List<String> permissions;
     private SessionLoginBehavior loginBehavior = SessionLoginBehavior.SSO_WITH_FALLBACK;
     private boolean publish = false;
     private boolean loginLock = false;
@@ -66,6 +68,24 @@ public class FacebookImpl extends FacebookConnect {
 
     public static void init() {
         FacebookConnect.implClass = FacebookImpl.class;
+        permissions = new ArrayList<String>();
+        String permissionsStr = Display.getInstance().getProperty("facebook_permissions", "");
+        permissionsStr = permissionsStr.trim();
+        
+        StringTokenizer token = new StringTokenizer(permissionsStr, ",");
+        if (token.countTokens() > 0) {
+            try {
+                while (token.hasMoreElements()) {
+                    String permission = (String) token.nextToken();
+                    permission = permission.trim();
+                    permissions.add(permission);
+                }
+            } catch (Exception e) {
+                //the pattern is not valid
+            }
+
+        }
+
     }
 
     @Override
@@ -174,7 +194,7 @@ public class FacebookImpl extends FacebookConnect {
             }
         });
         return arr[0];
-    } 
+    }
 
     @Override
     public void logout() {
@@ -223,14 +243,14 @@ public class FacebookImpl extends FacebookConnect {
                                     s.onActivityResult(AndroidNativeUtil.getActivity(), requestCode, resultCode, data);
                                 }
                                 cn.restoreIntentResultListener();
-                            } 
+                            }
                         });
                         //Session.OpenRequest openRequest = new Session.OpenRequest(cn);
                         Session.NewPermissionsRequest newPermissionsRequest = new Session.NewPermissionsRequest(cn, PUBLISH_PERMISSIONS);
                         newPermissionsRequest.setCallback(new Session.StatusCallback() {
 
                             public void call(Session session, SessionState state, final Exception exception) {
-                                
+
                                 if (exception != null) {
                                     Log.p("CN1 Write Permissions calback exception");
                                     Log.e(exception);
