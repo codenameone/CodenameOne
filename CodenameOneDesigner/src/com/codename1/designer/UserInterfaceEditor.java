@@ -1661,16 +1661,20 @@ public class UserInterfaceEditor extends BaseForm {
                     return super.getTableCellRendererComponent(table, valueStr, isSelected, hasFocus, row, column);
                 }
                 if(rowClass == String[][].class) {
-                    String[] s = ((String[][])value)[0];
-                    String valueStr = "[";
-                    for(int iter = 0 ; iter < s.length ; iter++) {
-                        valueStr += s[iter];
-                        if(iter < s.length - 1) {
-                            valueStr += ", ";
+                    if(((String[][])value).length > 0) {
+                        String[] s = ((String[][])value)[0];
+                        String valueStr = "[";
+                        for(int iter = 0 ; iter < s.length ; iter++) {
+                            valueStr += s[iter];
+                            if(iter < s.length - 1) {
+                                valueStr += ", ";
+                            }
                         }
+                        valueStr += "]";
+                        return super.getTableCellRendererComponent(table, valueStr, isSelected, hasFocus, row, column);
+                    } else {
+                        return super.getTableCellRendererComponent(table, "...", isSelected, hasFocus, row, column);
                     }
-                    valueStr += "]";
-                    return super.getTableCellRendererComponent(table, valueStr, isSelected, hasFocus, row, column);
                 }
 
                 if(rowClass == com.codename1.ui.Component.class) {
@@ -6902,7 +6906,7 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
             lockForDragging = false;
             return; 
         }
-        addComponentToContainer(new com.codename1.ui.AutoCompleteTextField(), "Picker");
+        addComponentToContainer(new com.codename1.ui.spinner.Picker(), "Picker");
     }//GEN-LAST:event_codenameOnePickerActionPerformed
 
 
