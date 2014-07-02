@@ -61,6 +61,8 @@ import com.codename1.ui.util.EventDispatcher;
  */
 public class Tabs extends Container {
     private Container contentPane = new Container(new TabsLayout());
+    private boolean eagerSwipeMode;
+    
     /**
      * Where the tabs are placed.
      */
@@ -927,6 +929,24 @@ public class Tabs extends Container {
         this.tabUIID = tabUIID;
     }
 
+    /**
+     * Allows marking tabs as swipe "eager" which instantly triggers swipe on movement
+     * rather than threshold the swipe.
+     * @return the eagerSwipeMode
+     */
+    public boolean isEagerSwipeMode() {
+        return eagerSwipeMode;
+    }
+
+    /**
+     * Allows marking tabs as swipe "eager" which instantly triggers swipe on movement
+     * rather than threshold the swipe.
+     * @param eagerSwipeMode the eagerSwipeMode to set
+     */
+    public void setEagerSwipeMode(boolean eagerSwipeMode) {
+        this.eagerSwipeMode = eagerSwipeMode;
+    }
+
 
     class TabsLayout extends Layout{
 
@@ -1012,6 +1032,16 @@ public class Tabs extends Container {
     
     }
     
+    /**
+     * Allows developers to customize the motion object for the slide effect
+     * to provide a linear slide effect.
+     * @param start start position
+     * @param end end position for the motion
+     * @return the motion object
+     */
+    protected Motion createTabSlideMotion(int start, int end) {
+        return Motion.createSplineMotion(start, end, 250);
+    }
     
     class SwipeListener implements ActionListener{
 
@@ -1080,16 +1110,20 @@ public class Tabs extends Container {
                         return;
                     }
                     if (!dragStarted) {
-                        if(riskySwipe) {
-                            if(Math.abs(x - initialX) < Math.abs(y - initialY)) {
-                                return;
-                            }
-                            // give heavier weight when we have two axis swipe
-                            dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 5);
+                        if(isEagerSwipeMode()) {
+                            dragStarted = true;
                         } else {
-                            // start drag not imediately, giving components some sort
-                            // of weight.
-                            dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                            if(riskySwipe) {
+                                if(Math.abs(x - initialX) < Math.abs(y - initialY)) {
+                                    return;
+                                }
+                                // give heavier weight when we have two axis swipe
+                                dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 5);
+                            } else {
+                                // start drag not imediately, giving components some sort
+                                // of weight.
+                                dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                            }
                         }
                     } 
                     if (initialX != -1 && contentPane.contains(x, y)) {
@@ -1137,7 +1171,7 @@ public class Tabs extends Container {
                             }
                             int start = contentPane.getComponentAt(active).getX();
                             int end = tabsGap;
-                            slideToDestMotion = Motion.createSplineMotion(start, end, 250);
+                            slideToDestMotion = createTabSlideMotion(start, end);
                             slideToDestMotion.start();
                             Form form = getComponentForm();
                             if (form != null) {

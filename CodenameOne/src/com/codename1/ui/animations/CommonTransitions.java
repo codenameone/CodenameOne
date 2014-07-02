@@ -35,6 +35,7 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.LazyValue;
 
 /**
  * Contains common transition animations including the following:
@@ -49,6 +50,7 @@ import com.codename1.ui.plaf.UIManager;
  */
 public final class CommonTransitions extends Transition {
     private Motion motion, motion2;
+    private LazyValue<Motion> lazyMotion;
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_SLIDE = 1;
     private static final int TYPE_FADE = 2;
@@ -591,6 +593,9 @@ public final class CommonTransitions extends Transition {
      */
     protected Motion createMotion(int startOffset, int dest, int speed) {
         if(motionSetManually) {
+            if(lazyMotion != null) {
+                return lazyMotion.get(new Integer(startOffset), new Integer(dest), new Integer(speed));
+            }
             return motion;
         }
         if(linearMotion) {
@@ -772,8 +777,8 @@ public final class CommonTransitions extends Transition {
                 g.translate(tval, 0);
                 current.paintComponent(g, false);
                 g.translate(-tval, 0);
-                g.setAlpha(255);
             }
+            g.setAlpha(255);
         }
     }
 
@@ -795,15 +800,15 @@ public final class CommonTransitions extends Transition {
             }
             if(incoming) {
                 if(dir) {
-                    m = Motion.createEaseInOutMotion(-travelDestination, 0, speed);
+                    m = createMotion(-travelDestination, 0, speed);
                 } else {
-                    m = Motion.createEaseInOutMotion(travelDestination, 0, speed);
+                    m = createMotion(travelDestination, 0, speed);
                 }
             } else {
                 if(dir) {
-                    m = Motion.createEaseInOutMotion(0, travelDestination, speed);
+                    m = createMotion(0, travelDestination, speed);
                 } else {
-                    m = Motion.createEaseInOutMotion(0, -travelDestination, speed);
+                    m = createMotion(0, -travelDestination, speed);
                 }
             }
             m.start();
@@ -1176,6 +1181,16 @@ public final class CommonTransitions extends Transition {
         this.motion = motion;
     }
     
+    /**
+     * Motion represents the physical movement within a transition, it can
+     * be replaced by the user to provide a more appropriate physical feel
+     * 
+     * @param motion new instance of the motion class that will be used by the transition
+     */
+    public void setMotion(LazyValue<Motion> motion) {
+        motionSetManually = true;
+        this.lazyMotion = motion;
+    }
     
     /**
      * @inheritDoc

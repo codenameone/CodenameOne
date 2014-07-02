@@ -1889,7 +1889,7 @@ public final class Display {
 
             // make sure the released event is sent to the same Form that got a
             // pressed event
-            if(x == f || (f != null && f.shouldSendPointerReleaseToOtherForm())){
+            if(x == f || f.shouldSendPointerReleaseToOtherForm()){
                 xArray1[0] = inputEventStackTmp[offset];
                 offset++;
                 yArray1[0] = inputEventStackTmp[offset];

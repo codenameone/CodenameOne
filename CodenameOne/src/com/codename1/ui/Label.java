@@ -168,10 +168,29 @@ public class Label extends Component {
         if(isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
             getComponentForm().registerAnimatedInternal(this);
         }
+        checkAnimation();
         if(maskName != null && mask == null) {
             setMask(UIManager.getInstance().getThemeMaskConstant(maskName));
         }
+        if(getIcon() != null) {
+            getIcon().lock();
+        }
     }
+
+    /**
+     * @inheritDoc
+     */
+    void deinitializeImpl() {
+        super.deinitializeImpl(); 
+        Form f = getComponentForm();
+        if(f != null) {
+            f.deregisterAnimated(this);
+        }
+        if(getIcon() != null) {
+            getIcon().unlock();
+        }
+    }
+    
     
     /**
      * Returns the label text

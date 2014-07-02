@@ -1803,7 +1803,12 @@ public class Form extends Container {
         }
     }
 
-    boolean shouldSendPointerReleaseToOtherForm() {
+    /**
+     * Indicates whether this form wants to receive pointerReleased events for touch
+     * events that started in a different form
+     * @return false by default
+     */
+    protected boolean shouldSendPointerReleaseToOtherForm() {
         return false;
     }
     

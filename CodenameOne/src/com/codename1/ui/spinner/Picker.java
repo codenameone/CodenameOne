@@ -48,6 +48,7 @@ public class Picker extends Button {
     private Object value = new Date();
     private boolean showMeridiem;
     private Object metaData;
+    private Object renderingPrototype;
     
     /**
      * Default constructor
@@ -70,6 +71,9 @@ public class Picker extends Button {
                     switch(type) {
                         case Display.PICKER_TYPE_STRINGS:
                             GenericSpinner gs = new GenericSpinner();
+                            if(renderingPrototype != null) {
+                                gs.setRenderingPrototype((String)renderingPrototype);
+                            }
                             String[] strArr = (String[])metaData;
                             gs.setModel(new DefaultListModel(strArr));
                             if(value != null) {
@@ -323,5 +327,21 @@ public class Picker extends Button {
     public void setShowMeridiem(boolean showMeridiem) {
         this.showMeridiem = showMeridiem;
         updateValue();
+    }
+
+    /**
+     * When using a lightweight spinner this will be used as the rendering prototype
+     * @return the renderingPrototype
+     */
+    public Object getRenderingPrototype() {
+        return renderingPrototype;
+    }
+
+    /**
+     * When using a lightweight spinner this will be used as the rendering prototype
+     * @param renderingPrototype the renderingPrototype to set
+     */
+    public void setRenderingPrototype(Object renderingPrototype) {
+        this.renderingPrototype = renderingPrototype;
     }
 }

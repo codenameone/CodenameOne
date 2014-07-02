@@ -38,6 +38,9 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -280,9 +283,91 @@ public class Component implements Animation, StyleListener {
     private Runnable refreshTask;
     private double pinchDistance;
     private static int restoreDragPercentage = -1;
+
+    private Component[] sameWidth;
+    private Component[] sameHeight;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
+    }
+
+    /**
+     * Places all of these components in the same width group, to remove a component from
+     * the group invoke this method with that component only.
+     * 
+     * @param c the components to group together, this will override all previous width grouping
+     */
+    public static void setSameWidth(Component... c) {
+        if(c.length == 1) {
+            // special case, remove grouping
+            if(c[0].sameWidth != null) {
+                ArrayList<Component> lst = new ArrayList<Component>(Arrays.asList(c[0].sameWidth));
+                lst.remove(c[0]);
+                if(lst.size() == 1) {
+                    lst.get(0).sameWidth = null;
+                } else {
+                    if(lst.size() > 0) {
+                        Component[] cmps = new Component[lst.size()];
+                        lst.toArray(cmps);
+                        setSameWidth(cmps);
+                    }
+                }
+                c[0].sameWidth = null;
+            }
+        } else {
+            for(Component cc : c) {
+                cc.sameWidth = c;
+            }
+        }
+    }
+    
+    /**
+     * Returns the array of components that have an equal width
+     * 
+     * @return components in the same width group
+     */
+    public Component[] getSameWidth() {
+        return sameWidth;
+    }
+    
+
+    /**
+     * Places all of these components in the same height group, to remove a component from
+     * the group invoke this method with that component only.
+     * 
+     * @param c the components to group together, this will override all previous height grouping
+     */
+    public static void setSameHeight(Component... c) {
+        if(c.length == 1) {
+            // special case, remove grouping
+            if(c[0].sameHeight != null) {
+                ArrayList<Component> lst = new ArrayList<Component>(Arrays.asList(c[0].sameHeight));
+                lst.remove(c[0]);
+                if(lst.size() == 1) {
+                    lst.get(0).sameHeight = null;
+                } else {
+                    if(lst.size() > 0) {
+                        Component[] cmps = new Component[lst.size()];
+                        lst.toArray(cmps);
+                        setSameHeight(cmps);
+                    }
+                }
+                c[0].sameHeight = null;
+            }
+        } else {
+            for(Component cc : c) {
+                cc.sameHeight = c;
+            }
+        }
+    }
+    
+    /**
+     * Returns the array of components that have an equal height
+     * 
+     * @return components in the same height group
+     */
+    public Component[] getSameHeight() {
+        return sameHeight;
     }
 
     /** 
@@ -600,6 +685,8 @@ public class Component implements Animation, StyleListener {
      * no guarantee or requirement.
      * 
      * @param d the component dimension
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality
      */
     public void setPreferredSize(Dimension d) {
         if(d == null) {
@@ -679,6 +766,8 @@ public class Component implements Animation, StyleListener {
      * 
      * @param preferredW the preferred width of the component
      * @see #setPreferredSize
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality
      */
     public void setPreferredW(int preferredW) {
         setPreferredSize(new Dimension(preferredW, getPreferredH()));
@@ -689,6 +778,8 @@ public class Component implements Animation, StyleListener {
      * 
      * @param preferredH the preferred height of the component
      * @see #setPreferredSize
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality
      */
     public void setPreferredH(int preferredH) {
         setPreferredSize(new Dimension(getPreferredW(), preferredH));
@@ -1724,8 +1815,7 @@ public class Component implements Animation, StyleListener {
         return d;
     }
 
-    private Dimension preferredSize() {
-
+    private Dimension preferredSizeImpl() {
         if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
             shouldCalcPreferredSize = false;
             if(hideInPortrait && Display.getInstance().isPortrait()) {
@@ -1735,7 +1825,38 @@ public class Component implements Animation, StyleListener {
             }
         }
         return preferredSize;
-
+    }
+    
+    private Dimension preferredSize() {
+        if(sameWidth != null || sameHeight != null) {
+            if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
+                if(sameWidth != null) {
+                    int w = -1;
+                    for(Component c : sameWidth) {
+                        int d = c.preferredSizeImpl().getWidth();
+                        if(w < d) {
+                            w = d;
+                        }
+                    }
+                    for(Component c : sameWidth) {
+                        c.preferredSizeImpl().setWidth(w);
+                    }
+                }
+                if(sameHeight != null) {
+                    int h = -1;
+                    for(Component c : sameHeight) {
+                        int d = c.preferredSizeImpl().getHeight();
+                        if(h < d) {
+                            h = d;
+                        }
+                    }
+                    for(Component c : sameHeight) {
+                        c.preferredSizeImpl().setHeight(h);
+                    }
+                }
+            }
+        }
+        return preferredSizeImpl();
     }
 
     /**
@@ -1807,8 +1928,19 @@ public class Component implements Animation, StyleListener {
                 getParent().setShouldLayout(shouldCalcPreferredSize);
             }
         }
+        if(shouldCalcPreferredSize) {
+            setShouldCalcPreferredSizeGroup(sameWidth);
+            setShouldCalcPreferredSizeGroup(sameHeight);
+        }
     }
 
+    private void setShouldCalcPreferredSizeGroup(Component[] cmps) {
+        if(cmps != null) {
+            for(Component c : cmps) {
+                c.setShouldCalcPreferredSize(true);
+            }
+        }
+    }
 
     /**
      * Prevents key events from being grabbed for focus traversal. E.g. a list component

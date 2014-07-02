@@ -911,7 +911,7 @@ public class SideMenuBar extends MenuBar {
             private boolean pressedInRightPanel;
             private boolean manualMotionLock;
 
-            boolean shouldSendPointerReleaseToOtherForm() {
+            protected boolean shouldSendPointerReleaseToOtherForm() {
                 return true;
             }
 

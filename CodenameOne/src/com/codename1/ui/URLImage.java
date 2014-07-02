@@ -113,6 +113,7 @@ public class URLImage extends EncodedImage {
     private byte[] imageData;
     private boolean repaintImage;
     private static final String IMAGE_SUFFIX = "ImageURLTMP";
+    private boolean locked;
     
     private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
         super(placeholder.getWidth(), placeholder.getHeight());
@@ -188,8 +189,10 @@ public class URLImage extends EncodedImage {
         }
         fetching = true;
         try {
+            locked = super.isLocked();
             if(storageFile != null) {
                 if(Storage.getInstance().exists(storageFile)) {
+                    unlock();
                     imageData = new byte[Storage.getInstance().entrySize(storageFile)];
                     InputStream is = Storage.getInstance().createInputStream(storageFile);
                     Util.readFully(is, imageData);
@@ -205,6 +208,7 @@ public class URLImage extends EncodedImage {
                 }
             } else {
                 if(FileSystemStorage.getInstance().exists(fileSystemFile)) {
+                    unlock();
                     imageData = new byte[(int)FileSystemStorage.getInstance().getLength(fileSystemFile)];
                     InputStream is = FileSystemStorage.getInstance().openInputStream(fileSystemFile);
                     Util.readFully(is, imageData);
@@ -251,6 +255,10 @@ public class URLImage extends EncodedImage {
     public boolean animate() {
         if(repaintImage) {
             repaintImage = false;
+            if(locked) {
+                lock();
+                locked = false;
+            }
             return true;
         }
         return false;

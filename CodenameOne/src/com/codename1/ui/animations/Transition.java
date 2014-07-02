@@ -66,7 +66,7 @@ public abstract class Transition implements Animation {
      */
     public void initTransition(){
     }
-    
+
     /**
      * Returns the destination form that should be set once animation is completed
      * 

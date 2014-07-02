@@ -564,12 +564,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int rightPadding = ta.getStyle().getPadding(ta.isRTL(), Component.RIGHT);
         int topPadding = ta.getStyle().getPadding(false, Component.TOP);
         boolean shouldBreak = false;
-        
+        int tawidth = ta.getWidth();
+        int x = ta.getX() + leftPadding;
+        int tagap = ta.getRowsGap();
         for (int i = 0; i < line; i++) {
-            int x = ta.getX() + leftPadding;
-            int y = ta.getY() +  topPadding +
-                    (ta.getRowsGap() + fontHeight) * i;
-            if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
+            int y = ta.getY() +  topPadding + (tagap + fontHeight) * i;
+            if(Rectangle.intersects(x, y, tawidth, fontHeight, oX, oY, oWidth, oHeight)) {
                 
                 String rowText = (String) ta.getTextAt(i);
                 //display ******** if it is a password field
@@ -584,13 +584,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
                 switch(align) {
                     case Component.RIGHT:
-                		x = ta.getX() + ta.getWidth() - rightPadding - f.stringWidth(displayText);
+                		x = ta.getX() + tawidth - rightPadding - f.stringWidth(displayText);
                         break;
                     case Component.CENTER:
-                        x+= (ta.getWidth()-leftPadding-rightPadding-f.stringWidth(displayText))/2;
+                        x+= (tawidth-leftPadding-rightPadding-f.stringWidth(displayText))/2;
                         break;
                 }
-                int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
+                //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
                 //if this is the last line to display and there is more content and isEndsWith3Points() is true
                 //add "..." at the last row
                 if(ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line){
@@ -1584,7 +1584,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 && (pull.getComponentAt(0) instanceof Label)){
             ((Label)cmpToDraw).setIcon(((Label)pull.getComponentAt(0)).getIcon());
         }
-        pull.replace(pull.getComponentAt(0), cmpToDraw, null);
+        Component current = pull.getComponentAt(0);
+        if(current != cmpToDraw) {
+            pull.replace(current, cmpToDraw, null);
+        }
 
         pull.setWidth(cmp.getWidth());
         pull.setX(cmp.getAbsoluteX());
@@ -1605,7 +1608,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
         if (pullDown == null) {
             pullDown = new Label(getUIManager().localize("pull.down", "Pull down do refresh..."));
-            pullDown.getStyle().setAlignment(Component.CENTER);
+            pullDown.getUnselectedStyle().setAlignment(Component.CENTER);
+            pullDown.getUnselectedStyle().setPadding(0, 0, 0 , 0);
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
                 i = Resources.getSystemResource().getImage("refresh-icon.png");
@@ -1615,14 +1619,20 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
         if (releaseToRefresh == null) {
             releaseToRefresh = new Label(getUIManager().localize("pull.release", "Release to refresh..."));
-            releaseToRefresh.getStyle().setAlignment(Component.CENTER);
-            ((Label) releaseToRefresh).setIcon(Resources.getSystemResource().getImage("refresh-icon.png"));
+            releaseToRefresh.getUnselectedStyle().setAlignment(Component.CENTER);
+            releaseToRefresh.getUnselectedStyle().setPadding(0, 0, 0 , 0);
+            Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
+            if(i == null) {
+                i = Resources.getSystemResource().getImage("refresh-icon.png");
+            }
+            ((Label) releaseToRefresh).setIcon(i);
         }
         if (updating == null) {
             updating = new Container(new BoxLayout(BoxLayout.X_AXIS));
             ((Container) updating).addComponent(new InfiniteProgress());
             ((Container) updating).addComponent(new Label(getUIManager().localize("pull.refresh", "Updating...")));
 
+            pull.getUnselectedStyle().setPadding(0, 0, 0 , 0);
             pull.addComponent(BorderLayout.CENTER, updating);
             pull.layoutContainer();
             pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));

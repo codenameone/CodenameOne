@@ -1214,7 +1214,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * This method prevents a manual timeout from occuring when invoked at a frequency faster
+     * This method prevents a manual timeout from occurring when invoked at a frequency faster
      * than the timeout.
      */
     void updateActivity() {
