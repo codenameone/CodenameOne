@@ -490,7 +490,7 @@ public class Transform {
         type = t.type;
         scaleX = t.scaleX;
         scaleY = t.scaleY;
-        scaleX = t.scaleZ;
+        scaleZ = t.scaleZ;
         translateX = t.translateX;
         translateY = t.translateY;
         translateZ = t.translateZ;
@@ -517,7 +517,8 @@ public class Transform {
      * @param t The transform to concatenate to this one.
      */
     public void concatenate(Transform t){
-        impl.concatenateTransform(nativeTransform, t.nativeTransform);
+        
+        impl.concatenateTransform(getNativeTransform(), t.getNativeTransform());
     }
     
     /**
