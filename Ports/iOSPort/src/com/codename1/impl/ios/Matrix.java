@@ -241,6 +241,13 @@ public final class Matrix {
         System.arraycopy(pIn, 0, factory.sTemp, 0, len);
         
         MatrixUtil.multiplyMV(factory.sTemp, 4, data, 0, factory.sTemp, 0);
+        float w = factory.sTemp[7];
+        if ( w != 1 && w != 0 ){
+            
+            for ( int i=4; i<7; i++){
+                factory.sTemp[i] = factory.sTemp[i]/w;
+            }
+        }
        
         //len = pOut.length;
         System.arraycopy(factory.sTemp, 4, pOut, 0, len);
