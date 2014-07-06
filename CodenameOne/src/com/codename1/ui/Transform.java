@@ -517,8 +517,8 @@ public class Transform {
      * @param t The transform to concatenate to this one.
      */
     public void concatenate(Transform t){
-        
         impl.concatenateTransform(getNativeTransform(), t.getNativeTransform());
+        type = TYPE_UNKNOWN;
     }
     
     /**
@@ -592,6 +592,7 @@ public class Transform {
         int olen = out.length;
         switch (type){
             case TYPE_TRANSLATION:
+                
                 out[0] = in[0]+translateX;
                 out[1] = in[1]+translateY;
                 if ( len > 2 ){
