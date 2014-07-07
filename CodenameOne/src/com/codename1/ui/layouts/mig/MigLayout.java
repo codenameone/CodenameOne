@@ -1,4 +1,4 @@
-package com.codename1.ui.layouts;
+package com.codename1.ui.layouts.mig;
 /*
  * License (BSD):
  * ==============
@@ -49,6 +49,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,6 +63,8 @@ import java.util.Map;
 /** A very flexible layout manager.
  * <p>
  * Read the documentation that came with this layout manager for information on usage.
+ * @deprecated this is currently an experimental integration and has known bugs
+ * do not rely on this layout for production
  */
 public final class MigLayout extends Layout
 {

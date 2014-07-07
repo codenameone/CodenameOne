@@ -291,6 +291,12 @@ public abstract class CodenameOneImplementation {
             editingText = null;
         }
     }
+    
+    /**
+     * Invoked for special cases to stop text editing and clear native editing state
+     */
+    public void stopTextEditing() {    
+    }
 
     /**
      * Encapsulates the editing code which is specific to the platform, some platforms

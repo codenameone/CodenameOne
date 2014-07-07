@@ -1937,7 +1937,7 @@ public class Component implements Animation, StyleListener {
     private void setShouldCalcPreferredSizeGroup(Component[] cmps) {
         if(cmps != null) {
             for(Component c : cmps) {
-                c.setShouldCalcPreferredSize(true);
+                c.shouldCalcPreferredSize = true;
             }
         }
     }

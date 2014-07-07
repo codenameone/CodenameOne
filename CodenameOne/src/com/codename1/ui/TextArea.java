@@ -535,6 +535,12 @@ public class TextArea extends Component {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
     }
 
+    void deinitializeImpl() {
+        super.deinitializeImpl(); 
+        Display.getInstance().stopEditing(this);
+    }
+
+    
         
     void onClick(){
         if(isEditable()) {

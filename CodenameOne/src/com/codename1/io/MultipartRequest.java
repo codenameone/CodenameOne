@@ -64,6 +64,26 @@ public class MultipartRequest extends ConnectionRequest {
         setContentType("multipart/form-data; boundary=" + boundary);
     }
 
+    /**
+     * Returns the boundary string which is normally generated based on system time
+     * 
+     * @return the multipart boundary string
+     */
+    public String getBoundary() {
+        return boundary;
+    }
+
+    /**
+     * Sets the boundary string, normally you don't need this method. Its useful to
+     * workaround server issues only. Notice that this method must be invoked before adding
+     * any elements.
+     * @param boundary the boundary string
+     */
+    public void setBoundary(String boundary) {
+        this.boundary = boundary;
+        setContentType("multipart/form-data; boundary=" + boundary);
+    }
+    
     protected void initConnection(Object connection) {
     	contentLength = calculateContentLength();
        	addRequestHeader("Content-Length", Long.toString(contentLength));

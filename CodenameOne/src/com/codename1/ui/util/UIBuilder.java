@@ -64,6 +64,7 @@ import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.TableLayout;
+import com.codename1.util.LazyValue;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -2117,7 +2118,12 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    private String previousFormName(Form f) {
+    /**
+     * Returns the name of the previous form
+     * @param f the current form
+     * @return the name of the previous form
+     */
+    String getPreviousFormName(Form f) {
         Vector formNavigationStack = getFormNavigationStackForComponent(f);
         if(formNavigationStack != null && formNavigationStack.size() > 0) {
             Hashtable h = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
@@ -2353,6 +2359,64 @@ public class UIBuilder { //implements Externalizable {
         return cnt;
     }
 
+    /**
+     * This is useful for swipe back navigation behavior
+     * @param f the form from which we should go back
+     * @return a lazy value that will return the back form
+     */
+    public LazyValue<Form> createBackLazyValue(final Form f) {
+        return new LazyValue<Form>() {
+            public Form get(Object... args) {
+                String n = getPreviousFormName(f);
+                return createForm(f);
+            }
+        };
+    }
+
+    Form createForm(Form f) {
+        Form currentForm = Display.getInstance().getCurrent();
+        if(currentForm != null && currentForm instanceof Dialog) {
+            ((Dialog)Display.getInstance().getCurrent()).dispose();
+            currentForm = Display.getInstance().getCurrent();
+        }
+        Vector formNavigationStack = baseFormNavigationStack;
+        if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
+            if(currentForm != null) {
+                String nextForm = (String)f.getClientProperty("%next_form%");
+
+                // we are in the sidemenu view we should really be using the parent form
+                SideMenuBar b = (SideMenuBar)currentForm.getClientProperty("cn1$sideMenuParent");
+                if(b != null) {
+                    currentForm = b.getParentForm();
+                }
+
+                // don't add back commands to transitional forms
+                if(nextForm == null) {
+                    String commandAction = currentForm.getName();
+                    if(allowBackTo(commandAction) && f.getBackCommand() == null) {
+                        Command backCommand;
+                        if(isSameBackDestination(currentForm, f)) {
+                            backCommand = currentForm.getBackCommand();
+                        } else {
+                            backCommand = createCommandImpl(getBackCommandText(currentForm.getTitle()), null,
+                                BACK_COMMAND_ID, commandAction, true, "");
+                            backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
+                            backCommand.putClientProperty(COMMAND_ACTION, commandAction);
+                        }
+                        if(backCommand != null) {
+                            setBackCommand(f, backCommand);
+                        }
+
+                        // trigger listener creation if this is the only command in the form
+                        getFormListenerInstance(f, null);
+                        formNavigationStack.addElement(getFormState(currentForm));
+                    }
+                }
+            }
+        }
+        return f;
+    }
+    
     private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
         Form currentForm = Display.getInstance().getCurrent();
         if(currentForm != null && currentForm instanceof Dialog) {
@@ -2518,7 +2582,7 @@ public class UIBuilder { //implements Externalizable {
      */
     private void postShowImpl(Form f) {
         postShow(f);
-        analyticsCallback(f.getName(), previousFormName(f));
+        analyticsCallback(f.getName(), getPreviousFormName(f));
     }
 
     /**

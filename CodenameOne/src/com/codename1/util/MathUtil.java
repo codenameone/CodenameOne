@@ -1300,4 +1300,42 @@ public abstract class MathUtil {
             return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) + 1L), start);
         }
     }
+    
+    /**
+     * Rounds the number to the closest integer
+     * @param a the number
+     * @return the closest integer
+     */
+    public static int round(float a) {
+        return (int)(a + 0.5f);
+    }
+
+    /**
+     * Rounds the number to the closest integer
+     * @param a the number
+     * @return the closest integer
+     */
+    public static long round(double a) {
+        return (long)(a + 0.5f);
+    }
+    
+    /**
+     * Rounds the number down
+     * @param a the number
+     * @return a rounded down number
+     */
+    public static int floor(float a) {
+        return (int)a;
+    }
+
+    /**
+     * Rounds the number down
+     * @param a the number
+     * @return a rounded down number
+     */
+    public static long floor(double a) {
+        return (long)a;
+    }
+    
+    
 }

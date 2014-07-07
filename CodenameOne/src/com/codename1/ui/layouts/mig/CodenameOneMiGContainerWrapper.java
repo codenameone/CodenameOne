@@ -1,4 +1,4 @@
-package com.codename1.ui.layouts;
+package com.codename1.ui.layouts.mig;
 /*
  * License (BSD):
  * ==============

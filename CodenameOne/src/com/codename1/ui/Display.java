@@ -1444,6 +1444,12 @@ public final class Display {
         impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
     }
     
+    void stopEditing(Component cmp) {
+        if(isTextEditing(cmp)) {
+            impl.stopTextEditing();
+        }
+    }
+    
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
     }

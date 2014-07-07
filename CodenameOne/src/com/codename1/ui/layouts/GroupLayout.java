@@ -27,7 +27,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.geom.Dimension;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 
 /**
  * GroupLayout is a LayoutManager that hierarchically groups components to
@@ -210,13 +212,13 @@ public class GroupLayout extends Layout {
     
     // Maps from Component to ComponentInfo.  This is used for tracking
     // information specific to a Component.
-    private Hashtable componentInfos;
+    private HashMap componentInfos;
     
     // Container we're doing layout for.
     private Container host;
     
     // Used by areParallelSiblings, cached to avoid excessive garbage.
-    private Vector tmpParallelSet;
+    private ArrayList tmpParallelSet;
     
     // Indicates Springs have changed in some way since last change.
     private boolean springsChanged;
@@ -285,8 +287,8 @@ public class GroupLayout extends Layout {
         this.host = host;
         setHorizontalGroup(createParallelGroup(LEADING, true));
         setVerticalGroup(createParallelGroup(LEADING, true));
-        componentInfos = new Hashtable();
-        tmpParallelSet = new Vector();
+        componentInfos = new HashMap();
+        tmpParallelSet = new ArrayList();
     }
 
     /**
@@ -406,10 +408,10 @@ public class GroupLayout extends Layout {
                 " " + spring.getMaximumSize(axis) + 
                 padding + "]\n");
         if (spring instanceof Group) {
-            Vector springs = ((Group)spring).springs;
+            ArrayList springs = ((Group)spring).springs;
             indent += "  ";
             for (int counter = 0; counter < springs.size(); counter++) {
-                dump(buffer, (Spring)springs.elementAt(counter), indent, axis);
+                dump(buffer, (Spring)springs.get(counter), indent, axis);
             }
         }
     }
@@ -497,7 +499,7 @@ public class GroupLayout extends Layout {
         if (horizontalGroup.springs.size() > 1) {
             index = 1;
         }
-        return (Group)horizontalGroup.springs.elementAt(index);
+        return (Group)horizontalGroup.springs.get(index);
     }
     
     /**
@@ -528,7 +530,7 @@ public class GroupLayout extends Layout {
         if (verticalGroup.springs.size() > 1) {
             index = 1;
         }
-        return (Group)verticalGroup.springs.elementAt(index);
+        return (Group)verticalGroup.springs.get(index);
     }
 
     /**
@@ -846,9 +848,9 @@ public class GroupLayout extends Layout {
         verticalGroup.setSize(VERTICAL, 0, height);
         
         // Step 4: apply the size to the components.
-        Enumeration componentInfo = componentInfos.elements();
-        while (componentInfo.hasMoreElements()) {
-            ComponentInfo info = (ComponentInfo)componentInfo.nextElement();
+        Iterator componentInfo = componentInfos.values().iterator();
+        while (componentInfo.hasNext()) {
+            ComponentInfo info = (ComponentInfo)componentInfo.next();
             Component c = info.getComponent();
             info.setBounds(insetLeft, insetTop, width, ltr);
         }
@@ -931,9 +933,9 @@ public class GroupLayout extends Layout {
             isValid = true;
             horizontalGroup.setSize(HORIZONTAL, UNSET, UNSET);
             verticalGroup.setSize(VERTICAL, UNSET, UNSET);
-            for (Enumeration cis = componentInfos.elements();
-                     cis.hasMoreElements();) {
-                ComponentInfo ci = (ComponentInfo)cis.nextElement();
+            for (Iterator cis = componentInfos.values().iterator();
+                     cis.hasNext();) {
+                ComponentInfo ci = (ComponentInfo)cis.next();
                 if (ci.updateVisibility()) {
                     visChanged = true;
                 }
@@ -990,9 +992,9 @@ public class GroupLayout extends Layout {
     }
     
     private void checkComponents() {
-        Enumeration infos = componentInfos.elements();
-        while (infos.hasMoreElements()) {
-            ComponentInfo info = (ComponentInfo)infos.nextElement();
+        Iterator infos = componentInfos.values().iterator();
+        while (infos.hasNext()) {
+            ComponentInfo info = (ComponentInfo)infos.next();
             if (info.horizontalSpring == null) {
                 throw new IllegalStateException(info.component +
                         " is not attached to a horizontal group");
@@ -1005,9 +1007,9 @@ public class GroupLayout extends Layout {
     }
     
     private void registerComponents(Group group, int axis) {
-        Vector springs = group.springs;
+        ArrayList springs = group.springs;
         for (int counter = springs.size() - 1; counter >= 0; counter--) {
-            Spring spring = (Spring)springs.elementAt(counter);
+            Spring spring = (Spring)springs.get(counter);
             if (spring instanceof ComponentSpring) {
                 ((ComponentSpring)spring).installIfNecessary(axis);
             } else if (spring instanceof Group) {
@@ -1054,10 +1056,10 @@ public class GroupLayout extends Layout {
      * comprise auto preferred padding springs.
      */
     private void insertAutopadding(boolean insert) {
-        horizontalGroup.insertAutopadding(HORIZONTAL, new Vector(1),
-                new Vector(1), new Vector(1), new Vector(1), insert);
-        verticalGroup.insertAutopadding(VERTICAL, new Vector(1),
-                new Vector(1), new Vector(1), new Vector(1), insert);
+        horizontalGroup.insertAutopadding(HORIZONTAL, new ArrayList(1),
+                new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
+        verticalGroup.insertAutopadding(VERTICAL, new ArrayList(1),
+                new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
     }
     
     /**
@@ -1077,17 +1079,17 @@ public class GroupLayout extends Layout {
             sourceSpring = sourceInfo.verticalSpring;
             targetSpring = targetInfo.verticalSpring;
         }
-        Vector sourcePath = tmpParallelSet;
-        sourcePath.removeAllElements();
+        ArrayList sourcePath = tmpParallelSet;
+        sourcePath.clear();
         Spring spring = sourceSpring.getParent();
         while (spring != null) {
-            sourcePath.addElement(spring);
+            sourcePath.add(spring);
             spring = spring.getParent();
         }
         spring = targetSpring.getParent();
         while (spring != null) {
             if (sourcePath.contains(spring)) {
-                sourcePath.removeAllElements();
+                sourcePath.clear();
                 while (spring != null) {
                     if (spring instanceof ParallelGroup) {
                         return true;
@@ -1098,7 +1100,7 @@ public class GroupLayout extends Layout {
             }
             spring = spring.getParent();
         }
-        sourcePath.removeAllElements();
+        sourcePath.clear();
         return false;
     }
     
@@ -1264,24 +1266,24 @@ public class GroupLayout extends Layout {
     }
     
     /**
-     * Simple copy constructor for vector
+     * Simple copy constructor for ArrayList
      */
-    private static Vector create(Vector v) {
+    private static ArrayList create(ArrayList v) {
         int size = v.size();
-        Vector vec = new Vector(size);
+        ArrayList vec = new ArrayList(size);
         for(int iter = 0 ; iter < size ; iter++) {
-            vec.addElement(v.elementAt(iter));
+            vec.add(v.get(iter));
         }
         return vec;
     }
     
     /**
-     * Adds all vector elements from source to dest
+     * Adds all ArrayList elements from source to dest
      */
-    private static void addAll(Vector dest, Vector source) {
+    private static void addAll(ArrayList dest, ArrayList source) {
         int size = source.size();
         for(int iter = 0 ; iter < size ; iter++) {
-            dest.addElement(source.elementAt(iter));
+            dest.add(source.get(iter));
         }
     }
     
@@ -1296,10 +1298,10 @@ public class GroupLayout extends Layout {
     public abstract class Group extends Spring {
         // private int origin;
         // private int size;
-        Vector springs;
+        ArrayList springs;
         
         Group() {
-            springs = new Vector();
+            springs = new ArrayList();
         }
         
         int indexOf(Spring spring) {
@@ -1311,7 +1313,7 @@ public class GroupLayout extends Layout {
          * the receiver.
          */
         Group addSpring(Spring spring) {
-            springs.addElement(spring);
+            springs.add(spring);
             spring.setParent(this);
             if (!(spring instanceof AutopaddingSpring) ||
                     !((AutopaddingSpring)spring).getUserCreated()) {
@@ -1386,7 +1388,7 @@ public class GroupLayout extends Layout {
         }
         
         Spring getSpring(int index) {
-            return (Spring)springs.elementAt(index);
+            return (Spring)springs.get(index);
         }
         
         int getSpringSize(Spring spring, int axis, int type) {
@@ -1420,8 +1422,8 @@ public class GroupLayout extends Layout {
          * @param insert Whether or not to insert AutopaddingSprings or just
          *               adjust any existing AutopaddingSprings.
          */
-        abstract void insertAutopadding(int axis, Vector leadingPadding,
-                Vector trailingPadding, Vector leading, Vector trailing,
+        abstract void insertAutopadding(int axis, ArrayList leadingPadding,
+                ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                 boolean insert);
         
         /**
@@ -1430,12 +1432,12 @@ public class GroupLayout extends Layout {
         void removeAutopadding() {
             unset();
             for (int counter = springs.size() - 1; counter >= 0; counter--) {
-                Spring spring = (Spring)springs.elementAt(counter);
+                Spring spring = (Spring)springs.get(counter);
                 if (spring instanceof AutopaddingSpring) {
                     if (((AutopaddingSpring)spring).getUserCreated()) {
                         ((AutopaddingSpring)spring).reset();
                     } else {
-                        springs.removeElementAt(counter);
+                        springs.remove(counter);
                     }
                 } else if (spring instanceof Group) {
                     ((Group)spring).removeAutopadding();
@@ -1447,7 +1449,7 @@ public class GroupLayout extends Layout {
             // Clear cached pref/min/max.
             unset();
             for (int counter = springs.size() - 1; counter >= 0; counter--) {
-                Spring spring = (Spring)springs.elementAt(counter);
+                Spring spring = (Spring)springs.get(counter);
                 if (spring instanceof AutopaddingSpring) {
                     ((AutopaddingSpring)spring).unset();
                 } else if (spring instanceof Group) {
@@ -1458,7 +1460,7 @@ public class GroupLayout extends Layout {
         
         void calculateAutopadding(int axis) {
             for (int counter = springs.size() - 1; counter >= 0; counter--) {
-                Spring spring = (Spring)springs.elementAt(counter);
+                Spring spring = (Spring)springs.get(counter);
                 if (spring instanceof AutopaddingSpring) {
                     // Force size to be reset.
                     spring.unset();
@@ -1473,7 +1475,7 @@ public class GroupLayout extends Layout {
         
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             for (int i = springs.size() -1; i >= 0; i--) {
-                Spring spring = (Spring)springs.elementAt(i);
+                Spring spring = (Spring)springs.get(i);
                 if (!spring.willHaveZeroSize(treatAutopaddingAsZeroSized)) {
                     return false;
                 }
@@ -1820,7 +1822,7 @@ public class GroupLayout extends Layout {
             // 5. Set the size of the springs.
 
             // First pass, sort the resizable springs into resizable
-            Vector resizable = buildResizableList(axis, useMin);
+            ArrayList resizable = buildResizableList(axis, useMin);
             int resizableCount = resizable.size();
             
             if (resizableCount > 0) {
@@ -1834,7 +1836,7 @@ public class GroupLayout extends Layout {
                 // preferred) into sizes.
                 for (int counter = 0; counter < resizableCount; counter++) {
                     SpringDelta springDelta = (SpringDelta)resizable.
-                            elementAt(counter);
+                            get(counter);
                     if ((counter + 1) == resizableCount) {
                         sDelta += slop;
                     }
@@ -1878,10 +1880,10 @@ public class GroupLayout extends Layout {
          * Returns the sorted list of SpringDelta's for the current set of
          * Springs.
          */
-        private Vector buildResizableList(int axis, boolean useMin) {
+        private ArrayList buildResizableList(int axis, boolean useMin) {
             // First pass, figure out what is resizable
             int size = springs.size();
-            Vector sorted = new Vector(size);
+            ArrayList sorted = new ArrayList(size);
             for (int counter = 0; counter < size; counter++) {
                 Spring spring = getSpring(counter);
                 int sDelta;
@@ -1893,18 +1895,18 @@ public class GroupLayout extends Layout {
                             spring.getPreferredSize(axis);
                 }
                 if (sDelta > 0) {
-                    sorted.addElement(new SpringDelta(counter, sDelta));
+                    sorted.add(new SpringDelta(counter, sDelta));
                 }
             }
             //size = sorted.size();
             
-            // insertion sort for a relatively small vector
+            // insertion sort for a relatively small ArrayList
 	    for (int i = 0 ; i < 0 ; i++) {
-		for (int j = i; j > 0 && ((SpringDelta)sorted.elementAt(j-1)).compareTo(sorted.elementAt(j)) > 0 ; j--) {
-                    Object a = sorted.elementAt(j-1);
-                    Object b = sorted.elementAt(j);
-		    sorted.setElementAt(b, j - 1);
-		    sorted.setElementAt(a, j);
+		for (int j = i; j > 0 && ((SpringDelta)sorted.get(j-1)).compareTo(sorted.get(j)) > 0 ; j--) {
+                    Object a = sorted.get(j-1);
+                    Object b = sorted.get(j);
+		    sorted.set(j - 1, b);
+		    sorted.set(j, a);
                 }
             }
             return sorted;
@@ -1912,7 +1914,7 @@ public class GroupLayout extends Layout {
         
         private int indexOfNextNonZeroSpring(int index, boolean treatAutopaddingAsZeroSized) {
             while (index < springs.size()) {
-                Spring spring = (Spring)springs.elementAt(index);
+                Spring spring = (Spring)springs.get(index);
                 if (!((Spring)spring).willHaveZeroSize(treatAutopaddingAsZeroSized)) {
                     return index;
                 }
@@ -1921,13 +1923,13 @@ public class GroupLayout extends Layout {
             return index;
         }
 
-        void insertAutopadding(int axis, Vector leadingPadding,
-                Vector trailingPadding, Vector leading, Vector trailing,
+        void insertAutopadding(int axis, ArrayList leadingPadding,
+                ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                 boolean insert) {
-            Vector newLeadingPadding = create(leadingPadding);
-            Vector newTrailingPadding = new Vector(1);
-            Vector newLeading = create(leading);
-            Vector newTrailing = null;
+            ArrayList newLeadingPadding = create(leadingPadding);
+            ArrayList newTrailingPadding = new ArrayList(1);
+            ArrayList newLeading = create(leading);
+            ArrayList newTrailing = null;
             int counter = 0;
             // Warning, this must use springs.size, as it may change during the
             // loop.
@@ -1937,16 +1939,16 @@ public class GroupLayout extends Layout {
                     if (newLeadingPadding.size() == 0) {
                         AutopaddingSpring padding = (AutopaddingSpring)spring;
                         padding.setSources(newLeading);
-                        newLeading.removeAllElements();
+                        newLeading.clear();
                         int nextCounter = indexOfNextNonZeroSpring(counter + 1, true);
                         if (nextCounter == springs.size()) {
                             // Last spring in the list, add it to trailingPadding.
                             if (!(padding instanceof ContainerAutopaddingSpring)) {
-                                trailingPadding.addElement(padding);
+                                trailingPadding.add(padding);
                             }
                         } else {
-                            newLeadingPadding.removeAllElements();
-                            newLeadingPadding.addElement(padding);
+                            newLeadingPadding.clear();
+                            newLeadingPadding.add(padding);
                         }
                         counter = nextCounter;
                     } else {
@@ -1960,7 +1962,7 @@ public class GroupLayout extends Layout {
                         AutopaddingSpring padding = new AutopaddingSpring();
                         // Force the newly created spring to be considered
                         // by NOT incrementing counter
-                        springs.insertElementAt(padding, counter);
+                        springs.add(counter, padding);
                         continue;
                     }
                     if (spring instanceof ComponentSpring) {
@@ -1972,33 +1974,33 @@ public class GroupLayout extends Layout {
                             continue;
                         }
                         for (int i = 0; i < newLeadingPadding.size(); i++) {
-                            ((AutopaddingSpring)newLeadingPadding.elementAt(i)).
+                            ((AutopaddingSpring)newLeadingPadding.get(i)).
                                     addTarget(cSpring, axis);
                         }
-                        newLeading.removeAllElements();
-                        newLeadingPadding.removeAllElements();
+                        newLeading.clear();
+                        newLeadingPadding.clear();
                         int nextCounter = indexOfNextNonZeroSpring(counter + 1, false);
                         if (nextCounter == springs.size()) {
                             // Last Spring, add it to trailing
-                            trailing.addElement(cSpring);
+                            trailing.add(cSpring);
                         } else {
                             // Not that last Spring, add it to leading
-                            newLeading.addElement(cSpring);
+                            newLeading.add(cSpring);
                         }
                         counter = nextCounter;
                     } else if (spring instanceof Group) {
                         // Forward call to child Group
                         if (newTrailing == null) {
-                            newTrailing = new Vector(1);
+                            newTrailing = new ArrayList(1);
                         } else {
-                            newTrailing.removeAllElements();
+                            newTrailing.clear();
                         }
-                        newTrailingPadding.removeAllElements();
+                        newTrailingPadding.clear();
                         ((Group)spring).insertAutopadding(axis, newLeadingPadding,
                                 newTrailingPadding, newLeading, newTrailing,
                                 insert);
-                        newLeading.removeAllElements();
-                        newLeadingPadding.removeAllElements();
+                        newLeading.clear();
+                        newLeadingPadding.clear();
                         int nextCounter = indexOfNextNonZeroSpring(counter + 1, 
                                 newTrailing.size() == 0);
                         if (nextCounter == springs.size()) {
@@ -2011,8 +2013,8 @@ public class GroupLayout extends Layout {
                         counter = nextCounter;
                     } else {
                         // Gap
-                        newLeadingPadding.removeAllElements();
-                        newLeading.removeAllElements();
+                        newLeadingPadding.clear();
+                        newLeading.clear();
                         counter++;
                     }
                 }
@@ -2331,25 +2333,25 @@ public class GroupLayout extends Layout {
             }
         }
         
-        void insertAutopadding(int axis, Vector leadingPadding,
-                Vector trailingPadding, Vector leading, Vector trailing,
+        void insertAutopadding(int axis, ArrayList leadingPadding,
+                ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                 boolean insert) {
             for (int counter = 0, max = springs.size(); counter < max; counter++) {
                 Spring spring = getSpring(counter);
                 if (spring instanceof ComponentSpring) {
                     if (((ComponentSpring)spring).isVisible()) {
                         for (int i = 0; i < leadingPadding.size(); i++) {
-                            ((AutopaddingSpring)leadingPadding.elementAt(i)).addTarget(
+                            ((AutopaddingSpring)leadingPadding.get(i)).addTarget(
                                     (ComponentSpring)spring, axis);
                         }
-                        trailing.addElement(spring);
+                        trailing.add(spring);
                     }
                 } else if (spring instanceof Group) {
                     ((Group)spring).insertAutopadding(axis, leadingPadding,
                             trailingPadding, leading, trailing, insert);
                 } else if (spring instanceof AutopaddingSpring) {
                     ((AutopaddingSpring)spring).setSources(leading);
-                    trailingPadding.addElement(spring);
+                    trailingPadding.add(spring);
                 }
             }
         }
@@ -2934,9 +2936,9 @@ public class GroupLayout extends Layout {
      * autocreatePadding is true, or explicitly created by the developer.
      */
     private class AutopaddingSpring extends Spring {
-        Vector sources;
+        ArrayList sources;
         ComponentSpring source;
-        private Vector matches;
+        private ArrayList matches;
         int size;
         int lastSize;
         private final int pref;
@@ -2966,7 +2968,7 @@ public class GroupLayout extends Layout {
             this.source = source;
         }
         
-        public void setSources(Vector sources) {
+        public void setSources(ArrayList sources) {
             this.sources = create(sources);
         }
         
@@ -3007,7 +3009,7 @@ public class GroupLayout extends Layout {
                     position = SOUTH;
                 }
                 for (int i = matches.size() - 1; i >= 0; i--) {
-                    AutopaddingMatch match = (AutopaddingMatch)matches.elementAt(i);
+                    AutopaddingMatch match = (AutopaddingMatch)matches.get(i);
                     maxPadding = Math.max(maxPadding,
                             calculatePadding(p, position, match.source,
                             match.target));
@@ -3051,7 +3053,7 @@ public class GroupLayout extends Layout {
                 Component component = spring.getComponent();
                 for (int counter = sources.size() - 1; counter >= 0; counter--){
                     ComponentSpring source = (ComponentSpring)sources.
-                            elementAt(counter);
+                            get(counter);
                     if (areParallelSiblings(source.getComponent(),
                             component, oAxis)) {
                         addValidTarget(source, spring);
@@ -3063,9 +3065,9 @@ public class GroupLayout extends Layout {
         private void addValidTarget(ComponentSpring source,
                 ComponentSpring target) {
             if (matches == null) {
-                matches = new Vector(1);
+                matches = new ArrayList(1);
             }
-            matches.addElement(new AutopaddingMatch(source, target));
+            matches.add(new AutopaddingMatch(source, target));
         }
         
         int calculateMinimumSize(int axis) {
@@ -3127,7 +3129,7 @@ public class GroupLayout extends Layout {
      * An extension of AutopaddingSpring used for container level padding.
      */
     private class ContainerAutopaddingSpring extends AutopaddingSpring {
-        private Vector targets;
+        private ArrayList targets;
         
         ContainerAutopaddingSpring() {
             super();
@@ -3141,9 +3143,9 @@ public class GroupLayout extends Layout {
 
         public void addTarget(ComponentSpring spring, int axis) {
             if (targets == null) {
-                targets = new Vector(1);
+                targets = new ArrayList(1);
             }
-            targets.addElement(spring);
+            targets.add(spring);
         }
 
         public void calculatePadding(int axis) {
@@ -3163,8 +3165,7 @@ public class GroupLayout extends Layout {
                     position = SOUTH;
                 }
                 for (int i = targets.size() - 1; i >= 0; i--) {
-                    ComponentSpring targetSpring = (ComponentSpring)targets.
-                                                                    elementAt(i);
+                    ComponentSpring targetSpring = (ComponentSpring)targets.get(i);
                     int padding = p.getContainerGap(
                                 targetSpring.getComponent(),
                                 position, host);
@@ -3187,7 +3188,7 @@ public class GroupLayout extends Layout {
                 if (sources != null) {
                     for (int i = sources.size() - 1; i >= 0; i--) {
                         ComponentSpring sourceSpring = (ComponentSpring)sources.
-                                elementAt(i);
+                                get(i);
                         maxPadding = Math.max(maxPadding,
                                 updateSize(p, sourceSpring, position));
                     }
@@ -3227,11 +3228,11 @@ public class GroupLayout extends Layout {
     // particular axis.
     private static final class LinkInfo {
         private final int axis;
-        private final Vector linked;
+        private final ArrayList linked;
         private int size;
         
         LinkInfo(int axis) {
-            linked = new Vector();
+            linked = new ArrayList();
             size = UNSET;
             this.axis = axis;
         }
@@ -3239,12 +3240,12 @@ public class GroupLayout extends Layout {
         public void add(ComponentInfo child) {
             LinkInfo childMaster = child.getLinkInfo(axis, false);
             if (childMaster == null) {
-                linked.addElement(child);
+                linked.add(child);
                 child.setLinkInfo(axis, this);
             } else if (childMaster != this) {
                 addAll(linked, childMaster.linked);
                 for (int i = 0; i < childMaster.linked.size(); i++) {
-                    ComponentInfo childInfo = (ComponentInfo)childMaster.linked.elementAt(i);
+                    ComponentInfo childInfo = (ComponentInfo)childMaster.linked.get(i);
                     childInfo.setLinkInfo(axis, this);
                 }
             }
@@ -3252,10 +3253,10 @@ public class GroupLayout extends Layout {
         }
         
         public void remove(ComponentInfo info) {
-            linked.removeElement(info);
+            linked.remove(info);
             info.setLinkInfo(axis, null);
             if (linked.size() == 1) {
-                ((ComponentInfo)linked.elementAt(0)).setLinkInfo(axis, null);
+                ((ComponentInfo)linked.get(0)).setLinkInfo(axis, null);
             }
             clearCachedSize();
         }
@@ -3274,7 +3275,7 @@ public class GroupLayout extends Layout {
         private int calculateLinkedSize(int axis) {
             int size = 0;
             for (int i = 0; i < linked.size(); i++) {
-                ComponentInfo info = (ComponentInfo)linked.elementAt(i);
+                ComponentInfo info = (ComponentInfo)linked.get(i);
                 ComponentSpring spring;
                 if (axis == HORIZONTAL) {
                     spring = info.horizontalSpring;
@@ -3337,7 +3338,7 @@ public class GroupLayout extends Layout {
 
         private void removeSpring(Spring spring) {
             if (spring != null) {
-                ((Group)spring.getParent()).springs.removeElement(spring);
+                ((Group)spring.getParent()).springs.remove(spring);
             }
         }
         

@@ -26,6 +26,7 @@ package com.codename1.ui.layouts;
 import com.codename1.ui.Component;
 
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 
 
 /**
@@ -163,18 +164,18 @@ public class LayoutStyle {
             throw new IllegalArgumentException("Components must be non-null");
         }
         if (type == RELATED) {
-            return 6;
+            return Display.getInstance().convertToPixels(1, true);
         } else if (type == UNRELATED) {
-            return 12;
+            return Display.getInstance().convertToPixels(2, true);
         } else if (type == INDENT) {
             if (position == GroupLayout.EAST || position == GroupLayout.WEST) {
                 int gap = getButtonChildIndent(component1, position);
                 if (gap != 0) {
                     return gap;
                 }
-                return 6;
+                return Display.getInstance().convertToPixels(1, true);
             }
-            return 6;
+            return Display.getInstance().convertToPixels(1, true);
         }
         throw new IllegalArgumentException("Invalid type");
     }
@@ -212,7 +213,7 @@ public class LayoutStyle {
         if (component == null) {
             throw new IllegalArgumentException("Component must be non-null");
         }
-        return 12;
+        return Display.getInstance().convertToPixels(2, true);
     }
 
     /**
