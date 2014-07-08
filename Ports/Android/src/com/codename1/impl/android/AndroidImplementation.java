@@ -5909,6 +5909,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isTransformSupported(Object graphics) {
         return true;
     }
+    
+    @Override
+    public boolean isPerspectiveTransformSupported(Object graphics){
+    	return true;
+    }
 
     @Override
     public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
@@ -5932,91 +5937,103 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isPerspectiveTransformSupported() {
-        return false;
+    	
+        return true;
     }
+    
+    
+    
+    
 
     @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
-        Matrix m = new Matrix();        
-        m.setTranslate(translateX, translateY);
-        return m;
+        return CN1Matrix4f.makeTranslation(translateZ, translateZ, translateZ);
     }
 
     @Override
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
-        Matrix m = new Matrix();
-        m.setScale(scaleX, scaleY);
-        return m;
+        CN1Matrix4f t = CN1Matrix4f.makeIdentity();
+        t.scale(scaleX, scaleY, scaleZ);
+        return t;
     }
 
     @Override
     public Object makeTransformRotation(float angle, float x, float y, float z) {
-        Matrix m = new Matrix();
-        m.setRotate((float) Math.toDegrees(angle));
-        return m;
+        return CN1Matrix4f.makeRotation(angle, x, y, z);
     }
 
     @Override
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
-        throw new RuntimeException("Transforms not supported");
+        return CN1Matrix4f.makePerspective(fovy, aspect, zNear, zFar);
     }
 
     @Override
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
-        throw new RuntimeException("Transforms not supported");
+        return CN1Matrix4f.makeOrtho(left, right, bottom, top, near, far);
     }
 
     @Override
     public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
-        throw new RuntimeException("Transforms not supported");
+       return CN1Matrix4f.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
     }
 
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
-        ((Matrix) nativeTransform).preRotate((float)Math.toDegrees(angle));
+        ((CN1Matrix4f)nativeTransform).rotate(angle, x, y, z);
     }
 
     @Override
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
-        ((Matrix) nativeTransform).preTranslate(x, y);
+        //((Matrix) nativeTransform).preTranslate(x, y);
+        ((CN1Matrix4f)nativeTransform).translate(x, y, z);
     }
 
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
-        ((Matrix) nativeTransform).preScale(x, y);
+        //((Matrix) nativeTransform).preScale(x, y);
+        ((CN1Matrix4f)nativeTransform).scale(x, y, z);
     }
 
     @Override
     public Object makeTransformInverse(Object nativeTransform) {
-        Matrix inverted = new Matrix();
-        if(((Matrix) nativeTransform).invert(inverted)){
+        
+        CN1Matrix4f inverted = CN1Matrix4f.makeIdentity();
+        inverted.setData(((CN1Matrix4f)nativeTransform).getData());
+        if( inverted.invert()){
             return inverted;
         }
         return null;
+        
+        //Matrix inverted = new Matrix();
+        //if(((Matrix) nativeTransform).invert(inverted)){
+        //    return inverted;
+        //}
+        //return null;
     }
 
     @Override
     public Object makeTransformIdentity() {
-        Matrix m = new Matrix();
-        return m;
+        return CN1Matrix4f.makeIdentity();
     }
 
     @Override
     public void copyTransform(Object src, Object dest) {
-        Matrix t1 = (Matrix) src;
-        Matrix t2 = (Matrix) dest;
-        t2.set(t1);
+        CN1Matrix4f t1 = (CN1Matrix4f) src;
+        CN1Matrix4f t2 = (CN1Matrix4f) dest;
+        t2.setData(t1.getData());
     }
 
     @Override
     public void concatenateTransform(Object t1, Object t2) {
-        ((Matrix) t1).preConcat((Matrix) t2);
+        //((Matrix) t1).preConcat((Matrix) t2);
+        ((CN1Matrix4f)t1).concatenate((CN1Matrix4f)t2);
     }
 
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
-        Matrix t = (Matrix) nativeTransform;
-        t.mapPoints(in, 0, out, 0, 2);
+        //Matrix t = (Matrix) nativeTransform;
+        //t.mapPoints(in, 0, out, 0, 2);
+        ((CN1Matrix4f)nativeTransform).transformCoord(in, out);
     }
 
     @Override

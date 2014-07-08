@@ -41,7 +41,10 @@
  */
 package com.codename1.impl.android;
 
+import java.util.Arrays;
+
 import android.graphics.Bitmap;
+import android.graphics.Camera;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -52,6 +55,8 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
+
+import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 
 /**
@@ -66,6 +71,8 @@ class AndroidGraphics {
     private Paint paint;
     private Paint font;
     private Transform transform;
+    private Matrix convertedTransform;
+    private boolean transformDirty = true;
     
     private boolean clipFresh;
     private final RectF tmprectF = new RectF();
@@ -120,7 +127,7 @@ class AndroidGraphics {
 
     public void drawImage(Object img, int x, int y) {
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawBitmap((Bitmap) img, x, y, paint);
         canvas.restore();
     }
@@ -138,15 +145,51 @@ class AndroidGraphics {
         dest.left = x;
         dest.right = x + w;
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawBitmap(b, src, dest, paint);
         canvas.restore();
     }
 
+    private Matrix t(){
+        if ( transformDirty ){
+        	// Conversion from 4x4 to 3x3
+        	// See http://www.w3.org/TR/2009/WD-SVG-Transforms-20090320/#_4x4-to-3x3-conversion
+        	// for formula
+            CN1Matrix4f m = (CN1Matrix4f)transform.getNativeTransform();
+            float[] mMatrix3x3 = new float[9];
+            float[] mMatrix4x4 = m.getData();
+           
+            
+            mMatrix3x3[0] = mMatrix4x4[0];
+            mMatrix3x3[1] = mMatrix4x4[4];
+            mMatrix3x3[2] = mMatrix4x4[12];
+            mMatrix3x3[3] = mMatrix4x4[1];
+            mMatrix3x3[4] = mMatrix4x4[5];
+            mMatrix3x3[5] = mMatrix4x4[13];
+            mMatrix3x3[6] = mMatrix4x4[3];
+            mMatrix3x3[7] = mMatrix4x4[7];
+            mMatrix3x3[8] = mMatrix4x4[15];
+            
+            
+            convertedTransform = new Matrix();
+            
+            convertedTransform.setValues(mMatrix3x3);
+            
+            transformDirty = false;
+           
+            
+            
+            
+            
+        }
+        return convertedTransform;
+        
+    }
+    
     public void drawLine(int x1, int y1, int x2, int y2) {
         paint.setStyle(Paint.Style.FILL);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawLine(x1, y1, x2, y2, paint);
         canvas.restore();
     }
@@ -163,7 +206,7 @@ class AndroidGraphics {
         }
         paint.setStyle(Paint.Style.STROKE);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawPath(this.tmppath, paint);
         canvas.restore();
     }
@@ -179,7 +222,7 @@ class AndroidGraphics {
         }
         paint.setStyle(Paint.Style.FILL);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawPath(this.tmppath, paint);
         canvas.restore();
     }
@@ -187,7 +230,7 @@ class AndroidGraphics {
     public void drawRGB(int[] rgbData, int offset, int x,
             int y, int w, int h, boolean processAlpha) {
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawBitmap(rgbData, offset, w, x, y, w, h,
                 processAlpha, null);
         canvas.restore();
@@ -199,7 +242,7 @@ class AndroidGraphics {
         paint.setAntiAlias(false);
         
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawRect(x, y, x + width, y + height, paint);        
         paint.setAntiAlias(antialias);
         canvas.restore();
@@ -211,14 +254,14 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
         canvas.restore();
     }
 
     public void drawString(String str, int x, int y) {
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawText(str, x, y - font.getFontMetricsInt().ascent, font);
         canvas.restore();
     }
@@ -228,7 +271,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.STROKE);
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawArc(this.tmprectF, 360 - startAngle,
                 -arcAngle, false, paint);
         canvas.restore();
@@ -239,7 +282,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawArc(this.tmprectF, 360 - startAngle,
                 -arcAngle, true, paint);
         canvas.restore();
@@ -251,7 +294,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         canvas.restore();
@@ -263,7 +306,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
         canvas.restore();
     }
@@ -342,7 +385,7 @@ class AndroidGraphics {
     public void drawPath(Path p) {
         paint.setStyle(Paint.Style.STROKE);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawPath(p, paint);
         canvas.restore();
     }
@@ -350,13 +393,14 @@ class AndroidGraphics {
     public void fillPath(Path p) {
         paint.setStyle(Paint.Style.FILL);
         canvas.save();
-        canvas.concat((Matrix)transform.getNativeTransform());
+        canvas.concat(t());
         canvas.drawPath(p, paint);
         canvas.restore();
     }
     
     public void setTransform(Transform transform) {
         this.transform = transform;
+        transformDirty = true;
     }
 
     public Transform getTransform() {
