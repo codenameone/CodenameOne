@@ -26,6 +26,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.List;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import java.util.Calendar;
+import java.util.Map;
 
 /**
  * A date spinner allows selecting a date value within the given date range
@@ -71,7 +72,15 @@ public class DateSpinner extends BaseSpinner {
                         if(numericMonths) {
                             value = "" + d;
                         } else {
-                            value = DateTimeRenderer.MONTHS[d - 1];
+                            Map<String, String> t = getUIManager().getBundle();
+                            String text = DateTimeRenderer.MONTHS[d - 1];
+                            if (t != null) {
+                                Object o = t.get("Calendar." + text);
+                                if (o != null) {
+                                    text = (String) o;
+                                }
+                            }
+                            value = text;
                         }
                     }
                     return super.getListCellRendererComponent(list, value, index, isSelected);

@@ -226,17 +226,29 @@ public class Slider extends Label {
     
     private void setProgressInternal(int value) {
         this.value = value;
-        if(renderValueOnTop) {
-            super.setText("" + value);
+        if(renderValueOnTop || renderPercentageOnTop) {
+            super.setText(formattedValue(value));
         } else {
-            if(renderPercentageOnTop) {
-                super.setText(value + "%");
-            } else {
-                if(isInitialized()) {
-                    repaint();
-                }
+            if(isInitialized()) {
+                repaint();
             }
         }
+    }
+
+    /**
+     * Allows formatting the appearance of the progress when text is drawn on top
+     * 
+     * @param value the value of the slider
+     * @return a string formatted version
+     */
+    protected String formattedValue(int value) {
+        if(renderValueOnTop) {
+            return("" + value);
+        }
+        if(renderPercentageOnTop) {
+            return(value + "%");
+        }
+        return("");
     }
     
 

@@ -1610,6 +1610,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             pullDown = new Label(getUIManager().localize("pull.down", "Pull down do refresh..."));
             pullDown.getUnselectedStyle().setAlignment(Component.CENTER);
             pullDown.getUnselectedStyle().setPadding(0, 0, 0 , 0);
+            pullDown.getUnselectedStyle().setMargin(0, 0, 0 , 0);
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
                 i = Resources.getSystemResource().getImage("refresh-icon.png");
@@ -1621,6 +1622,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             releaseToRefresh = new Label(getUIManager().localize("pull.release", "Release to refresh..."));
             releaseToRefresh.getUnselectedStyle().setAlignment(Component.CENTER);
             releaseToRefresh.getUnselectedStyle().setPadding(0, 0, 0 , 0);
+            releaseToRefresh.getUnselectedStyle().setMargin(0, 0, 0 , 0);
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
                 i = Resources.getSystemResource().getImage("refresh-icon.png");
@@ -1633,6 +1635,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             ((Container) updating).addComponent(new Label(getUIManager().localize("pull.refresh", "Updating...")));
 
             pull.getUnselectedStyle().setPadding(0, 0, 0 , 0);
+            pull.getUnselectedStyle().setMargin(0, 0, 0 , 0);
             pull.addComponent(BorderLayout.CENTER, updating);
             pull.layoutContainer();
             pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));

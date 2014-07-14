@@ -3101,6 +3101,20 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Returns true if executing this URL should work, returns false if it will not
+     * and null if this is unknown.
+     * @param url the url that would be executed
+     * @return true if executing this URL should work, returns false if it will not
+     * and null if this is unknown
+     */
+    public Boolean canExecute(String url) {
+        if(url.startsWith("http:") || url.startsWith("https:")) {
+            return Boolean.TRUE;
+        }
+        return null;
+    }
+    
+    /**
      * Executes the given URL on the native platform
      *
      * @param url the url to execute

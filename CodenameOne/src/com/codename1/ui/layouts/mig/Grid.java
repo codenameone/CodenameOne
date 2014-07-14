@@ -598,7 +598,7 @@ public final class Grid
 	public final int[] getWidth(int refHeight)
 	{
 		checkSizeCalcs(lastRefWidth, refHeight);
-		return width.clone();
+		return width;
 	}
 
 	public final int[] getHeight()
@@ -609,7 +609,7 @@ public final class Grid
 	public final int[] getHeight(int refWidth)
 	{
 		checkSizeCalcs(refWidth, lastRefHeight);
-		return height.clone();
+		return height;
 	}
 
 	private int lastRefWidth = 0, lastRefHeight = 0;

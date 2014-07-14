@@ -543,7 +543,7 @@ public final class UnitValue
 
 	public final UnitValue[] getSubUnits()
 	{
-		return subUnits != null ? subUnits.clone() : null;
+		return subUnits != null ? subUnits : null;
 	}
 
 	public final int getUnit()

@@ -2659,6 +2659,17 @@ public final class Display {
             localProperties.put(key, value);
         }
     }
+    
+    /**
+     * Returns true if executing this URL should work, returns false if it will not
+     * and null if this is unknown.
+     * @param url the url that would be executed
+     * @return true if executing this URL should work, returns false if it will not
+     * and null if this is unknown
+     */
+    public Boolean canExecute(String url) {
+        return impl.canExecute(url);
+    }
 
     /**
      * Executes the given URL on the native platform
