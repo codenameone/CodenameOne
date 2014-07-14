@@ -72,7 +72,7 @@ public class FacebookImpl extends FacebookConnect {
         String permissionsStr = Display.getInstance().getProperty("facebook_permissions", "");
         permissionsStr = permissionsStr.trim();
         
-        StringTokenizer token = new StringTokenizer(permissionsStr, ",");
+        StringTokenizer token = new StringTokenizer(permissionsStr, ", ");
         if (token.countTokens() > 0) {
             try {
                 while (token.hasMoreElements()) {

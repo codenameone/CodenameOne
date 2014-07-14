@@ -31,6 +31,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import com.codename1.io.Log;
 import com.codename1.location.Location;
 import static com.codename1.location.LocationManager.AVAILABLE;
 import static com.codename1.location.LocationManager.OUT_OF_SERVICE;
@@ -107,7 +108,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
                 return convert(location);
             }
         } catch (Exception err) {
-            err.printStackTrace();
+            Log.e(err);
             throw new IOException(err);
         }
         throw new IOException("cannot retrieve location try later");

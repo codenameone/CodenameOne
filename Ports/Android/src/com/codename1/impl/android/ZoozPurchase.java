@@ -100,6 +100,10 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
         intent.putExtra(CheckoutActivity.ZOOZ_AMOUNT, amount);
         intent.putExtra(CheckoutActivity.ZOOZ_CURRENCY_CODE, currency);
         intent.putExtra(CheckoutActivity.ZOOZ_IS_SANDBOX, isSandBox);
+        String zoozInvoice = Display.getInstance().getProperty("ZoozInvoice", null);
+        if(zoozInvoice != null) {
+            intent.putExtra(CheckoutActivity.ZOOZ_INVOICE, zoozInvoice);
+        }
         // start ZooZCheckoutActivity and wait to the activity result.
         activity.startActivityForResult(intent, ZOOZ_PAYMENT);
         

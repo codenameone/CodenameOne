@@ -388,8 +388,9 @@ public class InPlaceEditView extends FrameLayout {
         if (!leaveKeyboardShowing) {
             showVirtualKeyboard(false);
         }
+        int imo = mEditText.getImeOptions();
         if(reason == REASON_IME_ACTION &&
-                mEditText.getImeOptions() == EditorInfo.IME_ACTION_DONE && 
+            (imo == EditorInfo.IME_ACTION_DONE || imo == EditorInfo.IME_ACTION_SEARCH || imo == EditorInfo.IME_ACTION_SEND || imo == EditorInfo.IME_ACTION_GO) && 
                 mEditText.mTextArea instanceof TextField ){
             ((TextField)mEditText.mTextArea).fireDoneEvent();
         }

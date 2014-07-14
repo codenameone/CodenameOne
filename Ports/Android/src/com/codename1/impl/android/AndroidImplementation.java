@@ -505,12 +505,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
         activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        /*if (isTablet()) {
-            if(getDisplayWidth() > 1400) {
-                return Display.DENSITY_VERY_HIGH;
-            }
-            return Display.DENSITY_MEDIUM;
-        }*/
         switch (metrics.densityDpi) {
             case DisplayMetrics.DENSITY_LOW:
                 return Display.DENSITY_LOW;
@@ -2664,7 +2658,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (nativeThemeAvailable) {
             try {
                 InputStream is;
-                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet()) {
+                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet() || Display.getInstance().getProperty("and.hololight", "false").equals("true")) {
                     is = getResourceAsStream(getClass(), "/androidTheme.res");
                 } else {
                     is = getResourceAsStream(getClass(), "/android_holo_light.res");
@@ -4825,6 +4819,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 public String formatDateTime(Date d) {
                     return DateFormat.getDateTimeInstance().format(d);
+                }
+
+                public String formatDateTimeMedium(Date d) {
+                    DateFormat dd = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM);
+                    return dd.format(d);
+                }
+
+                public String formatDateTimeShort(Date d) {
+                    DateFormat dd = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
+                    return dd.format(d);
                 }
 
                 public String getCurrencySymbol() {
