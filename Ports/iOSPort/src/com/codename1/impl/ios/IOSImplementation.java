@@ -75,6 +75,7 @@ import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.io.Log;
 import com.codename1.media.MediaManager;
+import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.geom.GeneralPath;
@@ -94,6 +95,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static IOSNative nativeInstance = new IOSNative();
     
     private static PurchaseCallback purchaseCallback;
+    private static RestoreCallback restoreCallback;
     private int timeout = 120000;
     private static final Object CONNECTIONS_LOCK = new Object();
     private static Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
@@ -5079,6 +5081,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(main instanceof PurchaseCallback) {
             purchaseCallback = (PurchaseCallback)main;
         }
+        if(main instanceof RestoreCallback) {
+            restoreCallback = (RestoreCallback)main;
+        }
     }        
     
     private L10NManager l10n;
@@ -5481,6 +5486,40 @@ public class IOSImplementation extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     purchaseCallback.itemPurchased(sku);
+                }
+            });
+        }
+    }
+    
+    static void itemRestored(final String sku) {
+        if(restoreCallback != null) {
+            safeCallSerially(new Runnable() {
+                @Override
+                public void run() {
+                    restoreCallback.itemRestored(sku);
+                }
+            });
+        }
+    }
+    
+    static void restoreRequestComplete() {
+        Log.p("In restoreRequestComplete "+restoreCallback);
+        if(restoreCallback != null) {
+            safeCallSerially(new Runnable() {
+                @Override
+                public void run() {
+                    restoreCallback.restoreRequestComplete();
+                }
+            });
+        }
+    }
+    
+    static void restoreRequestError(final String errorMessage) {
+        if(restoreCallback != null) {
+            safeCallSerially(new Runnable() {
+                @Override
+                public void run() {
+                    restoreCallback.restoreRequestError(errorMessage);
                 }
             });
         }

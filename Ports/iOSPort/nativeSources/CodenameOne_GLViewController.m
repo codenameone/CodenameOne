@@ -139,7 +139,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
     
 #ifndef CN1_USE_ARC
     return [[GLUIImage alloc] initWithImage:img];
-#else 
+#else
     return (__bridge void*)[[GLUIImage alloc] initWithImage:img];
 #endif
 }
@@ -147,7 +147,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImage, const char* name) {
 #ifndef CN1_USE_ARC
     GLUIImage* img = (GLUIImage*)nativeImage;
-#else 
+#else
     GLUIImage* img = (__bridge GLUIImage*)nativeImage;
 #endif
     if(name != nil) {
@@ -199,7 +199,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if(hintString != nil) {
                 utf.placeholder = hintString;
             }
-
+            
             if((constraint & 0x80000) == 0x80000) {
                 utf.autocorrectionType = UITextAutocorrectionTypeNo;
             }
@@ -257,8 +257,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.returnKeyType = UIReturnKeyNext;
                 if(vkbAlwaysOpen) {
                     if(utf.keyboardType != UIKeyboardTypeDecimalPad
-                        && utf.keyboardType != UIKeyboardTypePhonePad
-                        && utf.keyboardType != UIKeyboardTypeNumberPad) {
+                       && utf.keyboardType != UIKeyboardTypePhonePad
+                       && utf.keyboardType != UIKeyboardTypeNumberPad) {
                         isLastEdit = YES;
                     }
                 }
@@ -269,12 +269,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
              addObserver:utf.delegate
              selector:@selector(textFieldDidChange)
              name:UITextFieldTextDidChangeNotification
-             object:utf];            
-
+             object:utf];
+            
             if ((utf.keyboardType == UIKeyboardTypeDecimalPad
-                || utf.keyboardType == UIKeyboardTypePhonePad
-                || utf.keyboardType == UIKeyboardTypeNumberPad
-                || (utf.returnKeyType == UIReturnKeyNext && vkbAlwaysOpen)) && !isIPad()) {
+                 || utf.keyboardType == UIKeyboardTypePhonePad
+                 || utf.keyboardType == UIKeyboardTypeNumberPad
+                 || (utf.returnKeyType == UIReturnKeyNext && vkbAlwaysOpen)) && !isIPad()) {
                 //add navigation toolbar to the top of the keyboard
                 if(showToolbar) {
 #ifndef CN1_USE_ARC
@@ -359,7 +359,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
-
+            
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard
 #ifndef CN1_USE_ARC
@@ -388,7 +388,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 if (isLastEdit) {
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
-#else 
+#else
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
@@ -396,7 +396,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 } else {
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
-#else 
+#else
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next"));
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
@@ -707,7 +707,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OB
     
     int j = 0;
     for ( int i=0; i<len; i+=2){
-
+        
         x[j] = data[i];
         y[j] = data[i+1];
         j++;
@@ -726,20 +726,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OB
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl
 (Renderer * renderer, int color, int alpha, int x, int y, int w, int h)
 {
-
+    
     DrawPath *f = [[DrawPath alloc] initWithArgs:renderer color:color alpha:alpha];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-        // add to pipeline here
-
+    // add to pipeline here
+    
 }
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h)
 {
-
+    
     DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
@@ -750,26 +750,26 @@ void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLui
 
 // END ES2 ADDITION -------------------------------------------------------------------------------------------------
 void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
-                                                                                                                                                       JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
-                                                                                                                                                       JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
-                                                                                                                                                       JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
-                                                                                                                                                       JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
-                                                                                     JAVA_INT originX, JAVA_INT originY
-                                                                                                                                                                   )
+                                                                                                                                                                               JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                               JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                               JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                               JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                               JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                               )
 {
 #ifdef USE_ES2
-//    dispatch_async(dispatch_get_main_queue(), ^{
-        GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                      b0,b1,b2,b3,
-                                      c0,c1,c2,c3,
-                                      d0,d1,d2,d3);
-        
-        SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
-        [CodenameOne_GLViewController upcoming:f];
+    //    dispatch_async(dispatch_get_main_queue(), ^{
+    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                              b0,b1,b2,b3,
+                                              c0,c1,c2,c3,
+                                              d0,d1,d2,d3);
+    
+    SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
+    [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
-        [f release];
+    [f release];
 #endif
-//    });
+    //    });
 #endif
 }
 
@@ -880,7 +880,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
     //GET_DIPLAY_HEIGHT_MARKER
-
+    
     //if(displayHeight <= 0) {
     displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     //}
@@ -1228,15 +1228,15 @@ static CodenameOne_GLViewController *sharedSingleton;
                                                      size:MOPUB_TABLET_AD_SIZE] autorelease];
     } else {
         self.adView = [[[MPAdView alloc] initWithAdUnitId:MOPUB_AD_UNIT
-                       size:MOPUB_AD_SIZE] autorelease];
+                                                     size:MOPUB_AD_SIZE] autorelease];
     }
 #else
     if(isIPad()) {
         self.adView = [[MPAdView alloc] initWithAdUnitId:MOPUB_TABLET_AD_UNIT
-                                                     size:MOPUB_TABLET_AD_SIZE];
+                                                    size:MOPUB_TABLET_AD_SIZE];
     } else {
         self.adView = [[MPAdView alloc] initWithAdUnitId:MOPUB_AD_UNIT
-                       size:MOPUB_AD_SIZE];
+                                                    size:MOPUB_AD_SIZE];
     }
 #endif
     self.adView.delegate = self;
@@ -1278,12 +1278,12 @@ bool lockDrawing;
     }
     int currentWidth = (int)self.view.bounds.size.width * scaleValue;
     if(currentWidth != displayWidth) {
-    [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+        [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
         displayWidth = currentWidth;
         displayHeight = (int)self.view.bounds.size.height * scaleValue;
         screenSizeChanged(displayWidth, displayHeight);
     }
-
+    
     //replaceViewDidAppear
 }
 
@@ -1341,7 +1341,7 @@ bool lockDrawing;
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 #else
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-
+    
     if (!aContext) {
         aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
     }
@@ -1353,7 +1353,7 @@ bool lockDrawing;
     
 	self.context = aContext;
 #ifndef CN1_USE_ARC
-        [aContext release];
+    [aContext release];
 #endif
 	
     [(EAGLView *)self.view setContext:context];
@@ -1361,10 +1361,10 @@ bool lockDrawing;
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
     
-//    if ([context API] == kEAGLRenderingAPIOpenGLES2)
-//        [self loadShaders];
-        
-
+    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
+    //        [self loadShaders];
+    
+    
     animating = FALSE;
     animationFrameInterval = 1;
     self.displayLink = nil;
@@ -1432,7 +1432,7 @@ bool lockDrawing;
         
         int wi = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
         int he = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
-
+        
         //some hacking to scale launch image so that it will be drawn correctly
         GLfloat xScale = 1;
         int statusbarHeight = 20;
@@ -1613,11 +1613,11 @@ int keyboardHeight;
         [EAGLContext setCurrentContext:nil];
     
 #ifndef CN1_USE_ARC
-        [context release];
+    [context release];
 #endif
- 
+    
 #ifdef INCLUDE_MOPUB
-     self.adView = nil;
+    self.adView = nil;
 #endif
     
 #ifndef CN1_USE_ARC
@@ -1635,7 +1635,7 @@ int keyboardHeight;
 #else
     java_lang_System_gc__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
-
+    
     // Release any cached data, images, etc. that aren't in use.
 }
 
@@ -1743,7 +1743,7 @@ int keyboardHeight;
     [self drawFrame:CGRectMake(0, 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl())];
 #ifdef INCLUDE_MOPUB
     [self.adView rotateToOrientation:toInterfaceOrientation];
-#endif    
+#endif
 }
 
 - (BOOL)shouldAutorotate {
@@ -1817,8 +1817,8 @@ int keyboardHeight;
     CGFloat centeredX = (self.view.bounds.size.width - size.width) / 2;
     CGFloat bottomAlignedY = self.view.bounds.size.height - size.height;
     self.adView.frame = CGRectMake(centeredX, bottomAlignedY, size.width, size.height);
-#endif    
-
+#endif
+    
     //DID_ROTATE_FROM_INTERFACE_MARKER
 }
 
@@ -2474,6 +2474,7 @@ extern SKPayment *paymentInstance;
         switch (transaction.transactionState)
         {
             case SKPaymentTransactionStatePurchased:
+                
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
                 continue;
@@ -2484,9 +2485,12 @@ extern SKPayment *paymentInstance;
                 }
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 continue;
+                
             case SKPaymentTransactionStateRestored:
                 NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
+                
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStatePurchasing:
                 NSLog(@"SKPaymentTransactionStatePurchasing");
@@ -2497,6 +2501,17 @@ extern SKPayment *paymentInstance;
                 continue;
         }
     }
+}
+
+-(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
+{
+    NSLog(@"Restore transactions finished");
+    com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+}
+-(void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error
+{
+    NSLog(@"Restore error");
+    com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
 }
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
@@ -2512,7 +2527,7 @@ extern SKPayment *paymentInstance;
 }
 
 #ifdef INCLUDE_ZOOZ
--(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{ 
+-(void)paymentSuccessWithResponse: (ZooZPaymentResponse *)response{
     NSString* tid = response.transactionID;
     JAVA_FLOAT amount = response.paidAmount;
     com_codename1_impl_ios_ZoozPurchase_paymentSuccessWithResponse___java_lang_String_float(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG tid), amount);
@@ -2572,7 +2587,7 @@ extern SKPayment *paymentInstance;
 extern int stringPickerSelection;
 #ifndef NEW_CODENAME_ONE_VM
 extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
-#else 
+#else
 extern JAVA_OBJECT pickerStringArray;
 #endif
 extern JAVA_LONG defaultDatePickerDate;
@@ -2584,7 +2599,7 @@ extern JAVA_LONG defaultDatePickerDate;
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
 #ifndef NEW_CODENAME_ONE_VM
             pickerStringArray = nil;
-#else 
+#else
             pickerStringArray = JAVA_NULL;
 #endif
         }
@@ -2608,7 +2623,7 @@ extern JAVA_LONG defaultDatePickerDate;
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
 #ifndef NEW_CODENAME_ONE_VM
             pickerStringArray = nil;
-#else 
+#else
             pickerStringArray = JAVA_NULL;
 #endif
         }
@@ -2637,7 +2652,7 @@ UIPopoverController* popoverControllerInstance;
                 defaultDatePickerDate = nil;
 #ifndef NEW_CODENAME_ONE_VM
                 pickerStringArray = nil;
-#else 
+#else
                 pickerStringArray = JAVA_NULL;
 #endif
             }
@@ -2656,35 +2671,35 @@ UIPopoverController* popoverControllerInstance;
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow: (NSInteger)row inComponent:(NSInteger)component {
     stringPickerSelection = row;
 }
- 
+
 // tell the picker how many rows are available for a given component
 - (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     return pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else 
+#else
     JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
     return arr->length;
 #endif
 }
- 
+
 // tell the picker how many components it will have
 - (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
     return 1;
 }
- 
+
 // tell the picker the title for a given component
 - (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     return toNSString(data[row]);
-#else 
+#else
     JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
     JAVA_ARRAY_OBJECT* o = (JAVA_ARRAY_OBJECT*)arr->data;
     return toNSString(CN1_THREAD_GET_STATE_PASS_ARG o[row]);
 #endif
 }
- 
+
 // tell the picker the width of each row for a given component
 - (CGFloat)pickerView:(UIPickerView *)pickerView widthForComponent:(NSInteger)component {
     int sectionWidth = 300;
