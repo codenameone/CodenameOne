@@ -45,6 +45,8 @@ public class InfiniteProgress extends Component {
     private int angle = 0;
     private int tick;
     
+    private int tintColor = 0x90000000;
+    
     /**
      * Default constructor to define the UIID
      */
@@ -62,7 +64,7 @@ public class InfiniteProgress extends Component {
             f.show();
         }
         int i = f.getTintColor();
-        f.setTintColor(0x90000000);
+        f.setTintColor(tintColor);
         Dialog d = new Dialog();
         d.setDialogUIID("Container");
         d.setLayout(new BorderLayout());
@@ -183,5 +185,21 @@ public class InfiniteProgress extends Component {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * The tinting color of the screen when the showInifiniteBlocking method is invoked
+     * @return the tintColor
+     */
+    public int getTintColor() {
+        return tintColor;
+    }
+
+    /**
+     * The tinting color of the screen when the showInifiniteBlocking method is invoked
+     * @param tintColor the tintColor to set
+     */
+    public void setTintColor(int tintColor) {
+        this.tintColor = tintColor;
     }
 }

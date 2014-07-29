@@ -519,6 +519,22 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    private void removeCommandComponent(Container cnt, Command cmd) {
+        int count = cnt.getComponentCount();
+        for(int iter = 0 ; iter < count ; iter++) {
+            Component c = cnt.getComponentAt(iter);
+            if(c instanceof Container) {
+                removeCommandComponent((Container)c, cmd);
+                continue;
+            }
+            if(c instanceof Button && ((Button)c).getCommand() == cmd) {
+                Container cc = getParent();
+                cc.removeComponent(c);
+                return;
+            }
+        }
+    }
+    
     /**
      * @inheritDoc
      */
@@ -526,6 +542,9 @@ public class SideMenuBar extends MenuBar {
         super.removeCommand(cmd);
         if (parent instanceof Dialog) {
             return;
+        }
+        if(cmd.getClientProperty("TitleCommand") != null && parent != null) {
+            removeCommandComponent(parent.getTitleArea(), cmd);
         }
         if(rightCommands != null){
             rightCommands.remove(cmd);

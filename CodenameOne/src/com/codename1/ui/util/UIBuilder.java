@@ -2368,7 +2368,7 @@ public class UIBuilder { //implements Externalizable {
         return new LazyValue<Form>() {
             public Form get(Object... args) {
                 String n = getPreviousFormName(f);
-                return createForm(f);
+                return createForm((Form)createContainer(fetchResourceFile(), n));
             }
         };
     }

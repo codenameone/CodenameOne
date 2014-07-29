@@ -211,4 +211,13 @@ public class DefaultListModel<T> implements ListModel<T> {
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }
+    
+    /**
+     * Returns the internal list of items which makes traversal using iterators easier.
+     * 
+     * @return the list, notice that you shouldn't modify it
+     */
+    public java.util.List<T> getList() {
+        return items;
+    }
 }

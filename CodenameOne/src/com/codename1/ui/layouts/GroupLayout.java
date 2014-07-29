@@ -52,7 +52,7 @@ import java.util.Iterator;
  * The following code builds a simple layout consisting of two labels in
  * one column, followed by two textfields in the next column:
  * <pre>
- *   JComponent panel = ...;
+ *   Container panel = ...;
  *   GroupLayout layout = new GroupLayout(panel);
  *   panel.setLayout(layout);
  *   layout.setAutocreateGaps(true);

@@ -35,7 +35,7 @@ public class DateTimeSpinner extends TimeSpinner {
     private Date today = new Date();
     private Date currentDate = today;
     private Date startDate = new Date(0);
-    private Date endDate = new Date(System.currentTimeMillis() + 10000 * 24 * 60 * 60000);
+    private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);
     private boolean markToday = true;
     private boolean includeYear;
     private int off;
