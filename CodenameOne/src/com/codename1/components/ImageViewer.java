@@ -54,7 +54,19 @@ public class ImageViewer extends Component {
     private DataChangedListener listListener;
     private Image swipePlaceholder;
     private float swipeThreshold = 0.4f;
-        
+    private int imageInitialPosition = IMAGE_FIT;
+
+    /**
+     * Indicates the initial position of the image in the viewer to FIT to the 
+     * component size
+     */ 
+    public final static int IMAGE_FIT = 0;
+    /**
+     * Indicates the initial position of the image in the viewer to FILL the 
+     * component size
+     */ 
+    public final static int IMAGE_FILL = 1;
+    
     // return values from image aspect calc
     private int prefX, prefY, prefW, prefH;
 
@@ -410,7 +422,13 @@ public class ImageViewer extends Component {
         Style s = getStyle();
         int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
         int height = getHeight() - s.getPadding(TOP) - s.getPadding(BOTTOM);
-        float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+        float r2; 
+        if(imageInitialPosition == IMAGE_FIT){
+            r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+        }else{
+            r2 = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));        
+        }
+        
         // calculate the image position to fit
         prefW = (int)(((float)iW) * r2);
         prefH = (int)(((float)iH) * r2);
@@ -745,4 +763,14 @@ public class ImageViewer extends Component {
         }
         
     }
+
+    /**
+     * Sets the viewer initial image position to fill or to fit.
+     * @param imageInitialPosition values can be IMAGE_FILL or IMAGE_FIT
+     */ 
+    public void setImageInitialPosition(int imageInitialPosition) {
+        this.imageInitialPosition = imageInitialPosition;
+    }
+    
+    
 }
