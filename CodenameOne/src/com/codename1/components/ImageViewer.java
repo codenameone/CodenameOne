@@ -450,7 +450,12 @@ public class ImageViewer extends Component {
         Style s = getStyle();
         int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
         int height = getHeight() - s.getPadding(TOP) - s.getPadding(BOTTOM);
-        float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+        float r2;
+        if(imageInitialPosition == IMAGE_FIT){
+            r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+        }else{
+            r2 = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));        
+        }
         imageDrawWidth = (int)(((float)iW) * r2 * zoom);
         imageDrawHeight = (int)(((float)iH) * r2 * zoom);
         imageX = (int)(s.getPadding(LEFT) + (width - imageDrawWidth) * panPositionX);
