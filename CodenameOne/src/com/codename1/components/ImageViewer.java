@@ -63,7 +63,9 @@ public class ImageViewer extends Component {
     public final static int IMAGE_FIT = 0;
     /**
      * Indicates the initial position of the image in the viewer to FILL the 
-     * component size
+     * component size.
+     * Notice this type might drop edges of the images in order to stretch the image
+     * to the full size of the Component.
      */ 
     public final static int IMAGE_FILL = 1;
     

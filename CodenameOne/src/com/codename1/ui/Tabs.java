@@ -233,7 +233,7 @@ public class Tabs extends Container {
      */
     public boolean animate() {
         boolean b = super.animate();
-        if (slideToDestMotion != null && swipeActivated) {
+        if (slideToDestMotion != null && swipeActivated || slideToDestMotion != null) {
             int motionX = slideToDestMotion.getValue();
             final int size = contentPane.getComponentCount();
             int tabWidth = contentPane.getWidth() - tabsGap*2;
@@ -489,7 +489,7 @@ public class Tabs extends Container {
                 if (content instanceof Container) {
                     ((Container) content).setBlockFocus(false);
                 }
-                setSelectedIndex(active);
+                setSelectedIndex(active, true);
                 initTabsFocus();
                 selectedTab = b;
                 selectedTab.setShouldCalcPreferredSize(true);
@@ -760,6 +760,33 @@ public class Tabs extends Container {
         return tabsContainer;
     }
 
+    public void setSelectedIndex(int index, boolean slideToSelected) {        
+        if (index < 0 || index >= tabsContainer.getComponentCount()) {
+            throw new IndexOutOfBoundsException("Index: "+index+", Tab count: "+tabsContainer.getComponentCount());
+        }
+        if(index == activeComponent){
+            return;
+        }
+        
+        Form form = getComponentForm();
+        if(slideToSelected && form != null){
+            int end = contentPane.getComponentAt(activeComponent).getX();
+            int start = contentPane.getComponentAt(index).getX();
+            slideToDestMotion = createTabSlideMotion(start, end);
+            slideToDestMotion.start();
+            form.registerAnimatedInternal(Tabs.this);
+            active = index;
+        }else{
+            if(selectionListener != null){
+                selectionListener.fireSelectionEvent(activeComponent, index);
+            }
+            activeComponent = index;
+            Button b = (Button)tabsContainer.getComponentAt(index);
+            b.fireClicked();
+            b.requestFocus();        
+        }
+    }
+    
     /**
      * Sets the selected index for this tabbedpane. The index must be a valid
      * tab index.
@@ -768,19 +795,7 @@ public class Tabs extends Container {
      * (index < 0 || index >= tab count)
      */
     public void setSelectedIndex(int index) {        
-        if (index < 0 || index >= tabsContainer.getComponentCount()) {
-            throw new IndexOutOfBoundsException("Index: "+index+", Tab count: "+tabsContainer.getComponentCount());
-        }
-        if(index == activeComponent){
-            return;
-        }
-        if(selectionListener != null){
-            selectionListener.fireSelectionEvent(activeComponent, index);
-        }
-        activeComponent = index;
-        Button b = (Button)tabsContainer.getComponentAt(index);
-        b.fireClicked();
-        b.requestFocus();
+        setSelectedIndex(index, false);
     }
 
     /**
