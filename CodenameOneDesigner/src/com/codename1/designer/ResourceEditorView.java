@@ -403,6 +403,18 @@ public class ResourceEditorView extends FrameView {
         uiList = new HorizontalList(loadedResources, this) {
             @Override
             public Icon getIconImage(String current) {
+                UIBuilder uib = new UIBuilder();
+                try {
+                    com.codename1.ui.Component cmp = uib.createContainer(loadedResources, current);
+                    if(cmp instanceof com.codename1.ui.Dialog){
+                        return new ImageIcon(ResourceEditorApp.class.getResource("/D.png"));
+                    }else if(cmp instanceof com.codename1.ui.Form){
+                        return new ImageIcon(ResourceEditorApp.class.getResource("/F.png"));                
+                    }else{
+                        return new ImageIcon(ResourceEditorApp.class.getResource("/C.png"));                                
+                    }
+                } catch (Exception e) {
+                }
                 return null;
             }
 

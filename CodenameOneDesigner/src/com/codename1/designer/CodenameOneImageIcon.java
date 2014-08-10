@@ -38,6 +38,7 @@ public class CodenameOneImageIcon implements Icon {
     private com.codename1.ui.Image img;
     private int width;
     private int height;
+    BufferedImage i;
     public CodenameOneImageIcon(com.codename1.ui.Image img) {
         this(img, 16, 16);
     }
@@ -56,9 +57,11 @@ public class CodenameOneImageIcon implements Icon {
         if(getImage() == null) {
             return;
         }
-        int[] rgb = getImage().scaled(width, height).getRGB();
-        BufferedImage i = new BufferedImage(getIconWidth(), getIconHeight(), BufferedImage.TYPE_INT_ARGB);
-        i.setRGB(0, 0, getIconWidth(), getIconHeight(), rgb, 0, getIconWidth());
+        if(i == null){
+            int[] rgb = getImage().scaled(width, height).getRGB();        
+            i = new BufferedImage(getIconWidth(), getIconHeight(), BufferedImage.TYPE_INT_ARGB);
+            i.setRGB(0, 0, getIconWidth(), getIconHeight(), rgb, 0, getIconWidth());
+        }
         g.drawImage(i, x, y, null);
     }
 
