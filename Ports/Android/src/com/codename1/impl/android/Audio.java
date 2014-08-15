@@ -132,7 +132,7 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
     public void prepare() {
         try {
             if (player != null) {
-                player.prepareAsync();
+                player.prepare();
             }
         } catch(Throwable t) {
             // some exceptions might occur here, with all the various illegal states they rarely matter

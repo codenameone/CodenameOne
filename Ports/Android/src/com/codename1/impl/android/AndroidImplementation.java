@@ -2279,7 +2279,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         protected Image generatePeerImage() {
             try {
-                Image image = new AndroidImplementation.NativeImage(AndroidNativeUtil.renderViewOnBitmap(v, getWidth(), getHeight()));
+                Bitmap bmp = AndroidNativeUtil.renderViewOnBitmap(v, getWidth(), getHeight());
+                if(bmp == null) {
+                    return Image.createImage(5, 5);
+                }
+                Image image = new AndroidImplementation.NativeImage(bmp);
                 return image;
             } catch(Throwable t) {
                 t.printStackTrace();
@@ -2533,10 +2537,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (layoutWrapper != null) {
                 activity.runOnUiThread(new Runnable() {
                     public void run() {
-                        // request focus of the wrapper. that will trigger the
-                        // android focus listener and move focus back to the
-                        // base view.
-                        layoutWrapper.requestFocus();
+                        if(isInitialized()) {
+                            // request focus of the wrapper. that will trigger the
+                            // android focus listener and move focus back to the
+                            // base view.
+                            layoutWrapper.requestFocus();
+                        }
                     }
                 });
             }
@@ -3828,7 +3834,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String getAppHomePath() {
-        return getContext().getFilesDir().getAbsolutePath();
+        return getContext().getFilesDir().getAbsolutePath() + "/";
     }
 
     /**
@@ -5481,7 +5487,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isNativePickerTypeSupported(int pickerType) {
-        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_STRINGS;
+        if(android.os.Build.VERSION.SDK_INT >= 11) {
+            return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_STRINGS;
+        }
+        return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME;
     }
     
     @Override
