@@ -91,7 +91,8 @@ public class URLImage extends EncodedImage {
                     if(tmp.getHeight() > placeholderImage.getHeight()) {
                         int diff = tmp.getHeight() - placeholderImage.getHeight();
                         int y = diff / 2;
-                        tmp = tmp.subImage(0, y, placeholderImage.getWidth(), placeholderImage.getHeight(), true);
+                        tmp = tmp.subImage(0, y, Math.min(placeholderImage.getWidth(), tmp.getWidth()), 
+                                Math.min(placeholderImage.getHeight(), tmp.getHeight()), true);
                     }
                 }
                 return EncodedImage.createFromImage(tmp, true);

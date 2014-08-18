@@ -474,6 +474,20 @@ public class ImageViewer extends Component {
         }
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public boolean animate() {
+        boolean result = false;
+        if(image != null && image.isAnimation()) {
+            result = image.animate();
+        }
+        return super.animate() || result; 
+    }
+    
+    
     
     /**
      * @inheritDoc

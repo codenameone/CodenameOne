@@ -1245,7 +1245,6 @@ public class Resources {
         int size = input.readShort();
         for(int iter = 0 ; iter < size ; iter++) {
             String key = input.readUTF();
-
             if(key.startsWith("@")) {
                 theme.put(key, input.readUTF());
                 continue;

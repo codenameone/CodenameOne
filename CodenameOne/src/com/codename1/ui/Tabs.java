@@ -760,6 +760,12 @@ public class Tabs extends Container {
         return tabsContainer;
     }
 
+    /**
+     * Sets the currently selected index in the tabs component 
+     * @param index the index for the tab starting with tab 0. 
+     * @param slideToSelected true to animate the transition to the new selection
+     * false to just move immediately
+     */
     public void setSelectedIndex(int index, boolean slideToSelected) {        
         if (index < 0 || index >= tabsContainer.getComponentCount()) {
             throw new IndexOutOfBoundsException("Index: "+index+", Tab count: "+tabsContainer.getComponentCount());

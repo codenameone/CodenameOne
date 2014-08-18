@@ -122,6 +122,7 @@ public class AutoCompleteTextField extends TextField {
         boolean v = filter.getSize() > 0 && getText().length() > minimumLength;
         if(v != popup.isVisible()) {
             popup.setVisible(v);
+            popup.setEnabled(v);
             f.repaint();
         } 
         popup.revalidate();
@@ -146,6 +147,7 @@ public class AutoCompleteTextField extends TextField {
             boolean v = filter.getSize() > 0 && text.length() > minimumLength;
             if(v != popup.isVisible()) {
                 popup.setVisible(v);
+                popup.setEnabled(v);
                 if(!v) {
                     Form f = getComponentForm();
                     if(f != null) {
@@ -260,7 +262,7 @@ public class AutoCompleteTextField extends TextField {
         popup.addComponent(l);
         popup.getStyle().setMargin(LEFT, getAbsoluteX());
         int top = getAbsoluteY() - f.getTitleArea().getHeight() + getHeight();
-        popup.getStyle().setMargin(TOP, top);
+        popup.getStyle().setMargin(TOP, Math.max(0, top));
         popup.setPreferredW(getWidth());
         popup.setPreferredH(Display.getInstance().getDisplayHeight() - top);
         if (f != null) {

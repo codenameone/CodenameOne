@@ -538,7 +538,7 @@ public class SimpleDateFormat extends DateFormat {
             tzMinutes += getDSTOffset(calendar);
             calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) + tzMinutes);
             // Now adjust the time again to local time.
-            calendar.set(Calendar.MILLISECOND, localTimezone.getRawOffset());
+            calendar.set(Calendar.MILLISECOND, calendar.get(Calendar.MILLISECOND) + localTimezone.getRawOffset());
         }
         return calendar.getTime();
     }

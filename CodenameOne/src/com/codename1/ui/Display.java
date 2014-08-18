@@ -181,6 +181,16 @@ public final class Display {
      */
     public static final int DENSITY_HD = 60;
 
+    /**
+     * Double the HD level density
+     */
+    public static final int DENSITY_2HD = 70;
+
+    /**
+     * 4K level density 
+     */
+    public static final int DENSITY_4K = 80;
+
 
     /**
      * Date native picker type, it returns a java.util.Date result.

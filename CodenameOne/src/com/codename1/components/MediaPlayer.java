@@ -183,10 +183,8 @@ public class MediaPlayer extends Container {
     
     /**
      * Sets the data source of this video player
-     * @param stream the stream containing the media data
+     * @param is the stream containing the media data
      * @param mimeType the type of the data in the stream
-     * @return Media a Media Object that can be used to control the playback 
-     * of the media
      * @throws java.io.IOException if the creation of the Media has failed
      */
     public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException{

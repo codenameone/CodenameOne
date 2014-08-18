@@ -1409,11 +1409,11 @@ public class ConnectionRequest implements IOProgressListener {
                                 return false;
                             }
                         }
-                        return true;
+                        return r.killed == killed;
                     }
                 } else {
                     if(r.requestArguments == null) {
-                        return true;
+                        return r.killed == killed;
                     }
                 }
             }

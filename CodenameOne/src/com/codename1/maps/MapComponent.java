@@ -1057,7 +1057,7 @@ public class MapComponent extends Container {
         // assuming always EDT
         if(listeners != null) {
             for(MapListener l : listeners) {
-                l.mapPositionUpdated(this, _zoom, _center);
+                l.mapPositionUpdated(this, _zoom, getCenter());
             }
         }
     }
