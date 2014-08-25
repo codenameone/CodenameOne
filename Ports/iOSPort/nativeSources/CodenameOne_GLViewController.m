@@ -1327,8 +1327,15 @@ bool lockDrawing;
     }
 }
 
+#ifdef USE_ES2
+extern GLKMatrix4 CN1transformMatrix;
+#endif
+
 - (void)awakeFromNib
 {
+#ifdef USE_ES2
+    CN1transformMatrix = GLKMatrix4Identity;
+#endif
     retinaBug = isRetinaBug();
     if(retinaBug) {
         scaleValue = 1;
