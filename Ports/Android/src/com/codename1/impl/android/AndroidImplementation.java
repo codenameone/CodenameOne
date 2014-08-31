@@ -5034,6 +5034,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public void setCurrentForm(final Form f) {
+        if(getCurrentForm() == null){
+            flushGraphics();
+        }
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
