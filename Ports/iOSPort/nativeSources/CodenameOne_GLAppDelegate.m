@@ -63,8 +63,12 @@ extern UIView *editingComponent;
     [[UIApplication sharedApplication] cancelAllLocalNotifications];
     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
+    if(userInfo == nil) {
+        //afterDidFinishLaunchingWithOptionsMarkerEntry
+        return YES;
+    }
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
-    if(userInfo == nil || apsInfo == nil) {
+    if(apsInfo == nil) {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
@@ -87,6 +91,20 @@ extern UIView *editingComponent;
 
 // required for URL opening
 - (BOOL)application:(UIApplication *)application willFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    if(launchOptions != nil) {
+        NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
+        if(url != nil) {
+            JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+            JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
+            JAVA_OBJECT value;
+            if([url isFileURL]) {
+                value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url.path);
+            } else {
+                value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
+            }
+            com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
+        }
+    }
     return YES;
 }
 
@@ -132,6 +150,7 @@ extern UIView *editingComponent;
      If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
      */
     com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    //----application_will_resign_active
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application

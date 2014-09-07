@@ -107,11 +107,11 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
-#ifndef CN1_USE_ARC
+/*#ifndef CN1_USE_ARC
     if(playerInstance != nil) {
         [self release];
     }
-#endif
+#endif*/
     if(runnableCallback != 0) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         com_codename1_ui_Display_callSerially___java_lang_Runnable(CN1_THREAD_GET_STATE_PASS_ARG o, runnableCallback);
@@ -152,9 +152,9 @@ AudioPlayer* currentlyPlaying = nil;
 - (void)playAudio {
     currentlyPlaying = self;
     if(playerInstance != nil) {
-#ifndef CN1_USE_ARC
+/*#ifndef CN1_USE_ARC
         [self retain];
-#endif
+#endif*/
         [playerInstance play];
     } else if(avPlayerInstance != nil){
         [avPlayerInstance play];

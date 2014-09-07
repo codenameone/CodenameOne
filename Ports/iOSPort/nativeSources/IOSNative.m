@@ -61,6 +61,7 @@
 #import "SocketImpl.h"
 
 //#import "QRCodeReaderOC.h"
+#define AUTO_PLAY_VIDEO
 
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
@@ -1347,6 +1348,17 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(CN1_THREAD_STATE_MU
 #endif
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+    __block JAVA_BOOLEAN result;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG url);
+        result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
+        POOL_END();
+    });
+    return result;
+}
+
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1945,6 +1957,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
         POOL_BEGIN();
         NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG str)];
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        [moviePlayerInstance prepareToPlay];
+#ifdef AUTO_PLAY_VIDEO
+        [moviePlayerInstance play];
+#endif
+        moviePlayerInstance.controlStyle = MPMovieControlStyleEmbedded;
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
@@ -1956,6 +1973,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
         POOL_BEGIN();
         NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG str)];
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+        
+#ifndef AUTO_PLAY_VIDEO
+        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
+#endif
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
@@ -1988,7 +2009,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
         [moviePlayerInstance retain];
 #endif
         [moviePlayerInstance prepareToPlay];
+#ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#endif
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
@@ -2016,6 +2039,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
         NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+#ifndef AUTO_PLAY_VIDEO
+        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
+#endif
 #ifndef CN1_USE_ARC
         [moviePlayerInstance retain];
 #endif
@@ -2043,7 +2069,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1
         [moviePlayerInstance retain];
 #endif
         [moviePlayerInstance prepareToPlay];
+#ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#endif
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
@@ -2065,6 +2093,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
 #ifndef CN1_USE_ARC
         [moviePlayerInstance retain];
+#endif
+#ifndef AUTO_PLAY_VIDEO
+        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
 #endif
         POOL_END();
     });
@@ -2263,12 +2294,13 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
         if ([MPNowPlayingInfoCenter class])  {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
             UIImage* i = [glll getImage];        
+            MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithImage:i];
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyArtwork,
                              MPNowPlayingInfoPropertyPlaybackRate,
                              nil];
             NSArray *values = [NSArray arrayWithObjects:
-                               i,
+                               artwork,
                                [NSNumber numberWithInt:1],
                                nil];
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
@@ -3206,7 +3238,8 @@ void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE
 #ifdef NEW_CODENAME_ONE_VM
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->isArray;
+    // second part of the expression check that this isn't a primitive array
+    return n1->__codenameOneParentClsReference->isArray && cn1_array_start_offset + 100 < n1->__codenameOneParentClsReference->classId;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofByteArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
@@ -3684,7 +3717,7 @@ NSData* arrayToData(JAVA_OBJECT arr) {
 
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3692,7 +3725,7 @@ JAVA_OBJECT nsDataToByteArr(NSData *data) {
 
 JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3700,7 +3733,7 @@ JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
 
 JAVA_OBJECT nsDataToCharArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3708,7 +3741,7 @@ JAVA_OBJECT nsDataToCharArray(NSData *data) {
 
 JAVA_OBJECT nsDataToShortArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3716,7 +3749,7 @@ JAVA_OBJECT nsDataToShortArray(NSData *data) {
 
 JAVA_OBJECT nsDataToIntArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3724,7 +3757,7 @@ JAVA_OBJECT nsDataToIntArray(NSData *data) {
 
 JAVA_OBJECT nsDataToLongArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3732,7 +3765,7 @@ JAVA_OBJECT nsDataToLongArray(NSData *data) {
 
 JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3740,7 +3773,7 @@ JAVA_OBJECT nsDataToFloatArray(NSData *data) {
 
 JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray([d length], &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -3861,7 +3894,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boo
 
 void com_codename1_impl_ios_IOSNative_log___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
-    NSLog(toNSString(CN1_THREAD_STATE_PASS_ARG name));
+    NSLog(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG name));
     POOL_END();
 }
 
@@ -4109,6 +4142,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 [actionSheet addButtonWithTitle:@"OK"];
                 topBoundry = 40;
+                //actionSheet.alpha=0.90;
             } else {
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
@@ -4232,6 +4266,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 [actionSheet addButtonWithTitle:@"OK"];
                 topBoundry = 40;
+                //actionSheet.alpha=0.90;
             } else {
                 actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
                 UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
@@ -4821,6 +4856,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 
 // End Shapes
 
+/*JAVA_OBJECT com_codename1_impl_ios_IOSNative_stackTraceToString___java_lang_Throwable(JAVA_OBJECT t) {
+    POOL_BEGIN();
+
+    NSArray* arr = [NSThread callStackSymbols];
+    NSMutableArray* marr = [[NSMutableArray alloc] init];
+    [marr addObjectsFromArray:arr];
+    [marr removeObjectAtIndex:0];
+    [marr removeObjectAtIndex:0];
+    [marr removeObjectAtIndex:0];
+    [marr removeObjectAtIndex:0];
+    NSString* nstr = [marr description];
+    JAVA_OBJECT jstr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG nstr);
+    POOL_END();
+    return jstr;
+}*/
 
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -5427,6 +5477,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_T
     virtual_java_io_Writer_write___java_lang_String(threadStateData, writer, th->java_lang_Throwable_stack);
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+    return com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, url);
+}
 #else
 JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
 }

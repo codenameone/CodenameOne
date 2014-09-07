@@ -2513,7 +2513,7 @@ extern SKPayment *paymentInstance;
 -(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
 {
     NSLog(@"Restore transactions finished");
-    com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 -(void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error
 {

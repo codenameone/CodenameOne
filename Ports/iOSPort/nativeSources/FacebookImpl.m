@@ -38,21 +38,29 @@ JAVA_BOOLEAN publishPermission = 0;
 #import "FBSession.h"
 
 
+#ifdef NEW_CODENAME_ONE_VM
+extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
+#else
 extern JAVA_OBJECT fromNSString(NSString* str);
+#endif
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         FBSession* s = [FBSession activeSession];
         if(s == nil || !s.isOpen) {
-            [FBSession openActiveSessionWithReadPermissions:@[@"basic_info"] allowLoginUI:YES
+            [FBSession openActiveSessionWithReadPermissions:@[@"public_profile", @"email", @"user_friends"] allowLoginUI:YES
                                 completionHandler:^(FBSession *session,
                                            FBSessionState status,
                                            NSError *error) {
                 [FBSession setActiveSession:session];
                 if(status == FBSessionStateClosedLoginFailed || status == FBSessionStateOpen) {
+#ifdef NEW_CODENAME_ONE_VM
+                    set_field_com_codename1_social_FacebookImpl_loginCompleted(threadStateData, JAVA_TRUE, instance);
+#else
                     com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
                     impl->fields.com_codename1_social_FacebookImpl.loginCompleted_ = TRUE;
+#endif
                     return;
                 }
             }];
@@ -75,7 +83,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSString *accessToken = [[[FBSession activeSession] accessTokenData] accessToken];
-        str = fromNSString(accessToken);
+        str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG accessToken);
         POOL_END();
     });
     return str;
@@ -98,6 +106,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codena
                           completionHandler:^(FBSession *session,
                                               NSError *error) {
                               if(callback != JAVA_NULL) {
+#ifdef NEW_CODENAME_ONE_VM
+                                  if(error == nil) {
+                                      virtual_com_codename1_social_LoginCallback_loginSuccessful__(CN1_THREAD_GET_STATE_PASS_ARG callback);
+                                      publishPermission = 1;
+                                  } else {
+                                      virtual_com_codename1_social_LoginCallback_loginFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG callback, JAVA_NULL);
+                                  }
+#else
                                   if(error == nil) {
                                       (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
                                       //com_codename1_social_LoginCallback_loginSuccessful__(callback);
@@ -106,12 +122,25 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codena
                                       //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
                                       (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
                                   }
+#endif
                               }
                           }];
         } else {
-            [FBSession openActiveSessionWithPublishPermissions:[NSArray arrayWithObjects:@"publish_actions",
-                                                                nil] defaultAudience:FBSessionDefaultAudienceEveryone allowLoginUI:YES completionHandler:^(FBSession *session,
-                FBSessionState state, NSError *error) {
+            [FBSession openActiveSessionWithPublishPermissions:[NSArray arrayWithObjects:@"publish_actions", nil] defaultAudience:FBSessionDefaultAudienceEveryone allowLoginUI:YES completionHandler:^(FBSession *session, FBSessionState state, NSError *error) {
+#ifdef NEW_CODENAME_ONE_VM
+                if(error) {
+                    if(callback != JAVA_NULL) {
+                        virtual_com_codename1_social_LoginCallback_loginFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG callback, JAVA_NULL);
+                    }
+                    return;
+                }
+                if (FBSession.activeSession.isOpen) {
+                    if(callback != JAVA_NULL) {
+                        virtual_com_codename1_social_LoginCallback_loginSuccessful__(CN1_THREAD_GET_STATE_PASS_ARG callback);
+                    }
+                    publishPermission = 1;
+                }
+#else
                     if(error) {
                         if(callback != JAVA_NULL) {
                             //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
@@ -126,6 +155,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codena
                         }
                         publishPermission = 1;
                     }
+#endif
                 }];
         }
         POOL_END();
