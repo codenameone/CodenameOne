@@ -4378,7 +4378,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void pause() {
-            nativeVideo.stopPlayback();
+            if(nativeVideo != null && nativeVideo.canPause()){
+                nativeVideo.pause();
+            }
         }
 
         @Override
