@@ -302,6 +302,7 @@ public class ConnectionRequest implements IOProgressListener {
                 if(c > 0) {
                     StringBuilder cookieStr = new StringBuilder();
                     Cookie first = (Cookie)v.elementAt(0);
+                    cookieSent(first);
                     cookieStr.append(first.getName());
                     cookieStr.append("=");
                     cookieStr.append(first.getValue());
@@ -311,6 +312,7 @@ public class ConnectionRequest implements IOProgressListener {
                         cookieStr.append(current.getName());
                         cookieStr.append("=");
                         cookieStr.append(current.getValue());
+                        cookieSent(current);
                     }
                     impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
                 } else {
@@ -356,6 +358,7 @@ public class ConnectionRequest implements IOProgressListener {
                         Cookie coo = parseCookieHeader(cookies[iter]);
                         if(coo != null) {
                             cook.addElement(coo);
+                            cookieReceived(coo);
                         }
                     }
                     Cookie [] arr = new Cookie[cook.size()];
@@ -379,6 +382,10 @@ public class ConnectionRequest implements IOProgressListener {
                     } else {
                         url = uri;
                     }
+                    if(requestArguments != null && url.indexOf('?') > -1) {
+                        requestArguments.clear();
+                    }
+                    
                     if((responseCode == 302 || responseCode == 303)){
                         if(this.post && shouldConvertPostToGetOnRedirect()) {
                             this.post = false;
@@ -442,6 +449,20 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             });
         }
+    }
+    
+    /**
+     * Callback invoked for every cookie received from the server
+     * @param c the cookie
+     */
+    protected void cookieReceived(Cookie c) {
+    }
+
+    /**
+     * Callback invoked for every cookie being sent to the server
+     * @param c the cookie
+     */
+    protected void cookieSent(Cookie c) {
     }
     
     /**

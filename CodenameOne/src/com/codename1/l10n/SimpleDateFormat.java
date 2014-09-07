@@ -272,6 +272,9 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     String format(Date source, StringBuffer toAppendTo) {
+        if(source == null) {
+            source = new Date();
+        }
         if (pattern == null) {
             return super.format(source, toAppendTo);
         }
@@ -805,7 +808,7 @@ public class SimpleDateFormat extends DateFormat {
                 return i;
             }
         }
-        char ch = source.charAt(0);
+        char ch = source.charAt(ofs);
         if (ch == markers[0].charAt(0)) {
             return Calendar.AM;
         }

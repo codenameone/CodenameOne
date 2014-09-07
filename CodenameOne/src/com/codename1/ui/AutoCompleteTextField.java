@@ -90,6 +90,7 @@ public class AutoCompleteTextField extends TextField {
     protected void deinitialize() {
         super.deinitialize();
         getComponentForm().removePointerPressedListener(listener);
+        removePopup();
     }
 
     void setParentText(String text) {
@@ -237,6 +238,7 @@ public class AutoCompleteTextField extends TextField {
         popup.removeAll();
         filterImpl(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        l.setItemGap(0);
         for(ActionListener al : listeners) {
             l.addActionListener(al);
         }

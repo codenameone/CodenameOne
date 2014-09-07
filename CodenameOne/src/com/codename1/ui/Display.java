@@ -3147,6 +3147,33 @@ public final class Display {
     }
 
     /**
+     * Notice: this method might be very slow and should be invoked on a separate thread!
+     * It might have platform specific optimizations over getAllContacts followed by looping
+     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+     * information.
+     * 
+     * @param withNumbers if true returns only contacts that has a number
+     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
+     * @param includesPicture if true try to fetch the Contact Picture if exists
+     * @param includesNumbers if true try to fetch all Contact numbers
+     * @param includesEmail if true try to fetch all Contact Emails
+     * @param includeAddress if true try to fetch all Contact Addresses
+     * @return array of the contacts
+     */
+    public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        return impl.getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+    }
+
+    /**
+     * Indicates if the getAllContacts is platform optimized, notice that the method
+     * might still take seconds or more to run so you should still use a separate thread!
+     * @return true if getAllContacts will perform faster that just getting each contact
+     */
+    public boolean isGetAllContactsFast() {
+        return impl.isGetAllContactsFast();
+    }
+    
+    /**
      * Get a Contact according to it's contact id.
      * @param id unique id of the Contact
      * @return a Contact Object
@@ -3163,8 +3190,8 @@ public final class Display {
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
      * @param includesPicture if true try to fetch the Contact Picture if exists
      * @param includesNumbers if true try to fetch all Contact numbers
-     * @param includesEmail if ture try to fetch all Contact Emails
-     * @param includeAddress if ture try to fetch all Contact Addresses
+     * @param includesEmail if true try to fetch all Contact Emails
+     * @param includeAddress if true try to fetch all Contact Addresses
      *  
      * @return a Contact Object
      */     

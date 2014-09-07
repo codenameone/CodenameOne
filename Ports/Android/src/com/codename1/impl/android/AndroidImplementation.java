@@ -515,7 +515,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Display.DENSITY_VERY_HIGH;
             case 480: // DisplayMetrics.DENSITY_XXHIGH
                 return Display.DENSITY_HD;
+            case 640: // DisplayMetrics.DENSITY_XXXHIGH 
+                return Display.DENSITY_2HD;
+                 
             default:
+                if(metrics.densityDpi > 640) {
+                    return Display.DENSITY_4K;
+                }
                 return Display.DENSITY_MEDIUM;
         }
     }
@@ -4219,6 +4225,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             boolean includesNumbers, boolean includesEmail, boolean includeAddress){
         return AndroidContactsManager.getInstance().getContact(activity, id, includesFullName, includesPicture, 
             includesNumbers, includesEmail, includeAddress);
+    }
+    
+    @Override
+    public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        return AndroidContactsManager.getInstance().getAllContacts(activity, withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+    }
+
+    @Override
+    public boolean isGetAllContactsFast() {
+        return true;
     }
     
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {

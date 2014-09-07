@@ -156,6 +156,9 @@ public class AndroidNativeUtil {
                 return br.renderViewOnBitmap(v, w, h);
             }
         }
+        if(w <= 0 || h <= 0) {
+            return null;
+        }
         final Bitmap nativeBuffer = Bitmap.createBitmap(
                         w, h, Bitmap.Config.ARGB_8888);
         AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {

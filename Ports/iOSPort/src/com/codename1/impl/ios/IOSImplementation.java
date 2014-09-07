@@ -42,6 +42,7 @@ import com.codename1.ui.util.Resources;
 import java.util.StringTokenizer;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -139,6 +140,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.initVM();
         super.postInit();
     }
+    
+    @Override
+    protected void initDefaultUserAgent() {
+        String ue = getProperty("User-Agent", null);
+        if(ue != null) {
+            ConnectionRequest.setDefaultUserAgent(Display.getInstance().getProperty("User-Agent", ue));
+        }
+    }
+
     
     public void init(Object m) {
         instance = this;
@@ -251,6 +261,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.isEditingText();
     }
 
+    @Override
+    public void stopTextEditing() {    
+        foldKeyboard();
+    }
+    
     public static void foldKeyboard() {
         if(instance.isAsyncEditMode()) {
             final Component cmp = Display.getInstance().getCurrent().getFocused();
@@ -396,7 +411,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
                 String hint = null;
-                if(currentEditing.getUIManager().isThemeConstant("nativeHintBool", false) && currentEditing.getHint() != null) {
+                if(currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                     hint = currentEditing.getHint();
                 }
                 if(isAsyncEditMode()) {
@@ -2050,7 +2065,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.releasePeer(c);
             return l;
         }
-
+        
+        private boolean statusInitialized;
+        
+        public void setStatus() {
+            if(!statusInitialized) {
+                statusInitialized = true;
+                if(nativeInstance.isGoodLocation(getLocation())) {
+                    super.setStatus(AVAILABLE);
+                } else {
+                    super.setStatus(TEMPORARILY_UNAVAILABLE);
+                }
+            }
+        }
+        
         @Override
         protected void bindListener() {
             if(!locationUpdating) {
@@ -2089,6 +2117,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void locationUpdate() {
         if(lm != null) {
             final LocationListener ls = lm.getLocationListener();
+            lm.setStatus();
             if(ls != null) {
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
@@ -2333,6 +2362,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(!isVideo) {
                 try {
                     moviePlayerPeer = nativeInstance.createAudio(Util.readInputStream(stream), onCompletion);
+                    nativeInstance.retainPeer(moviePlayerPeer);
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
@@ -2388,11 +2418,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void cleanup() {
             if(moviePlayerPeer != 0) {
-                if(isVideo) {
-                    nativeInstance.releasePeer(moviePlayerPeer);
-                } else {
+                pause();
+                if(!isVideo) {
                     nativeInstance.cleanupAudio(moviePlayerPeer);                    
                 }
+                //nativeInstance.releasePeer(moviePlayerPeer);
                 moviePlayerPeer = 0;
             }
         }
@@ -3476,6 +3506,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void unlockScreen(){
         nativeInstance.unlockScreen();
     }
+
+    @Override
+    public boolean isScreenLockSupported() {
+        return true;
+    }
     
     
     @Override
@@ -3755,6 +3790,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setBadgeNumber(int number) {
         nativeInstance.setBadgeNumber(number);
     }
+
+    @Override
+    public Boolean canExecute(String url) {
+        if(nativeInstance.canExecute(url)) {
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
+    }
     
     @Override
     public void execute(String url) {
@@ -3768,7 +3811,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void openNativeNavigationApp(double latitude, double longitude){    
-        execute("http://maps.apple.com/?ll=" + latitude+ "," + longitude);
+        String s = "maps://maps.apple.com/?ll=" + latitude+ "," + longitude;
+        if(canExecute(s)) {
+            execute("maps://maps.apple.com/?ll=" + latitude+ "," + longitude);
+        } else {
+            execute("http://maps.apple.com/?ll=" + latitude+ "," + longitude);
+        }
     }
     
     @Override
@@ -4982,6 +5030,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public void printStackTraceToStream(Throwable t, Writer o) {
         nativeInstance.printStackTraceToStream(t, o);
+        /*try {
+            o.write(nativeInstance.stackTraceToString(t));
+        } catch(IOException err) {}*/
     }
 
     /**
@@ -5358,6 +5409,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static boolean shouldApplicationHandleURL(String url, String caller) {
         if(instance.life != null) {
             instance.life.shouldApplicationHandleURL(url, caller);
+        }
+        if(Display.getInstance() != null) {
+            Display.getInstance().setProperty("AppArg", url);
         }
         return true;
     }

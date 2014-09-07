@@ -174,18 +174,7 @@ public class Form extends Container {
         addComponentToForm(BorderLayout.NORTH, titleArea);
         addComponentToForm(BorderLayout.CENTER, contentPane);
 
-        // this is injected automatically by the implementation in case of ads
-        String adPaddingBottom = d.getProperty("adPaddingBottom", null);
-        if(adPaddingBottom != null && adPaddingBottom.length() > 0) {
-            Container pad = new Container();
-            int dim = Integer.parseInt(adPaddingBottom);
-            dim = d.convertToPixels(dim, true);
-            if(Display.getInstance().isTablet()) {
-                dim *= 2;
-            }
-            pad.setPreferredSize(new Dimension(dim, dim));
-            addComponentToForm(BorderLayout.SOUTH, pad);
-        }
+        initAdPadding(d);
         
         contentPane.setUIID("ContentPane");
         contentPane.setScrollableY(true);
@@ -200,6 +189,21 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
     }
 
+    void initAdPadding(Display d) {
+        // this is injected automatically by the implementation in case of ads
+        String adPaddingBottom = d.getProperty("adPaddingBottom", null);
+        if(adPaddingBottom != null && adPaddingBottom.length() > 0) {
+            Container pad = new Container();
+            int dim = Integer.parseInt(adPaddingBottom);
+            dim = d.convertToPixels(dim, true);
+            if(Display.getInstance().isTablet()) {
+                dim *= 2;
+            }
+            pad.setPreferredSize(new Dimension(dim, dim));
+            addComponentToForm(BorderLayout.SOUTH, pad);
+        }        
+    }
+    
     /**
      * Here so dialogs can disable this
      */
@@ -451,12 +455,16 @@ public class Form extends Container {
             return menuBarDrag;
         }
         Container actual = getActualPane();
-        Component c = actual.getComponentAt(x, y);
-        if(c != null) {
-            return c.getDragRegionStatus(x, y);
-        }
-        if(isScrollable()) {
-            return DRAG_REGION_LIKELY_DRAG_Y;
+        
+        // no idea how this can happen
+        if(actual != null) {
+            Component c = actual.getComponentAt(x, y);
+            if(c != null) {
+                return c.getDragRegionStatus(x, y);
+            }
+            if(isScrollable()) {
+                return DRAG_REGION_LIKELY_DRAG_Y;
+            }
         }
         return DRAG_REGION_NOT_DRAGGABLE;
     }

@@ -130,14 +130,19 @@ class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoLi
 
     @Override
     public void prepare() {
-        try {
-            if (player != null) {
-                player.prepare();
+        AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (player != null) {
+                        player.prepare();
+                    }
+                } catch(Throwable t) {
+                    // some exceptions might occur here, with all the various illegal states they rarely matter
+                    t.printStackTrace();
+                }
             }
-        } catch(Throwable t) {
-            // some exceptions might occur here, with all the various illegal states they rarely matter
-            t.printStackTrace();
-        }
+        });
     }
     
     @Override

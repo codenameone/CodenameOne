@@ -186,6 +186,9 @@ public class TestRecorder extends javax.swing.JFrame {
         List<Integer> l = new ArrayList<Integer>();
         while(cmp != contentPane) {
             com.codename1.ui.Container parent = cmp.getParent();
+            if(parent == null) {
+                return null;
+            }
             l.add(0, parent.getComponentIndex(cmp));
             cmp = parent;
         }
@@ -337,7 +340,11 @@ public class TestRecorder extends javax.swing.JFrame {
                         if(name != null) {
                             generatedCode += "        ensureVisible(\"" + name + "\");\n";
                         } else {
-                            generatedCode += "        ensureVisible(" + getPathToComponent(scrollTo) + ");\n";
+                            String pp = getPathToComponent(scrollTo);
+                            if(pp == null) {
+                                return;
+                            }
+                            generatedCode += "        ensureVisible(" + pp + ");\n";
                         }
                         updateTestCode();
                     }
@@ -360,7 +367,11 @@ public class TestRecorder extends javax.swing.JFrame {
                             if(btn.getText() != null && btn.getText().length() > 0) {
                                 generatedCode += "        clickButtonByLabel(\"" + btn.getText() + "\");\n";
                             } else {
-                                generatedCode += "        clickButtonByPath(" + getPathToComponent(cmp) + ");\n";
+                                String pp = getPathToComponent(cmp);
+                                if(pp == null) {
+                                    return;
+                                }
+                                generatedCode += "        clickButtonByPath(" + pp + ");\n";
                             }
                         }
                     }

@@ -6113,6 +6113,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return DateFormat.getDateTimeInstance().format(d);
                 }
 
+                public String formatDateTimeMedium(Date d) {
+                    DateFormat dd = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM);
+                    return dd.format(d);
+                }
+
+                public String formatDateTimeShort(Date d) {
+                    DateFormat dd = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
+                    return dd.format(d);
+                }
+                
                 public String getCurrencySymbol() {
                     return NumberFormat.getInstance().getCurrency().getSymbol();
                 }
@@ -6723,7 +6733,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public String getAppHomePath() {
         new File(System.getProperty("user.home") + File.separator + appHomeDir).mkdirs();
-        return "file://home";
+        return "file://home/";
     }
 
     public int convertToPixels(int dipCount, boolean horizontal) {

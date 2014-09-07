@@ -119,6 +119,7 @@ public final class IOSNative {
     
     native void setImageName(long nativeImage, String name);
     
+    native boolean canExecute(String url);
     native void execute(String url);
 
     native void flashBacklight(int duration);
@@ -476,6 +477,7 @@ public final class IOSNative {
     
 
     public native void printStackTraceToStream(Throwable t, Writer o);
+    //public native String stackTraceToString(Throwable t);
 
     native void fillConvexPolygonGlobal(float[] points, int color, int alpha);
 

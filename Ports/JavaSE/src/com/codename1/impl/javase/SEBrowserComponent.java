@@ -108,7 +108,15 @@ public class SEBrowserComponent extends PeerComponent {
         web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
             @Override
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
-                p.fireWebEvent("onError", new ActionEvent(t1.getMessage(), -1));
+                if(t1 == null) {
+                    if(t == null) {
+                        p.fireWebEvent("onError", new ActionEvent("Unknown error", -1));
+                    } else {
+                        p.fireWebEvent("onError", new ActionEvent(t.getMessage(), -1));
+                    }
+                } else {
+                    p.fireWebEvent("onError", new ActionEvent(t1.getMessage(), -1));
+                }
             }
         });
 

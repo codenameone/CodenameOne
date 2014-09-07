@@ -28,6 +28,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.ui.plaf.Style;
 import java.util.Hashtable;
 
 /**
@@ -88,6 +89,10 @@ public class BrowserComponent extends Container {
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, c);
         internal = c;
+        Style s = internal.getUnselectedStyle();
+        s.setPadding(0, 0, 0, 0);
+        s.setMargin(0, 0, 0, 0);
+        s.setBgTransparency(255);
     }
 
     /**

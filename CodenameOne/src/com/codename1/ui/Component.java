@@ -3614,6 +3614,10 @@ public class Component implements Animation, StyleListener {
      */
     protected void laidOut() {
         if(!isCellRenderer()) {
+            CodenameOneImplementation ci = Display.getInstance().getImplementation();
+            if(ci.isEditingText()) {
+                return;
+            }
             int ivk = Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {

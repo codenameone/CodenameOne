@@ -180,6 +180,12 @@ public class Dialog extends Form {
         this();
         setTitle(title);
     }
+    
+    /**
+     * Disabling ad padding for dialogs
+     */
+    void initAdPadding(Display d) {
+    }
 
     /**
      * Constructs a Dialog with a title

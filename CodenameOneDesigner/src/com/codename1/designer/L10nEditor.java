@@ -1038,7 +1038,7 @@ private void syncWithUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
 }//GEN-LAST:event_syncWithUIActionPerformed
 
 private void renamePropertyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_renamePropertyActionPerformed
-        Object key = bundleTable.getValueAt(getModelSelection(bundleTable), 0);
+        Object key = bundleTable.getValueAt(bundleTable.getSelectedRow(), 0);
         JTextField newName = new JTextField((String)key);
         if(JOptionPane.showConfirmDialog(this, newName,
             "Rename", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) ==

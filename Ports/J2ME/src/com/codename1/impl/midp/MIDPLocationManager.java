@@ -73,8 +73,8 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
     protected void bindListener() {
         try {
             Criteria c = new Criteria();
-            c.setSpeedAndCourseRequired(true);
-            c.setAltitudeRequired(true);
+            c.setSpeedAndCourseRequired(false);
+            c.setAltitudeRequired(false);
             LocationProvider provider = LocationProvider.getInstance(c);
             provider.setLocationListener(this, -1, -1, -1);
         } catch (LocationException ex) {
