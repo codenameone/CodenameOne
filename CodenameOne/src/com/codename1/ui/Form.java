@@ -2820,7 +2820,7 @@ public class Form extends Container {
      */
     public void paint(Graphics g) {
         if(!inInternalPaint) {
-            paintBackground(g);
+            paintComponentBackground(g);
         }
         super.paint(g);
         if (tint) {

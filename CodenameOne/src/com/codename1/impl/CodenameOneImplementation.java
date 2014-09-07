@@ -586,6 +586,12 @@ public abstract class CodenameOneImplementation {
                 if (ani == cmp) {
                     return;
                 }
+                //no need to paint a Component if one of its parent is already in the queue
+                if(ani instanceof Container && cmp instanceof Component){
+                    if(((Container)ani).contains((Component)cmp)){
+                        return;                        
+                    }
+                }
             }
             // overcrowding the queue don't try to grow the array!
             if (paintQueueFill >= paintQueue.length) {

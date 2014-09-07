@@ -1756,14 +1756,14 @@ public class Container extends Component {
     /**
      * @inheritDoc
      */
-    public void paintBackground(Graphics g) {
+    public void paintComponentBackground(Graphics g) {
         if(isFlatten()) {
             super.paintBackgrounds(g);
             return;
         }
 
         if(shouldPaintContainerBackground()) {
-            super.paintBackground(g);
+            super.paintComponentBackground(g);
         } 
     }
 

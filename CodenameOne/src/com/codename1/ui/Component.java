@@ -1200,7 +1200,7 @@ public class Component implements Animation, StyleListener {
 
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
-        paintBackground(g);
+        paintComponentBackground(g);
 
         if (isScrollable()) {
             if(refreshTask != null && (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
@@ -1512,6 +1512,7 @@ public class Component implements Animation, StyleListener {
             }
             p.paint(g, rect);
         }
+        par.paintBackground(g);
         g.translate(-transX, -transY);
     }
 
@@ -1531,7 +1532,7 @@ public class Component implements Animation, StyleListener {
      * 
      * @param g the component graphics
      */
-    protected void paintBackground(Graphics g) {
+    void paintComponentBackground(Graphics g) {
         if(isFlatten()) {
             return;
         }
@@ -1577,6 +1578,16 @@ public class Component implements Animation, StyleListener {
         if (getStyle().getBgPainter() != null) {
             getStyle().getBgPainter().paint(g, bounds);
         }
+        paintBackground(g);
+    }
+    
+    /**
+     * This method paints the Component background, it should be overriden
+     * by subclasses to perform custom background drawing.
+     * 
+     * @param g the component graphics
+     */
+    protected void paintBackground(Graphics g) {
     }
     
     /**
@@ -2286,7 +2297,7 @@ public class Component implements Animation, StyleListener {
         Graphics g = draggedImage.getGraphics();
 
         g.translate(-getX(), -getY());
-        paintBackground(g);
+        paintComponentBackground(g);
         paint(g);
         if (isBorderPainted()) {
             paintBorder(g);

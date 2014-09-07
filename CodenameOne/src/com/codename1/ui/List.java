@@ -1450,7 +1450,7 @@ public class List<T> extends Component {
         int cH = g.getClipHeight();
         //g.pushClip();
         g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
-        cmp.paintBackground(g);
+        cmp.paintComponentBackground(g);
         g.setClip(cX, cY, cW, cH);
         //g.popClip();
     }

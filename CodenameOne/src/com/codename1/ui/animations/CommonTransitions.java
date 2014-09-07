@@ -719,7 +719,7 @@ public final class CommonTransitions extends Transition {
                     g.translate(0, -sourceForm.getTitleArea().getHeight());
                     g.setClip(clipX, clipY, clipW, clipH);
 
-                    sourceForm.getTitleArea().paintBackground(g);
+                    sourceForm.getTitleArea().paintComponentBackground(g);
                     paintShiftFadeHierarchy(sourceForm.getTitleArea(), 255 - alpha, g, false);
                     paintShiftFadeHierarchy(destForm.getTitleArea(), alpha, g, true);
                     return;
