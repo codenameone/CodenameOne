@@ -4719,7 +4719,7 @@ public abstract class CodenameOneImplementation {
         String[] arr = getAllContacts(withNumbers);
         Contact[] retVal = new Contact[arr.length];
         for(int iter = 0 ; iter  < arr.length ; iter++) {
-            retVal[iter] = getContactById(arr[iter]);
+            retVal[iter] = getContactById(arr[iter], includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
         }
         return retVal;
     }
