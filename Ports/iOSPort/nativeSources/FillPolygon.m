@@ -30,6 +30,7 @@
 
 #import "FillPolygon.h"
 #import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES1/gl.h>
 #import "CN1ES2compat.h"
 #import "xmlvm.h"
 

@@ -2,6 +2,7 @@
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES1/gl.h>
 #import <Math.h>
 
 GLKMatrix4 CN1modelViewMatrix;

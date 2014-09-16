@@ -61,7 +61,7 @@ extern BOOL isRetinaBug();
             if(isRetinaBug()) {
                 self.contentScaleFactor = 1.0;
             } else {
-                self.contentScaleFactor = 2.0;
+                self.contentScaleFactor = [[UIScreen mainScreen] scale];
             }
         }
         CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;

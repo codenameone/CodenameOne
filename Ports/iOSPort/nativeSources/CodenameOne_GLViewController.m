@@ -430,7 +430,7 @@ BOOL isRetinaBug() {
 }
 
 BOOL isRetina() {
-    if([[UIScreen mainScreen] scale] == 2) {
+    if([[UIScreen mainScreen] scale] > 1) {
         return !isRetinaBug();
     }
     return NO;
@@ -1425,8 +1425,25 @@ extern GLKMatrix4 CN1transformMatrix;
          img = [UIImage imageNamed:@"Default.png"];
          }*/
         if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
-            // workaround for stupid iphone 5 behavior where image named just DOESN'T WORK!
-            img = [UIImage imageNamed:@"Default-568h@2x.png"];
+            int largest = MAX(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl());
+            
+            // iphone 5x
+            if(largest < 1200) {
+                img = [UIImage imageNamed:@"Default-568h@2x.png"];
+            } else {
+                // iphone 6
+                if(largest < 1400) {
+                    img = [UIImage imageNamed:@"Default-667h@2x.png"];
+                } else {
+                    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+                    // iphone 6+
+                    if(isPortrait) {
+                        img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                    } else {
+                        img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                    }
+                }
+            }
         } else {
             img = [UIImage imageNamed:@"Default.png"];
         }

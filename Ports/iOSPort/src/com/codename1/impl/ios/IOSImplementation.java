@@ -3537,39 +3537,74 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.cleanupAudio(l[0]);
     }*/
 
+    private int dDensity = -1;
+    
     @Override
     public int getDeviceDensity() {
-        if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
-            return super.getDeviceDensity();
-        }
-        // ipad mini is ignored, there is no sensible way to detect it
-        if(isTablet()) {
-            if(getDisplayWidth() < 1100) {
-                return Display.DENSITY_MEDIUM;
+        if(dDensity == -1) {
+            if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
+                dDensity = super.getDeviceDensity();
+                return dDensity;
             }
-            return Display.DENSITY_VERY_HIGH;
-        } else {
-            if(getDisplayWidth() < 500) {
-                return Display.DENSITY_MEDIUM;
+            int dispWidth = getDisplayWidth();
+            // ipad mini is ignored, there is no sensible way to detect it
+            if(isTablet()) {
+                if(dispWidth < 1100) {
+                    dDensity = Display.DENSITY_MEDIUM;
+                    return dDensity;
+                }
+                dDensity = Display.DENSITY_VERY_HIGH;
+                return dDensity;
+            } else {
+                if(dispWidth < 500) {
+                    dDensity = Display.DENSITY_MEDIUM;
+                    return dDensity;
+                }
+                int largest = Math.max(dispWidth, getDisplayHeight());
+                if(largest > 2000) {
+                    dDensity = Display.DENSITY_HD;
+                    return dDensity;
+                }
+                dDensity = Display.DENSITY_VERY_HIGH;
+                return dDensity;
             }
-            return Display.DENSITY_VERY_HIGH;
         }
+        return dDensity;
     }
+    
+    double ppi = 0;
     
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
         // ipad mini is ignored, there is no sensible way to detect it
-        if(isTablet()) {
-            if(getDisplayWidth() < 1100) {
-                return (int)Math.round((((float)dipCount) * 5.1975051975052));
+        if(ppi == 0) {
+            int dispWidth = getDisplayWidth();
+            if(isTablet()) {
+                if(dispWidth < 1100) {
+                    ppi = 5.1975051975052;
+                } else {
+                    ppi = 10.3939299449122;
+                }
+            } else {
+                if(dispWidth < 500) {
+                    ppi = 6.4173236936575;
+                } else {
+                    int largest = Math.max(dispWidth, getDisplayHeight());
+                    if(largest > 2000) {
+                        // iphone 6 plus
+                        ppi = 19.25429416;                    
+                    } else {
+                        if(largest > 1300) {
+                            // iphone 6
+                            ppi = 12.8369704749679;                    
+                        } else {
+                            ppi = 12.8369704749679;                    
+                        }
+                    }
+                }
             }
-            return (int)Math.round((((float)dipCount) * 10.3939299449122));
-        } else {
-            if(getDisplayWidth() < 500) {
-                return (int)Math.round((((float)dipCount) * 6.4173236936575));
-            }
-            return (int)Math.round((((float)dipCount) * 12.8369704749679));
         }
+        return (int)Math.round((((float)dipCount) * ppi));
     }
 
     @Override
