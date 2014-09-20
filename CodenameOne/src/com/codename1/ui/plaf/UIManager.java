@@ -759,6 +759,14 @@ public class UIManager {
             themeProps.put("SideNavigationPanel.transparency", "255");
         }
         
+        if(installedTheme == null || !installedTheme.containsKey("PullToRefresh.derive")) {
+            themeProps.put("PullToRefresh.padding", "0,0,0,0");
+            themeProps.put("PullToRefresh.margin", "0,0,0,0");
+            themeProps.put("PullToRefresh.align", centerAlign);
+            themeProps.put("PullToRefresh.transparency", "0");
+            themeProps.put("PullToRefresh.fgColor", "0");
+       }
+    
         
     }
 

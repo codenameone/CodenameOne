@@ -1608,9 +1608,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
         if (pullDown == null) {
             pullDown = new Label(getUIManager().localize("pull.down", "Pull down do refresh..."));
-            pullDown.getUnselectedStyle().setAlignment(Component.CENTER);
-            pullDown.getUnselectedStyle().setPadding(0, 0, 0 , 0);
-            pullDown.getUnselectedStyle().setMargin(0, 0, 0 , 0);
+            pullDown.setUIID("PullToRefresh");
+            
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
                 i = Resources.getSystemResource().getImage("refresh-icon.png");
@@ -1620,9 +1619,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
         if (releaseToRefresh == null) {
             releaseToRefresh = new Label(getUIManager().localize("pull.release", "Release to refresh..."));
-            releaseToRefresh.getUnselectedStyle().setAlignment(Component.CENTER);
-            releaseToRefresh.getUnselectedStyle().setPadding(0, 0, 0 , 0);
-            releaseToRefresh.getUnselectedStyle().setMargin(0, 0, 0 , 0);
+            releaseToRefresh.setUIID("PullToRefresh");
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
                 i = Resources.getSystemResource().getImage("refresh-icon.png");
@@ -1632,7 +1629,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (updating == null) {
             updating = new Container(new BoxLayout(BoxLayout.X_AXIS));
             ((Container) updating).addComponent(new InfiniteProgress());
-            ((Container) updating).addComponent(new Label(getUIManager().localize("pull.refresh", "Updating...")));
+            Label l = new Label(getUIManager().localize("pull.refresh", "Updating..."));
+            l.setUIID("PullToRefresh");
+            ((Container) updating).addComponent(l);
 
             pull.getUnselectedStyle().setPadding(0, 0, 0 , 0);
             pull.getUnselectedStyle().setMargin(0, 0, 0 , 0);
