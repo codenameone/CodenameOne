@@ -22,8 +22,10 @@
  */
 package com.codename1.ui;
 
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.*;
 import java.util.ArrayList;
@@ -58,8 +60,9 @@ public class AutoCompleteTextField extends TextField {
      */ 
     public AutoCompleteTextField(ListModel<String> listModel) {
         popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        filter = new FilterProxyListModel<String>(listModel);
+        filter = new FilterProxyListModel<String>(listModel);                
         popup.setScrollable(false);
+        popup.setUIID("AutoCompletePopup");
         setConstraint(TextArea.NON_PREDICTIVE);
     }
 
@@ -149,13 +152,14 @@ public class AutoCompleteTextField extends TextField {
             if(v != popup.isVisible()) {
                 popup.setVisible(v);
                 popup.setEnabled(v);
+
                 if(!v) {
                     Form f = getComponentForm();
                     if(f != null) {
                         f.repaint();
                     }
                 }
-            } 
+            }
         }
         return res;
     }
@@ -247,7 +251,7 @@ public class AutoCompleteTextField extends TextField {
         }else{
             l.setRenderer(completionRenderer);
         }
-        l.setUIID("AutoCompletePopup");
+        l.setUIID("AutoCompleteList");
         l.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -263,10 +267,22 @@ public class AutoCompleteTextField extends TextField {
         });
         popup.addComponent(l);
         popup.getStyle().setMargin(LEFT, getAbsoluteX());
-        int top = getAbsoluteY() - f.getTitleArea().getHeight() + getHeight();
-        popup.getStyle().setMargin(TOP, Math.max(0, top));
         popup.setPreferredW(getWidth());
-        popup.setPreferredH(Display.getInstance().getDisplayHeight() - top);
+        
+        int y = getAbsoluteY();
+        int topMargin;
+        int popupHeight;
+        if(y < f.getContentPane().getHeight()/2){
+            topMargin =  y - f.getTitleArea().getHeight() + getHeight();
+            popupHeight = Display.getInstance().getDisplayHeight() - topMargin; 
+        }else{
+            popupHeight = Math.min(popup.getPreferredH(), f.getContentPane().getHeight()/2);       
+            topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
+        }
+        popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
+        popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
+        popup.setPreferredH(popupHeight);
+        
         if (f != null) {
             if (popup.getParent() == null) {
                 f.getLayeredPane().addComponent(popup);

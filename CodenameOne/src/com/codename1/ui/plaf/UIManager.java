@@ -767,6 +767,15 @@ public class UIManager {
             themeProps.put("PullToRefresh.fgColor", "0");
        }
     
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.derive")) {
+            themeProps.put("AutoCompletePopup.transparency", "255");
+            themeProps.put("AutoCompletePopup.border", Border.createLineBorder(1));       
+        }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.sel#derive")) {
+            themeProps.put("AutoCompletePopup.sel#transparency", "255");
+            themeProps.put("AutoCompletePopup.sel#border", Border.createLineBorder(1));
+        }
+
         
     }
 
