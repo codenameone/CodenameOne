@@ -313,8 +313,8 @@ public class Slider extends Label {
     /**
      * Paint the progress indicator
      */
-    public void paintBackground(Graphics g) {
-        super.paintBackground(g);
+    public void paintComponentBackground(Graphics g) {
+        super.paintComponentBackground(g);
         int clipX = g.getClipX();
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
@@ -341,7 +341,7 @@ public class Slider extends Label {
 
         // paint the selected style
         paintingFull = true;
-        super.paintBackground(g);
+        super.paintComponentBackground(g);
         paintingFull = false;
 
         g.setClip(clipX, clipY, clipW, clipH);
