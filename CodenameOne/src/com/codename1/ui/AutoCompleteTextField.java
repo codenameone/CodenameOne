@@ -242,6 +242,7 @@ public class AutoCompleteTextField extends TextField {
         popup.removeAll();
         filterImpl(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        l.setScrollToSelected(false);
         l.setItemGap(0);
         for(ActionListener al : listeners) {
             l.addActionListener(al);
@@ -276,7 +277,8 @@ public class AutoCompleteTextField extends TextField {
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
             popupHeight = Display.getInstance().getDisplayHeight() - topMargin; 
         }else{
-            popupHeight = Math.min(popup.getPreferredH(), f.getContentPane().getHeight()/2);       
+            popupHeight = Math.min(popup.getPreferredH(), f.getContentPane().getHeight()/2);  
+            popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
         popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
