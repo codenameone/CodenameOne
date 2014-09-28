@@ -92,6 +92,7 @@ public class Tabs extends Container {
     private int tabsGap = 0;
     private Style originalTabsContainerUnselected, originalTabsContainerSelected;
     private String tabUIID = "Tab";
+    private boolean animateTabSelection = true;
     
     /**
      * Creates an empty <code>TabbedPane</code> with a default
@@ -489,7 +490,7 @@ public class Tabs extends Container {
                 if (content instanceof Container) {
                     ((Container) content).setBlockFocus(false);
                 }
-                setSelectedIndex(active, true);
+                setSelectedIndex(active, animateTabSelection);
                 initTabsFocus();
                 selectedTab = b;
                 selectedTab.setShouldCalcPreferredSize(true);
@@ -966,6 +967,22 @@ public class Tabs extends Container {
      */
     public void setEagerSwipeMode(boolean eagerSwipeMode) {
         this.eagerSwipeMode = eagerSwipeMode;
+    }
+
+    /**
+     * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     * @return the animateTabSelection
+     */
+    public boolean isAnimateTabSelection() {
+        return animateTabSelection;
+    }
+
+    /**
+     * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     * @param animateTabSelection the animateTabSelection to set
+     */
+    public void setAnimateTabSelection(boolean animateTabSelection) {
+        this.animateTabSelection = animateTabSelection;
     }
 
 

@@ -45,6 +45,8 @@ public class Message {
 
     private HashMap<String, String> attachments;
     
+    private boolean cloudMessageFailSilently = false;
+    
     public static final String MIME_TEXT = "text/plain";
     
     public static final String MIME_HTML = "text/html";
@@ -173,6 +175,7 @@ public class Message {
      */
     public boolean sendMessageViaCloudSync(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
         ConnectionRequest r = createMessage(sender, recipient, recipientName, subject, plainTextBody);
+        r.setFailSilently(true);
         NetworkManager.getInstance().addToQueueAndWait(r);
         return r.getResposeCode() == 200;
     }
@@ -180,6 +183,7 @@ public class Message {
     private ConnectionRequest createMessage(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "sendEmailServlet");
+        cr.setFailSilently(cloudMessageFailSilently);
         cr.setPost(true);
         cr.addArgument("d", Display.getInstance().getProperty("built_by_user", ""));
         cr.addArgument("from", sender);
@@ -194,5 +198,23 @@ public class Message {
         }
         
         return cr;
+    }
+
+    /**
+     * Indicates whether the cloud message should produce an error dialog if sending failed
+     * 
+     * @return the cloudMessageFailSilently
+     */
+    public boolean isCloudMessageFailSilently() {
+        return cloudMessageFailSilently;
+    }
+
+    /**
+     * Indicates whether the cloud message should produce an error dialog if sending failed
+     * 
+     * @param cloudMessageFailSilently the cloudMessageFailSilently to set
+     */
+    public void setCloudMessageFailSilently(boolean cloudMessageFailSilently) {
+        this.cloudMessageFailSilently = cloudMessageFailSilently;
     }
 }

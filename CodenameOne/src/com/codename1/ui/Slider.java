@@ -408,6 +408,7 @@ public class Slider extends Label {
             x = Math.abs(x - getAbsoluteX());
             setProgressInternal((int)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue)));
         }
+        value = Math.max(value, minValue);
         
         if(vertical) {
             if(previousY < y){
@@ -451,6 +452,7 @@ public class Slider extends Label {
             x = Math.max(x - getAbsoluteX(), 0);
             per = (int)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue));
         }
+        per = Math.max(per, minValue);
         if(per != getProgress()) {
             setProgressInternal(per);
 

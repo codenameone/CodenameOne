@@ -53,6 +53,9 @@ public class MediaPlayer extends Container {
     private String dataSource;
     
     private String pendingDataURI;
+    private boolean autoplay;
+    private boolean loop;
+    private Runnable onCompletion;
     
     /**
      * Empty constructor
@@ -146,7 +149,12 @@ public class MediaPlayer extends Container {
      */
     public void setDataSource(String uri, Runnable onCompletion) throws IOException{
         dataSource = uri;
-        video = MediaManager.createMedia(uri, true, onCompletion);
+        if(onCompletion instanceof CompletionWrapper) {
+            video = MediaManager.createMedia(uri, true, onCompletion);
+        } else {
+            this.onCompletion = onCompletion;
+            video = MediaManager.createMedia(uri, true, new CompletionWrapper());
+        }
         initUI();
     }
     
@@ -188,7 +196,12 @@ public class MediaPlayer extends Container {
      * @throws java.io.IOException if the creation of the Media has failed
      */
     public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException{
-        video = MediaManager.createMedia(is, mimeType, onCompletion);
+        if(onCompletion instanceof CompletionWrapper) {
+            video = MediaManager.createMedia(is, mimeType, onCompletion);
+        } else {
+            this.onCompletion = onCompletion;
+            video = MediaManager.createMedia(is, mimeType, new CompletionWrapper());
+        }
         initUI();
     }
 
@@ -227,6 +240,16 @@ public class MediaPlayer extends Container {
             play.setIcon(playIcon);
         }else{
             play.setText("play");
+        }
+        if(autoplay) {
+            if (getPauseIcon() != null) {
+                play.setIcon(getPauseIcon());
+            } else {
+                play.setText("pause");
+            }
+            if(!video.isPlaying()){
+                video.play();
+            }
         }
         play.addActionListener(new ActionListener() {
 
@@ -270,6 +293,9 @@ public class MediaPlayer extends Container {
                 fwd.setText("fwd");
             }
             buttonsBar.addComponent(fwd);           
+        }
+        if(isInitialized()) {
+            revalidate();
         }
     }
 
@@ -370,4 +396,50 @@ public class MediaPlayer extends Container {
         return fwdIcon;
     }
 
+    /**
+     * Sets playback to start automatically
+     * @return the autoplay
+     */
+    public boolean isAutoplay() {
+        return autoplay;
+    }
+
+    /**
+     * Sets playback to start automatically
+     * @param autoplay the autoplay to set
+     */
+    public void setAutoplay(boolean autoplay) {
+        this.autoplay = autoplay;
+    }
+
+    /**
+     * Sets playback to loop
+     * @return the loop
+     */
+    public boolean isLoop() {
+        return loop;
+    }
+
+    /**
+     * Sets playback to loop
+     * @param loop the loop to set
+     */
+    public void setLoop(boolean loop) {
+        this.loop = loop;
+    }
+
+    class CompletionWrapper implements Runnable {
+        public void run() {
+            if(onCompletion != null) {
+                onCompletion.run();
+            }
+            if(isLoop()) {
+                try {
+                    setDataSource(dataSource, this);
+                } catch(IOException err) {
+                    err.printStackTrace();
+                }
+            }
+        }
+    }
 }

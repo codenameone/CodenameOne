@@ -23,6 +23,7 @@
 
 package com.codename1.ui.spinner;
 
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
@@ -169,6 +170,24 @@ public class Picker extends Button {
      */
     public void setType(int type) {
         this.type = type;
+        switch(type) {
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+                if(!(value instanceof Date)) {
+                    value = new Date();
+                }
+                break;
+            case Display.PICKER_TYPE_STRINGS:
+                if(!Util.instanceofObjArray(value)) {
+                    setStrings(new String[] {" "});
+                }
+                break;
+            case Display.PICKER_TYPE_TIME:
+                if(!(value instanceof Integer)) {
+                    setTime(0);
+                }
+                break;
+        }
     }
 
     /**
