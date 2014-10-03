@@ -219,7 +219,7 @@ public class AndroidContactsManager {
         retVal.setId(id);
 
         ContentResolver cr = activity.getContentResolver();
-
+ 
         String[] projection = new String[] {ContactsContract.Contacts.DISPLAY_NAME,
                 ContactsContract.Contacts.PHOTO_ID, 
                 ContactsContract.Contacts.HAS_PHONE_NUMBER};
@@ -566,7 +566,7 @@ public class AndroidContactsManager {
             String[] birthWhereParams = new String[]{ ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE };
 
             Cursor birthCur = contentResolver.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);
-            while (birthCur.moveToFirst()) {
+            while (birthCur.moveToNext()) {
                 String id = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.CONTACT_ID));
                 Contact contact = contacts.get(id);
                 if (contact == null) {

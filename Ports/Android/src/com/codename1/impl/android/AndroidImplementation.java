@@ -1688,11 +1688,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         if ("AppArg".equals(key)) {
-             android.content.Intent intent = activity.getIntent();
-             if(intent != null){
-                 Uri u = intent.getData();
-                 if (u != null) {
-                    if ("content".equals(intent.getScheme())) {
+            android.content.Intent intent = activity.getIntent();
+            if (intent != null) {
+                Uri u = intent.getData();
+                if (u != null) {
+                    String scheme = intent.getScheme();
+                    intent.setData(null);
+                    if ("content".equals(scheme)) {
                         try {
                             InputStream attachment = activity.getContentResolver().openInputStream(u);
                             if (attachment != null) {
@@ -1723,7 +1725,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                     } else {
                         String encodedPath = u.getEncodedPath();
-                        if(encodedPath != null && encodedPath.length() > 0){
+                        if (encodedPath != null && encodedPath.length() > 0) {
                             return encodedPath;
                         }
                         return u.toString();
