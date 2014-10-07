@@ -64,6 +64,7 @@ public class AutoCompleteTextField extends TextField {
         popup.setScrollable(false);
         popup.setUIID("AutoCompletePopup");
         setConstraint(TextArea.NON_PREDICTIVE);
+        
     }
 
     /**
@@ -129,7 +130,7 @@ public class AutoCompleteTextField extends TextField {
             popup.setEnabled(v);
             f.repaint();
         } 
-        popup.revalidate();
+        f.revalidate();
     }
     
     /**
@@ -268,22 +269,23 @@ public class AutoCompleteTextField extends TextField {
         });
         popup.addComponent(l);
         popup.getStyle().setMargin(LEFT, getAbsoluteX());
-        popup.setPreferredW(getWidth());
         
         int y = getAbsoluteY();
         int topMargin;
         int popupHeight;
+        int listHeight = filter.getUnderlying().getSize() * l.getElementSize(false, true).getHeight();
         if(y < f.getContentPane().getHeight()/2){
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
-            popupHeight = Display.getInstance().getDisplayHeight() - topMargin; 
+            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
         }else{
-            popupHeight = Math.min(popup.getPreferredH(), f.getContentPane().getHeight()/2);  
+            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
             popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
         popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
         popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
+        popup.setPreferredW(getWidth());
         
         if (f != null) {
             if (popup.getParent() == null) {

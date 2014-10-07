@@ -85,6 +85,17 @@ public class Oauth2 {
      * @param oauth2URL the authentication url of the service
      * @param clientId the client id that would like to use the service
      * @param redirectURI the redirect uri
+     */
+    public Oauth2(String oauth2URL, String clientId, String redirectURI) {
+        this(oauth2URL, clientId, redirectURI, null, null, null);
+    }
+    
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL the authentication url of the service
+     * @param clientId the client id that would like to use the service
+     * @param redirectURI the redirect uri
      * @param scope the authentication scope
      */
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope) {
@@ -211,8 +222,10 @@ public class Oauth2 {
     private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
 
         String URL = oauth2URL + "?client_id=" + clientId
-                + "&redirect_uri=" + Util.encodeUrl(redirectURI) + "&scope=" + scope;
-
+                + "&redirect_uri=" + Util.encodeUrl(redirectURI);
+        if(scope != null){
+            URL += "&scope=" + scope;
+        }
         if(clientSecret != null){
             URL += "&response_type=code";        
         }else{
