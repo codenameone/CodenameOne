@@ -324,6 +324,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, int i) {
+        if(isAsyncEditMode() && currentEditing != null && currentEditing != cmp && cmp instanceof TextArea) {
+            // fire action event when editing and pressing the next text field
+            Display.getInstance().onEditingComplete(cmp, ((TextArea)cmp).getText());
+        }
         if(!cmp.hasFocus()) {
             cmp.requestFocus();
         }

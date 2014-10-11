@@ -225,6 +225,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y
 
 extern int isIPad();
 extern int isIOS7();
+extern int isIOS8();
 
 NSString* fixFilePath(NSString* ns) {
     if([ns hasPrefix:@"file:"]) {
@@ -1955,7 +1956,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG str)];
+        NSString* s = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+        NSURL* u;
+        if([s hasPrefix:@"file:"]) {
+            u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+        } else {
+            u = [NSURL URLWithString:s];
+        }
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
@@ -2992,8 +2999,43 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
-        [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+        if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+            NSUInteger settingsParam = (/*UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound*/ 7);
+            id categoriesParam = nil;
+            Class settings = NSClassFromString(@"UIUserNotificationSettings");
+            if (settings) {
+                // Prepare class selector
+                SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
+
+                // Obtain a method signature of selector on UIUserNotificationSettings class
+                NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
+
+                // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
+                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+                invocation.selector = sel;
+                invocation.target = settings;
+
+                // Set arguments
+                [invocation setArgument:&settingsParam atIndex:2];
+                [invocation setArgument:&categoriesParam atIndex:3];
+
+                // Obtain an instance by firing an invocation
+                NSObject *settingsInstance;
+                [invocation invoke];
+                [invocation getReturnValue:&settingsInstance];
+
+                // Retain an instance so it can live after quitting method and prevent crash :-)
+                CFRetain((__bridge CFTypeRef)(settingsInstance));
+
+                // Finally call the desired method with proper settings
+                if (settingsInstance) {
+                    [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
+                }
+            }
+        } else {
+            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
                     (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+        }
     });
 #endif
 }
@@ -4062,6 +4104,53 @@ NSDate* currentDatePickerDate;
 UIPopoverController* popoverControllerInstance;
 JAVA_LONG defaultDatePickerDate;
 
+void showPopupPickerView(UIView *pickerView) {
+    int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
+    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-300, 320, 246)];
+    [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
+    
+    UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
+    pickerToolbar.tintColor = [UIColor whiteColor];
+    [pickerToolbar sizeToFit];
+    
+    UIBarButtonItem *cancelBtn = [[UIBarButtonItem alloc] initWithTitle:@"Cancel" style:UIBarButtonItemStyleBordered target:[CodenameOne_GLViewController instance] action:@selector(datePickerCancel)];
+    
+    [cancelBtn setTitleTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                       [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
+                                       NSForegroundColorAttributeName,
+                                       nil] forState:UIControlStateNormal];
+    
+    UIBarButtonItem *flexSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:[CodenameOne_GLViewController instance] action:nil];
+    
+    UIBarButtonItem *titleButton;
+    
+    float pickerMarginHeight = 168;
+    
+    
+    titleButton = [[UIBarButtonItem alloc] initWithTitle:@"" style:UIBarButtonItemStylePlain target: nil action: nil];
+    
+    [titleButton setTitleTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                         [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
+                                         NSForegroundColorAttributeName,
+                                         nil] forState:UIControlStateNormal];
+    
+    UIBarButtonItem *doneBtn = [[UIBarButtonItem alloc] initWithTitle:@"OK" style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(datePickerDismiss)];
+    
+    [doneBtn setTitleTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                     [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
+                                     NSForegroundColorAttributeName,
+                                     nil] forState:UIControlStateNormal];
+    
+    NSArray *itemArray = [[NSArray alloc] initWithObjects:cancelBtn, flexSpace, titleButton, flexSpace, doneBtn, nil];
+    
+    [pickerToolbar setItems:itemArray animated:YES];
+    [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
+    [fakeActionSheet addSubview:pickerToolbar];
+    [fakeActionSheet addSubview:pickerView];
+    [[CodenameOne_GLViewController instance].view addSubview:fakeActionSheet];
+    repaintUI();
+}
+
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -4136,6 +4225,11 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
+            if(isIOS8()) {
+                showPopupPickerView(pickerView);
+                return;
+            }
+
             UIActionSheet* actionSheet;
             int topBoundry = 10;
             if(isIOS7()) {
@@ -4184,6 +4278,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
     currentDatePickerDate = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        NSDate* date = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
         UIDatePicker* datePickerView;
         if(isIPad() || isIOS7()) {
             datePickerView = [[UIDatePicker alloc] init];
@@ -4201,7 +4296,6 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
                 datePickerView.datePickerMode = UIDatePickerModeDateAndTime;
                 break;
         }
-        NSDate* date = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
         datePickerView.tag = 10;
         datePickerView.date = date;
         defaultDatePickerDate = time;
@@ -4260,6 +4354,11 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
+            if(isIOS8()) {
+                showPopupPickerView(datePickerView);
+                return;
+            }
+
             UIActionSheet* actionSheet;
             int topBoundry = 10;
             if(isIOS7()) {

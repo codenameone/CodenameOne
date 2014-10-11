@@ -136,6 +136,10 @@
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event;
 
+- (void)datePickerChangeDate:(UIDatePicker *)sender;
+-(void)datePickerDismiss;
+-(void)datePickerCancel;
+
 + (void)initialize;
 
 +(CodenameOne_GLViewController*)instance;

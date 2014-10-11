@@ -440,7 +440,9 @@ BOOL isIOS7() {
     return !SYSTEM_VERSION_LESS_THAN(@"7.0");
 }
 
-
+BOOL isIOS8() {
+    return !SYSTEM_VERSION_LESS_THAN(@"8.0");
+}
 
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
@@ -2634,6 +2636,36 @@ extern JAVA_LONG defaultDatePickerDate;
 #endif
         currentDatePickerDate = nil;
     }
+}
+
+- (void)datePickerCancel {
+    repaintUI();
+    com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
+    currentDatePickerDate = nil;
+    pickerStringArray = nil;
+    UIView* v = (UIView*)[CodenameOne_GLViewController instance].view.subviews.firstObject;
+    [v removeFromSuperview];
+}
+
+- (void)datePickerDismiss {
+    repaintUI();
+    if(currentDatePickerDate == nil) {
+        if(pickerStringArray == nil) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
+        } else {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
+#ifndef NEW_CODENAME_ONE_VM
+            pickerStringArray = nil;
+#else
+            pickerStringArray = JAVA_NULL;
+#endif
+        }
+    } else {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG [currentDatePickerDate timeIntervalSince1970] * 1000);
+        currentDatePickerDate = nil;
+    }
+    UIView* v = (UIView*)[CodenameOne_GLViewController instance].view.subviews.firstObject;
+    [v removeFromSuperview];
 }
 
 - (void)datePickerDismissActionSheet:(id)sender {
