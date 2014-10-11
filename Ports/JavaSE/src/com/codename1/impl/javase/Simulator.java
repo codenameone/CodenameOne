@@ -42,6 +42,7 @@ public class Simulator {
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
+        System.setProperty("NSHighResolutionCapable", "true");
         String skin = System.getProperty("dskin");
         if (skin == null) {
             System.setProperty("dskin", "/iphone3gs.skin");

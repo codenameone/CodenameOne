@@ -454,7 +454,7 @@ public class Tabs extends Container {
         final Button b = tab;
         b.setUIID(tabUIID);
 
-        if(b.getIcon() == null) {
+        if(b.getIcon() == null && !getUIManager().isThemeConstant("TabEnableAutoImageBool", true)) {
             Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
             if(d != null) {
                 b.setIcon(d);

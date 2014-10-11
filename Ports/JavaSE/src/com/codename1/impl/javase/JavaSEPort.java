@@ -4638,7 +4638,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public void run() {
                 try {
-                    if (uri.indexOf(':') < 0) {
+                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
                         String mimeType = "video/mp4";
                         media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, mediaContainer, onCompletion);
                     }
@@ -5445,6 +5445,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
+        if(isDesktop()) {
+            return new String[] {"desktop", "tablet"};
+        }
         return platformOverrides;
     }
 

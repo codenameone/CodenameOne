@@ -337,6 +337,21 @@ public class ContainerList extends Container {
         return cmp.getSelectedRect();
     }
 
+    /**
+     * @inheritDoc
+     */
+    protected int getDragRegionStatus(int x, int y) {
+        if(!isScrollable()) {
+            return DRAG_REGION_NOT_DRAGGABLE;
+        }
+        if(isScrollableX()) {
+            if(isScrollableY()) {
+            return DRAG_REGION_POSSIBLE_DRAG_XY;
+            }
+            return DRAG_REGION_POSSIBLE_DRAG_X;
+        }
+        return DRAG_REGION_POSSIBLE_DRAG_Y;
+    }
     
 
     /**
