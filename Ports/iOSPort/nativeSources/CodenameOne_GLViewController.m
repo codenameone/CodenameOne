@@ -60,7 +60,7 @@ extern NSDate* currentDatePickerDate;
 extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
-BOOL vkbAlwaysOpen = NO;
+BOOL vkbAlwaysOpen = YES;
 BOOL viewDidAppearRepaint = YES;
 NSMutableArray* touchesArray = nil;
 
@@ -159,10 +159,30 @@ int isIPad() {
     return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
 }
 
+#define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+
+BOOL isIOS8() {
+    return !SYSTEM_VERSION_LESS_THAN(@"8.0");
+}
+
+BOOL isVKBAlwaysOpen() {
+    if(vkbAlwaysOpen) {
+        if(isIOS8() && !isIPad() && displayWidth > displayHeight) {
+            return NO;
+        }
+        return YES;
+    }
+    return NO;
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
  int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar) {
+    // don't show toolbar in iOS 8 in landscape since there is just no room for that...
+    if(isIOS8() && displayHeight < displayWidth) {
+        showToolbar = NO;
+    }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -173,7 +193,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [editingComponent release];
 #endif
             editingComponent = nil;
-            if(vkbAlwaysOpen) {
+            if(isVKBAlwaysOpen()) {
                 repaintUI();
             }
         }
@@ -255,7 +275,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.returnKeyType = UIReturnKeyDone;
             } else {
                 utf.returnKeyType = UIReturnKeyNext;
-                if(vkbAlwaysOpen) {
+                if(isVKBAlwaysOpen()) {
                     if(utf.keyboardType != UIKeyboardTypeDecimalPad
                        && utf.keyboardType != UIKeyboardTypePhonePad
                        && utf.keyboardType != UIKeyboardTypeNumberPad) {
@@ -274,7 +294,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if ((utf.keyboardType == UIKeyboardTypeDecimalPad
                  || utf.keyboardType == UIKeyboardTypePhonePad
                  || utf.keyboardType == UIKeyboardTypeNumberPad
-                 || (utf.returnKeyType == UIReturnKeyNext && vkbAlwaysOpen)) && !isIPad()) {
+                 || (utf.returnKeyType == UIReturnKeyNext && isVKBAlwaysOpen())) && !isIPad()) {
                 //add navigation toolbar to the top of the keyboard
                 if(showToolbar) {
 #ifndef CN1_USE_ARC
@@ -315,7 +335,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
-                        if(vkbAlwaysOpen && (utf.keyboardType == UIKeyboardTypeDecimalPad
+                        if(isVKBAlwaysOpen() && (utf.keyboardType == UIKeyboardTypeDecimalPad
                                              || utf.keyboardType == UIKeyboardTypePhonePad
                                              || utf.keyboardType == UIKeyboardTypeNumberPad)) {
                             // we need both done and next
@@ -423,8 +443,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 }
 
 
-#define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
-
 BOOL isRetinaBug() {
     return isIPad() && [[UIScreen mainScreen] scale] == 2 && SYSTEM_VERSION_LESS_THAN(@"6.0");
 }
@@ -438,10 +456,6 @@ BOOL isRetina() {
 
 BOOL isIOS7() {
     return !SYSTEM_VERSION_LESS_THAN(@"7.0");
-}
-
-BOOL isIOS8() {
-    return !SYSTEM_VERSION_LESS_THAN(@"8.0");
 }
 
 
@@ -1521,33 +1535,58 @@ int keyboardHeight;
         [currentTarget removeAllObjects];
     }
     keyboardIsShown = NO;
-    if(!modifiedViewHeight || vkbAlwaysOpen) {
+    if(!modifiedViewHeight || isVKBAlwaysOpen()) {
         return;
     }
     com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
-    NSValue* boundsValue = [userInfo objectForKey:UIKeyboardBoundsUserInfoKey];
-    CGSize keyboardSize = [boundsValue CGRectValue].size;
+    CGRect keyboardEndFrame;
+    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
+    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
     
+    keyboardHeight = keyboardFrame.size.height;
     
     // resize the scrollview
     CGRect viewFrame = self.view.frame;
     // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
+    int patchSize = 3;
+    if(isIOS8()) {
+        patchSize = 2;
+    }
+    
     keyboardSlideOffset = 0;
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y += keyboardSize.height / 3 * upsideDownMultiplier;
+            viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x -= keyboardSize.height / 3 * upsideDownMultiplier;
+            if(isIOS8()) {
+                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
+                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
+                    viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
+                } else {
+                    viewFrame.origin.y -= keyboardHeight / patchSize * upsideDownMultiplier;
+                }
+            } else {
+                viewFrame.origin.x -= keyboardHeight / patchSize * upsideDownMultiplier;
+            }
         }
     } else {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y += keyboardSize.height * upsideDownMultiplier;
+            viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x -= keyboardSize.height * upsideDownMultiplier;
+            if(isIOS8()) {
+                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
+                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
+                    viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
+                } else {
+                    viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+                }
+            } else {
+                viewFrame.origin.x -= keyboardHeight * upsideDownMultiplier;
+            }
         }
     }
     /*float y = editingComponent.frame.origin.y;
@@ -1566,12 +1605,14 @@ int keyboardHeight;
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
-    NSValue* boundsValue = [userInfo objectForKey:UIKeyboardBoundsUserInfoKey];
-    CGSize keyboardSize = [boundsValue CGRectValue].size;
-    keyboardHeight = keyboardSize.height;
+    CGRect keyboardEndFrame;
+    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
+    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
+
+    keyboardHeight = keyboardFrame.size.height;
     
     // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
-    if (keyboardIsShown || vkbAlwaysOpen) {
+    if (keyboardIsShown || isVKBAlwaysOpen()) {
         return;
     }
     
@@ -1581,7 +1622,7 @@ int keyboardHeight;
     
     patch = NO;
     keyboardSlideOffset = 0;
-    if(editCompoentY + editCompoentH < displayHeight / scaleValue - keyboardSize.height) {
+    if(editCompoentY + editCompoentH < displayHeight / scaleValue - keyboardHeight) {
         if(!forceSlideUpField) {
             modifiedViewHeight = NO;
             return;
@@ -1589,27 +1630,54 @@ int keyboardHeight;
             patch = YES;
         }
     } else {
-        if(editCompoentY < keyboardSize.height) {
+        if(editCompoentY < keyboardHeight) {
             patch = YES;
         }
     }
     modifiedViewHeight = YES;
+
+    int patchSize = 3;
+    if(isIOS8()) {
+        patchSize = 2;
+    }
     
     if(patch) {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y -= (keyboardSize.height / 3) * upsideDownMultiplier;
-            keyboardSlideOffset = -(keyboardSize.height / 3) * upsideDownMultiplier;
+            viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
+            keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x += (keyboardSize.height / 3) * upsideDownMultiplier;
-            keyboardSlideOffset = (keyboardSize.height / 3) * upsideDownMultiplier;
+            if(isIOS8()) {
+                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
+                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
+                    viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
+                    keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier * -1;
+                } else {
+                    viewFrame.origin.y += (keyboardHeight / patchSize) * upsideDownMultiplier;
+                    keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
+                }
+            } else {
+                viewFrame.origin.x += (keyboardHeight / patchSize) * upsideDownMultiplier;
+                keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
+            }
         }
     } else {
         if(displayHeight > displayWidth) {
-            viewFrame.origin.y -= keyboardSize.height * upsideDownMultiplier;
-            keyboardSlideOffset = -keyboardSize.height * upsideDownMultiplier;
+            viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+            keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
         } else {
-            viewFrame.origin.x += keyboardSize.height * upsideDownMultiplier;
-            keyboardSlideOffset = keyboardSize.height * upsideDownMultiplier;
+            if(isIOS8()) {
+                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
+                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
+                    viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+                    keyboardSlideOffset = keyboardHeight * upsideDownMultiplier * -1;
+                } else {
+                    viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
+                    keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
+                }
+            } else {
+                viewFrame.origin.x += keyboardHeight * upsideDownMultiplier;
+                keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
+            }
         }
     }
     
@@ -1909,7 +1977,7 @@ int keyboardHeight;
         
         // update the position of the edit component during drag events, we have to do this here
         // since the animation might run for a while
-        if(vkbAlwaysOpen && editingComponent != nil && !editingComponent.hidden) {
+        if(isVKBAlwaysOpen() && editingComponent != nil && !editingComponent.hidden) {
 #ifndef NEW_CODENAME_ONE_VM
             com_codename1_impl_ios_IOSImplementation* impl = (com_codename1_impl_ios_IOSImplementation*)com_codename1_impl_ios_IOSImplementation_GET_instance();
             com_codename1_ui_Component* comp = (com_codename1_ui_Component*)impl->fields.com_codename1_impl_ios_IOSImplementation.currentEditing_;
@@ -2296,7 +2364,7 @@ static BOOL skipNextTouch = NO;
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
     }
-    if(!vkbAlwaysOpen) {
+    if(!isVKBAlwaysOpen()) {
         [self foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
@@ -2331,7 +2399,7 @@ static BOOL skipNextTouch = NO;
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
     }
-    if(!vkbAlwaysOpen) {
+    if(!isVKBAlwaysOpen()) {
         [self foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
@@ -2339,7 +2407,7 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-    if(skipNextTouch || (editingComponent != nil && !vkbAlwaysOpen)) {
+    if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }
 	POOL_BEGIN();
