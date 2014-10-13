@@ -100,7 +100,11 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     protected void setQuery(String query) {
-        setUrl(GRAPH_URL + query);
+        String url = GRAPH_URL + query;
+        if(FaceBookAccess.getApiVersion().length() > 0){
+            url = GRAPH_URL + FaceBookAccess.getApiVersion() + "/" + query;
+        }
+        setUrl(url);
     }
 
     public String requestURL() {

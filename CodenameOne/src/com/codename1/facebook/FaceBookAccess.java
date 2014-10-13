@@ -70,6 +70,7 @@ public class FaceBookAccess {
     private Vector responseCodeListeners = new Vector();
     private static String token;
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
+    private static String apiVersion = "";
     
     
     private FaceBookAccess() {
@@ -1362,4 +1363,27 @@ public class FaceBookAccess {
             token = token.substring(token.indexOf('=') + 1);
         }
     }
+    
+    
+    /**
+     * Returns the api version used, if empty the non version-ed is used
+     */ 
+    public static String getApiVersion() {
+        return apiVersion;
+    }
+
+    /**
+     * Sets the Facebook api version being used, by default the api calls the 
+     * non version-ed version of the API.
+     * @param apiVersion valid values are "1.0", "2.0", "2.1"
+     */ 
+    public static void setApiVersion(String apiVersion) {
+        if(apiVersion.equals("1.0") || apiVersion.equals("2.0") || apiVersion.equals("2.1")){
+            FaceBookAccess.apiVersion = "v" + apiVersion;
+        }else{
+            throw new IllegalArgumentException("version must be one of the following 1.0, 2.0, 2.1");
+        }
+    }
+    
+    
 }
