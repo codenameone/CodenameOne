@@ -344,7 +344,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 a.deleteFile("CN1$AndroidPendingNotifications");
             }
         } catch(IOException err) {
-            err.printStackTrace();
         }
     }
     

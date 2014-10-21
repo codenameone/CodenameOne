@@ -69,7 +69,7 @@ public class Tabs extends Container {
     private int tabPlacement;
     private Container tabsContainer;
     private ButtonGroup radioGroup = new ButtonGroup();
-    private Button selectedTab;
+    private Component selectedTab;
     private boolean swipeActivated = true;
     
     private ActionListener press, drag, release;
@@ -289,11 +289,20 @@ public class Tabs extends Container {
         }
         this.textPosition = textPosition;
         for(int iter = 0 ; iter < getTabCount() ; iter++) {
-            Button b = (Button)tabsContainer.getComponentAt(iter);
-            b.setTextPosition(textPosition);
+            setTextPosition(tabsContainer.getComponentAt(iter), textPosition);
         }
     }
 
+    /**
+     * Invokes set text position on the given tab, the tab should be a toggle button radio by default but
+     * can be anything
+     * @param tabComponent the component representing the tab
+     * @param textPosition  the text position
+     */
+    protected void setTextPosition(Component tabComponent, int textPosition) {
+        ((Button)tabComponent).setTextPosition(textPosition);
+    }
+    
 
     /**
      * Returns The position of the text relative to the icon
@@ -401,6 +410,38 @@ public class Tabs extends Container {
     }
 
     /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     * @param title the title of the tab
+     * @param icon the icon of the tab
+     * @return component instance
+     */
+    protected Component createTab(String title, Image icon) {
+        RadioButton b = new RadioButton(title != null ? title : "", icon);
+        radioGroup.add(b);
+        b.setToggle(true);
+        b.setTextPosition(BOTTOM);
+        if(radioGroup.getButtonCount() == 1) {
+            b.setSelected(true);
+        }
+        if(textPosition != -1) {
+            b.setTextPosition(textPosition);
+        }
+
+        if(b.getIcon() == null && !getUIManager().isThemeConstant("TabEnableAutoImageBool", true)) {
+            Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
+            if(d != null) {
+                b.setIcon(d);
+                d = getUIManager().getThemeImageConstant("TabSelectedImage");
+                if(d != null) {
+                    b.setRolloverIcon(d);
+                    b.setPressedIcon(d);
+                }
+            }
+        }
+        return b;
+    }
+    
+    /**
      * Inserts a <code>component</code>, at <code>index</code>,
      * represented by a <code>title</code> and/or <code>icon</code>,
      * either of which may be <code>null</code>.
@@ -417,16 +458,7 @@ public class Tabs extends Container {
      */
     public void insertTab(String title, Image icon, Component component,
             int index) {
-        RadioButton b = new RadioButton(title != null ? title : "", icon);
-        b.setToggle(true);
-        radioGroup.add(b);
-        b.setTextPosition(BOTTOM);
-        if(radioGroup.getButtonCount() == 1) {
-            b.setSelected(true);
-        }
-        if(textPosition != -1) {
-            b.setTextPosition(textPosition);
-        }
+        Component b = createTab(title != null ? title : "", icon);
         insertTab(b, component, index);
     }
 
@@ -445,30 +477,18 @@ public class Tabs extends Container {
      * @see #removeTabAt
      * @deprecated should use radio button as an argument
      */
-    public void insertTab(Button tab, Component component,
+    public void insertTab(Component tab, Component component,
             int index) {
         checkIndex(index);
         if (component == null) {
             return;
         }
-        final Button b = tab;
+        final Component b = tab;
         b.setUIID(tabUIID);
-
-        if(b.getIcon() == null && !getUIManager().isThemeConstant("TabEnableAutoImageBool", true)) {
-            Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
-            if(d != null) {
-                b.setIcon(d);
-                d = getUIManager().getThemeImageConstant("TabSelectedImage");
-                if(d != null) {
-                    b.setRolloverIcon(d);
-                    b.setPressedIcon(d);
-                }
-            }
-        }
 
         b.addFocusListener(focusListener);
         
-        b.addActionListener(new ActionListener() {
+        bindTabActionListener(b, new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
 
                 if(selectedTab != null){
@@ -518,6 +538,16 @@ public class Tabs extends Container {
     }
 
     /**
+     * Binds an action listener to the tab component. this method should be used when overriding
+     * createTab
+     * @param tab the tab component
+     * @param l the listener
+     */
+    protected void bindTabActionListener(Component tab, ActionListener l) {
+        ((Button)tab).addActionListener(l);
+    }
+    
+    /**
      * Updates the information about the tab details
      *
      * @param title the title to be displayed in this tab
@@ -526,11 +556,22 @@ public class Tabs extends Container {
      */
     public void setTabTitle(String title, Image icon, int index) {
         checkIndex(index);
-        Button b = (Button)tabsContainer.getComponentAt(index);
+        setTabTitle(tabsContainer.getComponentAt(index), title, icon);
+    }
+
+    /**
+     * Updates the tabs title . This method should be used when overriding
+     * createTab
+     * @param tab the tab component
+     * @param title the title
+     * @param icon  the new icon
+     */
+    protected void setTabTitle(Component tab, String title, Image icon) {
+        Button b = (Button)tab;
         b.setText(title);
         b.setIcon(icon);
     }
-
+    
     /**
      * Returns the title of the tab at the given index
      * 
@@ -539,9 +580,31 @@ public class Tabs extends Container {
      */
     public String getTabTitle(int index) {
         checkIndex(index);
-        return ((Button)tabsContainer.getComponentAt(index)).getText();
+        return getTabTitle(tabsContainer.getComponentAt(index));
     }
 
+    /**
+     * Returns the title of the tab component. This method should be used when overriding
+     * createTab
+     * 
+     * @param tab the tab component
+     * @return label of the tab 
+     */
+    protected String getTabTitle(Component tab) {
+        return ((Button)tab).getText();
+    }    
+
+    /**
+     * Returns the icon of the tab component. This method should be used when overriding
+     * createTab
+     * 
+     * @param tab the tab component
+     * @return icon of the tab 
+     */
+    protected Image getTabIcon(Component tab) {
+        return ((Button)tab).getIcon();
+    }    
+    
     /**
      * Returns the icon of the tab at the given index
      *
@@ -550,9 +613,20 @@ public class Tabs extends Container {
      */
     public Image getTabIcon(int index) {
         checkIndex(index);
-        return ((Button)tabsContainer.getComponentAt(index)).getIcon();
+        return getTabIcon(tabsContainer.getComponentAt(index));
     }
 
+    /**
+     * Returns the selected icon of the tab component. This method should be used when overriding
+     * createTab
+     * 
+     * @param tab the tab component
+     * @return icon of the tab 
+     */
+    protected Image getTabSelectedIcon(Component tab) {
+        return ((Button)tab).getPressedIcon();
+    }    
+    
 
     /**
      * Returns the icon of the tab at the given index
@@ -562,7 +636,7 @@ public class Tabs extends Container {
      */
     public Image getTabSelectedIcon(int index) {
         checkIndex(index);
-        return ((Button)tabsContainer.getComponentAt(index)).getPressedIcon();
+        return getTabSelectedIcon(tabsContainer.getComponentAt(index));
     }
 
     /**
@@ -573,7 +647,18 @@ public class Tabs extends Container {
      */
     public void setTabSelectedIcon(int index, Image icon) {
         checkIndex(index);
-        ((Button)tabsContainer.getComponentAt(index)).setPressedIcon(icon);
+        setTabSelectedIcon(tabsContainer.getComponentAt(index), icon);
+    }
+
+    /**
+     * Sets the selected icon of the tab. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @param icon of the tab 
+     */
+    protected void setTabSelectedIcon(Component tab, Image icon) {
+        ((Button)tab).setPressedIcon(icon);
     }
 
     /**
@@ -788,10 +873,18 @@ public class Tabs extends Container {
                 selectionListener.fireSelectionEvent(activeComponent, index);
             }
             activeComponent = index;
-            Button b = (Button)tabsContainer.getComponentAt(index);
+            selectTab(tabsContainer.getComponentAt(index));
+        }
+    }
+    
+    /**
+     * Invoked to select a specific tab, this method should be overriden for subclasses overriding createTab
+     * @param tab the tab
+     */
+    protected void selectTab(Component tab) {
+            Button b = (Button)tab;
             b.fireClicked();
             b.requestFocus();        
-        }
     }
     
     /**

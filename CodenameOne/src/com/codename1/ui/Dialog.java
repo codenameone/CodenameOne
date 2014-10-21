@@ -1345,6 +1345,9 @@ public class Dialog extends Form {
      * @return the command selected if the dialog is modal and disposed via a command
      */
     private Command showPackedImpl(String position, boolean modal, boolean stretch) {
+        if(getTitle() == null) {
+            setTitle("");
+        }
         this.position = position;
         int height = Display.getInstance().getDisplayHeight();
         int width = Display.getInstance().getDisplayWidth();
