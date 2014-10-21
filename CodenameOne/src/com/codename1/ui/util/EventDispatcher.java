@@ -42,8 +42,6 @@ public class EventDispatcher {
 
     private boolean blocking = false;
     private ArrayList<Object> listeners;
-    private Object[] pending;
-    private Object pendingEvent;
     boolean actionListenerArray;
     boolean styleListenerArray;
     boolean bindTargetArray;
@@ -68,11 +66,9 @@ public class EventDispatcher {
     class CallbackClass implements Runnable {
         private Object[] iPending;
         private Object iPendingEvent;
-        public CallbackClass() {
-            if(!blocking) {
-                iPendingEvent = pendingEvent;
-                iPending = pending;
-            }
+        public CallbackClass(Object[] iPending, Object iPendingEvent) {
+            this.iPending = iPending;
+            this.iPendingEvent = iPendingEvent;
         }
 
         /**
@@ -84,16 +80,9 @@ public class EventDispatcher {
                 throw new IllegalStateException("This method should not be invoked by external code!");
             }
 
-            if(blocking) {
-                iPendingEvent = pendingEvent;
-                iPending = pending;
-            }
-
             if(styleListenerArray) {
                 Object[] p = (Object[])iPendingEvent;
                 fireStyleChangeSync((StyleListener[])iPending, (String)p[0], (Style)p[1]);
-                pendingEvent = null;
-                pending = null;
                 return;
             }
 
@@ -125,8 +114,6 @@ public class EventDispatcher {
         }
     };
 
-    private final Runnable callback = new CallbackClass();
-    
     /**
      * Add a listener to the dispatcher that would receive the events when they occurs
      * 
@@ -202,15 +189,12 @@ public class EventDispatcher {
             fireDataChangeSync(array, type, index);
         } else {
             dataChangeListenerArray = true;
-            pending = array;
-            pendingEvent = new int[] {type, index};
+            Runnable cl = new CallbackClass(array, new int[] {type, index});
             if(blocking) {
-                Display.getInstance().callSeriallyAndWait(callback);
+                Display.getInstance().callSeriallyAndWait(cl);
             } else {
-                Display.getInstance().callSerially(new CallbackClass());
+                Display.getInstance().callSerially(cl);
             }
-            pending = null;
-            pendingEvent = null;
         }
     }
     
@@ -238,15 +222,12 @@ public class EventDispatcher {
             fireBindTargetChangeSync(array, source, propertyName, oldValue, newValue);
         } else {
             bindTargetArray = true;
-            pending = array;
-            pendingEvent = new Object[] {source, propertyName, oldValue, newValue};
+            Runnable cl = new CallbackClass(array, new Object[] {source, propertyName, oldValue, newValue});
             if(blocking) {
-                Display.getInstance().callSeriallyAndWait(callback);
+                Display.getInstance().callSeriallyAndWait(cl);
             } else {
-                Display.getInstance().callSerially(new CallbackClass());
+                Display.getInstance().callSerially(cl);
             }
-            pending = null;
-            pendingEvent = null;
         }
     }
     
@@ -293,11 +274,8 @@ public class EventDispatcher {
             fireStyleChangeSync(array, property, source);
         } else if (fireStyleEventsOnNonEDT) {
             styleListenerArray = true;
-            pending = array;
-            pendingEvent = new Object[] {property, source};
-            Display.getInstance().callSerially(new CallbackClass());
-            pending = null;
-            pendingEvent = null;
+            Runnable cl = new CallbackClass(array, new Object[] {property, source});
+            Display.getInstance().callSerially(cl);
         }
     }
 
@@ -357,16 +335,12 @@ public class EventDispatcher {
             fireActionSync(array, ev);
         } else {
             actionListenerArray = true;
-            pending = array;
-            pendingEvent = ev;
+            Runnable cl = new CallbackClass(array, ev);
             if(blocking) {
-                Display.getInstance().callSeriallyAndWait(callback);
+                Display.getInstance().callSeriallyAndWait(cl);
             } else {
-                Display.getInstance().callSerially(new CallbackClass());
-            }
-            pending = null;
-            pendingEvent = null;
-            
+                Display.getInstance().callSerially(cl);
+            }            
         }
     }
 
@@ -400,15 +374,12 @@ public class EventDispatcher {
             fireSelectionSync(array, oldSelection, newSelection);
         } else {
             selectionListenerArray = true;
-            pending = array;
-            pendingEvent = new int[] {oldSelection, newSelection};
+            Runnable cl = new CallbackClass(array, new int[] {oldSelection, newSelection});
             if(blocking) {
-                Display.getInstance().callSeriallyAndWait(callback);
+                Display.getInstance().callSeriallyAndWait(cl);
             } else {
-                Display.getInstance().callSerially(new CallbackClass());
+                Display.getInstance().callSerially(cl);
             }
-            pending = null;
-            pendingEvent = null;            
         }
     }
     
@@ -455,15 +426,12 @@ public class EventDispatcher {
             fireFocusSync(array, c);
         } else {
             focusListenerArray = true;
-            pending = array;
-            pendingEvent = c;
+            Runnable cl = new CallbackClass(array, c);
             if(blocking) {
-                Display.getInstance().callSeriallyAndWait(callback);
+                Display.getInstance().callSeriallyAndWait(cl);
             } else {
-                Display.getInstance().callSerially(new CallbackClass());
+                Display.getInstance().callSerially(cl);
             }
-            pending = null;
-            pendingEvent = null;            
         }
     }
     
