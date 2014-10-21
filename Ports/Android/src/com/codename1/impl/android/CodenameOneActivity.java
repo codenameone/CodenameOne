@@ -38,17 +38,31 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
+import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payments.v3.IabException;
+import com.codename1.payments.v3.IabHelper;
+import com.codename1.payments.v3.IabResult;
+import com.codename1.payments.v3.Inventory;
+import com.codename1.payments.v3.Purchase;
+import com.codename1.payments.v3.SkuDetails;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CodenameOneActivity extends Activity {
+
     private Menu menu;
     private boolean nativeMenu = false;
     private IntentResultListener intentResultListener;
@@ -56,237 +70,173 @@ public class CodenameOneActivity extends Activity {
     private boolean waitingForResult;
     private boolean background;
     private Vector intentResult = new Vector();
-    /**
-     * The SharedPreferences key for recording whether we initialized the
-     * database.  If false, then we perform a RestoreTransactions request
-     * to get all the purchases for this user.
-     */
-    private static final String BILLING_DB_INITIALIZED = "billing_db_initialized";
-    private CN1PurchaseObserver cnPurchaseObserver;
-    private BillingService billing;
-    private PurchaseDatabase purchaseDB;
     
-    private final Object lock = new Object();
-    private Set<String> ownedItems;
-    private boolean inAppBillingSupported = false;
-    private boolean subscriptionSupported = false;
-    
-    private PowerManager.WakeLock wakeLock;
-    
-    /**
-     * Each product in the catalog is either MANAGED or UNMANAGED.  MANAGED
-     * means that the product can be purchased only once per user (such as a new
-     * level in a game). The purchase is remembered by Android Market and
-     * can be restored if this application is uninstalled and then
-     * re-installed. UNMANAGED is used for products that can be used up and
-     * purchased multiple times (such as poker chips). It is up to the
-     * application to keep track of UNMANAGED products for the user.
-     */
-    private enum Managed { MANAGED, UNMANAGED }
-    
-    /**
-     * If the database has not been initialized, we send a
-     * RESTORE_TRANSACTIONS request to Android Market to get the list of purchased items
-     * for this user. This happens if the application has just been installed
-     * or the user wiped data. We do not want to do this on every startup, rather, we want to do
-     * only when the database needs to be initialized.
-     */
-    private void restoreDatabase() {
-        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
-        boolean initialized = prefs.getBoolean(BILLING_DB_INITIALIZED, false);
-        if (!initialized) {
-            this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    billing.restoreTransactions();
-                }
-            });
-        }
-    }
+    //private final Object lock = new Object();
+    private Inventory inventory;
 
-    public boolean isInAppBillingSupported() {
-        return inAppBillingSupported;
-    }
-    
-    public boolean isSubscriptionSupported() {
-        return subscriptionSupported;
-    }
-    
-    private void addItem(String item) {
-        synchronized(lock) {
-            if(ownedItems == null) {
-                ownedItems = new HashSet<String>();
+    IabHelper mHelper;
+    // Listener that's called when we finish querying the items and subscriptions we own
+    IabHelper.QueryInventoryFinishedListener mGotInventoryListener = new IabHelper.QueryInventoryFinishedListener() {
+        public void onQueryInventoryFinished(IabResult result, Inventory inventory) {
+            // Have we been disposed of in the meantime? If so, quit.
+            if (mHelper == null) {
+                return;
             }
-            ownedItems.add(item);
+            
+            if (result.isFailure()) {
+                return;
+            }
+            List ownedItems = inventory.getAllOwnedSkus();
+            for (Iterator iterator = ownedItems.iterator(); iterator.hasNext();) {
+                String sku = (String)iterator.next();
+                if (!isConsumable(sku)) {
+                    continue;
+                }
+                //if the client own consumable products they need to be consumed
+                Purchase pur = inventory.getPurchase(sku);
+                if(pur.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
+                    mHelper.consumeAsync(pur, mConsumeFinishedListener);                
+                }
+            }
+            CodenameOneActivity.this.inventory = inventory;
         }
-    }
-    
-    private void removeItem(String item) {
-        synchronized(lock) {
-            if(ownedItems != null) {
-                ownedItems.remove(item);
+    };
+    IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
+        public void onIabPurchaseFinished(IabResult result, String sku, Purchase purchase) {
+            // if we were disposed of in the meantime, quit.
+            if (mHelper == null) {
+                return;
+            }
+            PurchaseCallback pc = getPurchaseCallback();
+            
+            if(result.isFailure()){
+                if (pc != null) {
+                    pc.itemPurchaseError(sku, result.getMessage());
+                    return;
+                }                        
+            }
+
+            if (!verifyDeveloperPayload(purchase)) {
+                return;
+            }            
+
+            if(result.isSuccess()){
+                if (pc != null) {
+                    pc.itemPurchased(sku);     
+                    inventory.addPurchase(purchase);
+                }            
+            }
+
+            //check if this product is a non consumable product
+            if (!isConsumable(sku)) {
+                return;
+            }
+
+            if(purchase.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
+                mHelper.consumeAsync(purchase, mConsumeFinishedListener);                
             }
         }
-    }
-    
+    };
+
+    // Called when consumption is complete
+    IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
+        public void onConsumeFinished(Purchase purchase, IabResult result) {
+
+            // if we were disposed of in the meantime, quit.
+            if (mHelper == null) {
+                return;
+            }
+
+            if (result.isFailure()) {
+                PurchaseCallback pc = getPurchaseCallback();
+                if (pc != null) {
+                    String sku = null;
+                    if(purchase != null){
+                        sku = purchase.getSku();
+                    }
+                    pc.itemPurchaseError(sku, result.getMessage());
+                }
+            }
+            if(purchase != null){
+                inventory.erasePurchase(purchase.getSku());
+            }
+        }
+    };
+
+    private PowerManager.WakeLock wakeLock;
+
     /**
      * Overriden by stub, returns the user application instance.
      */
     protected Object getApp() {
         return null;
     }
-    
+
     boolean wasPurchased(String item) {
-        synchronized(lock) {
-            return ownedItems != null ? ownedItems.contains(item) : false;
+        if(inventory != null){
+            return inventory.hasPurchase(item);
         }
+        Display.getInstance().invokeAndBlock(new Runnable() {
+
+            @Override
+            public void run() {
+                while(inventory == null){
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {                    
+                    }
+                }
+            }
+        });
+        return inventory.hasPurchase(item);        
     }
-    
+
     void purchase(final String item) {
-        waitingForResult = true;
+        //waitingForResult = true;
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                billing.requestPurchase(item, Consts.ITEM_TYPE_INAPP, null);
+                mHelper.launchPurchaseFlow(CodenameOneActivity.this, item, IntentResultListener.PAYMENT,
+                        mPurchaseFinishedListener, getPayload());
             }
-        });    
+        });
     }
 
     void subscribe(final String item) {
-        if(subscriptionSupported) {
-            waitingForResult = true;
-            this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    billing.requestPurchase(item, Consts.ITEM_TYPE_SUBSCRIPTION, null);
-                }
-            });
-        }
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mHelper.launchPurchaseFlow(CodenameOneActivity.this,
+                        item, IabHelper.ITEM_TYPE_SUBS,
+                        IntentResultListener.PAYMENT, mPurchaseFinishedListener, getPayload());
+            }
+        });
     }
-    
+
     public PurchaseCallback getPurchaseCallback() {
         Object app = getApp();
-        PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback)app : null;
+        PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback) app : null;
         return pc;
     }
 
-    /**
-     * A {@link PurchaseObserver} is used to get callbacks when Android Market sends
-     * messages to this application so that we can update the UI.
-     */
-    private class CN1PurchaseObserver extends PurchaseObserver {
-        public CN1PurchaseObserver(Handler handler) {
-            super(CodenameOneActivity.this, handler);
-        }
-
-        @Override
-        public void onBillingSupported(boolean supported, String type) {
-            if(type == null || type.equals(Consts.ITEM_TYPE_INAPP)) {
-                if (supported) {
-                    restoreDatabase();
-                    inAppBillingSupported = true;
-                }
-            } else if(type.equals(Consts.ITEM_TYPE_SUBSCRIPTION)) {
-                if(supported) {
-                    restoreDatabase();
-                    inAppBillingSupported = true;
-                    subscriptionSupported = true;
-                }
-                else {
-                    CodenameOneActivity.this.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            billing.checkBillingSupported(Consts.ITEM_TYPE_INAPP);
-                        }
-                    });
-                }
-            }
-        }
-        
-        @Override
-        public void onPurchaseStateChange(Consts.PurchaseState purchaseState, String itemId,
-                int quantity, long purchaseTime, String developerPayload) {
-            if (Consts.DEBUG) {
-                Log.i("CodeNameOne", "onPurchaseStateChange() itemId: " + itemId + " " + purchaseState);
-            }
-            PurchaseCallback pc = getPurchaseCallback();
-            if(purchaseState == Consts.PurchaseState.PURCHASED) {
-                addItem(itemId);
-                if(pc != null) {
-                    pc.itemPurchased(itemId);
-                }
-            } else if(purchaseState == Consts.PurchaseState.REFUNDED || purchaseState == Consts.PurchaseState.CANCELED || purchaseState == Consts.PurchaseState.EXPIRED) {
-                if(quantity <= 0) {
-                    removeItem(itemId);
-                }
-                if(pc != null) {
-                    pc.itemRefunded(itemId);
-                }
-            }
-}
-
-        @Override
-        public void onRequestPurchaseResponse(final BillingService.RequestPurchase request,
-                final Consts.ResponseCode responseCode) {
-            Object app = getApp();
-            if(app != null && app instanceof PurchaseCallback) {
-                final PurchaseCallback pc = (PurchaseCallback)app;
-                Display.getInstance().callSerially(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        //we need to handle other response code as well see Consts.ResponseCode
-                        if (responseCode == Consts.ResponseCode.RESULT_OK) {
-                            // purchase was successfully sent to server                             
-                            pc.itemPurchased(request.mProductId);
-                        } else if (responseCode == Consts.ResponseCode.RESULT_USER_CANCELED) {
-                            // user canceled purchase
-                            pc.itemPurchaseError(request.mProductId, "Canceled");
-                        } else {
-                            // purchase failed
-                            pc.itemPurchaseError(request.mProductId, responseCode.name());
-                        }
-                    }
-                });
-            }
-        }
-
-        @Override
-        public void onRestoreTransactionsResponse(BillingService.RestoreTransactions request,
-                Consts.ResponseCode responseCode) {
-            if (responseCode == Consts.ResponseCode.RESULT_OK) {
-                // completed RestoreTransactions request
-                // Update the shared preferences so that we don't perform
-                // a RestoreTransactions again.
-                SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-                SharedPreferences.Editor edit = prefs.edit();
-                edit.putBoolean(BILLING_DB_INITIALIZED, true);
-                edit.commit();
-            } else {
-                // RestoreTransactions error
-            }
-        }
-    }
-
-    
     @Override
     protected void onResume() {
         super.onResume();
         AndroidNativeUtil.onResume();
         waitingForResult = false;
         background = false;
-    }        
-    
+    }
+
     /**
      * Overriden by subclasses to return true if billing is supported on this
      * build
-     * 
+     *
      * @return false
      */
     protected boolean isBillingEnabled() {
         return false;
     }
-    
+
     /**
      * Get the Android native Menu
      *
@@ -299,13 +249,13 @@ public class CodenameOneActivity extends Activity {
     /**
      * This method will enable the Android native Menu system instead of the
      * regular Form Menu.
-     * 
+     *
      * @param enable
      */
     public void enableNativeMenu(boolean enable) {
         nativeMenu = enable;
     }
-    
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -315,21 +265,36 @@ public class CodenameOneActivity extends Activity {
             getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
             getActionBar().hide();
         }
-        
+
         try {
-            if(isBillingEnabled()) {
-                Handler mHandler = new Handler();
-                cnPurchaseObserver = new CN1PurchaseObserver(mHandler);
-                billing = new BillingService();
-                billing.setContext(this);
+            if (isBillingEnabled()) {
+                String k = getBase64EncodedPublicKey();
+                if(k.length() == 0){
+                    Log.e("Codename One", "android.licenseKey base64 is not configured");
+                }
+                mHelper = new IabHelper(this, getBase64EncodedPublicKey());
+                mHelper.enableDebugLogging(true);
+                mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
+                    public void onIabSetupFinished(IabResult result) {
 
-                purchaseDB = new PurchaseDatabase(this);
+                        if (!result.isSuccess()) {
+                            // Oh noes, there was a problem.
+                            Log.e("Codename One", "Problem setting up in-app billing: " + result);
+                            return;
+                        }
 
-                // Check if billing is supported.
-                ResponseHandler.register(cnPurchaseObserver);
-                billing.checkBillingSupported(Consts.ITEM_TYPE_SUBSCRIPTION);
+                        // Have we been disposed of in the meantime? If so, quit.
+                        if (mHelper == null) {
+                            return;
+                        }
+                        
+                        // IAB is fully set up. Now, let's get an inventory of stuff we own.
+                        mHelper.queryInventoryAsync(mGotInventoryListener);                        
+                    }
+                });
+
             }
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             // might happen if billing permissions are missing
             System.out.print("This exception is totally valid and here only for debugging purposes");
             t.printStackTrace();
@@ -339,71 +304,12 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
-        if(isBillingEnabled()) {
-            ResponseHandler.register(cnPurchaseObserver);
-            initializeOwnedItems();
-            //purchaseDB.enumerateHistory("com.tspx.tvportal.payment.upgrade");
-        }
     }
 
-     /**
-     * Creates a background thread that reads the database and initializes the
-     * set of owned items.
-     */
-    private void initializeOwnedItems() {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                doInitializeOwnedItems();
-            }
-        }).start();
-    }
-    
-    /**
-     * Reads the set of purchased items from the database in a background thread
-     * and then adds those items to the set of owned items
-     */
-    private void doInitializeOwnedItems() {
-        Cursor cursor = purchaseDB.queryAllPurchasedItems();
-        if (cursor == null) {
-            return;
-        }
-
-        Set<String> newItems = new HashSet<String>();
-        try {
-            int productIdCol = cursor.getColumnIndexOrThrow(
-                    PurchaseDatabase.PURCHASED_PRODUCT_ID_COL);
-            int quantityCol = cursor.getColumnIndexOrThrow(PurchaseDatabase.PURCHASED_QUANTITY_COL);
-            while (cursor.moveToNext()) {
-                int quanity = cursor.getInt(quantityCol);
-                if(quanity > 0) {
-                    String productId = cursor.getString(productIdCol);
-                    newItems.add(productId);
-                }
-            }
-        } finally {
-            cursor.close();
-        }
-
-        if(newItems.size() > 0) {
-            synchronized(lock) {
-                if(ownedItems != null) {
-                    ownedItems.addAll(newItems);
-                }
-                else {
-                    ownedItems = new HashSet<String>(newItems);
-                }
-            }
-        }
-    }
-    
     @Override
     protected void onStop() {
         super.onStop();
         background = true;
-        if(isBillingEnabled()) {
-            ResponseHandler.unregister(cnPurchaseObserver);
-        }
         unlockScreen();
     }
 
@@ -411,13 +317,14 @@ public class CodenameOneActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         AndroidNativeUtil.onDestroy();
-        if(isBillingEnabled()) {
-            purchaseDB.close();
-            billing.unbind();
+        if (isBillingEnabled()) {
+            if (mHelper != null) {
+                mHelper.dispose();
+                mHelper = null;
+            }
         }
         unlockScreen();
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -430,19 +337,19 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState); 
+        super.onSaveInstanceState(outState);
         AndroidNativeUtil.onSaveInstanceState(outState);
     }
 
     @Override
     public void onLowMemory() {
-        super.onLowMemory(); 
+        super.onLowMemory();
         AndroidNativeUtil.onLowMemory();
     }
-    
+
     @Override
     protected void onPause() {
-        super.onPause(); 
+        super.onPause();
         AndroidNativeUtil.onPause();
     }
 
@@ -515,18 +422,18 @@ public class CodenameOneActivity extends Activity {
             return false;
         }
         Command cmd = null;
-        final boolean [] tmpProp = new boolean[1];
-        if(item.getItemId() == android.R.id.home){
+        final boolean[] tmpProp = new boolean[1];
+        if (item.getItemId() == android.R.id.home) {
             cmd = currentForm.getBackCommand();
-            if(cmd == null){
+            if (cmd == null) {
                 return false;
             }
             cmd.putClientProperty("source", "ActionBar");
             tmpProp[0] = true;
         }
-        
+
         int commandIndex = item.getItemId();
-        if(cmd == null){
+        if (cmd == null) {
             cmd = currentForm.getCommand(commandIndex);
         }
         final Command command = cmd;
@@ -541,7 +448,7 @@ public class CodenameOneActivity extends Activity {
                 try {
                     currentForm.dispatchCommand(command, actionEvent);
                     //remove the temp source property
-                    if(tmpProp[0]){
+                    if (tmpProp[0]) {
                         command.putClientProperty("source", null);
                     }
                 } catch (Throwable e) {
@@ -552,9 +459,9 @@ public class CodenameOneActivity extends Activity {
 
         return true;
     }
-    
+
     protected void fireIntentResult() {
-        if(intentResult.size() > 0){
+        if (intentResult.size() > 0) {
             final IntentResult response = (IntentResult) intentResult.get(0);
             if (intentResultListener != null && response != null) {
                 Display.getInstance().callSerially(new Runnable() {
@@ -571,10 +478,14 @@ public class CodenameOneActivity extends Activity {
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        //is this a payment result
+        if (mHelper != null && mHelper.handleActivityResult(requestCode, resultCode, data)) {
+            return;
+        }
         IntentResult response = new IntentResult(requestCode, resultCode, data);
         intentResult.add(response);
     }
-    
+
     public void setIntentResultListener(IntentResultListener l) {
         this.intentResultListener = l;
     }
@@ -582,11 +493,11 @@ public class CodenameOneActivity extends Activity {
     public void setDefaultIntentResultListener(IntentResultListener l) {
         this.defaultResultListener = l;
     }
-    
-    public void restoreIntentResultListener(){
+
+    public void restoreIntentResultListener() {
         setIntentResultListener(defaultResultListener);
     }
-    
+
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
         waitingForResult = true;
@@ -599,8 +510,6 @@ public class CodenameOneActivity extends Activity {
         waitingForResult = true;
         super.startActivity(intent);
     }
-    
-    
 
     public boolean isWaitingForResult() {
         return waitingForResult;
@@ -609,27 +518,25 @@ public class CodenameOneActivity extends Activity {
     protected void setWaitingForResult(boolean waitingForResult) {
         this.waitingForResult = waitingForResult;
     }
-    
-    public boolean isBackground(){
+
+    public boolean isBackground() {
         return background;
     }
 
-            
     public void registerForPush(String key) {
         Intent registrationIntent = new Intent("com.google.android.c2dm.intent.REGISTER");
         registrationIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0)); // boilerplate
         registrationIntent.putExtra("sender", key);
         startService(registrationIntent);
     }
-    
+
     public void stopReceivingPush() {
         Intent unregIntent = new Intent("com.google.android.c2dm.intent.UNREGISTER");
         unregIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0));
         startService(unregIntent);
     }
-    
-    
-    public void lockScreen(){
+
+    public void lockScreen() {
         unlockScreen();
         try {
             android.os.PowerManager pm = (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
@@ -637,17 +544,77 @@ public class CodenameOneActivity extends Activity {
         } catch (Exception excp) {
             excp.printStackTrace();
         }
-        if(wakeLock != null){
+        if (wakeLock != null) {
             wakeLock.acquire();
         }
     }
-    
-    public void unlockScreen(){
-        if(wakeLock != null && wakeLock.isHeld()){
+
+    public void unlockScreen() {
+        if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
             wakeLock = null;
         }
     }
+
+    public String getBase64EncodedPublicKey() {
+        String key = Display.getInstance().getProperty("android.licenseKey", "");        
+        return key;
+    }
+
+    boolean verifyDeveloperPayload(Purchase p) {
+        String payload = p.getDeveloperPayload();
+
+        return true;
+    }
+
+    String getPayload() {
+        return "";
+    }
+
+    Product[] getProducts(String[] skus){
+        return getProducts(skus, false);
+    }
     
+    Product[] getProducts(String[] skus, boolean fromCacheOnly){
+        
+        if(inventory != null){
+            ArrayList pList = new ArrayList<Product>();
+            ArrayList moreskusList = new ArrayList<Product>();
+            for (int i = 0; i < skus.length; i++) {
+                String sku = skus[i];
+                if(inventory.hasDetails(sku)){
+                    SkuDetails details = inventory.getSkuDetails(sku);
+                    Product p = new Product();
+                    p.setSku(sku);
+                    p.setDescription(details.getDescription());
+                    p.setDisplayName(details.getTitle());
+                    p.setLocalizedPrice(details.getPrice());
+                    pList.add(p);
+                }else{
+                    moreskusList.add(sku);
+                }                
+            }
+            //if the inventory does not all the requestes sku make an update.
+            if(moreskusList.size() > 0 && !fromCacheOnly){
+                try {
+                    inventory = mHelper.queryInventory(true, moreskusList);
+                    return getProducts(skus, true);
+                } catch (IabException ex) {
+                    Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            Product [] products = new Product[pList.size()];
+            products = (Product[]) pList.toArray(products);
+            return products;
+        }
+        return null;
+    }
     
+    public boolean isConsumable(String sku){
+        if (sku.endsWith("nonconsume")) {
+            return false;
+        }
+        return true;
+    }
+
 }

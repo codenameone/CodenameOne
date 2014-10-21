@@ -25,6 +25,7 @@ package com.codename1.impl.android;
 import android.app.Activity;
 import android.content.Intent;
 import android.util.Log;
+import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.ui.Display;
@@ -75,7 +76,8 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
 
     @Override
     public boolean isSubscriptionSupported() {
-        return ((CodenameOneActivity)activity).isSubscriptionSupported();
+        //return ((CodenameOneActivity)activity).isSubscriptionSupported();
+        return true;
     }
 
     @Override
@@ -87,6 +89,15 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     public boolean isManualPaymentSupported() {
         return true;
     }
+    
+    public boolean isItemListingSupported() {
+        return true;
+    }
+    
+    public Product[] getProducts(String[] skus) {
+        return ((CodenameOneActivity)activity).getProducts(skus);
+    }
+    
     
     // ZOOZMARKER_START    
     @Override

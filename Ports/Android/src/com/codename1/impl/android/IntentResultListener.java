@@ -39,6 +39,8 @@ public interface IntentResultListener {
     public int OPEN_GALLERY = 5;
     public int ZOOZ_PAYMENT = 6;
     
+    public int PAYMENT = 101;
+    
     
     public void onActivityResult (int requestCode, int resultCode, Intent data);
 }
