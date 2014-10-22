@@ -104,6 +104,9 @@ public class NetworkEvent extends ActionEvent {
      */
     public NetworkEvent(ConnectionRequest request, Object metaData) {
         super(request);
+        if(request != null){
+            this.progressType = request.getResponseCode();
+        }
         this.metaData = metaData;
     }
 
@@ -208,4 +211,6 @@ public class NetworkEvent extends ActionEvent {
     public String getMessage() {
         return message;
     }
+    
+    
 }
