@@ -22,7 +22,6 @@
  */
 package com.codename1.ui;
 
-import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
@@ -84,7 +83,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void initComponent() {
         super.initComponent();
-        getComponentForm().addPointerPressedListener(listener);
+        getComponentForm().addPointerReleasedListener(listener);
     }
 
     /**
@@ -93,7 +92,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void deinitialize() {
         super.deinitialize();
-        getComponentForm().removePointerPressedListener(listener);
+        getComponentForm().removePointerReleasedListener(listener);
         removePopup();
     }
 
@@ -124,7 +123,7 @@ public class AutoCompleteTextField extends TextField {
         if (f != null && popup.getParent() == null) {
             addPopup();
         }
-        boolean v = filter.getSize() > 0 && getText().length() > minimumLength;
+        boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if(v != popup.isVisible()) {
             popup.setVisible(v);
             popup.setEnabled(v);
@@ -149,7 +148,7 @@ public class AutoCompleteTextField extends TextField {
     private boolean filterImpl(String text) {
         boolean res = filter(text);
         if(filter != null && popup != null) {
-            boolean v = filter.getSize() > 0 && text.length() > minimumLength;
+            boolean v = filter.getSize() > 0 && text.length() >= minimumLength;
             if(v != popup.isVisible()) {
                 popup.setVisible(v);
                 popup.setEnabled(v);
@@ -239,7 +238,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     private void addPopup() {
-        Form f = getComponentForm();
+        final Form f = getComponentForm();
         popup.removeAll();
         filterImpl(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
@@ -327,6 +326,8 @@ public class AutoCompleteTextField extends TextField {
             } else {
                 if (contains(evt.getX(), evt.getY())) {
                     addPopup();
+                    evt.consume();
+                    pointerReleased(evt.getX(), evt.getY());
                 }
 
             }
