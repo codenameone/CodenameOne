@@ -1,0 +1,35 @@
+//
+//  Prefix header
+//
+//  The contents of this file are implicitly included at the beginning of every source file.
+//
+
+#import <Availability.h>
+
+#ifndef __IPHONE_5_0
+#warning "This project uses features only available in iOS SDK 5.0 and later."
+#endif
+
+#ifdef __OBJC__
+    #import <UIKit/UIKit.h>
+    #import <Foundation/Foundation.h>
+#endif
+
+#include "cn1_globals.h"
+#include "cn1_class_method_index.h"
+#include "java_lang_Class.h"
+#include "java_lang_Object.h"
+#include "java_lang_Boolean.h"
+#include "java_lang_String.h"
+#include "java_lang_Integer.h"
+#include "java_lang_Byte.h"
+#include "java_lang_Short.h"
+#include "java_lang_Character.h"
+#include "java_lang_Thread.h"
+#include "java_lang_Long.h"
+#include "java_lang_Double.h"
+#include "java_lang_Float.h"
+#include "java_lang_Runnable.h"
+#include "java_lang_System.h"
+#include "java_lang_Throwable.h"
+#include "java_lang_StringBuilder.h"
