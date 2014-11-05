@@ -27,6 +27,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 
 /**
@@ -52,6 +53,7 @@ public class SwipeableContainer extends Container {
     private int topX = -1;
     private boolean waitForRelease;
 
+    private EventDispatcher dispatcher = new EventDispatcher();
     /**
      * Simple Constructor
      * 
@@ -219,6 +221,8 @@ public class SwipeableContainer extends Container {
                     bottomLeftWrapper.setVisible(true);
                     openedToLeft = false;
                     openedToRight = false;
+                }else{
+                    dispatcher.fireActionEvent(new ActionEvent(this));                
                 }
             }
             return !finished;
@@ -247,6 +251,41 @@ public class SwipeableContainer extends Container {
         return open && (openedToRight || openedToLeft);
     }
 
+    /**
+     * Returns true if the top Component is opened to the right side
+     */ 
+    public boolean isOpenedToRight() {
+        return openedToRight;
+    }
+
+    /**
+     * Returns true if the top Component is opened to the left side
+     */ 
+    public boolean isOpenedToLeft() {
+        return openedToLeft;
+    }
+    
+    
+
+    /**
+     * Adds a listener to the SwipeableContainer which will cause an event to 
+     * dispatch once the SwipeableContainer is fully opened
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void addSwipeOpenListener(ActionListener l){
+        dispatcher.addListener(l);
+    }
+    
+    /**
+     * Removes the given listener from the SwipeableContainer
+     * 
+     * @param l implementation of the action listener interface
+     */
+    public void removeSwipeOpenListener(ActionListener l){
+        dispatcher.removeListener(l);
+    }
+    
     class SwipeListener implements ActionListener {
 
         private final static int PRESS = 0;

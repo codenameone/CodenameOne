@@ -27,6 +27,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.*;
+import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 
 /**
@@ -71,10 +72,7 @@ public class AutoCompleteTextField extends TextField {
      * getSuggestionModel value as well as for the GUI builder
      */
     public AutoCompleteTextField() {
-        filter = new FilterProxyListModel<String>(new DefaultListModel(new String[]{""}));
-        popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        popup.setScrollable(false);
-        setConstraint(TextArea.NON_PREDICTIVE);
+        this(new DefaultListModel(new String[]{""}));
     }
     
     /**
@@ -110,7 +108,8 @@ public class AutoCompleteTextField extends TextField {
             return;
         }
         pickedText = null;
-        if(filterImpl(text)) {
+        Form f = getComponentForm();
+        if(f != null && filterImpl(text)) {
             updateFilterList();
         } 
     }
@@ -268,6 +267,9 @@ public class AutoCompleteTextField extends TextField {
         });
         popup.addComponent(l);
         popup.getStyle().setMargin(LEFT, getAbsoluteX());
+        byte [] units = popup.getStyle().getMarginUnit();
+        units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
+        popup.getStyle().setMarginUnit(units);
         
         int y = getAbsoluteY();
         int topMargin;
