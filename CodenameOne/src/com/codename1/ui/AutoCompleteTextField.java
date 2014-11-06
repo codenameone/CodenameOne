@@ -268,8 +268,10 @@ public class AutoCompleteTextField extends TextField {
         popup.addComponent(l);
         popup.getStyle().setMargin(LEFT, getAbsoluteX());
         byte [] units = popup.getStyle().getMarginUnit();
-        units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
-        popup.getStyle().setMarginUnit(units);
+        if(units != null){
+            units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
+            popup.getStyle().setMarginUnit(units);
+        }
         
         int y = getAbsoluteY();
         int topMargin;
