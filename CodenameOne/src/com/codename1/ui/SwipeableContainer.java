@@ -50,6 +50,7 @@ public class SwipeableContainer extends Container {
     private boolean swipeActivated = true;
     private SwipeListener press, drag, release;
     private int initialX = -1;
+    private int initialY = -1;
     private int topX = -1;
     private boolean waitForRelease;
 
@@ -302,6 +303,11 @@ public class SwipeableContainer extends Container {
             if (getComponentCount() == 0 || !swipeActivated || animate()) {
                 return;
             }
+            final int x = evt.getX();
+            final int y = evt.getY();
+            if (!topWrapper.contains(x, y)) {
+                return;
+            }
             Component bottomL;
             int bottomLeftW = 0;
             if(bottomLeftWrapper.getComponentCount() > 0){
@@ -318,22 +324,24 @@ public class SwipeableContainer extends Container {
                 bottomRightX = bottomR.getX();            
             }
 
-            final int x = evt.getX();
-            final int y = evt.getY();
             switch (type) {
                 case PRESS: {
-                    if (!topWrapper.contains(x, y)) {
-                        return;
-                    }
                     topX = topWrapper.getX();
                     initialX = x;
+                    initialY = y;
                     waitForRelease = true;
                     break;
                 }
                 case DRAG: {
+                    if (Math.abs(y - initialY) > Math.abs(x - initialX)) {
+                        return;
+                    }
                     if (!topWrapper.contains(x, y)) {
                         return;
                     }
+                    Component top = topWrapper.getComponentAt(0);
+                    top.dragInitiated();
+
                     if (initialX != -1) {
                         int diff = x - initialX;
                         int val = 0;
@@ -362,6 +370,9 @@ public class SwipeableContainer extends Container {
                     break;
                 }
                 case RELEASE: {
+                    if(topWrapper.getX() != 0){
+                        evt.consume();
+                    }
                     if (waitForRelease) {
                         initialX = -1;
                         //if (!isOpen()) {
