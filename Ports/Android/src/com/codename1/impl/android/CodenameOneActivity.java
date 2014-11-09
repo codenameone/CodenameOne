@@ -340,7 +340,13 @@ public class CodenameOneActivity extends Activity {
         super.onSaveInstanceState(outState);
         AndroidNativeUtil.onSaveInstanceState(outState);
     }
-
+    
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+    }
+    
     @Override
     public void onLowMemory() {
         super.onLowMemory();
