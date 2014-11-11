@@ -1867,7 +1867,7 @@ public class List<T> extends Component {
 
             if (orientation != HORIZONTAL) {
                 if(y < pos.getY()){
-                    selectedIndex = y / (rendererSize.getHeight() + itemGap);
+                    selectedIndex = (y - style.getPadding(false, TOP)) / (rendererSize.getHeight() + itemGap);
                 }else{
                     int current = getSelectedIndex();
                     if(y < pos.getY() + selectedSize.getHeight()){
@@ -1895,7 +1895,7 @@ public class List<T> extends Component {
                     }
                 } else {
                     if (x < pos.getX()) {
-                        selectedIndex = x / (rendererSize.getWidth() + itemGap);
+                        selectedIndex = (x - style.getPadding(false, LEFT)) / (rendererSize.getWidth() + itemGap);
                     } else {
                         int current = getSelectedIndex();
                         if (x < pos.getX() + selectedSize.getWidth()) {

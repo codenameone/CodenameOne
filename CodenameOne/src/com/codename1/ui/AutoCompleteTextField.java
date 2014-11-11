@@ -266,12 +266,14 @@ public class AutoCompleteTextField extends TextField {
             }
         });
         popup.addComponent(l);
-        popup.getStyle().setMargin(LEFT, getAbsoluteX());
         byte [] units = popup.getStyle().getMarginUnit();
         if(units != null){
             units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
+            units[Component.TOP] = Style.UNIT_TYPE_PIXELS;
             popup.getStyle().setMarginUnit(units);
         }
+        popup.getUnselectedStyle().setMargin(LEFT, getAbsoluteX());        
+        popup.getSelectedStyle().setMargin(LEFT, getAbsoluteX());        
         
         int y = getAbsoluteY();
         int topMargin;
