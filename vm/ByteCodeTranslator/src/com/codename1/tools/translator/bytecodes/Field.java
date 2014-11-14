@@ -66,11 +66,11 @@ public class Field extends Instruction {
     public String setFieldFromThis(int arg) {
         // special case for this
         if(arg == 0) {
-            return "    retainObj(__cn1ThisObject);\n    set_field_" + owner.replace('/', '_').replace('$', '_') + 
+            return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
                     "_" + name + "(threadStateData, __cn1ThisObject, __cn1ThisObject);\n";
         }
         if(isObject()) {
-            return "    retainObj(__cn1Arg" + arg + ");\n    set_field_" + owner.replace('/', '_').replace('$', '_') + 
+            return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
                     "_" + name + "(threadStateData, __cn1Arg" + arg + ", __cn1ThisObject);\n";
         }
         return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
@@ -136,7 +136,6 @@ public class Field extends Instruction {
                 b.append("(threadStateData));\n");
                 break;
             case Opcodes.PUTSTATIC:
-                b.append("if(stack[stackPointer - 1].type == CN1_TYPE_OBJECT) { \n        retainObj(stack[stackPointer - 1].data.o);\n    }\n");
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("set_static_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
@@ -193,7 +192,6 @@ public class Field extends Instruction {
                 }
                 break;
             case Opcodes.PUTFIELD:
-                b.append("if(stack[stackPointer - 1].type == CN1_TYPE_OBJECT) { \n        retainObj(stack[stackPointer - 1].data.o);\n    }\n");
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("    set_field_");
                 b.append(owner.replace('/', '_').replace('$', '_'));

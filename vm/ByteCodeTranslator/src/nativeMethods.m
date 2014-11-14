@@ -41,8 +41,6 @@ JAVA_BOOLEAN compareStringToCharArray(const char* str, JAVA_ARRAY_CHAR* chrs, in
 
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-    retainObj(destArr);
     
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
     NSStringEncoding enc;
@@ -64,7 +62,11 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     }
     
     // this allows emojii to work with the Strings properly
-    NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:((JAVA_ARRAY)b)->length encoding:enc];
+    int stringLength = ((JAVA_ARRAY)b)->length;
+    NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:stringLength encoding:enc];
+
+    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [nsStr length]);
+    retainObj(destArr);
     __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
     __block int length = 0;
     [nsStr enumerateSubstringsInRange:NSMakeRange(0, [nsStr length])
@@ -120,16 +122,29 @@ JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     set_field_java_lang_Throwable_stack(threadStateData, java_lang_Throwable_getStack___R_java_lang_String(threadStateData, __cn1ThisObject), __cn1ThisObject);
 }
 
+JAVA_OBJECT newline = JAVA_NULL;
+JAVA_OBJECT dot = JAVA_NULL;
+JAVA_OBJECT colon = JAVA_NULL;
+JAVA_OBJECT indent = JAVA_NULL;
+
+
 JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {
     JAVA_OBJECT bld = __NEW_INSTANCE_java_lang_StringBuilder(threadStateData);
     JAVA_OBJECT classObj = java_lang_Object_getClass___R_java_lang_Class(threadStateData, me);
     JAVA_OBJECT className = java_lang_Class_getName___R_java_lang_String(threadStateData, classObj);
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, className);
-    JAVA_OBJECT newline = newStringFromCString(threadStateData, "\n");
-    JAVA_OBJECT dot = newStringFromCString(threadStateData, ".");
-    JAVA_OBJECT colon = newStringFromCString(threadStateData, ":");
-    JAVA_OBJECT indent = newStringFromCString(threadStateData, "    at ");
+    if(newline == JAVA_NULL) {
+        newline = newStringFromCString(threadStateData, "\n");
+        newline->__codenameOneReferenceCount = 999999;
+        dot = newStringFromCString(threadStateData, ".");
+        dot->__codenameOneReferenceCount = 999999;
+        colon = newStringFromCString(threadStateData, ":");
+        colon->__codenameOneReferenceCount = 999999;
+        indent = newStringFromCString(threadStateData, "    at ");
+        indent->__codenameOneReferenceCount = 999999;
+    }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
+
     for(int iter = threadStateData->callStackOffset - 1 ; iter >= 0 ; iter--) {
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, indent);
         int classId = threadStateData->callStackClass[iter];

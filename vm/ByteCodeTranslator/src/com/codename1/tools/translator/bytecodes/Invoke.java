@@ -205,6 +205,11 @@ public class Invoke extends Instruction {
                 offset--;
             }
             if(opcode != Opcodes.INVOKESTATIC) {
+                if(opcode != Opcodes.INVOKESTATIC) {
+                        b.append("    releaseObj(threadStateData, stack[stackPointer - ");
+                        b.append(args.size() + 1);
+                        b.append("].data.o);\n");
+                }
                 if(args.size() > 0) {
                     b.append("    stackPointer -= ");
                     b.append(args.size());
@@ -267,6 +272,11 @@ public class Invoke extends Instruction {
                     b.append("].data.o);\n");
                 }
                 offset--;
+            }
+            if(opcode != Opcodes.INVOKESTATIC) {
+                    b.append("    releaseObj(threadStateData, stack[stackPointer - ");
+                    b.append(val);
+                    b.append("].data.o);\n");
             }
             b.append("    stackPointer -= ");
             b.append(val);

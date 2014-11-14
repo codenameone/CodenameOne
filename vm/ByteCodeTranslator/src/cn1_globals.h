@@ -89,6 +89,7 @@ struct clazz {
     
     void* __codenameOneThreadData;
     void* finalizerFunction;
+    void* releaseFieldsFunction;
     void* markFunction;
     
     JAVA_BOOLEAN initialized;
@@ -767,6 +768,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
         stackPointer = 1; \
         stack[0].data.o = threadStateData->exception; \
+        stack[0].type = CN1_TYPE_OBJECT; \
         goto labelName; \
     } \
 }
@@ -874,16 +876,16 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     int stackPointer = spPosition; \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset; \
-    initMethodStack(threadStateData, (JAVA_OBJECT)1, stackSize,localsStackSize, classNameId, methodNameId);
+    initMethodStack(threadStateData, (JAVA_OBJECT)1, stackSize,localsStackSize, classNameId, methodNameId); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     int stackPointer = spPosition; \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset; \
-    initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId);
+    initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 
 #ifdef __OBJC__
@@ -906,9 +908,9 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
-extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
-extern void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
-extern JAVA_BOOLEAN removeObjectFromHeapCollection(JAVA_OBJECT o);
+extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+extern void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 
 extern void codenameOneGCMark();
 extern void codenameOneGCSweep();

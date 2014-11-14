@@ -132,7 +132,12 @@ public class LabelInstruction extends Instruction {
             if(strs != null) {
                 b.append(":");
                 for(Pair s : strs) {
-                    b.append(" BEGIN_TRY(");
+                    b.append(" tryBlockOffset");
+                    b.append(parent);
+                    b.append(s.cls);
+                    b.append(s.counter);
+                    b.append(" = threadStateData->tryBlockOffset;\n");
+                    b.append("    BEGIN_TRY(");
                     b.append(s.cls);
                     b.append(", catch_");
                     b.append(parent);
@@ -143,7 +148,7 @@ public class LabelInstruction extends Instruction {
                     b.append(parent);
                     b.append(s.cls);
                     b.append(s.counter);
-                    b.append(" = cn1LocalsBeginInThread;\n");
+                    b.append(" = threadStateData->threadObjectStackOffset;\n");
                 }
                 b.append("\n");
             } else {

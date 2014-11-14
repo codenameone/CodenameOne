@@ -18,99 +18,99 @@
 int currentGcMarkValue = 1;
 
 struct clazz class_array1__JAVA_BOOLEAN = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BOOLEAN = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BOOLEAN = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_CHAR = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_CHAR = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_CHAR = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_BYTE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BYTE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BYTE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_SHORT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_SHORT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_SHORT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_INT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_INT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_INT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_LONG = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_LONG = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_LONG = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_FLOAT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_FLOAT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_FLOAT = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_DOUBLE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_DOUBLE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_DOUBLE = {
-   0, 999999, 0, 0, 0, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   0, 999999, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 void safeRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* es) {
@@ -220,9 +220,9 @@ void flushReleaseQueue() {
         }
         
         // double deletion can occur because of GC/ARC
-        if(!removeObjectFromHeapCollection(localQueue[iter])) {
+        /*if(!removeObjectFromHeapCollection(localQueue[iter])) {
             continue;
-        }
+        }*/
         
 
         finalizerFunctionPointer ptr = (finalizerFunctionPointer)localQueue[iter]->__codenameOneParentClsReference->finalizerFunction;
@@ -280,6 +280,34 @@ void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
                 threadStateData->pendingHeapAllocations[heapTrav] = 0;
             }
         }*/
+        if(threadStateData->heapReleaseSize == PER_THREAD_RELEASE_COUNT) {
+            // overflow danger... We need to clean the release queue!
+            if(threadStateData->threadBlockedByGC) {
+                // if the GC is running anyway, let it do its job
+                threadStateData->threadActive = JAVA_FALSE;
+                while(threadStateData->threadBlockedByGC) {
+                    usleep(1000);
+                }
+                threadStateData->threadActive = JAVA_TRUE;
+            } else {
+                // force the GC to run
+                invokedGC = YES;
+                threadStateData->threadActive = JAVA_FALSE;
+                java_lang_System_gc__(getThreadLocalData());
+                while(threadStateData->heapReleaseSize > 0 || threadStateData->threadBlockedByGC) {
+                    usleep((JAVA_INT)(1000));
+                }
+                invokedGC = NO;
+                threadStateData->threadActive = JAVA_TRUE;
+            }
+        }
+        
+        // release the child objects
+        finalizerFunctionPointer ptr = (finalizerFunctionPointer)o->__codenameOneParentClsReference->releaseFieldsFunction;
+        if(ptr != 0) {
+            ptr(threadStateData, o);
+        }
+        
         threadStateData->pendingHeapReleases[threadStateData->heapReleaseSize] = o;
         threadStateData->heapReleaseSize++;
     }
@@ -297,6 +325,7 @@ void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 
 void gcReleaseObj(JAVA_OBJECT o) {
     // if we are going overboard with object creation/release e.g. creating objects in loops without giving GC time to work
+    //NSLog(@"Freeing object %@", [NSString stringWithUTF8String:__codenameOneParentClsReference->clsName]);
     if(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE - 200) {
         // this is on the GC queue so we can just invoke it directly
         flushReleaseQueue();
@@ -394,12 +423,6 @@ extern struct ThreadLocalData** threadsToDelete;
  */
 void codenameOneGCMark() {
     struct ThreadLocalData* d = getThreadLocalData();
-    if(constantPoolObjects != 0) {
-        for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
-            gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter]);
-        }
-    }
-    markStatics(d);
     //int marked = 0;
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
@@ -426,6 +449,7 @@ void codenameOneGCMark() {
                 if(obj) {
                     t->pendingHeapAllocations[heapTrav] = 0;
                     if(obj->__codenameOneReferenceCount > 0) {
+                        gcMarkObject(d, obj, JAVA_FALSE);
                         placeObjectInHeapCollection(obj);
                     }
                 }
@@ -436,7 +460,7 @@ void codenameOneGCMark() {
             for(int heapTrav = 0 ; heapTrav < t->heapReleaseSize ; heapTrav++) {
                 JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapReleases[heapTrav];
                 if(obj) {
-                    removeObjectFromHeapCollection(obj);
+                    removeObjectFromHeapCollection(d, obj);
                     t->pendingHeapReleases[heapTrav] = 0;
                     gcReleaseObj(obj);
                 }
@@ -448,14 +472,19 @@ void codenameOneGCMark() {
                 struct elementStruct* current = &t->threadObjectStack[stackIter];
                 CODENAME_ONE_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE);
                 if(current != 0 && current->type == CN1_TYPE_OBJECT && current->data.o != JAVA_NULL) {
-                    gcMarkObject(t, current->data.o);
+                    gcMarkObject(t, current->data.o, JAVA_FALSE);
                     //marked++;
                 }
             }
+            markStatics(d);
             t->threadBlockedByGC = JAVA_FALSE;
         }
     }
     //NSLog(@"Mark set %i objects to %i", marked, currentGcMarkValue);
+    // since they are immutable this probably doesn't need as much sync as the statics...
+    for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
+        gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
+    }
 }
 
 /**
@@ -464,17 +493,19 @@ void codenameOneGCMark() {
  * it can just delete everything it finds
  */
 void codenameOneGCSweep() {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
     //int counter = 0;
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(o->__codenameOneGcMark != currentGcMarkValue) {
+            if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
                 CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
                 allObjectsInHeap[iter] = JAVA_NULL;
                 //if(o->__codenameOneReferenceCount > 0) {
                 //    NSLog(@"Sweped %X", (int)o);
                 //}
+                removeObjectFromHeapCollection(threadStateData, o);
                 gcReleaseObj(o);
                 //counter++;
             }
@@ -489,7 +520,7 @@ void codenameOneGCSweep() {
         lockCriticalSection();
         for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
             if(threadsToDelete[i] != 0) {
-                NSLog(@"Deleting thread: %i", i);
+                //NSLog(@"Deleting thread: %i", i);
                 struct ThreadLocalData* current = threadsToDelete[i];
                 free(current->blocks);
                 free(current->threadObjectStack);
@@ -506,11 +537,19 @@ void codenameOneGCSweep() {
     }
 }
 
-JAVA_BOOLEAN removeObjectFromHeapCollection(JAVA_OBJECT o) {
+JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     int pos = findPointerPosInHeap(o);
 
     // double deletion might occur when the GC and the reference counting collide
     if(pos < 0) {
+        // check the local thread heap
+        for(int heapTrav = 0 ; heapTrav < threadStateData->heapAllocationSize ; heapTrav++) {
+            JAVA_OBJECT obj = (JAVA_OBJECT)threadStateData->pendingHeapAllocations[heapTrav];
+            if(obj == o) {
+                threadStateData->pendingHeapAllocations[heapTrav] = JAVA_NULL;
+                return JAVA_TRUE;
+            }
+        }
         return JAVA_FALSE;
     }
     o->__heapPosition = -1;
@@ -527,14 +566,24 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     o->__codenameOneGcMark = currentGcMarkValue;
     o->__ownerThread = threadStateData;
     o->__heapPosition = -1;
+    o->__codenameOneReferenceCount = 1;
     
     if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
-        void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-        memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-        memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
-        threadStateData->threadHeapTotalSize *= 2;
-        free(threadStateData->pendingHeapAllocations);
-        threadStateData->pendingHeapAllocations = tmp;
+        if(threadStateData->threadBlockedByGC) {
+            threadStateData->threadActive = JAVA_FALSE;
+            while(threadStateData->threadBlockedByGC) {
+                usleep(1000);
+            }
+            threadStateData->threadActive = JAVA_TRUE;
+        }
+        if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
+            void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+            memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+            memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
+            threadStateData->threadHeapTotalSize *= 2;
+            free(threadStateData->pendingHeapAllocations);
+            threadStateData->pendingHeapAllocations = tmp;
+        }
     }
     threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize] = o;
     threadStateData->heapAllocationSize++;
@@ -554,21 +603,43 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     free(obj);
 }
 
-typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
+typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
 
-void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    // if this is a Class object or already marked this should be ignored
-    if(obj == JAVA_NULL || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneGcMark == currentGcMarkValue) {
+JAVA_OBJECT recursionBlocker[512];
+int recursionBlockerPosition = 0;
+void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
+    if(obj == JAVA_NULL || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
+    }
+
+    // if this is a Class object or already marked this should be ignored
+    if(obj->__codenameOneGcMark == currentGcMarkValue) {
+        if(force) {
+            for(int iter = 0 ; iter < recursionBlockerPosition ; iter++) {
+                if(recursionBlocker[iter] == obj) {
+                    return;
+                }
+            }
+            recursionBlocker[recursionBlockerPosition] = obj;
+            recursionBlockerPosition++;
+            obj->__codenameOneGcMark = currentGcMarkValue;
+            gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+            if(fp != 0) {
+                fp(threadStateData, obj, force);
+            }
+            recursionBlockerPosition--;
+        }
+        return;
+        
     }
     obj->__codenameOneGcMark = currentGcMarkValue;
     gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
     if(fp != 0) {
-        fp(threadStateData, obj);
+        fp(threadStateData, obj, force);
     }
 }
 
-void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL) {
         return;
     }
@@ -578,7 +649,7 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)arr->data;
         for(int iter = 0 ; iter < arr->length ; iter++) {
             if(data[iter] != JAVA_NULL) {
-                gcMarkObject(threadStateData, data[iter]);
+                gcMarkObject(threadStateData, data[iter], force);
             }
         }
     }
@@ -677,7 +748,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
     retainObj((JAVA_OBJECT)dat);
     java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
-    releaseObj(threadStateData, (JAVA_OBJECT)dat);
+    //releaseObj(threadStateData, (JAVA_OBJECT)dat);
     return o;
 }
 
@@ -693,6 +764,14 @@ void initConstantPool() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(threadStateData, CN1_CONSTANT_POOL_SIZE, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     JAVA_OBJECT* tmpConstantPoolObjects = (JAVA_ARRAY_OBJECT*)(*arr).data;
+    
+    // the constant pool should not be deleted...
+    for(int iter = 0 ; iter < threadStateData->heapAllocationSize ; iter++) {
+        if(threadStateData->pendingHeapAllocations[iter] == arr)  {
+            threadStateData->pendingHeapAllocations[iter] = JAVA_NULL;
+            break;
+        }
+    }
     invokedGC = YES;
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         tmpConstantPoolObjects[iter] = newStringFromCString(threadStateData, constantPool[iter]);
@@ -713,6 +792,10 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     }
     if (utf8String == JAVA_NULL) {
         utf8String = newStringFromCString(threadStateData, "UTF-8");
+        removeObjectFromHeapCollection(threadStateData, utf8String);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)utf8String)->java_lang_String_value);
+        ((struct obj__java_lang_String*)utf8String)->java_lang_String_value->__codenameOneReferenceCount = 999999;
+        utf8String->__codenameOneReferenceCount = 999999;
     }
     JAVA_OBJECT s = __NEW_java_lang_String(threadStateData);
     const char* chars = [str UTF8String];
@@ -733,6 +816,10 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     }
     if (utf8String == JAVA_NULL) {
         utf8String = newStringFromCString(threadStateData, "UTF-8");
+        removeObjectFromHeapCollection(threadStateData, utf8String);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)utf8String)->java_lang_String_value);
+        ((struct obj__java_lang_String*)utf8String)->java_lang_String_value->__codenameOneReferenceCount = 999999;
+        utf8String->__codenameOneReferenceCount = 999999;
     }
 
     JAVA_ARRAY byteArray = (JAVA_ARRAY)java_lang_String_getBytes___java_lang_String_R_byte_1ARRAY(threadStateData, str, utf8String);
@@ -812,7 +899,7 @@ JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
 }
 
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
-    NSLog(@"Throwing exception!"); 
+    //NSLog(@"Throwing exception!"); 
     java_lang_Throwable_fillInStack__(threadStateData, exceptionArg); 
     threadStateData->exception = exceptionArg; 
     threadStateData->tryBlockOffset--; 

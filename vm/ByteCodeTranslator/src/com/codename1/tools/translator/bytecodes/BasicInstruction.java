@@ -550,17 +550,17 @@ public class BasicInstruction extends Instruction {
                 
             case Opcodes.ARRAYLENGTH:
                 b.append("    { /* ARRAYLENGTH */\n" +
-                    "    if(stack[stackPointer - 1].data.o == JAVA_NULL) { \n" +
-                    "        throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \n" +
-                    "    }; \n" +
-                    "    stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                    "    stack[stackPointer - 1].data.i = (*((JAVA_ARRAY)stack[stackPointer - 1].data.o)).length; \n" +
-                    "}\n");
+                    "        if(stack[stackPointer - 1].data.o == JAVA_NULL) { \n" +
+                    "            throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \n" +
+                    "        }; \n" +
+                    "        stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
+                    "        stack[stackPointer - 1].data.i = (*((JAVA_ARRAY)stack[stackPointer - 1].data.o)).length; \n" +
+                    "    }\n");
                 break;                
                 
             case Opcodes.ATHROW:
                 //b.append("    NSLog(@\"Exception thrown %s %d %s %s\\n\", __FILE__, __LINE__, __PRETTY_FUNCTION__, __FUNCTION__);\n");
-                b.append("    throwException(threadStateData, POP_OBJ());\n");
+                b.append("    retainObj(stack[stackPointer - 1].data.o); throwException(threadStateData, POP_OBJ());\n");
                 break;                
                 
             case Opcodes.MONITORENTER:

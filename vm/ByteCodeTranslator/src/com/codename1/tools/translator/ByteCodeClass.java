@@ -309,6 +309,8 @@ public class ByteCodeClass {
             b.append("  &class__java_lang_Class, 999999, 0, &__FINALIZER_");
         }
         b.append(clsName);
+        b.append(" , &__RC_RELEASE_");
+        b.append(clsName);
         b.append(" , &__GC_MARK_");
         b.append(clsName);
         
@@ -377,9 +379,9 @@ public class ByteCodeClass {
             b.append("__");
             b.append(clsName);
             if(clsName.equals("java_lang_Class")) {
-                b.append(" = {\n 0, 999999, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n 0, 999999, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n &class__java_lang_Class, 999999, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n &class__java_lang_Class, 999999, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");
@@ -504,9 +506,9 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     if(bf.isObjectType()) {
                         if(bf.isFinal()) {
-                            b.append("(threadStateData);\n    STATIC_FIELD_");                        
+                            b.append("(threadStateData);\n    retainObj(__cn1StaticVal);\n    STATIC_FIELD_");                        
                         } else {
-                            b.append("(threadStateData);\n    releaseObj(threadStateData, STATIC_FIELD_");
+                            b.append("(threadStateData);\n    retainObj(__cn1StaticVal);\n    releaseObj(threadStateData, STATIC_FIELD_");
                             b.append(bf.getClsName());
                             b.append("_");
                             b.append(bf.getFieldName());
@@ -519,7 +521,7 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     if(bf.isObjectType() && bf.isFinal()) {
-                        b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(__cn1StaticVal);\n}\n\n");
+                        b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
                     } else {
                         b.append(" = __cn1StaticVal;\n}\n\n");
                     }
@@ -562,7 +564,7 @@ public class ByteCodeClass {
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
-                b.append(");\n    (*(struct obj__");
+                b.append(");\n    retainObj(__cn1Val);\n    (*(struct obj__");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    (*(struct obj__");
             }
@@ -575,8 +577,7 @@ public class ByteCodeClass {
         }
                 
         
-        // finalizer to cleanup variables
-        
+        // finalizer and GC_RELEASE to cleanup variables
         b.append("JAVA_VOID __FINALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete) {\n");
@@ -585,6 +586,18 @@ public class ByteCodeClass {
             b.append(clsName);
             b.append("_finalize__(threadStateData, objToDelete);\n");
         }
+        // invoke the finalize method of the base
+        if(baseClass != null) {
+            b.append("    __FINALIZER_");
+            b.append(baseClass.replace('/', '_').replace('$', '_'));
+            b.append("(threadStateData, objToDelete);\n");
+        }
+        
+        b.append("}\n\n");
+        
+        b.append("JAVA_VOID __RC_RELEASE_");
+        b.append(clsName);
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete) {\n");
 
         b.append("    struct obj__");
         b.append(clsName);
@@ -608,7 +621,7 @@ public class ByteCodeClass {
         
         // invoke the finalize method of the base
         if(baseClass != null) {
-            b.append("    __FINALIZER_");
+            b.append("    __RC_RELEASE_");
             b.append(baseClass.replace('/', '_').replace('$', '_'));
             b.append("(threadStateData, objToDelete);\n");
         }
@@ -618,7 +631,7 @@ public class ByteCodeClass {
         // mark function for the GC mark cycle to tag the objects that are reachable
         b.append("void __GC_MARK_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark) {\n    struct obj__");
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n    struct obj__");
         b.append(clsName);
         b.append("* objInstance = (struct obj__");
         b.append(clsName);
@@ -629,14 +642,14 @@ public class ByteCodeClass {
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
-                b.append(");\n");
+                b.append(", force);\n");
             }
         }
         // invoke the mark method of the base
         if(baseClass != null) {
             b.append("    __GC_MARK_");
             b.append(baseClass.replace('/', '_').replace('$', '_'));
-            b.append("(threadStateData, objToMark);\n");
+            b.append("(threadStateData, objToMark, force);\n");
         } else {
             // we can do this in Object.java only since all code will reach here eventually
             b.append("    objToMark->__codenameOneGcMark = currentGcMarkValue;\n");
@@ -1010,9 +1023,13 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");
 
+        b.append("extern void __RC_RELEASE_");
+        b.append(clsName);
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");
+
         b.append("extern void __GC_MARK_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark);\n");
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force);\n");
         
         if(!isInterface && !isAbstract) {
             b.append("extern JAVA_OBJECT __NEW_");
@@ -1472,7 +1489,7 @@ public class ByteCodeClass {
                 b.append(clsName);
                 b.append("_");
                 b.append(bf.getFieldName());
-                b.append(");\n");
+                b.append(", JAVA_TRUE);\n");
             }
         }
     }

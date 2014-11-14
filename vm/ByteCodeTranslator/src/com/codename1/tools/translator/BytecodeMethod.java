@@ -440,7 +440,7 @@ public class BytecodeMethod {
             b.append(");\n");
             int startOffset = 0;
             if(!staticMethod) {
-                b.append("    locals[0].data.o = __cn1ThisObject; retainObj(__cn1ThisObject);\n");
+                b.append("    locals[0].data.o = __cn1ThisObject; locals[0].type = CN1_TYPE_OBJECT; retainObj(__cn1ThisObject);\n");
                 startOffset++;
             }
             int localsOffset = startOffset;
@@ -968,15 +968,15 @@ public class BytecodeMethod {
                                     if(((Field)next).isObject()) {
                                         String varName = "returnValObj" + varCounter;
                                         varCounter++;
-                                        instructions.add(iter, new CustomIntruction("    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
-                                                    "    JAVA_OBJECT " + varName + " = " + s + ";\n    retainObj(" + varName + 
+                                        instructions.add(iter, new CustomIntruction("if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
+                                                    "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    retainObj(" + varName + 
                                                     ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
                                         iter = 0;
                                         instructionCount = instructions.size();
                                         continue;
                                     }
-                                    instructions.add(iter, new CustomIntruction("    return " + s + ";\n", 
-                                            "    RETURN_AND_RELEASE_FROM_METHOD(" + s + ", " + maxLocals + ");\n", dependentClasses));
+                                    instructions.add(iter, new CustomIntruction("if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    return " + s + ";\n", 
+                                            "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    RETURN_AND_RELEASE_FROM_METHOD(" + s + ", " + maxLocals + ");\n", dependentClasses));
                                     iter = 0;
                                     instructionCount = instructions.size();
                                     continue;

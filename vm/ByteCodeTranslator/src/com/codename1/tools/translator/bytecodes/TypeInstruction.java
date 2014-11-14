@@ -77,13 +77,23 @@ public class TypeInstruction extends Instruction {
             }
         } 
         if(opcode == Opcodes.ANEWARRAY) {
+            if(type.startsWith("[")) {
+                int dim = 2;
+                String tt = type.substring(1);
+                while(tt.startsWith("[")) {
+                    tt = tt.substring(1);
+                    dim++;
+                }
+                ByteCodeClass.addArrayType(actualType, dim);
+                return;
+            }
             ByteCodeClass.addArrayType(actualType, 1);
         }
     }
     
     
     @Override
-    public void appendInstruction(StringBuilder b) {
+    public void appendInstruction(StringBuilder b, List<Instruction> l) {
         type = type.replace('.', '_').replace('/', '_').replace('$', '_');
         b.append("    ");
         switch(opcode) {
@@ -93,9 +103,28 @@ public class TypeInstruction extends Instruction {
                 b.append("(threadStateData)); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
+                if(type.startsWith("[")) {
+                    int dim = 2;
+                    String t = type.substring(1);
+                    while(t.startsWith("[")) {
+                        t = t.substring(1);
+                        dim++;
+                    }
+                    
+                    b.append(" stackPointer--;\n    PUSH_POINTER(allocArray(threadStateData, stack[stackPointer].data.i, &class_array");
+                    b.append(dim);
+                    b.append("__");
+                    b.append(actualType);
+                    b.append(", sizeof(JAVA_OBJECT), 1 ));\n    stack[stackPointer - 1].data.o->__codenameOneParentClsReference = &class_array");
+                    b.append(dim);
+                    b.append("__");
+                    b.append(actualType);
+                    b.append("; /* ANEWARRAY multi */\n");
+                    break;
+                }
                 b.append("stackPointer--;\n    PUSH_POINTER(__NEW_ARRAY_");
                 b.append(actualType);
-                b.append("(threadStateData, stack[stackPointer].data.i)); /* ANEWARRAY */\n");
+                b.append("(threadStateData, stack[stackPointer].data.i));\n");
                 break;
             case Opcodes.CHECKCAST:
                 b.append("BC_CHECKCAST(");

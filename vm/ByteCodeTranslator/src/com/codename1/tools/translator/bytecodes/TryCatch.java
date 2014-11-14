@@ -88,6 +88,10 @@ public class TryCatch extends Instruction {
         b.append(start);
         b.append(cid);
         b.append(counter);
+        b.append(";\n    int tryBlockOffset");
+        b.append(start);
+        b.append(cid);
+        b.append(counter);
         b.append(";\n    DEFINE_CATCH_BLOCK(catch_");
         b.append(start);
         b.append(cid);
