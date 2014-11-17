@@ -1807,10 +1807,127 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenuItem exit = new JMenuItem("Exit");
             simulatorMenu.add(exit);
+            
+            JMenu helpMenu = new JMenu("Help");
+            helpMenu.setDoubleBuffered(true);
+
+            JMenuItem javadocs = new JMenuItem("Javadocs");
+            javadocs.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    try {
+                        Desktop.getDesktop().browse(new URI("https://codenameone.googlecode.com/svn/trunk/CodenameOne/javadoc/index.html"));
+                    } catch (Exception ex) {
+                        
+                    }
+                }
+            });
+            helpMenu.add(javadocs);
+
+            JMenuItem how = new JMenuItem("How Do I?...");
+            how.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    try {
+                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/how-do-i.html"));
+                    } catch (Exception ex) {                        
+                    }
+                }
+            });
+            helpMenu.add(how);
+
+            JMenuItem forum = new JMenuItem("Community Forum");
+            forum.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    try {
+                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/discussion-forum.html"));
+                    } catch (Exception ex) {                        
+                    }
+                }
+            });
+            helpMenu.add(forum);
+            
+            JMenuItem bserver = new JMenuItem("Build Server");
+            bserver.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    try {
+                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
+                    } catch (Exception ex) {                        
+                    }
+                }
+            });
+            helpMenu.addSeparator();
+            helpMenu.add(bserver);
+            helpMenu.addSeparator();
+            
+            JMenuItem about = new JMenuItem("About");
+            about.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    final JDialog about;
+                    if(window !=null){
+                        about = new JDialog(window);
+                    }else{
+                        about = new JDialog();                    
+                    }
+                    JPanel panel = new JPanel();                    
+                    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));                    
+
+                    JPanel imagePanel = new JPanel();
+                    
+                    JLabel image = new JLabel(new javax.swing.ImageIcon(getClass().getResource("/CodenameOne_Small.png")));
+                    image.setHorizontalAlignment(SwingConstants.CENTER);
+                    imagePanel.add(image);
+                    
+                    panel.add(imagePanel);
+                    
+                    JPanel linkPanel = new JPanel();
+                    
+                    JButton link = new JButton();
+                    link.setText("<HTML>For more information, please <br>visit <FONT color=\"#000099\"><U>www.codenameone.com</U></FONT></HTML>");
+                    link.setHorizontalAlignment(SwingConstants.LEFT);
+                    link.setBorderPainted(false);
+                    link.setOpaque(false);
+                    link.setBackground(Color.WHITE);
+                    link.addActionListener(new ActionListener() {
+
+                        public void actionPerformed(ActionEvent e) {
+                            try {
+                                Desktop.getDesktop().browse(new URI("http://www.codenameone.com"));
+                            } catch (Exception ex) {                        
+                            }
+                        }
+                    });
+                    linkPanel.add(link);
+                    panel.add(linkPanel);
+
+                    JPanel closePanel = new JPanel();
+                    JButton close = new JButton("close");
+                    close.addActionListener(new ActionListener() {
+
+                        public void actionPerformed(ActionEvent e) {
+                          about.dispose();
+                        }
+                    });
+                    closePanel.add(close);
+                    panel.add(closePanel);
+                    
+                    about.add(panel);
+                    about.pack();
+                    if(window != null){
+                        about.setLocationRelativeTo(window);
+                    }
+                    about.setVisible(true);
+                }
+            });            
+            helpMenu.add(about);
 
             if (showMenu) {
                 bar.add(simulatorMenu);
                 bar.add(skinMenu);
+                bar.add(helpMenu);
             }
 
             rotate.addActionListener(new ActionListener() {
@@ -1946,6 +2063,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         JMenu m;
         if (menu == null) {
             m = new JMenu("Skins");
+            m.setDoubleBuffered(true);
         } else {
             m = menu;
             m.removeAll();
@@ -2409,6 +2527,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         } else {
             window = new JFrame();
+            java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
+            java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
+            try {
+                // setIconImages is only available in JDK 1.6
+                window.setIconImages(Arrays.asList(new java.awt.Image[] {large, small}));
+            } catch (Throwable err) {
+                window.setIconImage(small);
+            }
+            
             window.addWindowListener(new WindowListener() {
 
                 public void windowOpened(WindowEvent e) {
@@ -6296,6 +6423,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public boolean isNativeBrowserComponentSupported() {
         return fxExists;
+        //return false;
     }
 
     public PeerComponent createBrowserComponent(final Object parent) {
