@@ -232,6 +232,6 @@ public final class Float{
      * @return object instance
      */
     public static Float valueOf(float i) {
-        return null;
+        return new Float(i);
     }
 }

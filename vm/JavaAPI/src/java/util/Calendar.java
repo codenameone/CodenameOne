@@ -338,6 +338,9 @@ public abstract class Calendar{
      */
     protected Calendar(){
         zone = TimeZone.getDefault();
+        fields = new int[FIELD_COUNT];
+        isSet = new boolean[FIELD_COUNT];
+        areFieldsSet = isTimeSet = false;
     }
 
     /**

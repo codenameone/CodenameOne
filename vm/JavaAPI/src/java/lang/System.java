@@ -85,7 +85,7 @@ public final class System {
                                 System.gcLight();
                             }
                             synchronized(LOCK) {
-                                LOCK.wait(100);
+                                LOCK.wait(1000);
                             }
                         } catch (InterruptedException ex) {
                         }
