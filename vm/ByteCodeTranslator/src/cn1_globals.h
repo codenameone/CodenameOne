@@ -83,11 +83,15 @@ struct CN1ThreadData {
 };
 
 struct clazz {
-    // these first 2 aren't really used but they allow us to treat a clazz as an object
+    // these first  fields aren't really used but they allow us to treat a clazz as an object
     struct clazz *__codenameOneParentClsReference;
     int __codenameOneReferenceCount;
     
     void* __codenameOneThreadData;
+    int __codenameOneGcMark;
+    void* __ownerThread;
+    int __heapPosition;
+
     void* finalizerFunction;
     void* releaseFieldsFunction;
     void* markFunction;

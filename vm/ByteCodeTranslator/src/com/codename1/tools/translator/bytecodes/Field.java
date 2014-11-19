@@ -145,8 +145,8 @@ public class Field extends Instruction {
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
-                        b.append("POP_OBJ");
-                        break;
+                        b.append("PEEK_OBJ(1));\n    releaseObj(threadStateData, PEEK_OBJ(1)); stackPointer--;\n");
+                        return;
                     case 'D':
                         b.append("POP_DOUBLE");
                         break;
@@ -193,7 +193,7 @@ public class Field extends Instruction {
                 break;
             case Opcodes.PUTFIELD:
                 //b.append("SAFE_RETAIN(1);\n    ");
-                b.append("    set_field_");
+                b.append("set_field_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
                 b.append("_");
                 b.append(name);
@@ -201,8 +201,13 @@ public class Field extends Instruction {
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
-                        b.append("POP_OBJ");
-                        break;
+                        b.append("PEEK_OBJ");
+                        if(useThis) {
+                            b.append("(1), __cn1ThisObject);\n    releaseObj(threadStateData, PEEK_OBJ(1)); stackPointer--;\n");
+                        } else {
+                            b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
+                        }
+                        return;
                     case 'D':
                         b.append("POP_DOUBLE");
                         break;

@@ -304,9 +304,9 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  0, 999999, 0, &__FINALIZER_");
+            b.append("  0, 999999, 0, 0, &__FINALIZER_");
         } else {
-            b.append("  &class__java_lang_Class, 999999, 0, &__FINALIZER_");
+            b.append("  &class__java_lang_Class, 999999, 0, 0, &__FINALIZER_");
         }
         b.append(clsName);
         b.append(" , &__RC_RELEASE_");
