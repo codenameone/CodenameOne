@@ -1382,7 +1382,10 @@ public class Container extends Component {
                     return component;
                 }
                 if (cmp instanceof Container) {
-                    component = ((Container) cmp).getComponentAt(x, y);
+                    Component c = ((Container) cmp).getComponentAt(x, y);
+                    if(c != null){
+                        component = c;
+                    }
                 }
                 if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {
                     return component;
