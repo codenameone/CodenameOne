@@ -61,7 +61,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class CodenameOneActivity extends Activity {
+public class CodenameOneActivity extends android.support.v7.app.ActionBarActivity {
 
     private Menu menu;
     private boolean nativeMenu = false;
@@ -258,13 +258,10 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
         super.onCreate(savedInstanceState);
+        getSupportActionBar().hide();
         AndroidNativeUtil.onCreate(savedInstanceState);
-
-        if (android.os.Build.VERSION.SDK_INT >= 11) {
-            getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
-            getActionBar().hide();
-        }
 
         try {
             if (isBillingEnabled()) {

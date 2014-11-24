@@ -98,6 +98,7 @@ import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.support.v4.app.ActivityCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -397,24 +398,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
-
-        if (!hasActionBar()) {
-            try {
-                activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
-            } catch (Exception e) {
-                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
-            }
-        } else {
-            activity.invalidateOptionsMenu();
-            try {
-                activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
-                activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
-            } catch (Exception e) {
-                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
-            }
-            NotifyActionBar notify = new NotifyActionBar(activity, false);
-            notify.run();
+            
+        ActivityCompat.invalidateOptionsMenu(activity);
+        try {
+            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
+        } catch (Exception e) {
+            //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
         }
+        NotifyActionBar notify = new NotifyActionBar(activity, false);
+        notify.run();
+            
         if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         }
@@ -479,13 +473,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
-            activity.invalidateOptionsMenu();
+            ActivityCompat.invalidateOptionsMenu(activity);
         }
     }
 
-    private boolean hasActionBar() {
+    /*private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
-    }
+    }*/
 
     public int translatePixelForDPI(int pixel) {
         return (int) TypedValue.applyDimension(
@@ -1645,9 +1639,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 ((CodenameOneActivity) activity).enableNativeMenu(true);
             }
         }
-        if (hasActionBar()) {
-            //activity.runOnUiThread(new NotifyActionBar(activity, commandBehavior));
-        }
     }
     
     private static class NotifyActionBar implements Runnable {
@@ -1666,11 +1657,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
-            activity.invalidateOptionsMenu();
+            ActivityCompat.invalidateOptionsMenu(activity);
             if (show) {
-                activity.getActionBar().show();
+                ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar().show();
             } else {
-                activity.getActionBar().hide();
+                ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar().hide();
             }
         }
     }
@@ -3023,38 +3014,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
-    /**
-     * A class that is used by executeAndReturnString to be exposed in Javascript
-     * so that it can accept return values.
-     */
-    static class AndroidBrowserComponentCallback {
-        static final String JS_VAR_NAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent";
-        static final String JS_RETURNVAL_VARNAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent_returnValue";
-        private String returnValue;
-        private boolean valueSet = false;
-        
-        //@JavascriptInterface
-        public synchronized void setReturnValue(String value){
-            valueSet = true;
-            this.returnValue = value;
-            notify();
-        }
-
-        public String getReturnValue() {
-            return returnValue;
-        }
-
-        public boolean isValueSet() {
-            return valueSet;
-        }
-
-        public void reset() {
-            valueSet = false;
-        }
-    }
-
-    
-    
     
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
@@ -5042,7 +5001,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public boolean isNativeTitle() {
-        return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
+        return Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
 
     public void refreshNativeTitle(){
@@ -5093,7 +5052,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
-            ActionBar ab = activity.getActionBar();
+            android.support.v7.app.ActionBar ab = ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;
             if(android.os.Build.VERSION.SDK_INT >= 14){
