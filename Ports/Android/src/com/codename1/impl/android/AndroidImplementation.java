@@ -4103,15 +4103,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activity.startActivity(dialer);
     }
 
+    @Override
+    public int getSMSSupport() {
+        return Display.SMS_BOTH;
+    }
+    
     /**
      * @inheritDoc
      */
-    public void sendSMS(final String phoneNumber, final String message) throws IOException {
+    public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
 //        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
 //                new Intent("SMS_DELIVERED"), 0);
-        SmsManager sms = SmsManager.getDefault();
-        ArrayList<String> parts = sms.divideMessage(message);
-        sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
+        if(i) {
+            Intent smsIntent = new Intent(Intent.ACTION_VIEW);
+            smsIntent.setType("vnd.android-dir/mms-sms");
+            smsIntent.putExtra("address", phoneNumber);
+            smsIntent.putExtra("sms_body",message);
+            activity.startActivity(smsIntent);            
+        } else {
+            SmsManager sms = SmsManager.getDefault();
+            ArrayList<String> parts = sms.divideMessage(message);
+            sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
+        }
     }
     
     @Override

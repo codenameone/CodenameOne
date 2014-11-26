@@ -128,7 +128,9 @@ public class AutoCompleteTextField extends TextField {
             popup.setEnabled(v);
             f.repaint();
         } 
-        f.revalidate();
+        if(f != null) {
+            f.revalidate();
+        }
     }
     
     /**

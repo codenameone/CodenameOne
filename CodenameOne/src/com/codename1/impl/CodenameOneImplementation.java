@@ -325,7 +325,11 @@ public abstract class CodenameOneImplementation {
     public void hideTextEditor() {
         Component c = editingText;
         editingText = null;
-        c.repaint();
+        
+        // this might happen when the component is no longer a part of the form e.g. in the case of table editing.
+        if(c != null) {
+            c.repaint();
+        }
     }
         
     /**
@@ -4613,14 +4617,23 @@ public abstract class CodenameOneImplementation {
      */
     public void dial(String phoneNumber) {        
     }
-
+    
     /**
      * Sends a SMS message to the given phone number
      * @param phoneNumber to send the sms
      * @param message the content of the sms
      * @throws IOException if for some reason sending failed
      */
-    public void sendSMS(String phoneNumber, String message) throws IOException{
+    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException{
+    }
+
+    /**
+     * Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.), 
+     * SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
+     * @return one of the SMS_* values
+     */
+    public int getSMSSupport() {
+        return Display.SMS_SEAMLESS;
     }
     
     /**

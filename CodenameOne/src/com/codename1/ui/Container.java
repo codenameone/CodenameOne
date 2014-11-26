@@ -1995,8 +1995,8 @@ public class Container extends Component {
         setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         dontRecurseContainer = true;
-        int deltaX = getAbsoluteX(); //- getScrollX();
-        int deltaY = getAbsoluteY();// - getScrollY();
+        int deltaX = getAbsoluteX();
+        int deltaY = getAbsoluteY();
         int sourceX = source.getAbsoluteX() - deltaX;
         int destX = destination.getAbsoluteX() - deltaX;
         int sourceY = source.getAbsoluteY() - deltaY;
@@ -2036,8 +2036,7 @@ public class Container extends Component {
         getComponentForm().registerAnimated(a);
         if(wait) {
             Display.getInstance().invokeAndBlock(a);
-        }
-        
+        }        
     }
     
     /**

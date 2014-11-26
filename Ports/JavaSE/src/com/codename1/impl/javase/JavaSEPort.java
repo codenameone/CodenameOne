@@ -1671,7 +1671,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
             subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
             refundSupported = pref.getBoolean("refundSupported", true);
-            JMenu purchaseMenu = new JMenu("Purchase");
+            JMenu purchaseMenu = new JMenu("In App Purchase");
             simulatorMenu.add(purchaseMenu);
             final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
             manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
@@ -4670,7 +4670,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void execute(String url) {
         try {
             if(url.startsWith("file:")) {
-                url = "file://" + unfile(url).replace('\\', '/');
+                url = new File(unfile(url)).toURI().toURL().toExternalForm();
             }
             Desktop.getDesktop().browse(new URI(url));
         } catch (Exception ex) {
@@ -5600,8 +5600,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public void sendSMS(final String phoneNumber, final String message) throws IOException {
+    public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
         System.out.println("sending sms to " + phoneNumber);
+    }
+
+    @Override
+    public int getSMSSupport() {
+        return Display.SMS_NOT_SUPPORTED;
     }
 
     @Override

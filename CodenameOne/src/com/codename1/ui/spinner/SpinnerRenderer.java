@@ -140,7 +140,6 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T>{
         if(perspective < 0 || perspective >= PERSPECTIVES) {
             return;
         }
-        System.out.println("Drawing " + s + " at " + perspective);
         int l = s.length();
         int position = 0;
         for(int iter = 0 ; iter < l ; iter++) {

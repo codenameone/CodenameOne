@@ -3850,9 +3850,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void openNativeNavigationApp(double latitude, double longitude){    
-        String s = "maps://maps.apple.com/?ll=" + latitude+ "," + longitude;
+        String s = "http://maps.apple.com/?daddr=" + latitude+ "," + longitude;
         if(canExecute(s)) {
-            execute("maps://maps.apple.com/?ll=" + latitude+ "," + longitude);
+            execute(s);
         } else {
             execute("http://maps.apple.com/?ll=" + latitude+ "," + longitude);
         }
@@ -4187,7 +4187,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void sendSMS(String phoneNumber, String message) throws IOException{
+    public int getSMSSupport() {
+        return Display.SMS_INTERACTIVE;
+    }
+    
+    @Override
+    public void sendSMS(String phoneNumber, String message, boolean i) throws IOException{
         nativeInstance.sendSMS(phoneNumber, message);
     }
 

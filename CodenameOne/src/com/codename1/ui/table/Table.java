@@ -744,10 +744,19 @@ public class Table extends Container {
     }
 
     class Listener implements DataChangedListener, ActionListener {
+        private int editingColumn = -1;
+        private int editingRow = -1;
         /**
          * @inheritDoc
          */
         public final void dataChanged(int row, int column) {
+            // prevents the table from rebuilding on every text field edit which makes the table 
+            // more usable on iOS devices with the VKB/Native editing
+            if(editingColumn == column && editingRow == row) {
+                editingColumn = -1;
+                editingRow = -1;
+                return;
+            }
             Object value = model.getValueAt(row, column);
             boolean e = model.isCellEditable(row, column);
             Component cell = createCellImpl(value, row, column, e);
@@ -774,6 +783,8 @@ public class Table extends Container {
             TextArea t = (TextArea)evt.getSource();
             int row = getCellRow(t);
             int column = getCellColumn(t);
+            editingColumn = column;
+            editingRow = row;
             getModel().setValueAt(row, column, t.getText());
         }
     }

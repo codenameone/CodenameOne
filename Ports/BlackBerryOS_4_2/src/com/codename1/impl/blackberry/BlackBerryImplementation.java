@@ -2943,7 +2943,7 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         }
     }
 
-    public void sendSMS(final String phoneNumber, final String message) throws IOException {
+    public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
         //why on hell?? RIM has 2 different API's one for CDMA and 
         //one for GSM
         if (!isCDMA()) {

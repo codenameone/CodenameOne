@@ -64,8 +64,6 @@ class SpinnerDateModel implements ListModel {
         this.max = max;
         this.min = min;
         this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
-        System.out.println("Date is: " + new Date(currentValue));
-        System.out.println("Date plus offset is: " + new Date(currentValue + TimeZone.getDefault().getRawOffset() + 4 * 60 * 60 * 1000) + " raw offset is: " + TimeZone.getDefault().getRawOffset());
     }
 
     /**

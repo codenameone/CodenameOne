@@ -93,7 +93,12 @@ public class TextEditUtil {
         if (curEditedComponent != null) {
             Component next = curEditedComponent.getNextFocusDown();
             if (next == null) {
-                next = curEditedComponent.getComponentForm().findNextFocusVertical(true);
+                Form parent = curEditedComponent.getComponentForm();
+                
+                // could happen in the case of a table that gets recreated on edit
+                if(parent != null) {
+                    next = parent.findNextFocusVertical(true);
+                }
             }
 
             if (next != null && next instanceof TextArea && ((TextArea) next).isEditable() && ((TextArea) next).isEnabled()) {

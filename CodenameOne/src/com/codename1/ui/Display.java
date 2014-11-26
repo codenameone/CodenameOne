@@ -134,6 +134,26 @@ public final class Display {
      * Half QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
+    /**
+     * Used by getSMSSupport to indicate that SMS is not supported
+     */
+    public static final int SMS_NOT_SUPPORTED = 1;
+    
+    /**
+     * Used by getSMSSupport to indicate that SMS is sent in the background without a compose UI
+     */
+    public static final int SMS_SEAMLESS = 2;
+    
+    /**
+     * Used by getSMSSupport to indicate that SMS triggers the native SMS app which will show a compose UI
+     */
+    public static final int SMS_INTERACTIVE = 3;
+    
+    /**
+     * Used by getSMSSupport to indicate that SMS can be sent in either seamless or interactive mode
+     */
+    public static final int SMS_BOTH = 4;
+    
 
     private static final int POINTER_PRESSED = 1;
     private static final int POINTER_RELEASED = 2;
@@ -3041,12 +3061,32 @@ public final class Display {
     }    
     
     /**
+     * Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.), 
+     * SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
+     * @return one of the SMS_* values
+     */
+    public int getSMSSupport() {
+        return impl.getSMSSupport();
+    }
+
+    
+    /**
      * Sends a SMS message to the given phone number
      * @param phoneNumber to send the sms
      * @param message the content of the sms
      */
     public void sendSMS(String phoneNumber, String message) throws IOException{
-        impl.sendSMS(phoneNumber, message);
+        impl.sendSMS(phoneNumber, message, false);
+    }
+    
+    /**
+     * Sends a SMS message to the given phone number
+     * @param phoneNumber to send the sms
+     * @param message the content of the sms
+     * @param interactive indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport
+     */
+    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException{
+        impl.sendSMS(phoneNumber, message, interactive);
     }
     
     /**

@@ -1255,12 +1255,12 @@ public class Dialog extends Form {
                 }
                 
                 width = Math.min(prefWidth, availableWidth - x);
-                result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
+                result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             } else {
                 // popup left
                 width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
                 x = rect.getX() - width;
-                result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
+                result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             }
         }
 

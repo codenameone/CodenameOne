@@ -780,6 +780,15 @@ public class Border {
         return obj1.equals(obj2);
     }
 
+    /**
+     * Creates a border that is comprised of multiple border types so one border type can be used on top
+     * while another one can be used at the bottom. Notice that this doesn't work well with all border types (e.g. image borders)
+     * @param top the top border
+     * @param bottom the bottom border
+     * @param left the left border
+     * @param right the right border
+     * @return a compound border
+     */
     public static Border createCompoundBorder(Border top, Border bottom, Border left, Border right) {
 
         if ((top != null && !top.isRectangleType()) || 

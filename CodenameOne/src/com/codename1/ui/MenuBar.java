@@ -1518,6 +1518,21 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
+     * Sets the command UIID to the given UIID, notice that this won't work for all menu types since some menu
+     * types might be implemented natively or as a list in which case the UIID won't apply!
+     * @param cmd the command
+     * @param uiid the uiid for the given command
+     */
+    public void setCommandUIID(Command cmd, String uiid) {
+        Button b = findCommandComponent(cmd);
+        if(b != null) {
+            b.setUIID(uiid);
+            revalidate();
+        }
+        cmd.putClientProperty("cn1$CommandUIID", uiid);
+    }
+    
+    /**
      * Creates a touch command for use as a touch menu item
      * 
      * @param c command to map into the returned button
@@ -1536,7 +1551,12 @@ public class MenuBar extends Container implements ActionListener {
         b.setTactileTouch(true);
         b.setTextPosition(Label.BOTTOM);
         b.setEndsWith3Points(false);
-        b.setUIID("TouchCommand");
+        String uiid = (String)c.getClientProperty("cn1$CommandUIID");
+        if(uiid != null) {
+            b.setUIID(uiid);
+        } else {
+            b.setUIID("TouchCommand");
+        }
         Integer gap = (Integer)c.getClientProperty("iconGap");
         if(gap != null) {
             b.setGap(gap.intValue());

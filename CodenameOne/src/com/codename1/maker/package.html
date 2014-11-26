@@ -5,43 +5,8 @@
   </head>
     <body>
         <p>
-            Contains the set of API's that allows developers to build plugins for the Codename One Maker tool.
+            This package is deprecated and will be removed in a coming revision
         </p>
         <p>
-            To build a plugin one would start by creating a descriptor XML file and couple it with a Codename One Library
-            containing a class that extends the maker plugin class. For more on that please visit the 
-            <a href="http://www.codenameone.com/maker-developer.html">Maker developer section in the Codename One website</a>.
-            See a sample of a cn1m_plugin file below. This file allows the maker application to create a UI that will
-            prompt the user for all these values. Once these values are set the plugin will receive all of them via the 
-            getMetaData method.
-        </p>
-        <pre>
-            &lt;?xml version="1.0" encoding="UTF-8"?&gt;
-            &lt;plugin makerVer="0.1" name="Plugin Display Name" package="com.mydomain.myplugin" developer="emailUsedForRegistration@domain.com" 
-                    developerName="My Company Name" version="1.0" help="http://website.com/help.html"
-                    cn1lib="http://site.com/pathTo.cn1lib" class="MakerPluginSubClass" &gt;
-                &lt;arg name="argName" display="Display Name" type="string" default="DefaultValue" details="Optional additional details" /&gt;
-            &lt;/plugin&gt;
-        </pre>
-        <!-- pre>
-            &lt;?xml version="1.0" encoding="UTF-8"?&gt;
-            &lt;plugin makerVer="0.1" name="Plugin Display Name" package="com.mydomain.myplugin" developer="emailUsedForRegistration@domain.com" 
-                    developerName="My Company Name" version="1.0" help="http://website.com/help.html"
-                    cn1lib="http://site.com/pathTo.cn1lib" class="com.mydomain.myplugin.MakerPluginSubClass" &gt;
-                &lt;arg name="shortName" display="Display Name" type="string" default="DefaultValue" details="Optional additional details" /&gt;
-                &lt;arg name="arg2" display="Check box" default="true" type="boolean" required="true" /&gt;
-                &lt;arg name="arg3" display="Double" default="1" type="double"&gt;
-                &lt;arg name="arg4" display="Multiple Choice" default="X1" type="multi"&gt;
-                    &lt;multi value="X1" /&gt;
-                    &lt;multi value="X2" /&gt;
-                    &lt;multi value="X3" /&gt;
-                    &lt;multi value="X4" /&gt;
-                    &lt;multi value="X5" /&gt;
-                &lt;/arg&gt;
-                &lt;arg name="email" display="E-Mail" type="email" default="address@x.com" /&gt;
-                &lt;arg name="phone" display="Phone" type="phone" default="555-5554" /&gt;
-                &lt;arg name="url" display="Web Address" type="url" default="http://myURL" /&gt;
-            &lt;/plugin&gt;
-        </pre -->
-    </body>
+        </body>
 </html>

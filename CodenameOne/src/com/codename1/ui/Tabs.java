@@ -528,7 +528,7 @@ public class Tabs extends Container {
         contentPane.addComponent(index, component);
         setTabsLayout(tabPlacement);
         if (tabsContainer.getComponentCount() == 1) {
-            selectedTab = (Button) tabsContainer.getComponentAt(0);
+            selectedTab = tabsContainer.getComponentAt(0);
             if (component instanceof Container) {
                 ((Container) component).setBlockFocus(false);
             }

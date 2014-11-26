@@ -33,6 +33,7 @@ import java.util.Hashtable;
  * is implemented as an abstract class to allow future extensibility.
  *
  * @author Shai Almog
+ * @deprecated this class is no longer supported and will be removed in an upcoming revision
  */
 public abstract class MakerPlugin {
     private String title;

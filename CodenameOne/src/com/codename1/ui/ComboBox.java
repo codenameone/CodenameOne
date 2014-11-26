@@ -287,7 +287,7 @@ public class ComboBox<T> extends List<T> {
             Form parentForm = getComponentForm();
 
             int listW = Math.max(getWidth() , l.getPreferredW());
-            listW = Math.min(listW + getUIManager().getLookAndFeel().getVerticalScrollWidth(), parentForm.getContentPane().getWidth());
+            listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());
 
 
             Component content = popupDialog.getDialogComponent();
