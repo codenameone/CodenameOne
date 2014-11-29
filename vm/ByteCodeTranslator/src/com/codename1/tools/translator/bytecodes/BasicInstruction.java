@@ -520,7 +520,7 @@ public class BasicInstruction extends Instruction {
                 break;
                 
             case Opcodes.ARETURN:
-                b.append("    retainObj(PEEK_OBJ(1));\n");
+                //b.append("    retainObj(PEEK_OBJ(1));\n");
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
@@ -560,7 +560,7 @@ public class BasicInstruction extends Instruction {
                 
             case Opcodes.ATHROW:
                 //b.append("    NSLog(@\"Exception thrown %s %d %s %s\\n\", __FILE__, __LINE__, __PRETTY_FUNCTION__, __FUNCTION__);\n");
-                b.append("    retainObj(stack[stackPointer - 1].data.o); throwException(threadStateData, POP_OBJ());\n");
+                b.append("    throwException(threadStateData, POP_OBJ());\n");
                 break;                
                 
             case Opcodes.MONITORENTER:

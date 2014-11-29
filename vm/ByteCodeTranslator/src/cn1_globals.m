@@ -561,6 +561,18 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
+    if(o == NULL) {
+        // malloc failed! We need to free up RAM FAST!
+        invokedGC = YES;
+        threadStateData->threadActive = JAVA_FALSE;
+        java_lang_System_gc__(getThreadLocalData());
+        while(threadStateData->heapReleaseSize > 0 || threadStateData->threadBlockedByGC) {
+            usleep((JAVA_INT)(1000));
+        }
+        invokedGC = NO;
+        threadStateData->threadActive = JAVA_TRUE;
+        return codenameOneGcMalloc(threadStateData, size, parent);
+    }
     memset(o, 0, size);
     o->__codenameOneParentClsReference = parent;
     o->__codenameOneGcMark = currentGcMarkValue;

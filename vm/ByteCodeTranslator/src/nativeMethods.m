@@ -133,6 +133,7 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
     JAVA_OBJECT classObj = java_lang_Object_getClass___R_java_lang_Class(threadStateData, me);
     JAVA_OBJECT className = java_lang_Class_getName___R_java_lang_String(threadStateData, classObj);
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, className);
+    releaseObj(threadStateData, bld);
     if(newline == JAVA_NULL) {
         newline = newStringFromCString(threadStateData, "\n");
         newline->__codenameOneReferenceCount = 999999;
@@ -144,22 +145,38 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         indent->__codenameOneReferenceCount = 999999;
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
+    releaseObj(threadStateData, bld);
 
     for(int iter = threadStateData->callStackOffset - 1 ; iter >= 0 ; iter--) {
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, indent);
+        releaseObj(threadStateData, bld);
+
         int classId = threadStateData->callStackClass[iter];
         int methodId = threadStateData->callStackMethod[iter];
         int line = threadStateData->callStackLine[iter];
         
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(classId));
+        releaseObj(threadStateData, bld);
+
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, dot);
+        releaseObj(threadStateData, bld);
+
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(methodId));
+        releaseObj(threadStateData, bld);
+
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, colon);
+        releaseObj(threadStateData, bld);
+
         java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(threadStateData, bld, line);
+        releaseObj(threadStateData, bld);
         
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
+        releaseObj(threadStateData, bld);
     }
-    return java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, bld);
+    JAVA_OBJECT o = java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, bld);
+    releaseObj(threadStateData, bld);
+    o->__codenameOneReferenceCount = 0;
+    return o;
 }
 
 JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len) {
