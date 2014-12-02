@@ -258,11 +258,22 @@ public class CodenameOneActivity extends android.support.v7.app.ActionBarActivit
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
+        if(!AndroidImplementation.oldActionBar) {
+            getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
+        }
         super.onCreate(savedInstanceState);
+        
+        // will be commented out during old action bar build
         getSupportActionBar().hide();
         AndroidNativeUtil.onCreate(savedInstanceState);
-
+        
+        if(AndroidImplementation.oldActionBar) {
+            if (android.os.Build.VERSION.SDK_INT >= 11) {
+                getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
+                getActionBar().hide();
+            }
+        }
+        
         try {
             if (isBillingEnabled()) {
                 String k = getBase64EncodedPublicKey();

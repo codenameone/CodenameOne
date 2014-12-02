@@ -156,6 +156,7 @@ import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
 import java.net.ServerSocket;
+import java.text.ParseException;
 import java.util.*;
 //import android.webkit.JavascriptInterface;
 
@@ -203,6 +204,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
+    public static final boolean oldActionBar = false;
     
     /**
      * This method in used internally for ads
@@ -398,16 +400,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void init(Object m) {
         this.activity = (Activity) m;
-            
-        ActivityCompat.invalidateOptionsMenu(activity);
-        try {
-            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
-        } catch (Exception e) {
-            //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+           
+        if(oldActionBar) {
+            if (!hasActionBar()) {
+                try {
+                    activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
+                } catch (Exception e) {
+
+                }
+           } else {
+                activity.invalidateOptionsMenu();
+                try {
+                    activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
+                    activity.requestWindowFeature(Window.FEATURE_PROGRESS);
+                } catch (Exception e) {
+                    //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+                }
+                NotifyActionBar notify = new NotifyActionBar(activity, false);
+                notify.run();            
+            }
+        } else {
+            ActivityCompat.invalidateOptionsMenu(activity);
+            try {
+                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
+            } catch (Exception e) {
+                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+            }
+            NotifyActionBar notify = new NotifyActionBar(activity, false);
+            notify.run();
         }
-        NotifyActionBar notify = new NotifyActionBar(activity, false);
-        notify.run();
             
         if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -473,13 +495,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
-            ActivityCompat.invalidateOptionsMenu(activity);
+            if(oldActionBar) {
+                activity.invalidateOptionsMenu();
+            } else {
+                ActivityCompat.invalidateOptionsMenu(activity);
+            }
         }
     }
 
-    /*private boolean hasActionBar() {
+    private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
-    }*/
+    }
 
     public int translatePixelForDPI(int pixel) {
         return (int) TypedValue.applyDimension(
@@ -1657,6 +1683,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
+            if(oldActionBar) {
+                 activity.invalidateOptionsMenu();
+                 if (show) {
+                     activity.getActionBar().show();
+                 } else {
+                     activity.getActionBar().hide();
+                 }
+                 return;
+            }
             ActivityCompat.invalidateOptionsMenu(activity);
             if (show) {
                 ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar().show();
@@ -4794,6 +4829,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (l10n == null) {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+                public double parseDouble(String localeFormattedDecimal) {
+                    try {
+                        return NumberFormat.getNumberInstance().parse(localeFormattedDecimal).doubleValue();
+                    } catch (ParseException err) {
+                        return Double.parseDouble(localeFormattedDecimal);
+                    }
+                }
+                
                 public String format(int number) {
                     return NumberFormat.getNumberInstance().format(number);
                 }
@@ -5014,6 +5057,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public boolean isNativeTitle() {
+        if(oldActionBar) {
+            return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
+        }
         return Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
 
@@ -5065,6 +5111,45 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
+            if(oldActionBar) {
+                ActionBar ab = activity.getActionBar();
+                String title = f.getTitle();
+                boolean hasMenuBtn = false;
+                if(android.os.Build.VERSION.SDK_INT >= 14){
+                    try {
+                        ViewConfiguration vc = ViewConfiguration.get(activity);
+                        Method m = vc.getClass().getMethod("hasPermanentMenuKey", (Class[])null);
+                        hasMenuBtn = ((Boolean)m.invoke(vc, (Object[])null)).booleanValue();
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                }
+                if((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)){
+                    activity.runOnUiThread(new NotifyActionBar(activity, true));
+                }else{
+                    activity.runOnUiThread(new NotifyActionBar(activity, false));
+                    return;
+                }
+
+                ab.setTitle(title);
+                ab.setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
+                if(android.os.Build.VERSION.SDK_INT >= 14){
+                    Image icon = f.getTitleComponent().getIcon();
+                    try {
+                        if(icon != null){
+                            ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable(activity.getResources(), (Bitmap)icon.getImage()));
+                        }else{
+                            if(activity.getApplicationInfo().icon != 0){
+                                ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
+                            }
+                        }
+                        activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                }
+                return;
+            }
             android.support.v7.app.ActionBar ab = ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;
