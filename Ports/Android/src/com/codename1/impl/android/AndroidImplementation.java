@@ -98,7 +98,6 @@ import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
-//import android.support.v4.app.ActivityCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -204,7 +203,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
-    public static final boolean oldActionBar = true;
     
     /**
      * This method in used internally for ads
@@ -484,11 +482,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
-            if(oldActionBar) {
-                activity.invalidateOptionsMenu();
-            } /*else {
-                ActivityCompat.invalidateOptionsMenu(activity);
-            }*/
+            activity.invalidateOptionsMenu();
         }
     }
 
@@ -1672,16 +1666,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public void run() {
-            if(oldActionBar) {
-                 activity.invalidateOptionsMenu();
-                 if (show) {
-                     activity.getActionBar().show();
-                 } else {
-                     activity.getActionBar().hide();
-                 }
-                 return;
-            }
-            //ActivityCompat.invalidateOptionsMenu(activity);
+            activity.invalidateOptionsMenu();
             if (show) {
                 activity.getActionBar().show();
             } else {
@@ -5097,45 +5082,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
-            if(oldActionBar) {
-                ActionBar ab = activity.getActionBar();
-                String title = f.getTitle();
-                boolean hasMenuBtn = false;
-                if(android.os.Build.VERSION.SDK_INT >= 14){
-                    try {
-                        ViewConfiguration vc = ViewConfiguration.get(activity);
-                        Method m = vc.getClass().getMethod("hasPermanentMenuKey", (Class[])null);
-                        hasMenuBtn = ((Boolean)m.invoke(vc, (Object[])null)).booleanValue();
-                    } catch(Throwable t) {
-                        t.printStackTrace();
-                    }
-                }
-                if((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)){
-                    activity.runOnUiThread(new NotifyActionBar(activity, true));
-                }else{
-                    activity.runOnUiThread(new NotifyActionBar(activity, false));
-                    return;
-                }
-
-                ab.setTitle(title);
-                ab.setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
-                if(android.os.Build.VERSION.SDK_INT >= 14){
-                    Image icon = f.getTitleComponent().getIcon();
-                    try {
-                        if(icon != null){
-                            ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable(activity.getResources(), (Bitmap)icon.getImage()));
-                        }else{
-                            if(activity.getApplicationInfo().icon != 0){
-                                ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
-                            }
-                        }
-                        activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
-                    } catch(Throwable t) {
-                        t.printStackTrace();
-                    }
-                }
-                return;
-            }
             ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;
@@ -5154,7 +5100,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 activity.runOnUiThread(new NotifyActionBar(activity, false));
                 return;
             }
-            
+
             ab.setTitle(title);
             ab.setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
             if(android.os.Build.VERSION.SDK_INT >= 14){
@@ -5172,6 +5118,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     t.printStackTrace();
                 }
             }
+            return;
         }
         
     }
