@@ -98,7 +98,7 @@ import android.os.Environment;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
-import android.support.v4.app.ActivityCompat;
+//import android.support.v4.app.ActivityCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -204,7 +204,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
-    public static final boolean oldActionBar = false;
+    public static final boolean oldActionBar = true;
     
     /**
      * This method in used internally for ads
@@ -486,9 +486,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void run() {
             if(oldActionBar) {
                 activity.invalidateOptionsMenu();
-            } else {
+            } /*else {
                 ActivityCompat.invalidateOptionsMenu(activity);
-            }
+            }*/
         }
     }
 
@@ -1681,7 +1681,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                  }
                  return;
             }
-            ActivityCompat.invalidateOptionsMenu(activity);
+            //ActivityCompat.invalidateOptionsMenu(activity);
             if (show) {
                 activity.getActionBar().show();
             } else {
