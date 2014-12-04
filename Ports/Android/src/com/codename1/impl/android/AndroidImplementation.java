@@ -401,36 +401,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void init(Object m) {
         this.activity = (Activity) m;
            
-        if(oldActionBar) {
-            if (!hasActionBar()) {
-                try {
-                    activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
-                } catch (Exception e) {
-
-                }
-           } else {
-                activity.invalidateOptionsMenu();
-                try {
-                    activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
-                    activity.requestWindowFeature(Window.FEATURE_PROGRESS);
-                } catch (Exception e) {
-                    //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
-                }
-                NotifyActionBar notify = new NotifyActionBar(activity, false);
-                notify.run();            
+        if (!hasActionBar()) {
+            try {
+                activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            } catch (Exception e) {
+                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
         } else {
-            ActivityCompat.invalidateOptionsMenu(activity);
+            activity.invalidateOptionsMenu();
             try {
-                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
                 activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
+                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
             NotifyActionBar notify = new NotifyActionBar(activity, false);
             notify.run();
         }
-            
+
         if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
             activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         }
@@ -1694,9 +1683,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             ActivityCompat.invalidateOptionsMenu(activity);
             if (show) {
-                ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar().show();
+                activity.getActionBar().show();
             } else {
-                ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar().hide();
+                activity.getActionBar().hide();
             }
         }
     }
@@ -5057,10 +5046,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public boolean isNativeTitle() {
-        if(oldActionBar) {
-            return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
-        }
-        return Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
+        return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
     }
 
     public void refreshNativeTitle(){
@@ -5150,7 +5136,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 return;
             }
-            android.support.v7.app.ActionBar ab = ((android.support.v7.app.ActionBarActivity)activity).getSupportActionBar();
+            ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;
             if(android.os.Build.VERSION.SDK_INT >= 14){

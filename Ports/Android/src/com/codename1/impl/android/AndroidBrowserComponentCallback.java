@@ -35,7 +35,7 @@ public class AndroidBrowserComponentCallback {
     private String returnValue;
     private boolean valueSet = false;
 
-    @JavascriptInterface
+    //@JavascriptInterface
     public synchronized void setReturnValue(String value) {
         valueSet = true;
         this.returnValue = value;
