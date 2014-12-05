@@ -410,7 +410,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
                 activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
-                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                //activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }

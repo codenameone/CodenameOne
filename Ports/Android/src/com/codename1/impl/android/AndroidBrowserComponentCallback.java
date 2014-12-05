@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.android;
 
-import android.webkit.JavascriptInterface;
+//import android.webkit.JavascriptInterface;
 
 /**
  * A class that is used by executeAndReturnString to be exposed in Javascript so
