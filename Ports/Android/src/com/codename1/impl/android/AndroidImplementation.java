@@ -3252,22 +3252,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         
 
-        public void setScrollingEnabled(boolean enabled){
+        public void setScrollingEnabled(final boolean enabled){
             this.scrollingEnabled = enabled;
-            web.setHorizontalScrollBarEnabled(enabled);
-            web.setVerticalScrollBarEnabled(enabled);
-            if ( !enabled ){
-                web.setOnTouchListener(new View.OnTouchListener(){
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.setHorizontalScrollBarEnabled(enabled);
+                    web.setVerticalScrollBarEnabled(enabled);
+                    if ( !enabled ){
+                        web.setOnTouchListener(new View.OnTouchListener(){
 
-                    @Override
-                    public boolean onTouch(View view, MotionEvent me) {
-                        return (me.getAction() == MotionEvent.ACTION_MOVE);
+                            @Override
+                            public boolean onTouch(View view, MotionEvent me) {
+                                return (me.getAction() == MotionEvent.ACTION_MOVE);
+                            }
+
+                        });
+                    } else {
+                       web.setOnTouchListener(null);
                     }
-
-                });
-            } else {
-               web.setOnTouchListener(null);
-            }
+                }
+            });
             
         }
         
@@ -3462,9 +3466,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
 
-        public  void setPinchZoomEnabled(boolean e) {
-            web.getSettings().setSupportZoom(e);
-            web.getSettings().setBuiltInZoomControls(e);
+        public  void setPinchZoomEnabled(final boolean e) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    web.getSettings().setSupportZoom(e);
+                    web.getSettings().setBuiltInZoomControls(e);
+                }
+            });
         }
     }
 
