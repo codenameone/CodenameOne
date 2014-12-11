@@ -76,7 +76,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private final AndroidGraphics graphics;
     private final AndroidGraphics internalGraphics;
     private final AndroidImplementation implementation;
-
+    private boolean paintViewOnBuffer = false;
+    
     public AndroidAsyncView(Activity activity, AndroidImplementation implementation) {
         super(activity);
         setId(2001);
@@ -91,7 +92,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     @Override
     protected void onDraw(Canvas c) {
-        boolean paintOnBuffer = implementation.isEditingText() || InPlaceEditView.isKeyboardShowing() || implementation.nativePeers.size() > 0;
+        boolean paintOnBuffer = paintViewOnBuffer || 
+                implementation.isEditingText() || 
+                InPlaceEditView.isKeyboardShowing() || 
+                implementation.nativePeers.size() > 0;
 
         internalGraphics.setCanvasNoSave(c);
         AndroidGraphics g = internalGraphics;
@@ -106,7 +110,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         if (paintOnBuffer) {
             cn1View.d(c);
         }
+    }
 
+    public void setPaintViewOnBuffer(boolean paintViewOnBuffer) {
+        this.paintViewOnBuffer = paintViewOnBuffer;
     }
 
     @Override
@@ -120,10 +127,11 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
-        // method used for View implementation. is it still
-        // required with a SurfaceView?
         super.onWindowVisibilityChanged(visibility);
         this.visibilityChangedTo(visibility == View.VISIBLE);
+        if(visibility != View.VISIBLE){
+            paintViewOnBuffer = true;
+        }
     }
 
     @Override

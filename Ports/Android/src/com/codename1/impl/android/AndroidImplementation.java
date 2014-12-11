@@ -410,7 +410,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
                 activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
-                //activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                
+                if(android.os.Build.VERSION.SDK_INT >= 21){
+                    //WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+                    activity.getWindow().addFlags(-2147483648);
+                }
             } catch (Exception e) {
                 //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
             }
@@ -618,6 +622,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void confirmControlView() {
         myView.getAndroidView().setVisibility(View.VISIBLE);
+        //ugly workaround for a bug where on some android versions the async view
+        //came back black from the background.
+        if(myView instanceof AndroidAsyncView){
+            new Thread(new Runnable() {
+
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(1000);                        
+                    } catch (Exception e) {
+                    }
+                    ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
+                }
+            }).start();
+        }
     }
 
     public void hideNotifyPublic() {
