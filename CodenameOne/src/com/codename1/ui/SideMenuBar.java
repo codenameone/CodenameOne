@@ -191,7 +191,7 @@ public class SideMenuBar extends MenuBar {
             }
         }
         super.removeAllCommands();
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
 
     /**
@@ -319,7 +319,7 @@ public class SideMenuBar extends MenuBar {
                     if (rightSideButton != null) {
                         rightSideSwipePotential = !transitionRunning && evt.getX() > displayWidth - displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
-                    if (parent.getTitleComponent() instanceof Button) {
+                    if (getTitleComponent() instanceof Button) {
                         topSwipePotential = !transitionRunning && evt.getY() < Display.getInstance().getDisplayHeight() / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
                     sideSwipePotential = !transitionRunning && evt.getX() < displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
@@ -358,10 +358,11 @@ public class SideMenuBar extends MenuBar {
         return DRAG_REGION_NOT_DRAGGABLE;
     }
     
-    private void installRightCommands() {
+    void installRightCommands() {
         if (rightCommands != null) {
+            
             for (int i = 0; i < rightCommands.size(); i++) {
-                Command rightCommand = (Command) rightCommands.get(i);
+                Command rightCommand = (Command) rightCommands.get(rightCommands.size() -1 - i);
                 String uiid = (String)rightCommand.getClientProperty("uiid");
                 if(uiid == null){
                     uiid = "TitleCommand";
@@ -378,8 +379,28 @@ public class SideMenuBar extends MenuBar {
                     } else {
                         if (east instanceof Container) {
                             Container cnt = (Container) east;
-                            cnt.addComponent(b);
+                            //check if this command is already added
+                            boolean shouldAdd = true;
+                            for(int j=0; j<cnt.getComponentCount(); j++){
+                                Component c = cnt.getComponentAt(j);
+                                if(c instanceof Button){
+                                    Command cc = ((Button)c).getCommand();
+                                    if(cc != null && cc.equals(b.getCommand())){
+                                        shouldAdd = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if(shouldAdd){
+                                cnt.addComponent(b);
+                            }
                         } else {
+                            if(east instanceof Button){
+                                Command cc = ((Button)east).getCommand();
+                                if(cc != null && cc.equals(b.getCommand())){
+                                    continue;
+                                }                            
+                            }
                             east.getParent().removeComponent(east);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(east);
@@ -392,13 +413,13 @@ public class SideMenuBar extends MenuBar {
             }
 
         }
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
     
-    private void installLeftCommands() {
+    void installLeftCommands() {
         if (leftCommands != null) {
             for (int i = 0; i < leftCommands.size(); i++) {
-                Command leftCommand = (Command) leftCommands.get(i);
+                Command leftCommand = (Command) leftCommands.get(leftCommands.size() -1 - i);
                 String uiid = (String)leftCommand.getClientProperty("uiid");
                 if(uiid == null){
                     uiid = "TitleCommand";
@@ -416,8 +437,29 @@ public class SideMenuBar extends MenuBar {
                     } else {
                         if (west instanceof Container) {
                             Container cnt = (Container) west;
-                            cnt.addComponent(b);
+                            //check if this command is already added
+                            boolean shouldAdd = true;
+                            for(int j=0; j<cnt.getComponentCount(); j++){
+                                Component c = cnt.getComponentAt(j);
+                                if(c instanceof Button){
+                                    Command cc = ((Button)c).getCommand();
+                                    if(cc != null && cc.equals(b.getCommand())){
+                                        shouldAdd = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if(shouldAdd){
+                                cnt.addComponent(b);
+                            }
                         } else {
+                            if(west instanceof Button){
+                                Command cc = ((Button)west).getCommand();
+                                if(cc != null && cc.equals(b.getCommand())){
+                                    continue;
+                                }                            
+                            }
+                            
                             west.getParent().removeComponent(west);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(west);
@@ -430,7 +472,7 @@ public class SideMenuBar extends MenuBar {
             }
 
         }
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
     
 
@@ -553,11 +595,11 @@ public class SideMenuBar extends MenuBar {
             leftCommands.remove(cmd);
         }
         if (getCommandCount() == 0) {
-            if (parent.getTitleComponent() != null) {
-                parent.getTitleComponent().getParent().removeAll();
+            if (getTitleComponent() != null) {
+                getTitleComponent().getParent().removeAll();
             }
             getTitleAreaContainer().removeAll();
-            getTitleAreaContainer().addComponent(BorderLayout.CENTER, parent.getTitleComponent());
+            getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());
         }        
         installRightCommands();
         installLeftCommands();
@@ -638,7 +680,7 @@ public class SideMenuBar extends MenuBar {
             if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
                 titleArea.addComponent(BorderLayout.WEST, openButton);
             }
-            Label l = parent.getTitleComponent();
+            Component l = getTitleComponent();
             if (l.getParent() != null) {
                 l.getParent().removeComponent(l);
             }
@@ -667,13 +709,13 @@ public class SideMenuBar extends MenuBar {
                 }
             }
         }
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
 
     private void validateCommandPlacement(String placement) {
         if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
             ((BorderLayout) getTitleAreaContainer().getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
-            if (!(parent.getTitleComponent() instanceof Button)) {
+            if (!(getTitleComponent() instanceof Button)) {
                 Button b = new Button(parent.getTitle());
                 b.setUIID("Title");
                 parent.setTitleComponent(b);
@@ -854,7 +896,7 @@ public class SideMenuBar extends MenuBar {
                 } else {
                     menu.addComponent(cmp);
                 }
-                parent.initTitleBarStatus();
+                initTitleBarStatus();
             } else {
                 // special case: hide back button that doesn't have text, icon or a side component entry
                 if(parent.getBackCommand() == c && (c.getCommandName() == null || c.getCommandName().length() == 0) &&

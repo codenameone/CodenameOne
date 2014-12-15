@@ -776,6 +776,18 @@ public class UIManager {
             themeProps.put("AutoCompletePopup.sel#border", Border.createLineBorder(1));
         }
 
+        if (installedTheme == null || !installedTheme.containsKey("CommandList.derive")) {
+            themeProps.put("CommandList.transparency", "255");
+            themeProps.put("CommandList.border", Border.createLineBorder(1));       
+        }
+        if (installedTheme == null || !installedTheme.containsKey("CommandList.sel#derive")) {
+            themeProps.put("CommandList.sel#transparency", "255");
+            themeProps.put("CommandList.sel#border", Border.createLineBorder(1));
+        }
+
+        if (installedTheme == null || !installedTheme.containsKey("Toolbar.derive")) {
+            themeProps.put("Toolbar.derive", "TitleArea");
+        }
         
     }
 

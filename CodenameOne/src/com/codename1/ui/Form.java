@@ -2924,6 +2924,16 @@ public class Form extends Container {
      */
     public void setMenuBar(MenuBar menuBar) {
         this.menuBar = menuBar;
+        menuBar.initMenuBar(this);
+    }
+    
+    /**
+     * Sets the Form Toolbar
+     * 
+     * @param toolbar 
+     */
+    public void setToolBar(Toolbar toolbar){
+        setMenuBar(toolbar.getMenuBar());
     }
 
     /**

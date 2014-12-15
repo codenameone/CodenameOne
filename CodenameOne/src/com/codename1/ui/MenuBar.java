@@ -38,6 +38,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
@@ -344,7 +345,7 @@ public class MenuBar extends Container implements ActionListener {
         return null;
     }
 
-    private void adaptTitleLayoutBackCommandStructure() {
+    void adaptTitleLayoutBackCommandStructure() {
         Container t = getTitleAreaContainer();
         if (t.getComponentCount() - componentCountOffset(t) == 3) {
             return;
@@ -352,17 +353,17 @@ public class MenuBar extends Container implements ActionListener {
         BorderLayout titleLayout = (BorderLayout) t.getLayout();
         if (Display.COMMAND_BEHAVIOR_ICS == getCommandBehavior()) {
             titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
-            parent.getTitleComponent().getUnselectedStyle().setAlignment(Component.LEFT, true);
+            getTitleComponent().getUnselectedStyle().setAlignment(Component.LEFT, true);
         } else {
             titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
         }
         t.removeAll();
-        t.addComponent(BorderLayout.CENTER, parent.getTitleComponent());
+        t.addComponent(BorderLayout.CENTER, getTitleComponent());
         Container leftContainer = new Container(new BoxLayout(BoxLayout.X_AXIS));
         Container rightContainer = new Container(new BoxLayout(BoxLayout.X_AXIS));
         t.addComponent(BorderLayout.EAST, rightContainer);
         t.addComponent(BorderLayout.WEST, leftContainer);
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
 
     private Container findLeftTitleContainer() {
@@ -418,13 +419,13 @@ public class MenuBar extends Container implements ActionListener {
             } else {
                 titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
             }
-            Label l = parent.getTitleComponent();
+            Component l = getTitleComponent();
             if (l.getParent() != null) {
                 l.getParent().removeComponent(l);
             }
             t.removeAll();
             t.addComponent(BorderLayout.CENTER, l);
-            parent.initTitleBarStatus();
+            initTitleBarStatus();
         }
     }
 
@@ -753,7 +754,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
     
-    private void verifyBackCommandRTL(Button bg) {
+    void verifyBackCommandRTL(Button bg) {
         if(getCommandBehavior() == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && isRTL()) {
             if(bg.getClientProperty("$cn1BackRTL") == null) {
                 bg.putClientProperty("$cn1BackRTL", Boolean.TRUE);
@@ -803,7 +804,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    private Button createBackCommandButton() {
+    protected Button createBackCommandButton() {
         Button back = new Button(parent.getBackCommand());
         if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
             back.setText("<");
@@ -812,7 +813,7 @@ public class MenuBar extends Container implements ActionListener {
         return back;
     }
 
-    private void synchronizeCommandsWithButtonsInBackbutton() {
+    void synchronizeCommandsWithButtonsInBackbutton() {
         adaptTitleLayoutBackCommandStructure();
         Container leftContainer = findLeftTitleContainer();
         
@@ -853,7 +854,7 @@ public class MenuBar extends Container implements ActionListener {
                 leftContainer.removeAll();
                 rightContainer.removeAll();
                 removeAll();
-                parent.initTitleBarStatus();
+                initTitleBarStatus();
                 break;
             case 1:
                 if (parent.getBackCommand() != null) {
@@ -865,7 +866,7 @@ public class MenuBar extends Container implements ActionListener {
                 }
                 if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {
                     removeAll();
-                    parent.initTitleBarStatus();
+                    initTitleBarStatus();
                 }
                 break;
             case 2:
@@ -882,7 +883,7 @@ public class MenuBar extends Container implements ActionListener {
                     }
                     if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {
                         removeAll();
-                        parent.initTitleBarStatus();
+                        initTitleBarStatus();
                     }
                 } else {
                     addTwoTitleButtons(leftContainer, rightContainer);
@@ -891,7 +892,11 @@ public class MenuBar extends Container implements ActionListener {
             default:
                 if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
                     rightContainer.removeAll();
-                    Button menu = createTouchCommandButton(new Command("", UIManager.getInstance().getThemeImageConstant("menuImage")) {
+                    Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
+                    if (i == null) {
+                        i = Resources.getSystemResource().getImage("of_menu.png");
+                    }                    
+                    Button menu = createTouchCommandButton(new Command("", i) {
 
                         public void actionPerformed(ActionEvent ev) {
                             showMenu();
@@ -919,7 +924,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    private void hideEmptyCommand(Button b) {
+    void hideEmptyCommand(Button b) {
         if(hideEmptyCommands) {
             if(b.getText() == null || b.getText().length() == 0) {
                 b.setUIID("Container");
@@ -1140,13 +1145,13 @@ public class MenuBar extends Container implements ActionListener {
         Container t = getTitleAreaContainer();
         BorderLayout titleLayout = (BorderLayout) t.getLayout();
         titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
-        Label l = parent.getTitleComponent();
+        Component l = getTitleComponent();
         t.removeAll();
         if (l.getParent() != null) {
             l.getParent().removeComponent(l);
         }
         t.addComponent(BorderLayout.CENTER, l);
-        parent.initTitleBarStatus();
+        initTitleBarStatus();
     }
 
     /**
@@ -1160,13 +1165,13 @@ public class MenuBar extends Container implements ActionListener {
                 || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
                 || behavior == Display.COMMAND_BEHAVIOR_ICS) {
             
-            if(parent.getTitleComponent() != null){
-                parent.getTitleComponent().getParent().removeAll();
+            if(getTitleComponent() != null){
+                getTitleComponent().getParent().removeAll();
             }
             getTitleAreaContainer().removeAll();
-            getTitleAreaContainer().addComponent(BorderLayout.CENTER, parent.getTitleComponent());            
+            getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());            
             removeAll();
-            parent.initTitleBarStatus();
+            initTitleBarStatus();
             return;
         }
         updateCommands();
@@ -1711,6 +1716,22 @@ public class MenuBar extends Container implements ActionListener {
      */
     protected Container getTitleAreaContainer(){
         return parent.getTitleArea();
+    }
+    
+    /**
+     * Gets the Form titleComponent
+     * @return titleComponent
+     */
+    protected Component getTitleComponent(){
+        return parent.getTitleComponent();
+    }
+    
+    Form getParentForm(){
+        return parent;
+    }
+    
+    void initTitleBarStatus() {
+        parent.initTitleBarStatus();
     }
     
 }
