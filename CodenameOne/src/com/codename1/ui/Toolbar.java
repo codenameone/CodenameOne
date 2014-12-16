@@ -110,6 +110,7 @@ public class Toolbar extends Container {
      */
     public void addCommandToSideMenu(Command cmd) {
         sideMenu.addCommand(cmd);
+        sideMenu.installMenuBar();
     }
 
     /**
@@ -124,6 +125,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
         cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
         sideMenu.addCommand(cmd);
+        sideMenu.installMenuBar();
     }
 
     /**
@@ -136,6 +138,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
         cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.FALSE);
         sideMenu.addCommand(cmd);
+        sideMenu.installMenuBar();
     }
 
     /**
