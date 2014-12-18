@@ -523,7 +523,7 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    int getCommandBehavior() {
+    public int getCommandBehavior() {
         return Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION;
     }
 

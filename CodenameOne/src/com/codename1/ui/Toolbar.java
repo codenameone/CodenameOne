@@ -49,6 +49,8 @@ public class Toolbar extends Container {
     private Vector overflowCommands;
 
     private Button menuButton;
+    
+    private boolean initialized = false;
 
     /**
      * Empty Constructor
@@ -70,6 +72,7 @@ public class Toolbar extends Container {
             ((Label) center).setText(title);
         } else {
             titleComponent = new Label(title);
+            titleComponent.setUIID("Title");
             if (center != null) {
                 replace(center, titleComponent, null);
             } else {
@@ -96,6 +99,7 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToOverflowMenu(Command cmd) {
+        checkIfInitialized();
         if (overflowCommands == null) {
             overflowCommands = new Vector();
         }
@@ -109,6 +113,7 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToSideMenu(Command cmd) {
+        checkIfInitialized();
         sideMenu.addCommand(cmd);
         sideMenu.installMenuBar();
     }
@@ -122,6 +127,7 @@ public class Toolbar extends Container {
      * @param cmd a Command to handle the events
      */
     public void addComponentToSideMenu(Component cmp, Command cmd) {
+        checkIfInitialized();
         cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
         cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
         sideMenu.addCommand(cmd);
@@ -134,6 +140,7 @@ public class Toolbar extends Container {
      * @param cmp c Component to be added to the menu
      */
     public void addComponentToSideMenu(Component cmp) {
+        checkIfInitialized();
         Command cmd = new Command("");
         cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
         cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.FALSE);
@@ -147,6 +154,7 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
+        checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
     }
@@ -157,6 +165,7 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToLeftBar(Command cmd) {
+        checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
@@ -246,6 +255,12 @@ public class Toolbar extends Container {
         }
     }
 
+    private void checkIfInitialized(){
+        if(!initialized){
+            throw new IllegalStateException("Need to call "
+                    + "Form#setToolBar(Toolbar toolbar) before adding Components");
+        }
+    }
     class ToolbarSideMenu extends SideMenuBar {
 
         @Override
@@ -266,6 +281,7 @@ public class Toolbar extends Container {
             parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);
             setTitle(parent.getTitle());
             parent.revalidate();
+            initialized = true;
         }
 
         @Override
@@ -346,7 +362,7 @@ public class Toolbar extends Container {
         }
 
         @Override
-        int getCommandBehavior() {
+        public int getCommandBehavior() {
             return Display.COMMAND_BEHAVIOR_ICS;
         }
 

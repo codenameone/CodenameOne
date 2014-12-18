@@ -251,7 +251,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
     
-    int getCommandBehavior() {
+    public int getCommandBehavior() {
         int i = Display.getInstance().getCommandBehavior();
         if (Display.getInstance().getImplementation().getSoftkeyCount() == 0) {
             if (i != Display.COMMAND_BEHAVIOR_BUTTON_BAR && i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
@@ -717,7 +717,7 @@ public class MenuBar extends Container implements ActionListener {
             } else {
                 c = result;
                 // a touch menu will always send its commands on its own...
-                if (!parent.getUIManager().getLookAndFeel().isTouchMenus()) {
+                if (!isTouchMenus()) {
                     c = result;
                     if (c != null) {
                         ActionEvent e = new ActionEvent(c);
@@ -1120,7 +1120,7 @@ public class MenuBar extends Container implements ActionListener {
      */
     protected void installMenuBar() {
         if (getParent() == null) {
-            int type = Display.getInstance().getCommandBehavior();
+            int type = getCommandBehavior();
             if (type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT 
                     || type == Display.COMMAND_BEHAVIOR_ICS
                     || type == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
@@ -1734,4 +1734,9 @@ public class MenuBar extends Container implements ActionListener {
         parent.initTitleBarStatus();
     }
     
+    private boolean isTouchMenus() {
+        int t = getCommandBehavior();
+        return t == Display.COMMAND_BEHAVIOR_TOUCH_MENU ||
+                (t == Display.COMMAND_BEHAVIOR_DEFAULT && Display.getInstance().isTouchScreenDevice());
+    }
 }
