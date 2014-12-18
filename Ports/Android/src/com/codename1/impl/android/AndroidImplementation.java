@@ -5058,7 +5058,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public boolean isNativeTitle() {
-        return hasActionBar() && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
+        Form f = getCurrentForm();
+        return hasActionBar() && (f != null && f.getMenuBar().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE);
     }
 
     public void refreshNativeTitle(){
