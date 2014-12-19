@@ -214,8 +214,8 @@ public class Toolbar extends Container {
             transitionIn = lf.getDefaultMenuTransitionIn();
             transitionOut = lf.getDefaultMenuTransitionOut();
         } else {
-            transitionIn = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300, true);
-            transitionOut = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300, true);
+            transitionIn = CommonTransitions.createFade(300);
+            transitionOut = CommonTransitions.createFade(300);
         }
         menu.setTransitionOutAnimator(transitionIn);
         menu.setTransitionInAnimator(transitionOut);
