@@ -149,6 +149,7 @@ public class Form extends Container {
     private UIManager uiManager;
     private Component stickyDrag;
     private boolean dragStopFlag;
+    private Toolbar toolbar;
             
     /**
      * Default constructor creates a simple form
@@ -241,6 +242,9 @@ public class Form extends Container {
      * There are some alternatives such as command behavior (thru Display or the theme constants)
      */
     public Container getTitleArea() {
+        if(toolbar != null){
+            return toolbar;
+        }
         return titleArea;
     }
 
@@ -1161,6 +1165,10 @@ public class Form extends Container {
         if (titleArea != null) {
             titleArea.refreshTheme(merge);
         }
+        if (toolbar != null) {
+            toolbar.refreshTheme(merge);
+        }
+        
         super.refreshTheme(merge);
 
         // when  changing the theme the menu behavior might also change
@@ -2013,7 +2021,7 @@ public class Form extends Container {
                 }
             }
         } else {
-            Component cmp = titleArea.getComponentAt(x, y);
+            Component cmp = getTitleArea().getComponentAt(x, y);
             if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                 cmp.pointerPressed(x, y);
                 tactileTouchVibe(x, y, cmp);
@@ -2375,7 +2383,7 @@ public class Form extends Container {
                         }
                     }
                 } else {
-                    Component cmp = titleArea.getComponentAt(x, y);
+                    Component cmp = getTitleArea().getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled()) {
                         cmp.pointerReleased(x, y);
                     }
@@ -2933,9 +2941,20 @@ public class Form extends Container {
      * @param toolbar 
      */
     public void setToolBar(Toolbar toolbar){
+        this.toolbar =toolbar;
         setMenuBar(toolbar.getMenuBar());
     }
 
+    /**
+     * Gets the Form Toolbar if exists or null
+     * 
+     * @return the Toolbar instance or null if does not exists.
+     */
+    public Toolbar getToolbar() {
+        return toolbar;
+    }
+
+    
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
