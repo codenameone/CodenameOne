@@ -141,7 +141,7 @@ public class FacebookShare extends ShareService {
                             });
                             final String endpoint = "https://graph.facebook.com/me/photos?access_token=" + token;
                             req.setUrl(endpoint);
-                            req.addArgument("message", f[0].getMessage());
+                            req.addArgumentNoEncoding("message", f[0].getMessage());
                             InputStream is = null;
                             try {
                                 is = FileSystemStorage.getInstance().openInputStream(image);
