@@ -67,6 +67,7 @@ public class Toolbar extends Container {
      * @param title the Toolbar title
      */
     public void setTitle(String title) {
+        checkIfInitialized();
         Component center = ((BorderLayout) getLayout()).getCenter();
         if (center instanceof Label) {
             ((Label) center).setText(title);
@@ -89,6 +90,7 @@ public class Toolbar extends Container {
      * @param titleCmp Comoponent to place in the Toolbar center.
      */
     public void setTitleComponent(Component titleCmp) {
+        checkIfInitialized();
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
@@ -258,7 +260,7 @@ public class Toolbar extends Container {
     private void checkIfInitialized(){
         if(!initialized){
             throw new IllegalStateException("Need to call "
-                    + "Form#setToolBar(Toolbar toolbar) before adding Components");
+                    + "Form#setToolBar(Toolbar toolbar) before calling this method");
         }
     }
     class ToolbarSideMenu extends SideMenuBar {
@@ -282,6 +284,7 @@ public class Toolbar extends Container {
             setTitle(parent.getTitle());
             parent.revalidate();
             initialized = true;
+            initTitleBarStatus();
         }
 
         @Override
