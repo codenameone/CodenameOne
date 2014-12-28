@@ -281,9 +281,9 @@ public class Toolbar extends Container {
             Component ta = parent.getTitleArea();
             parent.removeComponentFromForm(ta);
             parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);
+            initialized = true;
             setTitle(parent.getTitle());
             parent.revalidate();
-            initialized = true;
             initTitleBarStatus();
         }
 
