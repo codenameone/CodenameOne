@@ -113,9 +113,6 @@ public class Form extends Container {
      * to be handled by a single block
      */
     private EventDispatcher commandListener;
-    private EventDispatcher pointerPressedListeners;
-    private EventDispatcher pointerReleasedListeners;
-    private EventDispatcher pointerDraggedListeners;
     /**
      * Relevant for modal forms where the previous form should be rendered underneath
      */
@@ -847,7 +844,7 @@ public class Form extends Container {
         return layeredPane;
     }
     
-    private Container getActualPane(){
+    Container getActualPane(){
         if(layeredPane != null){
             return layeredPane.getParent();
         }else{
@@ -2043,75 +2040,6 @@ public class Form extends Container {
             parent = parent.getParent();
         }
         return false;
-    }
-
-    /**
-     * Adds a listener to the pointer event
-     *
-     * @param l callback to receive pointer events
-     */
-    public void addPointerPressedListener(ActionListener l) {
-        if (pointerPressedListeners == null) {
-            pointerPressedListeners = new EventDispatcher();
-        }
-        pointerPressedListeners.addListener(l);
-    }
-
-    /**
-     * Removes the listener from the pointer event
-     *
-     * @param l callback to remove
-     */
-    public void removePointerPressedListener(ActionListener l) {
-        if (pointerPressedListeners != null) {
-            pointerPressedListeners.removeListener(l);
-        }
-    }
-
-    /**
-     * Adds a listener to the pointer event
-     *
-     * @param l callback to receive pointer events
-     */
-    public void addPointerReleasedListener(ActionListener l) {
-        if (pointerReleasedListeners == null) {
-            pointerReleasedListeners = new EventDispatcher();
-        }
-        pointerReleasedListeners.addListener(l);
-    }
-
-    /**
-     * Removes the listener from the pointer event
-     *
-     * @param l callback to remove
-     */
-    public void removePointerReleasedListener(ActionListener l) {
-        if (pointerReleasedListeners != null) {
-            pointerReleasedListeners.removeListener(l);
-        }
-    }
-
-    /**
-     * Adds a listener to the pointer event
-     *
-     * @param l callback to receive pointer events
-     */
-    public void addPointerDraggedListener(ActionListener l) {
-        if (pointerDraggedListeners == null) {
-            pointerDraggedListeners = new EventDispatcher();
-        }
-        pointerDraggedListeners.addListener(l);
-    }
-
-    /**
-     * Removes the listener from the pointer event
-     *
-     * @param l callback to remove
-     */
-    public void removePointerDraggedListener(ActionListener l) {
-        if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.removeListener(l);
-        }
     }
 
     private void autoRelease(int x, int y) {

@@ -23,8 +23,11 @@
 package com.codename1.ui;
 
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
@@ -49,7 +52,23 @@ public class Toolbar extends Container {
     private Vector overflowCommands;
 
     private Button menuButton;
-    
+
+    private ScrollListener scrollListener;
+
+    private ActionListener releasedListener;
+
+    private boolean scrollOff = false;
+
+    private int initialY;
+
+    private int actualPaneInitialY;
+
+    private int actualPaneInitialH;
+
+    private Motion hideShowMotion;
+
+    private boolean showing;
+
     private boolean initialized = false;
 
     /**
@@ -243,9 +262,9 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Adds a status bar space to the north of the Component, subclasses can 
+     * Adds a status bar space to the north of the Component, subclasses can
      * override this default behavior.
-     */ 
+     */
     protected void initTitleBarStatus() {
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
@@ -257,12 +276,140 @@ public class Toolbar extends Container {
         }
     }
 
-    private void checkIfInitialized(){
-        if(!initialized){
+    private void checkIfInitialized() {
+        if (!initialized) {
             throw new IllegalStateException("Need to call "
                     + "Form#setToolBar(Toolbar toolbar) before calling this method");
         }
     }
+
+    /**
+     * Sets the Toolbar to scroll off the screen upon content scroll. This
+     * feature can only work if the Form contentPane is scrollableY
+     *
+     * @param scrollOff if true the Toolbar needs to scroll off the screen when
+     * the Form ContentPane is scrolled
+     */
+    public void setScrollOffUponContentPane(boolean scrollOff) {
+        if (initialized && !this.scrollOff && scrollOff) {
+            bindScrollListener(true);
+        }
+        this.scrollOff = scrollOff;
+    }
+
+    /**
+     * Hide the Toolbar if it is currently showing
+     */
+    public void hideToolbar() {
+        showing = false;       
+        if (actualPaneInitialH == 0) {
+            Form f = getComponentForm();
+            if(f != null){
+                initVars(f.getActualPane());
+            }
+        }
+        hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);
+        getComponentForm().registerAnimated(this);
+        hideShowMotion.start();
+    }
+
+    /**
+     * Show the Toolbar if it is currently not showing
+     */
+    public void showToolbar() {
+        showing = true;
+        hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
+        getComponentForm().registerAnimated(this);
+        hideShowMotion.start();
+    }
+
+    public boolean animate() {
+        if (hideShowMotion != null) {
+            Form f = getComponentForm();
+            final Container actualPane = f.getActualPane();
+            int val = hideShowMotion.getValue();
+            if (showing) {
+                setY(val);
+                actualPane.setY(actualPaneInitialY + val);
+                actualPane.setHeight(actualPaneInitialH + getHeight() - val);
+                actualPane.doLayout();
+            } else {
+                setY(val);
+                actualPane.setY(actualPaneInitialY + val);
+                actualPane.setHeight(actualPaneInitialH - val);
+                actualPane.doLayout();
+            }
+            f.repaint();
+            boolean finished = hideShowMotion.isFinished();
+            if (finished) {
+                f.deregisterAnimated(this);
+                hideShowMotion = null;
+            }
+            return !finished;
+        }
+        return false;
+    }
+
+    private void initVars(Container actualPane) {
+        initialY = getY();
+        actualPaneInitialY = actualPane.getY();
+        actualPaneInitialH = actualPane.getHeight();
+    }
+
+    private void bindScrollListener(boolean bind) {
+        final Form f = getComponentForm();
+        if (f != null) {
+            final Container actualPane = f.getActualPane();
+            final Container contentPane = f.getContentPane();
+            if (bind) {
+                initVars(actualPane);
+                scrollListener = new ScrollListener() {
+
+                    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                        int diff = scrollY - oldscrollY;
+                        int toolbarNewY = getY() - diff;
+                        if (Math.abs(toolbarNewY) < 2) {
+                            return;
+                        }
+                        toolbarNewY = Math.max(toolbarNewY, -getHeight());
+                        toolbarNewY = Math.min(toolbarNewY, initialY);
+                        int paneNewY = getHeight() + toolbarNewY;
+                        if (toolbarNewY != getY()) {
+                            setY(toolbarNewY);
+                            int currentY = actualPane.getY();
+                            actualPane.setY(paneNewY);
+                            int paneHeight = actualPane.getHeight() + (currentY - paneNewY);
+                            actualPane.setHeight(paneHeight);
+                            actualPane.doLayout();
+                            f.repaint();
+                        }
+                    }
+                };
+
+                contentPane.addScrollListener(scrollListener);
+                releasedListener = new ActionListener() {
+
+                    public void actionPerformed(ActionEvent evt) {
+                        if (getY() + getHeight() / 2 > 0) {
+                            showToolbar();
+                        } else {
+                            hideToolbar();
+                        }
+                        f.repaint();
+                    }
+                };
+                contentPane.addPointerReleasedListener(releasedListener);
+            } else {
+                if (scrollListener != null) {
+                    contentPane.removeScrollListener(scrollListener);
+                    contentPane.removePointerReleasedListener(releasedListener);
+                }
+
+            }
+        }
+
+    }
+
     class ToolbarSideMenu extends SideMenuBar {
 
         @Override
@@ -282,6 +429,9 @@ public class Toolbar extends Container {
             parent.removeComponentFromForm(ta);
             parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);
             initialized = true;
+            if (scrollOff) {
+                bindScrollListener(true);
+            }
             setTitle(parent.getTitle());
             parent.revalidate();
             initTitleBarStatus();

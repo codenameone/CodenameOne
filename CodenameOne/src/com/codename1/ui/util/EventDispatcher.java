@@ -48,6 +48,7 @@ public class EventDispatcher {
     boolean dataChangeListenerArray;
     boolean focusListenerArray;
     boolean selectionListenerArray;
+    boolean scrollListenerArray;
 
     private static boolean fireStyleEventsOnNonEDT = false;
     
@@ -103,6 +104,11 @@ public class EventDispatcher {
 
             if(selectionListenerArray) {
                 fireSelectionSync((SelectionListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1]);
+                return;
+            }
+            
+            if(scrollListenerArray) {
+                fireScrollSync((ScrollListener[])iPending, ((int[])iPendingEvent)[0], ((int[])iPendingEvent)[1], ((int[])iPendingEvent)[2], ((int[])iPendingEvent)[3]);
                 return;
             }
 
@@ -307,6 +313,15 @@ public class EventDispatcher {
     }
     
     /**
+     * Synchronious internal call for common code
+     */
+    private void fireScrollSync(ScrollListener[] array, int l, int t, int oldl, int oldt) {
+        for(int iter = 0 ; iter < array.length ; iter++) {
+            array[iter].scrollChanged(l, t, oldl, oldt);
+        }
+    }
+    
+    /**
      * Fires the event safely on the EDT without risk of concurrency errors
      * 
      * @param ev the ActionEvent to fire to the listeners
@@ -375,6 +390,43 @@ public class EventDispatcher {
         } else {
             selectionListenerArray = true;
             Runnable cl = new CallbackClass(array, new int[] {oldSelection, newSelection});
+            if(blocking) {
+                Display.getInstance().callSeriallyAndWait(cl);
+            } else {
+                Display.getInstance().callSerially(cl);
+            }
+        }
+    }
+    
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     * 
+     */
+    public void fireScrollEvent(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+        if(listeners == null || listeners.size() == 0) {
+            return;
+        }
+        // minor optimization for a common use case to avoid allocation costs
+        boolean isEdt = Display.getInstance().isEdt();
+        if(isEdt && listeners.size() == 1) {
+            ScrollListener a = (ScrollListener)listeners.get(0);
+            a.scrollChanged(scrollX, scrollY, oldscrollX, oldscrollY);
+            return;
+        }
+        ScrollListener[] array;
+        synchronized(this) {
+            array = new ScrollListener[listeners.size()];
+            for(int iter = 0 ; iter < array.length ; iter++) {
+                array[iter] = (ScrollListener)listeners.get(iter);
+            }
+        }
+        // if we already are on the EDT just fire the event
+        if(isEdt) {
+            fireScrollSync(array, scrollX, scrollY, oldscrollX, oldscrollY);
+        } else {
+            selectionListenerArray = true;
+            Runnable cl = new CallbackClass(array, new int[] {scrollX, scrollY, oldscrollX, oldscrollY});
             if(blocking) {
                 Display.getInstance().callSeriallyAndWait(cl);
             } else {

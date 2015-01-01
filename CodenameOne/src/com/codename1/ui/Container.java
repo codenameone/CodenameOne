@@ -1442,8 +1442,19 @@ public class Container extends Component {
         Component cmp = getComponentAt(x, y);
         if (cmp == this) {
             super.pointerPressed(x, y);
-        } else if (cmp != null) {
-            cmp.pointerPressed(x, y);
+            return;
+        }
+        if (cmp != null) {
+            //give priority to focusable components contained in the Container
+            if(cmp.isFocusable() || cmp.isGrabsPointerEvents()){
+                cmp.pointerPressed(x, y);
+                return;
+            }
+            if(isFocusable() || isGrabsPointerEvents()){
+                super.pointerPressed(x, y);
+                return;                
+            }
+            cmp.pointerPressed(x, y);            
         }
     }
 

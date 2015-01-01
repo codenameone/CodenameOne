@@ -34,6 +34,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -184,7 +185,6 @@ public class Component implements Animation, StyleListener {
     private Style disabledStyle;
     private Container parent;
     private boolean focused = false;
-    private EventDispatcher focusListeners = new EventDispatcher();
     private boolean handlesInput = false;
     boolean shouldCalcPreferredSize = true;
     boolean shouldCalcScrollSize = true;
@@ -195,8 +195,6 @@ public class Component implements Animation, StyleListener {
 
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
-    private EventDispatcher dropListener;
-    private EventDispatcher dragOverListener;
             
     /**
      * Indicates the decrement units for the scroll opacity
@@ -286,6 +284,14 @@ public class Component implements Animation, StyleListener {
 
     private Component[] sameWidth;
     private Component[] sameHeight;
+    
+    private EventDispatcher focusListeners = new EventDispatcher();
+    private EventDispatcher scrollListeners;
+    private EventDispatcher dropListener;
+    private EventDispatcher dragOverListener;    
+    EventDispatcher pointerPressedListeners;
+    EventDispatcher pointerReleasedListeners;
+    EventDispatcher pointerDraggedListeners;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -912,6 +918,34 @@ public class Component implements Animation, StyleListener {
         focusListeners.removeListener(l);
     }
 
+    /**
+     * Registers interest in receiving callbacks for scroll gained events, 
+     * a scroll event is invoked when the component is scrolled.
+     * 
+     * @param l listener interface implementing the observable pattern
+     */
+    public void addScrollListener(ScrollListener l) {
+        if(scrollListeners == null){
+            scrollListeners = new EventDispatcher();                    
+        }
+        scrollListeners.addListener(l);
+    }
+
+    /**
+     * Deregisters interest in receiving callbacks for scroll gained events
+     * 
+     * @param l listener interface implementing the observable pattern
+     */
+    public void removeScrollListener(ScrollListener l) {
+        if(scrollListeners == null) {
+            return;
+        }
+        scrollListeners.removeListener(l);
+        if(!scrollListeners.hasListeners()) {
+            scrollListeners = null;
+        }
+    }
+    
     /**
      * When working in 3 softbutton mode "fire" key (center softbutton) is sent to this method
      * in order to allow 3 button devices to work properly. When overriding this method
@@ -1687,19 +1721,28 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollX(int scrollX) {
         // the setter must always update the value regardless...
-        this.scrollX = scrollX;
+        int scrollXtmp = scrollX;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
-            this.scrollX = Math.min(this.scrollX, getScrollDimension().getWidth() - getWidth());
-            this.scrollX = Math.max(this.scrollX, 0);
+            scrollXtmp = Math.min(scrollXtmp, getScrollDimension().getWidth() - getWidth());
+            scrollXtmp = Math.max(scrollXtmp, 0);
         }
         if (isScrollableX()) {
             onParentPositionChange();
             repaint();
         }
+        if(scrollListeners != null){
+            scrollListeners.fireScrollEvent(scrollXtmp, this.scrollY, this.scrollX, this.scrollY);
+        }
+        this.scrollX = scrollXtmp;
         onScrollX(scrollX);
     }
     
     void resetScroll() {
+        if(scrollListeners != null){
+            if(scrollX != 0 || scrollY != 0){
+                scrollListeners.fireScrollEvent(0, 0, this.scrollX, this.scrollY);
+            }
+        }
         scrollX = 0;
         scrollY = 0;
     }
@@ -1719,16 +1762,20 @@ public class Component implements Animation, StyleListener {
             }
         }
         // the setter must always update the value regardless... 
-        this.scrollY = scrollY;
+        int scrollYtmp = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             int h = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
-            this.scrollY = Math.min(this.scrollY, h);
-            this.scrollY = Math.max(this.scrollY, 0);
+            scrollYtmp = Math.min(scrollYtmp, h);
+            scrollYtmp = Math.max(scrollYtmp, 0);
         }         
         if (isScrollableY()) {
             onParentPositionChange();            
             repaint();
         }
+        if(scrollListeners != null){
+            scrollListeners.fireScrollEvent(this.scrollX, scrollYtmp, this.scrollX, this.scrollY);
+        }
+        this.scrollY = scrollYtmp;
         onScrollY(scrollY);
     }
 
@@ -2271,15 +2318,15 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerDragged(int[] x, int[] y) {
-        if(x.length > 1) {
+        if (x.length > 1) {
             double currentDis = distance(x, y);
-            
+
             // prevent division by 0
             if (pinchDistance <= 0) {
                 pinchDistance = currentDis;
             }
             double scale = currentDis / pinchDistance;
-            if(pinch((float)scale)) {
+            if (pinch((float)scale)) {
                 return;
             }
         }
@@ -2420,6 +2467,11 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerDragged(int x, int y) {
         Form p = getComponentForm();
+        
+        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
+        }
+        
         if(dragAndDropInitialized) {
             if (!dragActivated) {
                 dragActivated = true;
@@ -2585,6 +2637,9 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerPressed(int x, int y) {
         dragActivated = false;
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
+        }
         clearDrag();
         if(isDragAndDropOperation(x, y)) {
             restoreDragPercentage = Display.getInstance().getDragStartPercentage();
@@ -2623,6 +2678,13 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerReleased(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         pointerReleaseImpl(x, y);
         scrollOpacity = 0xff;
     }
@@ -2778,6 +2840,75 @@ public class Component implements Animation, StyleListener {
         dragAndDropInitialized = false;
     }
 
+    /**
+     * Adds a listener to the pointer event
+     *
+     * @param l callback to receive pointer events
+     */
+    public void addPointerPressedListener(ActionListener l) {
+        if (pointerPressedListeners == null) {
+            pointerPressedListeners = new EventDispatcher();
+        }
+        pointerPressedListeners.addListener(l);
+    }
+
+    /**
+     * Removes the listener from the pointer event
+     *
+     * @param l callback to remove
+     */
+    public void removePointerPressedListener(ActionListener l) {
+        if (pointerPressedListeners != null) {
+            pointerPressedListeners.removeListener(l);
+        }
+    }
+
+    /**
+     * Adds a listener to the pointer event
+     *
+     * @param l callback to receive pointer events
+     */
+    public void addPointerReleasedListener(ActionListener l) {
+        if (pointerReleasedListeners == null) {
+            pointerReleasedListeners = new EventDispatcher();
+        }
+        pointerReleasedListeners.addListener(l);
+    }
+
+    /**
+     * Removes the listener from the pointer event
+     *
+     * @param l callback to remove
+     */
+    public void removePointerReleasedListener(ActionListener l) {
+        if (pointerReleasedListeners != null) {
+            pointerReleasedListeners.removeListener(l);
+        }
+    }
+
+    /**
+     * Adds a listener to the pointer event
+     *
+     * @param l callback to receive pointer events
+     */
+    public void addPointerDraggedListener(ActionListener l) {
+        if (pointerDraggedListeners == null) {
+            pointerDraggedListeners = new EventDispatcher();
+        }
+        pointerDraggedListeners.addListener(l);
+    }
+
+    /**
+     * Removes the listener from the pointer event
+     *
+     * @param l callback to remove
+     */
+    public void removePointerDraggedListener(ActionListener l) {
+        if (pointerDraggedListeners != null) {
+            pointerDraggedListeners.removeListener(l);
+        }
+    }
+    
     private void pointerReleaseImpl(int x, int y) {
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
