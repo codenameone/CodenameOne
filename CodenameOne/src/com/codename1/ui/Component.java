@@ -3415,6 +3415,9 @@ public class Component implements Animation, StyleListener {
                 updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB(), false);            
             }
 
+            if(scrollListeners != null){
+                scrollListeners.fireScrollEvent(this.scrollX, dragVal, this.scrollX, this.scrollY);
+            }
             scrollY = dragVal;
             onScrollY(scrollY);
             updateTensileHighlightIntensity(0, 0, false);
@@ -3452,6 +3455,9 @@ public class Component implements Animation, StyleListener {
                 setScrollX(dragVal);
             }
 
+            if(scrollListeners != null){
+                scrollListeners.fireScrollEvent(dragVal, this.scrollY, this.scrollX, this.scrollY);
+            }
             scrollX = dragVal;
             onScrollX(scrollX);
             animateX = true;

@@ -30,6 +30,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
@@ -69,6 +71,8 @@ public class Toolbar extends Container {
 
     private boolean showing;
 
+    private boolean layered = false;
+    
     private boolean initialized = false;
 
     /**
@@ -80,6 +84,16 @@ public class Toolbar extends Container {
         sideMenu = new ToolbarSideMenu();
     }
 
+    /**
+     * This constructor places the Toolbar on a different layer on top of the 
+     * Content Pane.
+     * 
+     * @param layered if true places the Toolbar on top of the Content Pane
+     */
+    public Toolbar(boolean layered) {
+        this();
+        this.layered = layered;
+    }
     /**
      * Sets the title of the Toolbar.
      *
@@ -328,15 +342,14 @@ public class Toolbar extends Container {
             Form f = getComponentForm();
             final Container actualPane = f.getActualPane();
             int val = hideShowMotion.getValue();
-            if (showing) {
-                setY(val);
+            setY(val);
+            if(!layered){
                 actualPane.setY(actualPaneInitialY + val);
-                actualPane.setHeight(actualPaneInitialH + getHeight() - val);
-                actualPane.doLayout();
-            } else {
-                setY(val);
-                actualPane.setY(actualPaneInitialY + val);
-                actualPane.setHeight(actualPaneInitialH - val);
+                if (showing) {
+                    actualPane.setHeight(actualPaneInitialH + getHeight() - val);
+                } else {
+                    actualPane.setHeight(actualPaneInitialH - val);
+                }
                 actualPane.doLayout();
             }
             f.repaint();
@@ -368,19 +381,18 @@ public class Toolbar extends Container {
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                         int diff = scrollY - oldscrollY;
                         int toolbarNewY = getY() - diff;
-                        if (Math.abs(toolbarNewY) < 2) {
+                        if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
                             return;
                         }
                         toolbarNewY = Math.max(toolbarNewY, -getHeight());
                         toolbarNewY = Math.min(toolbarNewY, initialY);
-                        int paneNewY = getHeight() + toolbarNewY;
                         if (toolbarNewY != getY()) {
                             setY(toolbarNewY);
-                            int currentY = actualPane.getY();
-                            actualPane.setY(paneNewY);
-                            int paneHeight = actualPane.getHeight() + (currentY - paneNewY);
-                            actualPane.setHeight(paneHeight);
-                            actualPane.doLayout();
+                            if(!layered){
+                                actualPane.setY(actualPaneInitialY + toolbarNewY);
+                                actualPane.setHeight(actualPaneInitialH + getHeight() - toolbarNewY);
+                                actualPane.doLayout();
+                            }
                             f.repaint();
                         }
                     }
@@ -424,17 +436,32 @@ public class Toolbar extends Container {
 
         @Override
         protected void initMenuBar(Form parent) {
-            super.initMenuBar(parent);
             Component ta = parent.getTitleArea();
             parent.removeComponentFromForm(ta);
-            parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);
-            initialized = true;
-            if (scrollOff) {
-                bindScrollListener(true);
+            super.initMenuBar(parent);
+            if(layered){
+                Container layeredPane = parent.getLayeredPane();
+                Container p = layeredPane.getParent();
+                Container top = new Container(new BorderLayout());
+                top.addComponent(BorderLayout.NORTH, Toolbar.this);
+                p.addComponent(top);
+            
+            }else{
+                parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);
             }
+            
+            initialized = true;
             setTitle(parent.getTitle());
             parent.revalidate();
             initTitleBarStatus();
+            Display.getInstance().callSerially(new Runnable() {
+
+                public void run() {
+                    if (scrollOff) {
+                        bindScrollListener(true);
+                    }
+                }
+            });
         }
 
         @Override

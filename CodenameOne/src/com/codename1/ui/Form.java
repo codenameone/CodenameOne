@@ -239,7 +239,7 @@ public class Form extends Container {
      * There are some alternatives such as command behavior (thru Display or the theme constants)
      */
     public Container getTitleArea() {
-        if(toolbar != null){
+        if(toolbar != null && toolbar.getParent() != null){
             return toolbar;
         }
         return titleArea;
