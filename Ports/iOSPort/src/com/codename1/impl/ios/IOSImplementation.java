@@ -1452,8 +1452,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             PathIterator path = shape.getPathIterator();
             Rectangle rb = shape.getBounds();
             // Notice that these will be cleaned up in the dealloc method of the DrawPath objective-c class
-            
-            NativePathRenderer renderer = new NativePathRenderer(rb.getX(), rb.getY(), rb.getWidth(), rb.getHeight(), path.getWindingRule());
+            int padding = (int)Math.ceil(lineWidth);
+            int padding2 = padding * 2;
+            NativePathRenderer renderer = new NativePathRenderer(rb.getX()-padding, rb.getY()-padding, rb.getWidth()+padding2, rb.getHeight()+padding2, path.getWindingRule());
             NativePathStroker stroker = new NativePathStroker(renderer, lineWidth, capStyle, miterStyle, miterLimit);
             NativePathConsumer c = stroker.consumer;
             fillPathConsumer(path, c);
@@ -1737,8 +1738,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 
                 if ( out != null ){
                     TextureAlphaMask mask = (TextureAlphaMask)out;
-                    Rectangle bounds = s.getBounds();
-                    return new TextureAlphaMaskProxy(mask, bounds);
+                    //Rectangle bounds = s.getBounds();
+                    return new TextureAlphaMaskProxy(mask, mask.getBounds());
                     
                 } else {
                     textures.remove(shapeID);
