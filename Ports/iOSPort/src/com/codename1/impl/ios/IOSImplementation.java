@@ -1425,10 +1425,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     public TextureAlphaMask createAlphaMask(Shape shape, Stroke stroke) {
         int[] bounds = new int[]{0,0,0,0};
         long tex = nativeCreateAlphaMaskForShape(shape, stroke, bounds);
+        Rectangle shapeBounds = shape.getBounds();
+        int[] padding = new int[]{
+            //top
+            shapeBounds.getY()-bounds[1],   
+            // right
+            bounds[2] - (shapeBounds.getX()+shapeBounds.getWidth()), 
+            // bottom
+            bounds[3] - (shapeBounds.getY()+shapeBounds.getHeight()), 
+            // left
+            shapeBounds.getX()-bounds[0]
+        };
+        
         if ( tex == 0 ){
             return null;
         }
-        return new TextureAlphaMask(tex, new Rectangle(bounds[0], bounds[1], bounds[2]-bounds[0], bounds[3]-bounds[1]));
+        return new TextureAlphaMask(tex, new Rectangle(bounds[0], bounds[1], bounds[2]-bounds[0], bounds[3]-bounds[1]), padding);
     }
     
     @Override
@@ -1738,8 +1750,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 
                 if ( out != null ){
                     TextureAlphaMask mask = (TextureAlphaMask)out;
-                    //Rectangle bounds = s.getBounds();
-                    return new TextureAlphaMaskProxy(mask, mask.getBounds());
+                    Rectangle bounds = s.getBounds();
+                    return new TextureAlphaMaskProxy(mask, bounds);
                     
                 } else {
                     textures.remove(shapeID);
@@ -2800,10 +2812,27 @@ public class IOSImplementation extends CodenameOneImplementation {
     class TextureAlphaMask {
         private Rectangle bounds;
         private long textureName;
+        private int[] padding;
         
-        TextureAlphaMask(long textureName, Rectangle bounds){
+        TextureAlphaMask(long textureName, Rectangle bounds, int[] padding){
             this.bounds = bounds;
             this.textureName = textureName;
+            this.padding = padding;
+        }
+        
+        void setPadding(int n, int e, int s, int w){
+            padding[0] = n;
+            padding[1] = e;
+            padding[2] = s;
+            padding[3] = w;
+        }
+        
+        void setPadding(int[] padding){
+            this.padding = padding;
+        }
+        
+        int[] getPadding(){
+            return padding;
         }
         
         void dispose(){
@@ -2859,9 +2888,13 @@ public class IOSImplementation extends CodenameOneImplementation {
        
         
         public TextureAlphaMaskProxy(TextureAlphaMask m, Rectangle bounds){
-            super(m.textureName, m.bounds);
+            super(m.textureName, m.bounds, m.padding);
             mask = m;
             this.bounds = bounds;
+            this.bounds.setX(bounds.getX()-m.padding[3]);
+            this.bounds.setY(bounds.getY()-m.padding[0]);
+            this.bounds.setWidth(bounds.getWidth()+m.padding[3]+m.padding[1]);
+            this.bounds.setHeight(bounds.getHeight()+m.padding[0]+m.padding[2]);
         }
         
         public Rectangle getBounds(){
@@ -3236,6 +3269,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         void nativeDrawAlphaMask(TextureAlphaMask mask) {
             if ( mask.getTextureName() != 0 ){
                 Rectangle r = mask.getBounds();
+                //Log.p("Drawing shape with bounds "+r);
                 nativeInstance.drawTextureAlphaMask(mask.getTextureName(), this.color, this.alpha, r.getX(), r.getY(), r.getWidth(), r.getHeight() );
             }
         }
