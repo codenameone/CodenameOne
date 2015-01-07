@@ -18,6 +18,9 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include "java_util_Date.h"
+#include "java_text_DateFormat.h"
+#include "CodenameOne_GLViewController.h"
 
 /*
  * The class representing classes
@@ -206,7 +209,10 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
 
 JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
-    return (JAVA_LONG)(CFAbsoluteTimeGetCurrent() * 1000.0);
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    JAVA_LONG l = (((JAVA_LONG)time.tv_sec) * 1000) + (time.tv_usec / 1000);
+    return l;
 }
 
 JAVA_DOUBLE java_lang_Double_longBitsToDouble___long_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG n1)
@@ -310,9 +316,17 @@ JAVA_OBJECT java_lang_Integer_toString___int_int_R_java_lang_String(CODENAME_ONE
 }
 
 JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_INT radix) {
-    char s[20];
-    ltostr(s, d, radix);
-    return newStringFromCString(threadStateData, s);
+    char str[256];
+    switch(radix) {
+        case 10:
+            sprintf(str, "%lld", d);    
+            return newStringFromCString(threadStateData, str);
+        case 16:
+            sprintf(str, "%llx", d);    
+            return newStringFromCString(threadStateData, str);
+    }
+    ltostr(str, d, radix);
+    return newStringFromCString(threadStateData, str);
 }
 
 JAVA_DOUBLE java_lang_Math_cos___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
@@ -605,6 +619,10 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     flushReleaseQueue();
 }
 
+JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
+    exit(i);
+}
+
 JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     int err = 0;
     // we need to synchronize the mutex initialization since there might be a race condition here
@@ -772,6 +790,8 @@ void* threadRunner(void *x)
 }
 
 JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
+    // disable reference counting on the thread object to prevent the gap between thread start and actual thread running
+    th->__codenameOneReferenceCount = 999999;
     pthread_t pt;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -797,7 +817,24 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
         data[iter] = (char)chrs[iter];
     }
     data[length] = 0;
-    return strtod(data, NULL);
+    JAVA_DOUBLE db = strtod(data, NULL);
+    int exp = 1;
+    if(e != 0) {
+        if(e < 0) {
+            while(e < 0) {
+                e++;
+                exp *= 10;
+            }
+            db /= exp;
+        } else {
+            while(e > 0) {
+                e--;
+                exp *= 10;
+            }
+            db /= exp;
+        }
+    }
+    return db;
 }
 
 void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {
@@ -857,3 +894,67 @@ JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THR
 
 /*JAVA_OBJECT java_util_Locale_getOSCountry___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
 }*/
+
+JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    struct obj__java_text_DateFormat* df = (struct obj__java_text_DateFormat*)__cn1ThisObject;
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    struct obj__java_util_Date* dateObj = (struct obj__java_util_Date*)__cn1Arg1;
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(dateObj->java_util_Date_date / 1000)];
+
+    switch (df->java_text_DateFormat_dateStyle) {
+        // no date - only time
+        case -1:
+            [formatter setDateStyle:NSDateFormatterNoStyle];
+            switch (df->java_text_DateFormat_dateStyle) {
+                // long time format
+                case 1:
+                    [formatter setTimeStyle:NSDateFormatterLongStyle];
+                    break;
+                    
+                // medium time format
+                case 2:
+                    [formatter setTimeStyle:NSDateFormatterMediumStyle];
+                    break;
+                    
+                // short time format
+                case 3:
+                    [formatter setTimeStyle:NSDateFormatterShortStyle];
+                    break;
+                   
+                // full time format
+                default:
+                    [formatter setTimeStyle:NSDateFormatterFullStyle];
+                    break;
+            }
+            break;
+
+        // long date format
+        case 1:
+            [formatter setDateStyle:NSDateFormatterLongStyle];
+            break;
+
+        // medium date length
+        case 2:
+            [formatter setDateStyle:NSDateFormatterMediumStyle];
+            break;
+
+        // short date length
+        case 3:
+            [formatter setDateStyle:NSDateFormatterShortStyle];
+            break;
+            
+        // full date
+        default:
+            [formatter setDateStyle:NSDateFormatterFullStyle];
+            break;
+    }
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+
+    return str;
+}

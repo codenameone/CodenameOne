@@ -304,9 +304,9 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  0, 999999, 0, 0, &__FINALIZER_");
+            b.append("  0, 999999, 0, 0, 0, 0, &__FINALIZER_");
         } else {
-            b.append("  &class__java_lang_Class, 999999, 0, 0, &__FINALIZER_");
+            b.append("  &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
         }
         b.append(clsName);
         b.append(" , &__RC_RELEASE_");
@@ -379,9 +379,9 @@ public class ByteCodeClass {
             b.append("__");
             b.append(clsName);
             if(clsName.equals("java_lang_Class")) {
-                b.append(" = {\n 0, 999999, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n 0, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n &class__java_lang_Class, 999999, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n &class__java_lang_Class, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");
@@ -824,7 +824,7 @@ public class ByteCodeClass {
                         b.append("[cn1_class_id_");
                         b.append(cls.clsName);
                         b.append("] = malloc(sizeof(int*) * ");
-                        b.append(methods.size());
+                        b.append(getMethodCountIncludingBase());
                         b.append(");\n");
                         offset = 0;
                         for(BytecodeMethod m : virtualMethodList) {
@@ -942,6 +942,17 @@ public class ByteCodeClass {
             if(bf.isStaticField() && !fieldList.contains(bf)) {
                 fieldList.add(bf);
             } 
+        }
+        if(baseInterfacesObject != null) {
+            for(ByteCodeClass baseInterface : baseInterfacesObject) {
+                if(baseInterface.fields != null) {
+                    for(ByteCodeField bf : baseInterface.fields) {
+                        if(!fieldList.contains(bf)) {
+                            fieldList.add(bf);
+                        } 
+                    }
+                }
+            }
         }
         if(baseClassObject != null) {
             baseClassObject.buildStaticFieldList(fieldList);
@@ -1374,6 +1385,14 @@ public class ByteCodeClass {
             initial++;
         }
         return initial;
+    }
+    
+    public int getMethodCountIncludingBase() {
+        int size = methods.size();
+        if(baseClassObject != null) {
+            return size + baseClassObject.getMethodCountIncludingBase();
+        }
+        return size;
     }
     
     public List<BytecodeMethod> getMethods() {

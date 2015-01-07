@@ -281,25 +281,10 @@ void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
             }
         }*/
         if(threadStateData->heapReleaseSize == PER_THREAD_RELEASE_COUNT) {
-            // overflow danger... We need to clean the release queue!
-            if(threadStateData->threadBlockedByGC) {
-                // if the GC is running anyway, let it do its job
-                threadStateData->threadActive = JAVA_FALSE;
-                while(threadStateData->threadBlockedByGC) {
-                    usleep(1000);
-                }
-                threadStateData->threadActive = JAVA_TRUE;
-            } else {
-                // force the GC to run
-                invokedGC = YES;
-                threadStateData->threadActive = JAVA_FALSE;
-                java_lang_System_gc__(getThreadLocalData());
-                while(threadStateData->heapReleaseSize > 0 || threadStateData->threadBlockedByGC) {
-                    usleep((JAVA_INT)(1000));
-                }
-                invokedGC = NO;
-                threadStateData->threadActive = JAVA_TRUE;
-            }
+            // overflow danger! We need to clean the release queue!
+            // just disable RC for this case
+            (*o).__codenameOneReferenceCount = 1;
+            return;
         }
         
         // release the child objects
@@ -681,7 +666,7 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     return (JAVA_OBJECT)array;
 }
 
-JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, struct clazz* parentType, struct clazz* childType, int primitiveSize) {
+JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length2, int length1, struct clazz* parentType, struct clazz* childType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 2);
     JAVA_ARRAY_OBJECT* objs = base->data;
     if(length2 > -1) {
@@ -693,7 +678,7 @@ JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, st
     return (JAVA_OBJECT)base;
 }
 
-JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, int length3, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, int primitiveSize) {
+JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length3, int length2, int length1, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 3);
     JAVA_ARRAY_OBJECT* objs = base->data;
     if(length2 > -1) {
@@ -711,7 +696,7 @@ JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, in
     return (JAVA_OBJECT)base;
 }
 
-JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, int length3, int length4, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, struct clazz* greatGrandChildType, int primitiveSize) {
+JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, int length2, int length1, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, struct clazz* greatGrandChildType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 4);
     JAVA_ARRAY_OBJECT* objs = base->data;
     if(length2 > -1) {
@@ -751,6 +736,9 @@ JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
  * Creates a java.lang.String object from a c string
  */
 JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
+    if(str == 0) {
+        return JAVA_NULL;
+    }
     int length = (int)strlen(str);
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*) (*dat).data;
@@ -945,6 +933,30 @@ void** initVtableForInterface() {
         interfaceVtableGlobal[6] = &java_lang_Object_wait__;
         interfaceVtableGlobal[7] = &java_lang_Object_wait___long;
         interfaceVtableGlobal[8] = &java_lang_Object_wait___long_int;
+        class_array1__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_CHAR.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_CHAR.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_CHAR.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_BYTE.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_BYTE.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_BYTE.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_SHORT.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_SHORT.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_SHORT.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_INT.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_INT.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_INT.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_LONG.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_LONG.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_LONG.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_FLOAT.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_FLOAT.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_FLOAT.vtable = interfaceVtableGlobal;
+        class_array1__JAVA_DOUBLE.vtable = interfaceVtableGlobal;
+        class_array2__JAVA_DOUBLE.vtable = interfaceVtableGlobal;
+        class_array3__JAVA_DOUBLE.vtable = interfaceVtableGlobal;
     }
     return interfaceVtableGlobal;
 }

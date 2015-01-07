@@ -125,7 +125,7 @@ public class ByteCodeMethodArg {
     }
     
     public boolean isDoubleOrLong() {
-        return primitiveType == Double.TYPE || primitiveType == Long.TYPE;
+        return (primitiveType == Double.TYPE || primitiveType == Long.TYPE) && arrayDimensions == 0;
     }
 
     /**

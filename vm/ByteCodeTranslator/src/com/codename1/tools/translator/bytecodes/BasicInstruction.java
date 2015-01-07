@@ -230,7 +230,7 @@ public class BasicInstruction extends Instruction {
                 break;
 
             case Opcodes.DUP2:
-                b.append("    BC_DUP(); /* DUP2 */\n");
+                b.append("    BC_DUP2(); /* DUP2 */\n");
                 break;
                 
             case Opcodes.DUP_X1:
@@ -370,7 +370,7 @@ public class BasicInstruction extends Instruction {
                 break;
                 
             case Opcodes.LUSHR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (((unsigned long long)stack[stackPointer - 1].data.l) << (0x3f & ((unsigned long long)stack[stackPointer].data.l))); /* LUSHR */\n");
+                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (((unsigned long long)stack[stackPointer - 1].data.l) >> (0x3f & ((unsigned long long)stack[stackPointer].data.i))); /* LUSHR */\n");
                 break;
                 
             case Opcodes.IAND:
@@ -520,7 +520,7 @@ public class BasicInstruction extends Instruction {
                 break;
                 
             case Opcodes.ARETURN:
-                //b.append("    retainObj(PEEK_OBJ(1));\n");
+                b.append("    retainObj(PEEK_OBJ(1));\n");
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);

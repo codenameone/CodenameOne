@@ -77,6 +77,7 @@ public class BytecodeMethod {
     private boolean nativeMethod;
     private List<String> dependentClasses = new ArrayList<String>();
     private List<Instruction> instructions = new ArrayList<Instruction>();
+    private String declaration = ""; 
     private String sourceFile;
     private int maxStack;
     private int maxLocals;
@@ -89,6 +90,13 @@ public class BytecodeMethod {
     private String desc;
     private boolean eliminated;
     private boolean usedByNative;
+    
+    static boolean optimizerOn;
+    
+    static {
+        String op = System.getProperty("optimizer");
+        optimizerOn = op == null || op.equalsIgnoreCase("on");
+    }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
         methodName = name;
@@ -416,7 +424,12 @@ public class BytecodeMethod {
             return;
         }
             
-        boolean hasInstructions = optimize();
+        b.append(declaration);
+        
+        boolean hasInstructions = true;
+        if(optimizerOn) {
+            hasInstructions = optimize();
+        }
         
         if(hasInstructions) {
             if(staticMethod) {
@@ -939,6 +952,9 @@ public class BytecodeMethod {
     private int varCounter = 0;
     
     boolean optimize() {
+        if(clsName.endsWith("ExecuteCursor") && methodName.indexOf("_INIT") > -1) {
+            System.out.println("Break");
+        }
         int instructionCount = instructions.size();
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
@@ -1012,11 +1028,13 @@ public class BytecodeMethod {
                                         instructions.remove(iter);
                                         instructions.remove(iter);
                                         instructions.remove(iter);
-                                        String s = ((Field)isThisPutField).setFieldFromThis(localsOffsetToArgOffset(((VarOp)next).getIndex()) );
-                                        instructions.add(iter, new CustomIntruction(s, s, dependentClasses));
-                                        if(isReturn) {
+                                        
+                                        // only in the case of a completely blank setter...
+                                        if(isReturn && iter == 0) {
                                             instructions.remove(iter);
                                         }
+                                        String s = ((Field)isThisPutField).setFieldFromThis(localsOffsetToArgOffset(((VarOp)next).getIndex()) );
+                                        instructions.add(iter, new CustomIntruction(s, s, dependentClasses));
                                         iter = 0;
                                         instructionCount = instructions.size();
                                         continue;
@@ -1034,6 +1052,13 @@ public class BytecodeMethod {
                         continue;
                     }
                     break;
+                /*case Opcodes.ACONST_NULL:
+                    if(constReturn(Opcodes.ACONST_NULL, 0, nextOpcode, iter)) {
+                        iter = 0;
+                        instructionCount = instructions.size();
+                        continue;
+                    }
+                    break;*/
                 case Opcodes.ICONST_1:
                     if(constReturn(Opcodes.IRETURN, 1, nextOpcode, iter)) {
                         iter = 0;
@@ -1128,9 +1153,10 @@ public class BytecodeMethod {
                                 String varName = "returnValObj" + varCounter;
                                 varCounter++;
                                 int s = Parser.addToConstantPool((String)ldic.getValue());
-                                instructions.add(iter, new CustomIntruction("    JAVA_OBJECT " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + ");\n    return " + varName + ";\n", 
-                                            "    JAVA_OBJECT " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + 
-                                            ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
+                                //declaration += "    JAVA_OBJECT " + varName + ";\n";
+                                instructions.add(iter, new CustomIntruction("    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + ");\n    return " + varName + "; }\n", 
+                                            "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + 
+                                            ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
                                 iter = 0;
                                 instructionCount = instructions.size();
                             }

@@ -492,6 +492,25 @@ typedef struct clazz*       JAVA_CLASS;
     stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
     safeRetain(&stack[stackPointer - 1])
 
+#define BC_DUP2()  \
+if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type == CN1_TYPE_DOUBLE) {\
+    BC_DUP(); \
+} else {\
+    { \
+        JAVA_LONG plong = stack[stackPointer - 2].data.l; \
+        JAVA_LONG plong2 = stack[stackPointer - 1].data.l; \
+        stack[stackPointer].type = CN1_TYPE_INVALID; \
+        stack[stackPointer + 1].type = CN1_TYPE_INVALID; \
+        stack[stackPointer].data.l = plong; \
+        stack[stackPointer + 1].data.l = plong2; \
+        stackPointer+=2; \
+    } \
+    stack[stackPointer - 1].type = stack[stackPointer - 3].type; \
+    stack[stackPointer - 2].type = stack[stackPointer - 4].type; \
+    safeRetain(&stack[stackPointer - 1]); \
+    safeRetain(&stack[stackPointer - 2]); \
+}
+
 #define BC_DUP2_X1() {\
     stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
     stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \

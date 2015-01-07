@@ -93,14 +93,33 @@ public class ByteCodeTranslator {
                 if(f.getName().endsWith(".class")) {
                     Parser.parse(f);
                 } else {
-                    // copy the file to the dest dir
-                    copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                    if(!f.isDirectory()) {
+                        // copy the file to the dest dir
+                        copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                    }
                 }
             }
         }
         if(directoryList != null) {
             for(File f : directoryList) {
+                if(f.getName().endsWith(".bundle")) {
+                    copyDir(f, outputDir);
+                    continue;
+                }
                 execute(f, outputDir);
+            }
+        }
+    }
+    
+    private void copyDir(File source, File destDir) throws IOException {
+        File destFile = new File(destDir, source.getName());
+        destFile.mkdirs();
+        File[] files = source.listFiles();
+        for(File f : files) {
+            if(f.isDirectory()) {
+                copyDir(f, destFile);
+            } else {
+                copy(new FileInputStream(f), new FileOutputStream(new File(destFile, f.getName())));
             }
         }
     }
@@ -110,6 +129,10 @@ public class ByteCodeTranslator {
      */
     public static void main(String[] args) throws Exception {        
         if(args.length == 0) {
+            //new File("build/GoogleMaps").mkdirs();
+            new File("build/CatchApplication").mkdirs();
+            //args = new String[] {"ios", "/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/codenameone-google-maps/GoogleMaps/build/classes;/Users/shai/dev/codenameone-google-maps/GoogleMaps/native/ios;/Users/shai/dev/codenameone-google-maps/GoogleMapsTest/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/CodenameOne/ByteCodeTranslator/GoogleMapsStub", 
+            //    "build/GoogleMaps", "GoogleMapsTestApp", "com.codename1.test.googlemaps", "GoogleMapsTestApp", "1.0", "ios", "none"};
             args = new String[] {"ios", "/Users/shai/dev/CodenameOne/ByteCodeTranslator/tmp;/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/cn1/Demos/KitchenSink/build/classes", 
                 "build/kitchen", "KitchenSink", "com.codename1.demos.kitchen", "Kitchen Sink", "1.0", "ios", "none"};
         }
@@ -200,12 +223,12 @@ public class ByteCodeTranslator {
             copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));            
             
             String[] sourceFiles = srcRoot.list(new FilenameFilter() {
-
                 @Override
                 public boolean accept(File pathname, String string) {
-                    return !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
+                    return string.endsWith(".bundle") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
                 }
             });
+            
             StringBuilder fileOneEntry = new StringBuilder();
             StringBuilder fileTwoEntry = new StringBuilder();
             StringBuilder fileListEntry = new StringBuilder();
@@ -252,8 +275,8 @@ public class ByteCodeTranslator {
 
             ArrayList<String> arr = new ArrayList<String>();
             arr.addAll(includeFrameworks);
-            arr.add("");
             arr.addAll(Arrays.asList(sourceFiles));
+            
             for(String file : arr) {
                 fileListEntry.append("		0");
                 currentValue++;
@@ -285,7 +308,8 @@ public class ByteCodeTranslator {
                     }
                 } else {
                     fileListEntry.append("; path = \"");
-                    if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
+                    if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
+                            file.endsWith(".bundle") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
                         fileListEntry.append(file);
                     } else {
                         fileListEntry.append(appName);
@@ -310,14 +334,25 @@ public class ByteCodeTranslator {
                     fileOneEntry.append(" */; };\n");                
                 }
                 
-                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".xib")) {
+                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
+                        file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xib")) {
+                    
+                    // bundle also needs to be a runtime resource
+                    if(file.endsWith(".bundle")) {
+                        resources.append("\n				0");
+                        resources.append(referenceValue);
+                        resources.append("18E9ABBC002F3D1D /* ");
+                        resources.append(file);
+                        resources.append(" */,");                        
+                    }
+                    
                     fileTwoEntry.append("				0");
                     fileTwoEntry.append(fileOneValue);
                     fileTwoEntry.append("18E9ABBC002F3D1D /* ");
                     fileTwoEntry.append(file);
                     fileTwoEntry.append(" */,\n");
 
-                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh")) {
+                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle") ) {
                         fileThreeEntry.append("				0");
                         fileThreeEntry.append(referenceValue);
                         fileThreeEntry.append("18E9ABBC002F3D1D /* ");
@@ -345,7 +380,7 @@ public class ByteCodeTranslator {
                             fileTwoEntry.append(file);
                             fileTwoEntry.append(" */,\n");
 
-                            if(!file.endsWith(".h")) {
+                            if(!file.endsWith(".h") && !file.endsWith(".bundle")) {
                                 fileThreeEntry.append("				0");
                                 fileThreeEntry.append(referenceValue);
                                 fileThreeEntry.append("18E9ABBC002F3D1D /* ");
@@ -409,6 +444,9 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".plist")) {
             return "text.plist.xml";
+        }
+        if(s.endsWith(".bundle")) {
+            return "wrapper.plug-in";
         }
         if(s.endsWith(".m") || s.endsWith(".c")) {
             return "sourcecode.c.objc";

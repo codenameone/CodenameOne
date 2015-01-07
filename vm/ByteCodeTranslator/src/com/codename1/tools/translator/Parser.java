@@ -393,8 +393,11 @@ public class Parser extends ClassVisitor {
                 if(mtd.isEliminated() || mtd.isUsedByNative() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.isNative()) {
                     continue;
                 }
-                
+
                 if(!isMethodUsed(mtd)) {
+                    if(isMethodUsedByBaseClassOrInterface(mtd, bc)) {
+                        continue;
+                    }
                     found = true;
                     mtd.setEliminated(true);
                     /*if(ByteCodeTranslator.verbose) {
@@ -404,6 +407,47 @@ public class Parser extends ClassVisitor {
             }
         }
         return found;
+    }
+    
+    private static boolean isMethodUsedByBaseClassOrInterface(BytecodeMethod mtd, ByteCodeClass cls) {
+        boolean b = checkMethodUsedByBaseClassOrInterface(mtd, cls.getBaseClassObject());
+        if(b) {
+            return true;
+        }
+        for(ByteCodeClass bc : cls.getBaseInterfacesObject()) {
+            b = checkMethodUsedByBaseClassOrInterface(mtd, bc);
+            if(b) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean checkMethodUsedByBaseClassOrInterface(BytecodeMethod mtd, ByteCodeClass cls) {
+        if(cls == null) {
+            return false;
+        }
+        if(cls.getBaseInterfacesObject() != null) {
+            for(ByteCodeClass bc : cls.getBaseInterfacesObject()) {
+                for(BytecodeMethod m :  bc.getMethods()) {
+                    if(m.getMethodName().equals(mtd.getMethodName())) {
+                        if(m.isUsedByNative()) {
+                            return true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        for(BytecodeMethod m :  cls.getMethods()) {
+            if(m.getMethodName().equals(mtd.getMethodName())) {
+                if(m.isUsedByNative()) {
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
     }
 
     private static void cullClasses(boolean found, int depth) {
