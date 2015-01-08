@@ -5852,9 +5852,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
         if(datePickerResult == -1) {
             // there is no cancel option in the phone device
-            if(!isTablet()) {
-                return currentValue;
-            }
+            // Commented out because now iOS7 and higher have a cancel button
+            //  And should we even care about this case if there is no
+            // cancel button?
+            //if(!isTablet()) {
+            //    return currentValue;
+            //}
             return null;
         }
         if(type == Display.PICKER_TYPE_STRINGS) {
