@@ -52,6 +52,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
+import com.codename1.ui.Stroke;
 
 import com.codename1.ui.Transform;
 
@@ -378,12 +379,79 @@ class AndroidGraphics {
         canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);        
     }
     
-    public void drawPath(Path p) {
+    public void drawPath(Path p, Stroke stroke) {
         paint.setStyle(Paint.Style.STROKE);
+        Stroke old = setStroke(stroke);
         canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawPath(p, paint);
         canvas.restore();
+        setStroke(old);
+    }
+    
+    /**
+     * Sets the stroke of the current Paint object.
+     * @param stroke The stroke to set.
+     * @return The old stroke.
+     */
+    private Stroke setStroke(Stroke stroke){
+        Stroke old = new Stroke(paint.getStrokeWidth(), convertStrokeCap(paint.getStrokeCap()),  convertStrokeJoin(paint.getStrokeJoin()), paint.getStrokeMiter());
+        paint.setStrokeCap(convertStrokeCap(stroke.getCapStyle()));
+        paint.setStrokeJoin(convertStrokeJoin(stroke.getJoinStyle()));
+        paint.setStrokeMiter(stroke.getMiterLimit());
+        paint.setStrokeWidth(stroke.getLineWidth());
+        
+        return old;
+    }
+    
+    private int convertStrokeCap(Paint.Cap cap){
+        if ( Paint.Cap.BUTT.equals(cap)){
+            return Stroke.CAP_BUTT;
+        } else if ( Paint.Cap.ROUND.equals(cap)){
+            return Stroke.CAP_ROUND;
+        } else if ( Paint.Cap.SQUARE.equals(cap)){
+            return Stroke.CAP_SQUARE;
+        } else {
+            return Stroke.CAP_BUTT;
+        }
+    }
+    
+    private Paint.Cap convertStrokeCap(int cap){
+        switch ( cap ){
+            case Stroke.CAP_BUTT:
+                return Paint.Cap.BUTT;
+            case Stroke.CAP_ROUND:
+                return Paint.Cap.ROUND;
+            case Stroke.CAP_SQUARE:
+                return Paint.Cap.SQUARE;
+            default:
+                return Paint.Cap.BUTT;
+        }
+    }
+    
+    private int convertStrokeJoin(Paint.Join join){
+        if ( Paint.Join.BEVEL.equals(join)){
+            return Stroke.JOIN_BEVEL;
+        } else if ( Paint.Join.MITER.equals(join)){
+            return Stroke.JOIN_MITER;
+        } else if ( Paint.Join.ROUND.equals(join)){
+            return Stroke.JOIN_ROUND;
+        } else {
+            return Stroke.JOIN_BEVEL;
+        }
+    }
+    
+    private Paint.Join convertStrokeJoin(int join){
+        switch ( join ){
+            case Stroke.JOIN_BEVEL:
+                return Paint.Join.BEVEL;
+            case Stroke.JOIN_MITER:
+                return Paint.Join.MITER;
+            case Stroke.JOIN_ROUND:
+                return Paint.Join.ROUND;
+            default:
+                return Paint.Join.BEVEL;
+        }
     }
     
     public void fillPath(Path p) {

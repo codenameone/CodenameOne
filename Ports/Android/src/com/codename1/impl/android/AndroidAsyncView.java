@@ -36,6 +36,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import java.util.ArrayList;
@@ -569,15 +570,16 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             });
         }
 
-        public void drawPath(final Path p) {
+        public void drawPath(final Path p, final Stroke stroke) {
             final int alph = alpha;
             final int col = color;
+            
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(alph);
                     underlying.setColor(col);
-                    underlying.drawPath(p);
+                    underlying.drawPath(p, stroke);
                 }
             });
         }

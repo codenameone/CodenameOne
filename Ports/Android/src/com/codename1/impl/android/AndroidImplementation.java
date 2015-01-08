@@ -5979,8 +5979,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
         AndroidGraphics ag = (AndroidGraphics)graphics;
         Path p = cn1ShapeToAndroidPath(shape);
-        ag.drawPath(p);
+        ag.drawPath(p, stroke);
+        
     }
+    
+    
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
     @Override
