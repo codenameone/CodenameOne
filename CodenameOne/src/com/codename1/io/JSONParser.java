@@ -253,7 +253,7 @@ public class JSONParser implements JSONParseCallback {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
-                                            callback.numericToken(Long.parseLong(ct));
+                                            callback.longToken(Long.parseLong(ct));
                                         }
                                     } else {
                                         callback.numericToken(Double.parseDouble(ct));
@@ -287,7 +287,7 @@ public class JSONParser implements JSONParseCallback {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
-                                            callback.numericToken(Long.parseLong(ct));
+                                            callback.longToken(Long.parseLong(ct));
                                         }
                                     } else {
                                         callback.numericToken(Double.parseDouble(ct));
@@ -325,7 +325,7 @@ public class JSONParser implements JSONParseCallback {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
-                                            callback.numericToken(Long.parseLong(ct));
+                                            callback.longToken(Long.parseLong(ct));
                                         }
                                     } else {
                                         callback.numericToken(Double.parseDouble(ct));
