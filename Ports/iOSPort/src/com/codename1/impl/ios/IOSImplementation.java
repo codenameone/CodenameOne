@@ -5837,7 +5837,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             nativeInstance.openDatePicker(type, time, x, y, w, h);
         }
-        
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
@@ -5849,7 +5848,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
             }
-        });
+        }, true);
         if(datePickerResult == -1) {
             // there is no cancel option in the phone device
             // Commented out because now iOS7 and higher have a cancel button
