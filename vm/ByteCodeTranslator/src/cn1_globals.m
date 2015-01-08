@@ -145,8 +145,13 @@ struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, struct elementStr
 void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* array, int* sp) {
     while(count > 0) {
         --(*sp);
+        javaTypes t = array[*sp].type;
         safeRelease(threadStateData, &array[*sp]);
-        count--;
+        if(t == CN1_TYPE_DOUBLE || t == CN1_TYPE_LONG) {
+            count -= 2;
+        } else {
+            count--;
+        }
     }
 }
 
