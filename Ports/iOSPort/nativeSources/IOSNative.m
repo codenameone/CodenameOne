@@ -4154,7 +4154,7 @@ void showPopupPickerView(UIView *pickerView) {
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
-#else 
+#else
     pickerStringArray = stringArray;
 #endif
     currentDatePickerDate = nil;
@@ -4191,7 +4191,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             //add a space filler to the left:
             UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
                                            UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
-
+            
 #ifndef NEW_CODENAME_ONE_VM
             JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
 #else
@@ -4221,35 +4221,30 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
-
+            
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
-            if(isIOS8()) {
+            if(isIOS7()) {
                 showPopupPickerView(pickerView);
                 return;
             }
-
+            
             UIActionSheet* actionSheet;
             int topBoundry = 10;
-            if(isIOS7()) {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
-                [actionSheet addButtonWithTitle:@"OK"];
-                topBoundry = 40;
-                //actionSheet.alpha=0.90;
-            } else {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
-                UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
-                closeButton.momentary = YES;
-                closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
-                closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
-                closeButton.tintColor = [UIColor blackColor];
-                [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
-                [actionSheet addSubview:closeButton];
+            
+            actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+            UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
+            closeButton.momentary = YES;
+            closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
+            closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
+            closeButton.tintColor = [UIColor blackColor];
+            [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
+            [actionSheet addSubview:closeButton];
 #ifndef CN1_USE_ARC
-                [closeButton release];
+            [closeButton release];
 #endif
-            }
+            
             
             [actionSheet setActionSheetStyle:UIActionSheetStyleBlackTranslucent];
             
@@ -4270,7 +4265,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
         }
         POOL_END();
         repaintUI();
-    });    
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
@@ -4354,31 +4349,26 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
-            if(isIOS8()) {
+            if(isIOS7()) {
                 showPopupPickerView(datePickerView);
                 return;
             }
-
+            
             UIActionSheet* actionSheet;
             int topBoundry = 10;
-            if(isIOS7()) {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
-                [actionSheet addButtonWithTitle:@"OK"];
-                topBoundry = 40;
-                //actionSheet.alpha=0.90;
-            } else {
-                actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
-                UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
-                closeButton.momentary = YES;
-                closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
-                closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
-                closeButton.tintColor = [UIColor blackColor];
-                [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
-                [actionSheet addSubview:closeButton];
+            
+            actionSheet = [[UIActionSheet alloc] initWithTitle:nil delegate:[CodenameOne_GLViewController instance] cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil];
+            UISegmentedControl *closeButton = [[UISegmentedControl alloc] initWithItems:[NSArray arrayWithObject:@"Close"]];
+            closeButton.momentary = YES;
+            closeButton.frame = CGRectMake(260, 7.0f, 50.0f, 30.0f);
+            closeButton.segmentedControlStyle = UISegmentedControlStyleBar;
+            closeButton.tintColor = [UIColor blackColor];
+            [closeButton addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerDismissActionSheet:) forControlEvents:UIControlEventValueChanged];
+            [actionSheet addSubview:closeButton];
 #ifndef CN1_USE_ARC
-                [closeButton release];
+            [closeButton release];
 #endif
-            }
+            
             
             [actionSheet setActionSheetStyle:UIActionSheetStyleBlackTranslucent];
             
@@ -4398,6 +4388,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
         repaintUI();
     });
 }
+
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer) {
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
