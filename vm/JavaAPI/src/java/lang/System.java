@@ -106,8 +106,7 @@ public final class System {
      * The call System.exit(n) is effectively equivalent to the call:
      * Runtime.getRuntime().exit(n)
      */
-    public static void exit(int status){
-    }
+    public static native void exit(int status);
 
     /**
      * Runs the garbage collector.

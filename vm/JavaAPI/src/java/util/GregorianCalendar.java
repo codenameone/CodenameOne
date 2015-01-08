@@ -64,13 +64,19 @@ class GregorianCalendar extends Calendar {
     
     private int lastYearSkew = 0;
 
-    public GregorianCalendar() {}
+    public GregorianCalendar() {
+        setTimeZone(TimeZone.getDefault());
+    }
     public GregorianCalendar(TimeZone zone) {
         setTimeZone(zone);
     }
     
     protected void computeFields() {
         TimeZone timeZone = getTimeZone();
+        if(timeZone == null) {
+            timeZone = TimeZone.getDefault();
+            setTimeZone(timeZone);
+        }
         int dstOffset = timeZone.inDaylightTime(new Date(time)) ? timeZone.getDSTSavings() : 0;
         int zoneOffset = timeZone.getRawOffset();
         fields[DST_OFFSET] = dstOffset;

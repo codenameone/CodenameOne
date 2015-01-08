@@ -58,6 +58,8 @@ public class DateFormat extends Format {
 	 * Constant for default style (MEDIUM) parsing/formatting pattern.
 	 */
 	public static final int DEFAULT = MEDIUM;
+        
+                    private static int NONE = -1;
 
 	private int dateStyle;
 	private int timeStyle;
@@ -98,9 +100,9 @@ public class DateFormat extends Format {
 	 * @return  formatted date.
 	 * @throws IllegalArgumentException of the source can not be formatted.
 	 */
-	String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
-		return null;
-	}
+	public String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
+                        return format((Date)obj, toAppendTo);
+                    }
 
 	/**
 	 * Format a given date.
@@ -109,7 +111,7 @@ public class DateFormat extends Format {
 	 * @return  formatted date.
 	 */
 	public String format(Date source) {
-		return format(source, new StringBuffer());
+		return format(source, null);
 	}
 
 	/**
@@ -119,9 +121,7 @@ public class DateFormat extends Format {
 	 * @param toAppendTo buffer to which to append output.
 	 * @return  formatted date.
 	 */
-	String format(Date source, StringBuffer toAppendTo) {
-		return null;
-	}
+	native String format(Date source, StringBuffer toAppendTo);
 
 	/**
 	 * NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
@@ -175,7 +175,7 @@ public class DateFormat extends Format {
 	 * @see #DEFAULT
 	 */
 	public static final DateFormat getDateInstance(int style) {
-		return getDateTimeInstance(style, DEFAULT);
+		return getDateTimeInstance(style, NONE);
 	}
 
 	/**
@@ -190,7 +190,7 @@ public class DateFormat extends Format {
 	 * @see #DEFAULT
 	 */
 	public static final DateFormat getTimeInstance(int style) {
-		return getDateTimeInstance(DEFAULT, style);
+		return getDateTimeInstance(NONE, style);
 	}
 
 	/**

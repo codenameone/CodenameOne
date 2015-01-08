@@ -42,6 +42,13 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         this(10);
     }
 
+    public ArrayList(E... arr) {
+        this(arr.length);
+        for(E x : arr) {
+            add(x);
+        }
+    }
+
     /**
      * Constructs a new instance of {@code ArrayList} with the specified
      * capacity.

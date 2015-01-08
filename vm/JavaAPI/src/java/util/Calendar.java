@@ -337,6 +337,8 @@ public abstract class Calendar{
      * See Also:TimeZone.getDefault()
      */
     protected Calendar(){
+        // default to the current time
+        time = System.currentTimeMillis();
         zone = TimeZone.getDefault();
         fields = new int[FIELD_COUNT];
         isSet = new boolean[FIELD_COUNT];
