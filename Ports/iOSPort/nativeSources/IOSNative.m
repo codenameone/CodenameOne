@@ -4112,8 +4112,18 @@ void showPopupPickerView(UIView *pickerView) {
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
     pickerToolbar.tintColor = [UIColor whiteColor];
     [pickerToolbar sizeToFit];
-    
-    UIBarButtonItem *cancelBtn = [[UIBarButtonItem alloc] initWithTitle:@"Cancel" style:UIBarButtonItemStyleBordered target:[CodenameOne_GLViewController instance] action:@selector(datePickerCancel)];
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
+#else
+    JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+#endif
+    JAVA_OBJECT str;
+#ifndef NEW_CODENAME_ONE_VM
+    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"Cancel"), fromNSString(@"Cancel"));
+#else
+    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_STATE_PASS_ARG @"Cancel"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"Cancel"));
+#endif
+    UIBarButtonItem *cancelBtn = [[UIBarButtonItem alloc] initWithTitle:toNSString(CN1_THREAD_STATE_PASS_ARG str) style:UIBarButtonItemStyleBordered target:[CodenameOne_GLViewController instance] action:@selector(datePickerCancel)];
     
     [cancelBtn setTitleTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
                                        [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
@@ -4133,8 +4143,14 @@ void showPopupPickerView(UIView *pickerView) {
                                          [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
                                          NSForegroundColorAttributeName,
                                          nil] forState:UIControlStateNormal];
+    JAVA_OBJECT str2;
+#ifndef NEW_CODENAME_ONE_VM
+    str2 = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"OK"), fromNSString(@"OK"));
+#else
+    str2 = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"));
+#endif
     
-    UIBarButtonItem *doneBtn = [[UIBarButtonItem alloc] initWithTitle:@"OK" style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(datePickerDismiss)];
+    UIBarButtonItem *doneBtn = [[UIBarButtonItem alloc] initWithTitle:toNSString(CN1_THREAD_STATE_PASS_ARG str2) style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(datePickerDismiss)];
     
     [doneBtn setTitleTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
                                      [UIColor colorWithRed:253.0/255.0 green:68.0/255.0 blue:142.0/255.0 alpha:1.0],
@@ -4293,6 +4309,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
         }
         datePickerView.tag = 10;
         datePickerView.date = date;
+        currentDatePickerDate = date;
         defaultDatePickerDate = time;
         [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
         if(isIPad()) {
@@ -4388,6 +4405,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
         repaintUI();
     });
 }
+
 
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer) {
