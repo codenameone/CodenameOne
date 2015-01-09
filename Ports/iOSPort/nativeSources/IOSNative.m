@@ -2370,6 +2370,9 @@ CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
+        if ([com_codename1_impl_ios_IOSNative_createCLLocation respondsToSelector:@selector(requestWhenInUseAuthorization)]) {
+            [com_codename1_impl_ios_IOSNative_createCLLocation requestWhenInUseAuthorization];
+        }
     });
     CLLocationManager* c = com_codename1_impl_ios_IOSNative_createCLLocation;
     com_codename1_impl_ios_IOSNative_createCLLocation = nil;
@@ -4104,7 +4107,7 @@ NSDate* currentDatePickerDate;
 UIPopoverController* popoverControllerInstance;
 JAVA_LONG defaultDatePickerDate;
 
-void showPopupPickerView(UIView *pickerView) {
+void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
     UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-300, 320, 246)];
     [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
@@ -4242,7 +4245,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
             if(isIOS7()) {
-                showPopupPickerView(pickerView);
+                showPopupPickerView(CN1_THREAD_GET_STATE_PASS_ARG pickerView);
                 return;
             }
             
@@ -4367,7 +4370,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
             if(isIOS7()) {
-                showPopupPickerView(datePickerView);
+                showPopupPickerView(CN1_THREAD_GET_STATE_PASS_ARG datePickerView);
                 return;
             }
             
