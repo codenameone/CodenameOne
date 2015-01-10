@@ -1250,8 +1250,12 @@ public class SideMenuBar extends MenuBar {
                     }
                 } else {
                     v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
-                    if(v < 0 && rightSideButton != null) {
-                        v = rightSideButton.getWidth();
+                    if(v < 0) {
+                        if(placement == COMMAND_PLACEMENT_VALUE_RIGHT){
+                            v = rightSideButton.getWidth();
+                        }else{
+                            v = openButton.getWidth();
+                        }
                     } else {
                         v = m.getWidth() / 100 * v;                        
                     }
