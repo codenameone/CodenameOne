@@ -27,6 +27,7 @@
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
+#include "CN1ES2compat.h"
 
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 extern UIView *editingComponent;

@@ -51,6 +51,8 @@ extern void glDisableCN1StateES2(enum CN1GLenum);
 extern void glAlphaMaskTexCoordPointerES2( GLint , GLenum , GLsizei , const GLvoid *);
 extern void glSetTransformES2(GLKMatrix4);
 extern GLKMatrix4 glGetTransformES2();
+extern GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShaderSrc);
+extern void glLoadIdentityES2();
 
 #define _glMatrixMode(foo) glMatrixModeES2(foo)
 #define _glLoadIdentity()  glLoadIdentityES2()

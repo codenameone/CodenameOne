@@ -63,6 +63,10 @@ int connections = 0;
     });
 }
 
+-(NSCachedURLResponse*)connection:(NSURLConnection*)connection willCacheResponse:(NSCachedURLResponse *)cachedResponse {
+    return nil;
+}
+
 - (void)setMethod:(NSString*)mtd {
     [request setHTTPMethod:mtd];
 }

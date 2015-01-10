@@ -3601,6 +3601,20 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(CN1_THREAD_ST
     return o;
 }
 
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_parseDouble___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+#else
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+#endif
+    [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG d);
+    JAVA_DOUBLE result = [[formatter numberFromString:ns] doubleValue];
+    POOL_END();
+    return result;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_DOUBLE d) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -4557,7 +4571,7 @@ void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY(CN1
 
 
 //native void fillConvexPolygonGlobal(float[] points, int color, int alpha);
-//extern void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OBJECT points, int color, int alpha);
+extern void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OBJECT points, int color, int alpha);
 void com_codename1_impl_ios_IOSNative_fillConvexPolygonGlobal___float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT points, int color, int alpha)
 {
     POOL_BEGIN();
@@ -5474,6 +5488,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double_R_java_lang
     return com_codename1_impl_ios_IOSNative_formatCurrency___double(CN1_THREAD_STATE_PASS_ARG instanceObject, d);
 }
 
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_parseDouble___java_lang_String_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT d) {
+    return com_codename1_impl_ios_IOSNative_parseDouble___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, d);
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
     return com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_PASS_ARG instanceObject, d);
 }
@@ -5580,7 +5598,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode___R_boolean(CN1_TH
     return com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  thisObj, JAVA_OBJECT writer, JAVA_OBJECT exception) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  thisObj, JAVA_OBJECT exception, JAVA_OBJECT writer) {
     struct obj__java_lang_Throwable* th = (struct obj__java_lang_Throwable*)exception;
     if(th->java_lang_Throwable_stack == JAVA_NULL) {
         java_lang_Throwable_fillInStack__(threadStateData, exception);

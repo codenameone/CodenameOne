@@ -60,7 +60,9 @@ extern NSDate* currentDatePickerDate;
 extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
-BOOL vkbAlwaysOpen = YES;
+
+// important, this must stay as NO for the iphone builder to work properly during translation
+BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
 NSMutableArray* touchesArray = nil;
 
@@ -1538,7 +1540,11 @@ int keyboardHeight;
     if(!modifiedViewHeight || isVKBAlwaysOpen()) {
         return;
     }
+#ifdef NEW_CODENAME_ONE_VM
+    repaintUI();
+#else
     com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#endif
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
@@ -1562,31 +1568,31 @@ int keyboardHeight;
         if(displayHeight > displayWidth) {
             viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
         } else {
-            if(isIOS8()) {
+            /*if(isIOS8()) {
                 UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
                 if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
                     viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
                 } else {
                     viewFrame.origin.y -= keyboardHeight / patchSize * upsideDownMultiplier;
                 }
-            } else {
+            } else {*/
                 viewFrame.origin.x -= keyboardHeight / patchSize * upsideDownMultiplier;
-            }
+            //}
         }
     } else {
         if(displayHeight > displayWidth) {
             viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
         } else {
-            if(isIOS8()) {
+            /*if(isIOS8()) {
                 UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
                 if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
                     viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
                 } else {
                     viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
                 }
-            } else {
+            } else {*/
                 viewFrame.origin.x -= keyboardHeight * upsideDownMultiplier;
-            }
+            //}
         }
     }
     /*float y = editingComponent.frame.origin.y;
@@ -1602,6 +1608,10 @@ int keyboardHeight;
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
+    if(editingComponent == nil) {
+        modifiedViewHeight = NO;
+        return;
+    }
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
@@ -1646,7 +1656,7 @@ int keyboardHeight;
             viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
             keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
         } else {
-            if(isIOS8()) {
+            /*if(isIOS8()) {
                 UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
                 if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
                     viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
@@ -1655,17 +1665,17 @@ int keyboardHeight;
                     viewFrame.origin.y += (keyboardHeight / patchSize) * upsideDownMultiplier;
                     keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
                 }
-            } else {
+            } else {*/
                 viewFrame.origin.x += (keyboardHeight / patchSize) * upsideDownMultiplier;
                 keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
-            }
+            //}
         }
     } else {
         if(displayHeight > displayWidth) {
             viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
             keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
         } else {
-            if(isIOS8()) {
+            /*if(isIOS8()) {
                 UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
                 if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
                     viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
@@ -1674,10 +1684,10 @@ int keyboardHeight;
                     viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
                     keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
                 }
-            } else {
+            } else {*/
                 viewFrame.origin.x += keyboardHeight * upsideDownMultiplier;
                 keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
-            }
+            //}
         }
     }
     
@@ -2711,7 +2721,8 @@ extern JAVA_LONG defaultDatePickerDate;
     com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
     currentDatePickerDate = nil;
     pickerStringArray = nil;
-    UIView* v = (UIView*)[CodenameOne_GLViewController instance].view.subviews.firstObject;
+    NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
+    UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
 }
 
@@ -2732,7 +2743,8 @@ extern JAVA_LONG defaultDatePickerDate;
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG [currentDatePickerDate timeIntervalSince1970] * 1000);
         currentDatePickerDate = nil;
     }
-    UIView* v = (UIView*)[CodenameOne_GLViewController instance].view.subviews.firstObject;
+    NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
+    UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
 }
 
