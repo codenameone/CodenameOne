@@ -47,8 +47,9 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
     NSStringEncoding enc;
-    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encoding)->data;
-    int arrLength = ((JAVA_ARRAY)encoding)->length;
+    struct obj__java_lang_String* encString = (struct obj__java_lang_String*)encoding;
+    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encString->java_lang_String_value)->data;
+    int arrLength = encString->java_lang_String_count;
     if(encoding == JAVA_NULL || compareStringToCharArray("UTF-8", encArr, arrLength)) {
         enc = NSUTF8StringEncoding;
     } else {
@@ -271,7 +272,7 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
 
 JAVA_OBJECT java_lang_Double_toString___double_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) {
     char s[32];
-    sprintf(s, "%f", d);
+    sprintf(s, "%lf", d);
     return newStringFromCString(threadStateData, s);
 }
 
@@ -424,6 +425,13 @@ JAVA_DOUBLE java_lang_Math_tan___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA
     return tan(a);
 }
 
+JAVA_BOOLEAN isClassNameEqual(const char * clsName, JAVA_ARRAY_CHAR* chrs, int length) {
+    for(int i = 0 ; i < length ; i++) {
+        if(clsName[i] != chrs[i]) return JAVA_FALSE;
+    }
+    return JAVA_TRUE;
+}
+
 JAVA_OBJECT java_lang_Class_forNameImpl___java_lang_String_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT className) {
     int length = java_lang_String_length___R_int(threadStateData, className);
     JAVA_ARRAY arrayData = (JAVA_ARRAY)java_lang_String_toCharNoCopy___R_char_1ARRAY(threadStateData, className);
@@ -431,8 +439,8 @@ JAVA_OBJECT java_lang_Class_forNameImpl___java_lang_String_R_java_lang_Class(COD
     
     for(int iter = 0 ; iter < classListSize ; iter++) {
         if(strlen(classesList[iter]->clsName) == length) {
-            for(int i = 0 ; i < length ; i++) {
-                if(classesList[iter]->clsName[i] != chrs[i]) continue;
+            if(!isClassNameEqual(classesList[iter]->clsName, chrs, length)) {
+                continue;
             }
             return (JAVA_OBJECT)classesList[iter];
         }

@@ -1019,6 +1019,7 @@ public class SideMenuBar extends MenuBar {
                     closeMenu();
                 }
                 super.sizeChanged(w, h);
+                parent.sizeChangedInternal(w, h);
             }
 
             public void pointerPressed(int x, int y) {
@@ -1201,19 +1202,42 @@ public class SideMenuBar extends MenuBar {
         }
 
         if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+            int v = 0;
             if (Display.getInstance().isPortrait()) {
                 if (Display.getInstance().isTablet()) {
-                    rightPanel.setPreferredH(m.getHeight() * 2 / 3);
+                    v = getUIManager().getThemeConstant("topMenuSizeTabPortraitInt", -1);
+                    if(v < 0) {
+                        v = m.getHeight()* 2 / 3;
+                    } else {
+                        v = m.getHeight()/ 100 * v;                        
+                    }
                 } else {
-                    rightPanel.setPreferredH(openButton.getHeight());
+                    v = getUIManager().getThemeConstant("topMenuSizePortraitInt", -1);
+                    if(v < 0) {
+                        v = openButton.getHeight();
+                    } else {
+                        v = m.getHeight()/ 100 * v;                        
+                    }
                 }
             } else {
                 if (Display.getInstance().isTablet()) {
-                    rightPanel.setPreferredH(m.getHeight() * 3 / 4);
+                    v = getUIManager().getThemeConstant("topMenuSizeTabLandscapeInt", -1);
+                    if(v < 0) {
+                        v = m.getHeight()* 3 / 4;
+                    } else {
+                        v = m.getWidth() / 100 * v;                        
+                    }
                 } else {
-                    rightPanel.setPreferredH(m.getHeight() * 4 / 10);
+                    v = getUIManager().getThemeConstant("topMenuSizeLandscapeInt", -1);
+                    if(v < 0) {
+                        v = m.getHeight()* 4 / 10;
+                    } else {
+                        v = m.getHeight()/ 100 * v;                        
+                    }
                 }
             }
+            
+            rightPanel.setPreferredH(v);
         } else {
             if (Display.getInstance().isPortrait()) {
                 int v = 0;
@@ -1226,7 +1250,7 @@ public class SideMenuBar extends MenuBar {
                     }
                 } else {
                     v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
-                    if(v < 0) {
+                    if(v < 0 && rightSideButton != null) {
                         v = rightSideButton.getWidth();
                     } else {
                         v = m.getWidth() / 100 * v;                        

@@ -37,7 +37,7 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public class Storage {
-    private CacheMap cache = new CacheMap();
+    private final CacheMap cache = new CacheMap();
     private static Storage INSTANCE;
     private boolean normalizeNames = true;
 

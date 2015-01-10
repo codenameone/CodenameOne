@@ -1064,7 +1064,6 @@ public class Image {
     
     /**
      * Rotates this image by 90 degrees while changing the ratio of the picture 
-     * @param image the image
      * @param maintainOpacity whether the opacity in the image should be maintained
      * @return a new image rotated by 90 degrees
      */

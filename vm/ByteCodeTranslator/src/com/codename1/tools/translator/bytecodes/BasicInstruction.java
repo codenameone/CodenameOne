@@ -34,10 +34,19 @@ public class BasicInstruction extends Instruction {
     private final int value;
     private int maxStack;
     private int maxLocals;
+    private static boolean synchronizedMethod;
+    private static boolean staticMethod;
+    private static String className;
     
     public BasicInstruction(int opcode, int value) {
         super(opcode);
         this.value = value;
+    }
+    
+    public static void setSynchronizedMethod(boolean b, boolean stat, String cls) {
+        synchronizedMethod = b;
+        staticMethod = stat;
+        className = cls;
     }
     
     public void setMaxes(int maxStack, int maxLocals) {
@@ -45,6 +54,18 @@ public class BasicInstruction extends Instruction {
         this.maxStack = maxStack;
     }
 
+    private void appendSynchronized(StringBuilder b) {
+        if(synchronizedMethod) {
+            if(staticMethod) {
+                b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                b.append(className);
+                b.append(");\n");
+            } else {
+                b.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+            }
+        }
+    }
+    
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         switch(opcode) {
@@ -472,6 +493,8 @@ public class BasicInstruction extends Instruction {
                 break;                  
                 
             case Opcodes.IRETURN:
+                appendSynchronized(b);
+                
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
@@ -484,6 +507,8 @@ public class BasicInstruction extends Instruction {
                 break;                
                 
             case Opcodes.LRETURN:
+                appendSynchronized(b);
+                                
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
@@ -496,6 +521,8 @@ public class BasicInstruction extends Instruction {
                 break;                
                 
             case Opcodes.FRETURN:
+                appendSynchronized(b);
+                
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
@@ -508,6 +535,8 @@ public class BasicInstruction extends Instruction {
                 break;                
                 
             case Opcodes.DRETURN:
+                appendSynchronized(b);
+                
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
@@ -520,6 +549,8 @@ public class BasicInstruction extends Instruction {
                 break;
                 
             case Opcodes.ARETURN:
+                appendSynchronized(b);
+                
                 b.append("    retainObj(PEEK_OBJ(1));\n");
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
@@ -533,6 +564,8 @@ public class BasicInstruction extends Instruction {
                 break;
                 
             case Opcodes.RETURN:
+                appendSynchronized(b);
+                
                 if(!hasInstructions) {
                     b.append("    return;\n");
                     break;

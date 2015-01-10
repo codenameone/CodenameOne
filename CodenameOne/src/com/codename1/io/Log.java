@@ -202,6 +202,9 @@ public class Log {
             m.setUrl(url);
             byte[] read = Util.readInputStream(Storage.getInstance().createInputStream("CN1Log__$"));
             m.addArgument("i", "" + devId);
+            m.addArgument("by",Display.getInstance().getProperty("built_by_user", ""));
+            m.addArgument("p", Display.getInstance().getProperty("package_name", ""));
+            m.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
             m.addData("log", read, "text/plain");
             m.setFailSilently(true);
             NetworkManager.getInstance().addToQueueAndWait(m);

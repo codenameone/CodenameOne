@@ -107,7 +107,12 @@ public class MorphTransition extends Transition {
         for(int iter = 0 ; iter < size ; iter++) {
             String k = keyIterator.next();
             String v = fromTo.get(k);
-            CC cc = new CC(findByName(s, k), findByName(d, v), sourceForm, destForm);
+            Component sourceCmp = findByName(s, k);
+            Component  destCmp = findByName(d, v);
+            if(sourceCmp == null || destCmp == null) {
+                continue;
+            }
+            CC cc = new CC(sourceCmp, destCmp, sourceForm, destForm);
             fromToComponents[iter] = cc;
             cc.placeholder = new Label();
             cc.placeholder.setVisible(false);
@@ -161,6 +166,9 @@ public class MorphTransition extends Transition {
                 
                 // restore forms to orignial states
                 for(CC c : fromToComponents) {
+                    if(c == null) {
+                        continue;
+                    }
                     Container p = c.placeholder.getParent();
                     Object constraint = p.getLayout().getComponentConstraint(c.placeholder);
                     p.removeComponent(c.placeholder);
@@ -185,6 +193,9 @@ public class MorphTransition extends Transition {
                 return true;
             }
             for(CC c : fromToComponents) {
+                if(c == null) {
+                    continue;
+                }
                 int x = c.xMotion.getValue();
                 int y = c.yMotion.getValue();
                 int w = c.wMotion.getValue();

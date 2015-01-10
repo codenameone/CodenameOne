@@ -1474,7 +1474,11 @@ public final class Display {
         impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
     }
     
-    void stopEditing(Component cmp) {
+    /**
+     * Allows us to stop editString on the given text component
+     * @param cmp the text field/text area component
+     */
+    public void stopEditing(Component cmp) {
         if(isTextEditing(cmp)) {
             impl.stopTextEditing();
         }
@@ -2444,7 +2448,7 @@ public final class Display {
      * @param c character to test
      * @return true if the charcter is an RTL character
      */
-	public boolean isRTL(char c) {
+    public boolean isRTL(char c) {
         return impl.isRTL(c);
     }
 

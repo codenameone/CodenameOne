@@ -88,7 +88,14 @@ public class Invoke extends Instruction {
     }
     
     private String findActualOwner(ByteCodeClass bc) {
-        for(BytecodeMethod mtd : bc.getMethods()) {
+        if(bc == null) {
+            return owner;
+        }
+        List<BytecodeMethod> mtds = bc.getMethods();
+        if(mtds == null) {
+            return owner;
+        }
+        for(BytecodeMethod mtd : mtds) {
             if(mtd.getMethodName().equals(name) && mtd.isStatic()) {
                 return bc.getClsName();
             }

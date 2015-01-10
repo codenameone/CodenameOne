@@ -793,7 +793,16 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(class__");
         b.append(clsName);
-        b.append(".initialized) return;\n\n    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+        b.append(".initialized) return;\n\n    ");
+
+        if(arrayTypes.contains("1_" + clsName)) {
+            b.append("class_array1__");
+            b.append(clsName);
+            b.append(".vtable = initVtableForInterface();\n    ");
+        }
+
+        b.append("monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+        
         b.append(clsName);
         b.append(");\n    if(class__");
         b.append(clsName);

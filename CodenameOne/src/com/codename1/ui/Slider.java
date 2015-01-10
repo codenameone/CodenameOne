@@ -354,9 +354,9 @@ public class Slider extends Label {
                 g.drawImage(thumbImage, xPos,
                         y + height / 2 - thumbImage.getHeight() / 2);
             } else {
-                int yPos = y + height - thumbImage.getHeight() / 2;
-                yPos = Math.max(getY(), yPos);
-                yPos = Math.min(getY() + getHeight() - thumbImage.getHeight(), yPos);
+                int yPos = y;// + height - thumbImage.getHeight() / 2;
+                //yPos = Math.max(getY(), yPos);
+                //yPos = Math.min(getY() + getHeight() - thumbImage.getHeight(), yPos);
                 g.drawImage(thumbImage, getX() + width / 2 - thumbImage.getWidth() / 2,
                         yPos);
             }

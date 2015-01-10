@@ -273,8 +273,8 @@ public class Parser extends ClassVisitor {
             } else {
                 bldM.append(",\n    \"");
             }
-            first = false;
-            bldM.append(con.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t"));
+            first = false;            
+            bldM.append(encodeString(con));
             bldM.append("\" /* ");
             bldM.append(offset);
             offset++;
@@ -324,34 +324,77 @@ public class Parser extends ClassVisitor {
         fos.close();
     }
     
-    public static void writeOutput(File outputDirectory) throws Exception {
-        for(ByteCodeClass bc : classes) {
-            // special case for object
-            if(bc.getClsName().equals("java_lang_Object")) {
-                continue;
+    private static String encodeString(String con) {
+        String str = con.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+        int len = str.length();
+        for(int iter = 0 ; iter < len ; iter++) {
+            char c = str.charAt(iter);
+            if(c > 127) {
+                // needs encoding... Verify there are no more characters to encode
+                if(iter == len) {
+                    return str.replace("" + c, "\\u" + fourChars(Integer.toHexString(c)));
+                }
+                return encodeString(str.replace("" + c, "\\u" + fourChars(Integer.toHexString(c))));
             }
-            bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
-            List<ByteCodeClass> lst = new ArrayList<ByteCodeClass>();
-            for(String s : bc.getBaseInterfaces()) {
-                lst.add(getClassByName(s));
-            }
-            bc.setBaseInterfacesObject(lst);
         }
-        for(ByteCodeClass bc : classes) {
-            bc.updateAllDependencies();
-        }   
-        ByteCodeClass.markDependencies(classes);
-        classes = ByteCodeClass.clearUnmarked(classes);
-        
-        // load the native sources (including user native code) 
-        readNativeFiles(outputDirectory);
-        
-        // loop over methods and start eliminating the body of unused methods
-        eliminateUnusedMethods();
-        
-        generateClassAndMethodIndexHeader(outputDirectory);
-        for(ByteCodeClass bc : classes) {
-            writeFile(bc.getClsName(), bc, outputDirectory);
+        return str;
+    }
+    
+    private static String fourChars(String s) {
+        switch(s.length()) {
+            case 1: 
+                return "000" + s;
+            case 2: 
+                return "00" + s;
+            case 3: 
+                return "0" + s;
+        }
+        return s;
+    }
+    
+    public static void writeOutput(File outputDirectory) throws Exception {
+        String file = "Unknown File";
+        try {
+            for(ByteCodeClass bc : classes) {
+                // special case for object
+                if(bc.getClsName().equals("java_lang_Object")) {
+                    continue;
+                }
+                file = bc.getClsName();
+                bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
+                List<ByteCodeClass> lst = new ArrayList<ByteCodeClass>();
+                for(String s : bc.getBaseInterfaces()) {
+                    lst.add(getClassByName(s));
+                }
+                bc.setBaseInterfacesObject(lst);
+            }
+            for(ByteCodeClass bc : classes) {
+                file = bc.getClsName();
+                bc.updateAllDependencies();
+            }   
+            ByteCodeClass.markDependencies(classes);
+            classes = ByteCodeClass.clearUnmarked(classes);
+
+            // load the native sources (including user native code) 
+            readNativeFiles(outputDirectory);
+
+            // loop over methods and start eliminating the body of unused methods
+            eliminateUnusedMethods();
+
+            generateClassAndMethodIndexHeader(outputDirectory);
+            for(ByteCodeClass bc : classes) {
+                file = bc.getClsName();
+                writeFile(bc.getClsName(), bc, outputDirectory);
+            }
+        } catch(Throwable t) {
+            System.out.println("Error while working with the class: " + file);
+            t.printStackTrace();
+            if(t instanceof Exception) {
+                throw (Exception)t;
+            }
+            if(t instanceof RuntimeException) {
+                throw (RuntimeException)t;
+            }
         }
     }
     

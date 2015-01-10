@@ -375,6 +375,7 @@ public final class IOSNative {
     native String formatDate(long date);
     native String formatDateShort(long date);
     native String formatDateTime(long date);
+    native double parseDouble(String localeFormattedDecimal);
     native String formatDateTimeMedium(long date);
     native String formatDateTimeShort(long date);
     native String getCurrencySymbol();

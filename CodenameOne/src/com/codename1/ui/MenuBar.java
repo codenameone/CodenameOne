@@ -1512,7 +1512,7 @@ public class MenuBar extends Container implements ActionListener {
      */
     protected int calculateTouchCommandGridColumns(Container grid) {
         int count = grid.getComponentCount();
-        int maxWidth = 0;
+        int maxWidth = 10;
         for (int iter = 0; iter < count; iter++) {
             Component c = grid.getComponentAt(iter);
             Style s = c.getUnselectedStyle();
