@@ -29,6 +29,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
@@ -122,6 +123,53 @@ public class SpanLabel extends Container {
     }
     
     /**
+     * Indicates the alignment of the whole text block, this is different from setting the alignment of the text within
+     * the block since the UIID might have a border or other design element that won't be affected by such alignment.
+     * The default is none (-1) which means no alignment takes place and the text block takes the whole width.
+     * @param align valid values are Component.LEFT, Component.RIGHT, Component.CENTER. Anything else will
+     * stretch the text block
+     */
+    public void setTextBlockAlign(int align) {
+        switch(align) {
+            case LEFT:
+            case RIGHT:
+            case CENTER:
+                wrapText(align);
+                return;
+            default:
+                if(text.getParent() != this) {
+                    removeComponent(text.getParent());
+                    text.getParent().removeAll();
+                    addComponent(BorderLayout.CENTER, text);
+                }
+        }
+    }
+    
+    /**
+     * Returns the alignment of the whole text block and not the text within it!
+     * 
+     * @return -1 for unaligned otherwise one of Component.LEFT/RIGHT/CENTER
+     */
+    public int getTextBlockAlign() {
+        if(text.getParent() == this) {
+            return -1;
+        }
+        return ((FlowLayout)text.getParent().getLayout()).getAlign();
+    }
+    
+    private void wrapText(int alignment) {
+        Container parent = text.getParent();
+        if(parent == this) {
+            parent.removeComponent(text);
+            parent = new Container(new FlowLayout(alignment));
+            parent.addComponent(text);
+            addComponent(BorderLayout.CENTER, parent);
+        } else {
+            ((FlowLayout)parent.getLayout()).setAlign(alignment);
+        }
+    }
+    
+    /**
      * Returns the image of the icon
      * @return the icon
      */
@@ -132,7 +180,7 @@ public class SpanLabel extends Container {
     /**
      * Sets the icon position based on border layout constraints
      * 
-     * @param s position either North/South/East/West
+     * @param t position either North/South/East/West
      */
     public void setIconPosition(String t) {
         removeComponent(icon);

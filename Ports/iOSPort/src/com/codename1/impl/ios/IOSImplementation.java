@@ -240,6 +240,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(textEditorHidden) {
             return;
         }
+        Form current = getCurrentForm();
+        if(current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+            current.forceRevalidate();
+        } 
         nativeInstance.hideTextEditing();
         textEditorHidden = true;
         repaintTextEditor(false);
@@ -280,6 +285,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
+                        if(f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                            f.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                            f.forceRevalidate();
+                            return;
+                        } 
                         
                         // revalidate even if we transition to a different form since the 
                         // spacing might have remained during the transition
@@ -339,31 +349,34 @@ public class IOSImplementation extends CodenameOneImplementation {
                 });
             }
         }
-        Boolean b = (Boolean)cmp.getClientProperty("ios.async");
-        if(isAsyncEditMode() && b == null) {
-            // check whether the parent has a scrollable parent
-            Container p = cmp.getParent();
-            while(p != null) {
-                if(p.isScrollableY()) {
-                    break;
+        Form parentForm = cmp.getComponentForm();
+        if(!parentForm.isFormBottomPaddingEditingMode()) {
+            Boolean b = (Boolean)cmp.getClientProperty("ios.async");
+            if(isAsyncEditMode() && b == null) {
+                // check whether the parent has a scrollable parent
+                Container p = cmp.getParent();
+                while(p != null) {
+                    if(p.isScrollableY()) {
+                        break;
+                    }
+                    p = p.getParent();
                 }
-                p = p.getParent();
+                // no scrollabel parent automatically configure the text field for legacy mode
+                if(p == null) {
+                    b = Boolean.FALSE;
+                    cmp.putClientProperty("ios.async", b);
+                    Display.getInstance().setProperty("ios.async", "true");
+                }
             }
-            // no scrollabel parent automatically configure the text field for legacy mode
-            if(p == null) {
-                b = Boolean.FALSE;
-                cmp.putClientProperty("ios.async", b);
-                Display.getInstance().setProperty("ios.async", "true");
+            if(b != null) {
+                nativeInstance.setAsyncEditMode(b.booleanValue());
+            } else {
+                String a = Display.getInstance().getProperty("ios.async", null);
+                if(a != null) {
+                    nativeInstance.setAsyncEditMode(a.equals("true"));
+                }
             }
-        }
-        if(b != null) {
-            nativeInstance.setAsyncEditMode(b.booleanValue());
-        } else {
-            String a = Display.getInstance().getProperty("ios.async", null);
-            if(a != null) {
-                nativeInstance.setAsyncEditMode(a.equals("true"));
-            }
-        }
+        } 
         
         textEditorHidden = false;
         currentEditing = (TextArea)cmp;
@@ -373,7 +386,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
         boolean forceSlideUpTmp = false;
-        Form current = Display.getInstance().getCurrent();
+        final Form current = Display.getInstance().getCurrent();
         if(current instanceof Dialog && !isTablet()) {
             // special case, if we are editing a small dialog we want to move it
             // so the bottom of the dialog shows within the screen. This is
@@ -389,7 +402,17 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         if(isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
-            current.revalidate();
+            if(current.isFormBottomPaddingEditingMode()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
+                        current.forceRevalidate();
+                    }
+                });
+            } else {
+                current.revalidate();
+            }
         } else {
             cmp.repaint();
         }
@@ -423,7 +446,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
                 String hint = null;
-                if(currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
+                if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                     hint = currentEditing.getHint();
                 }
                 if(isAsyncEditMode()) {

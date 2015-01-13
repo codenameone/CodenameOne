@@ -1141,7 +1141,7 @@ public class Container extends Component {
                     // special case for the first component to allow the user to scroll all the 
                     // way to the top
                     Form f = getComponentForm();
-                    if (f != null && Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() == 0 && 
+                    if (f != null && f.getInvisibleAreaUnderVKB() == 0 && 
                             f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
                         if (r == c.getBounds()) {
@@ -1537,7 +1537,12 @@ public class Container extends Component {
      * @inheritDoc
      */
     public boolean isScrollableY() {
-        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() - Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() || isAlwaysTensile());
+        Form f = getComponentForm();
+        int v = 0;
+        if(f != null) {
+            v= f.getInvisibleAreaUnderVKB();
+        }
+        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() -  v || isAlwaysTensile());
     }
 
     /**

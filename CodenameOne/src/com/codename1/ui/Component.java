@@ -1465,7 +1465,7 @@ public class Component implements Animation, StyleListener {
             parent.paintGlassImpl(g);
         }
         if(tensileHighlightIntensity > 0) {
-            int i = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+            int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
             if(scrollY >= i - 1) {
                 getUIManager().getLookAndFeel().paintTensileHighlight(this, g, false , tensileHighlightIntensity);
             } else {
@@ -1764,7 +1764,9 @@ public class Component implements Animation, StyleListener {
         // the setter must always update the value regardless... 
         int scrollYtmp = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
-            int h = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+            Form parentForm = getComponentForm();
+            int v = Form.getInvisibleAreaUnderVKB(parentForm);
+            int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
         }         
@@ -1799,7 +1801,7 @@ public class Component implements Animation, StyleListener {
     
     private void updateTensileHighlightIntensity(int lastScroll, int scroll, boolean motion) {
         if(tensileHighlightEnabled) {
-            int h = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+            int h = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
             if(h <= 0) {
                 // layout hasn't completed yet
                 tensileHighlightIntensity = 0;
@@ -2542,12 +2544,12 @@ public class Component implements Animation, StyleListener {
                 }
                 int scroll = getScrollY() + (lastScrollY - y);
                 
-                if(isAlwaysTensile() && getScrollDimension().getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() <= getHeight()) {
+                if(isAlwaysTensile() && getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) <= getHeight()) {
                     if (scroll >= -tl && scroll < getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 } else {
-                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() - getHeight() + tl) {
+                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) - getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 }
@@ -2942,7 +2944,7 @@ public class Component implements Animation, StyleListener {
                     startTensile(scroll, 0, true);
                     return;
                 } else {
-                    int scrh = getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+                    int scrh = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
                     if(scroll > scrh) {
                         startTensile(scroll, Math.max(scrh, 0), true);
                         return;
@@ -2964,7 +2966,7 @@ public class Component implements Animation, StyleListener {
                     draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
                 } else {
                     draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                            getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB() + tl/2, speed, 0.0007f);
+                            getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
                 }
             } else {
                 if(speed < 0) {
@@ -3392,9 +3394,10 @@ public class Component implements Animation, StyleListener {
                 if (dragVal < 0) {
                     startTensile(dragVal, 0, true);
                 } else {
-                    int edge = (getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB());
+                    int iv = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                    int edge = (getScrollDimension().getHeight() - getHeight() + iv);
                     if (dragVal > edge && edge > 0) {
-                        startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB(), true);
+                        startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
                     } else {
                         if (snapToGrid && getScrollY() < edge && getScrollY() > 0) {
                             int dest = getGridPosY();
@@ -3412,7 +3415,7 @@ public class Component implements Animation, StyleListener {
                 
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
-                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Display.getInstance().getImplementation().getInvisibleAreaUnderVKB(), false);            
+                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()), false);            
             }
 
             if(scrollListeners != null){
@@ -3534,7 +3537,7 @@ public class Component implements Animation, StyleListener {
             int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
 
             Rectangle view;
-            int invisibleAreaUnderVKB = Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
             if (isSmoothScrolling() && destScrollY > -1) {
                 view = new Rectangle(getScrollX(), destScrollY, w, h - invisibleAreaUnderVKB);
             } else {
@@ -3755,7 +3758,9 @@ public class Component implements Animation, StyleListener {
             if(ci.isEditingText()) {
                 return;
             }
-            int ivk = Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+            Form f = getComponentForm();
+            int ivk = Form.getInvisibleAreaUnderVKB(f);
+            
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {
                 setScrollY(getScrollDimension().getHeight() - getHeight() + ivk);

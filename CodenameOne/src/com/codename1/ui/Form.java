@@ -96,6 +96,9 @@ public class Form extends Container {
     //private FormSwitcher formSwitcher;
     private Component focused;
     private ArrayList<Component> mediaComponents;
+    
+    private boolean bottomPaddingMode;
+    
     /**
      * This member allows us to define an animation that will draw the transition for
      * entering this form. A transition is an animation that would occur when 
@@ -187,6 +190,39 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
     }
 
+    static int getInvisibleAreaUnderVKB(Form f) {
+        if(f == null) {
+            return 0;
+        }
+        return f.getInvisibleAreaUnderVKB();
+    }
+    
+    int getInvisibleAreaUnderVKB() {
+        if(bottomPaddingMode) {
+            return 0;
+        }
+        return Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+    }
+        
+    /**
+     * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
+     * possible when working with text fields that aren't in a scrollable container.
+     * @param b true to enable false to disable
+     */
+    public void setFormBottomPaddingEditingMode(boolean b) {
+        bottomPaddingMode = b;
+    }
+    
+    /**
+     * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
+     * possible when working with text fields that aren't in a scrollable container.
+     * 
+     * @return true when this mode is enabled
+     */
+    public boolean isFormBottomPaddingEditingMode() {
+        return bottomPaddingMode;
+    }
+    
     void initAdPadding(Display d) {
         // this is injected automatically by the implementation in case of ads
         String adPaddingBottom = d.getProperty("adPaddingBottom", null);
@@ -2466,7 +2502,10 @@ public class Form extends Container {
             Component current = root.getComponentAt(iter);
             if (current.isFocusable()) {
                 int currentY = current.getAbsoluteY();
-                int focusedY = focused.getAbsoluteY();
+                int focusedY = 0;
+                if(focused != null) {
+                    focusedY = focused.getAbsoluteY();
+                }
                 if (down) {
                     if (focusedY < currentY) {
                         if (bestCandidate != null) {
