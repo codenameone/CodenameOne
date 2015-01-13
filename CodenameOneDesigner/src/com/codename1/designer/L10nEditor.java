@@ -74,9 +74,11 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
+import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.Locator;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 
 /**
@@ -880,6 +882,19 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                         SAXParserFactory spf = SAXParserFactory.newInstance();
                         SAXParser saxParser = spf.newSAXParser();
                         XMLReader xmlReader = saxParser.getXMLReader();
+                        xmlReader.setErrorHandler(new ErrorHandler() {
+                            public void warning(SAXParseException exception) throws SAXException {
+                                exception.printStackTrace();
+                            }
+
+                            public void error(SAXParseException exception) throws SAXException {
+                                exception.printStackTrace();
+                            }
+
+                            public void fatalError(SAXParseException exception) throws SAXException {
+                                exception.printStackTrace();
+                            }
+                        });
                         xmlReader.setContentHandler(new ContentHandler() {
                             private String currentName;
                             private StringBuilder chars = new StringBuilder();
@@ -906,7 +921,7 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
 
                             @Override
                             public void startElement(String uri, String localName, String qName, Attributes atts) throws SAXException {
-                                if("string".equals(localName)) {
+                                if("string".equals(localName) || "string".equals(qName)) {
                                     currentName = atts.getValue("name");
                                     chars.setLength(0);
                                 }
@@ -914,8 +929,16 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
 
                             @Override
                             public void endElement(String uri, String localName, String qName) throws SAXException {
-                                if("string".equals(localName)) {
-                                    res.setLocaleProperty(localeName, locale, currentName, chars.toString());
+                                if("string".equals(localName) || "string".equals(qName)) {
+                                    String str = chars.toString();
+                                    if(str.startsWith("\"") && str.endsWith("\"")) {
+                                        str = str.substring(1);
+                                        str = str.substring(0, str.length() - 1);
+                                        res.setLocaleProperty(localeName, locale, currentName, str);
+                                        return;
+                                    }
+                                    str = str.replace("\\'", "'");
+                                    res.setLocaleProperty(localeName, locale, currentName, str);
                                 }
                             }
 
