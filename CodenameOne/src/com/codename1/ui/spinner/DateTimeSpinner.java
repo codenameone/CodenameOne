@@ -60,6 +60,10 @@ public class DateTimeSpinner extends TimeSpinner {
             if(markToday) {
                 ((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime());
             }
+            this.setCurrentDate(currentDate);
+            this.setStartDate(startDate);
+            this.setEndDate(endDate);
+            
         }
         super.initSpinner();
     }
