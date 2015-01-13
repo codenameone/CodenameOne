@@ -42,6 +42,8 @@
 #import "ZooZ.h"
 #endif
 
+#define IOS8_LOCATION_WARNING NSLog(@"As of iOS8, location services requires the ios.locationUsageDescription build hint to be set.");
+
 
 //#define INCLUDE_MOPUB
 #ifdef INCLUDE_MOPUB

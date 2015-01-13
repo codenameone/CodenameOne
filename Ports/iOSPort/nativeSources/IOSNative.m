@@ -2370,7 +2370,10 @@ CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
-        if ([com_codename1_impl_ios_IOSNative_createCLLocation respondsToSelector:@selector(requestWhenInUseAuthorization)]) {
+        if ([com_codename1_impl_ios_IOSNative_createCLLocation respondsToSelector:@selector     (requestWhenInUseAuthorization)]) {
+#ifdef IOS8_LOCATION_WARNING
+IOS8_LOCATION_WARNING
+#endif
             [com_codename1_impl_ios_IOSNative_createCLLocation requestWhenInUseAuthorization];
         }
     });
