@@ -57,7 +57,7 @@ public class BasicInstruction extends Instruction {
     private void appendSynchronized(StringBuilder b) {
         if(synchronizedMethod) {
             if(staticMethod) {
-                b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                b.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
                 b.append(className);
                 b.append(");\n");
             } else {

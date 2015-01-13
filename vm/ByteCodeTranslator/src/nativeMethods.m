@@ -43,8 +43,6 @@ JAVA_BOOLEAN compareStringToCharArray(const char* str, JAVA_ARRAY_CHAR* chrs, in
 }
 
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
     NSStringEncoding enc;
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)encoding;
@@ -65,9 +63,28 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         }
     }
     
+    // first try to optimize encoding in case of US-ASCII characters
+    JAVA_BOOLEAN ascii = JAVA_TRUE;
+    for(int iter = 0 ; iter < len ; iter++) {
+        if(sourceData[iter] > 126) {
+            ascii = JAVA_FALSE;
+            break;
+        }
+    }
+    if(ascii) {
+        JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
+        retainObj(destArr);
+        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+        for(int iter = 0 ; iter < len ; iter++) {
+            dest[iter] = sourceData[iter];
+        }
+        
+        return destArr;
+    }
+
     // this allows emojii to work with the Strings properly
-    int stringLength = ((JAVA_ARRAY)b)->length;
-    NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:stringLength encoding:enc];
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:len encoding:enc];
 
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [nsStr length]);
     retainObj(destArr);

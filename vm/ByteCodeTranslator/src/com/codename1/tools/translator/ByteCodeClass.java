@@ -1513,7 +1513,7 @@ public class ByteCodeClass {
     public void appendStaticFieldsMark(StringBuilder b) {
         for(ByteCodeField bf : fields) {
             if(bf.isStaticField() && bf.isObjectType() && !bf.isFinal()) {
-                b.append("    gcMarkObject(threadStateData, STATIC_FIELD_");
+                b.append("    recursionBlockerPosition = 0;\n    gcMarkObject(threadStateData, STATIC_FIELD_");
                 b.append(clsName);
                 b.append("_");
                 b.append(bf.getFieldName());
