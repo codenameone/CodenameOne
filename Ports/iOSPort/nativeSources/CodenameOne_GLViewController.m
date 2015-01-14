@@ -64,6 +64,11 @@ extern void stringEdit(int finished, int cursorPos, NSString* text);
 // important, this must stay as NO for the iphone builder to work properly during translation
 BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
+
+// keyboard width and height.  Updated when keyboard is shown and hidden
+int vkbHeight = 0;
+int vkbWidth = 0;
+
 NSMutableArray* touchesArray = nil;
 
 int nextPowerOf2(int val) {
@@ -81,6 +86,7 @@ BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
 BOOL forceSlideUpField;
+
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
@@ -176,6 +182,7 @@ BOOL isVKBAlwaysOpen() {
     }
     return NO;
 }
+
 
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
@@ -1237,6 +1244,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     return sharedSingleton->drawTextureSupported;
 }
 
+
+
 #ifdef INCLUDE_MOPUB
 @synthesize adView;
 - (void)viewDidLoad {
@@ -1537,6 +1546,18 @@ int keyboardHeight;
         [currentTarget removeAllObjects];
     }
     keyboardIsShown = NO;
+    
+    // vkbHeight and vkbWidth may be redundant with keyboardWidth value
+    // These are exposed in Java by the getVKBWidth() and getVKBHeight()
+    // native methods, and are used to calculate padding for bottom form padding keyboard.
+    vkbHeight = 0;
+    vkbWidth = 0;
+    
+    // Callback to java to handle case when keyboard is hidden -- for async editing
+    // with bottom form padding currently so that the form can readjust its padding
+    // to use the new space.
+    com_codename1_impl_ios_IOSImplementation_keyboardWillBeHidden__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    
     if(!modifiedViewHeight || isVKBAlwaysOpen()) {
         return;
     }
@@ -1620,6 +1641,17 @@ int keyboardHeight;
     CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
 
     keyboardHeight = keyboardFrame.size.height;
+    
+    // This may be redundant... vkbHeight and vkbWidth are exposed to java using
+    // the getVKBWidth() and getVKBHeight() native methods.  I think vkbHeight
+    // is the same as keyboardHeight though, so may be room for some consolidation.
+    CGSize kbSize = [[userInfo objectForKey:UIKeyboardFrameBeginUserInfoKey] CGRectValue].size;
+    vkbHeight = (int)kbSize.height;
+    vkbWidth = (int)kbSize.width;
+    
+    // Callback to Java for async editing so that it can resize the form to account for the
+    // keyboard taking up space.
+    com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
     if (keyboardIsShown || isVKBAlwaysOpen()) {

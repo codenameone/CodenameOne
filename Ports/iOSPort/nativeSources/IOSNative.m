@@ -4458,6 +4458,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE
     return vkbAlwaysOpen;
 }
 
+extern int vkbHeight;
+JAVA_INT com_codename1_impl_ios_IOSNative_getVKBHeight__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject){
+    return (JAVA_INT)vkbHeight*scaleValue;
+}
+
+extern int vkbWidth;
+JAVA_INT com_codename1_impl_ios_IOSNative_getVKBWidth__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject){
+    return (JAVA_INT)vkbWidth*scaleValue;
+}
+
 void com_codename1_impl_ios_IOSNative_setAsyncEditMode___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN b) {
     vkbAlwaysOpen = b;
 }
@@ -5052,6 +5062,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsShapeSupportedGlobal___R_b
 
 
 // END Shapes (ES2)
+
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getVKBHeight___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject){
+    return (JAVA_INT)com_codename1_impl_ios_IOSNative_getVKBHeight__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+extern int vkbWidth;
+JAVA_INT com_codename1_impl_ios_IOSNative_getVKBWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject ){
+    return (JAVA_INT)com_codename1_impl_ios_IOSNative_getVKBWidth__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isPainted__(CN1_THREAD_STATE_PASS_ARG instanceObject);

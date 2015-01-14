@@ -411,6 +411,8 @@ public final class IOSNative {
     public native void setAsyncEditMode(boolean b);
     public native void foldVKB();
     public native void hideTextEditing();
+    public native int getVKBHeight();
+    public native int getVKBWidth();
 
     public native long connectSocket(String host, int port);    
     public native String getHostOrIP();

@@ -315,13 +315,47 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public int getInvisibleAreaUnderVKB() {
         if(isAsyncEditMode() && isEditingText()) {
-            if(isTablet()) {
-                return getDisplayHeight() / 5;
-            } else {
-                return getDisplayHeight() / 5 * 3;
-            }
+            return nativeInstance.getVKBHeight();
         }
         return 0;
+    }
+    
+    /**
+     * Callback for native.  Called when keyboard is shown.  Used for async editing 
+     * with formBottomPaddingEditingMode.
+     */
+    static void keyboardWillBeShown(){
+        if(nativeInstance.isAsyncEditMode()) {
+            // revalidate the parent since the size of form is now larger due to the vkb
+            final Form current = Display.getInstance().getCurrent();
+            if(current.isFormBottomPaddingEditingMode()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        
+                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                        current.animateLayout(500);
+                    }
+                });
+            } else {
+                current.revalidate();
+            }
+        }
+    }
+    
+    /**
+     * Callback for native.  Called when keyboard is hidden.  Used for async editing 
+     * with formBottomPaddingEditingMode.
+     */
+    static void keyboardWillBeHidden(){
+        Display.getInstance().callSerially(new Runnable(){
+
+            @Override
+            public void run() {
+                Display.getInstance().getCurrent().animateLayout(500);
+            }
+            
+        });
     }
     
     public void setCurrentForm(Form f) {
@@ -642,7 +676,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
 
-    private static String iosMode = "legacy";
+    private static String iosMode = "auto";
     
     public static void setIosMode(String l) {
         iosMode = l;
