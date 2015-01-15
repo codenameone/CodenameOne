@@ -74,6 +74,7 @@ public class FlowLayout extends Layout{
         int y = parent.getStyle().getPadding(false, Component.TOP);
         int rowH=0;
         int start=0;
+        int rowBaseline=0;
 
         int maxComponentWidth = width;
 
@@ -98,11 +99,19 @@ public class FlowLayout extends Layout{
 
                 x += cmp.getWidth() + cmp.getStyle().getMargin(false, Component.RIGHT);
                 rowH = Math.max(rowH, cmp.getHeight() + cmp.getStyle().getMargin(false, Component.TOP)+ cmp.getStyle().getMargin(false, Component.BOTTOM));
+                if ( valign == Component.BASELINE ){
+                    int cmpPrefH = cmp.getPreferredH();
+                    int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);
+                    
+                    rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMargin(false, Component.TOP));
+                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMargin(false, Component.BOTTOM) + cmpPrefH-cmpBaseline);
+                }
             } else {
-                moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, i);
+                moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, i, rowBaseline);
                 fillRow(parent, width, start, i);
                 x = initX+cmp.getStyle().getMargin(false, Component.LEFT);
                 y += rowH;
+                rowBaseline = 0;
 
                 if(rtl) {
                 	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMargin(false, Component.LEFT)));
@@ -112,12 +121,19 @@ public class FlowLayout extends Layout{
 
                 cmp.setY(y + cmp.getStyle().getMargin(false, Component.TOP));
                 rowH = cmp.getPreferredH()+ cmp.getStyle().getMargin(false, Component.TOP)+ cmp.getStyle().getMargin(false, Component.BOTTOM);
+                if ( valign == Component.BASELINE ){
+                    int cmpPrefH = cmp.getPreferredH();
+                    int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);
+                    
+                    rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMargin(false, Component.TOP));
+                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMargin(false, Component.BOTTOM) + cmpPrefH-cmpBaseline);
+                }
                 x += cmp.getPreferredW()+ cmp.getStyle().getMargin(false, Component.RIGHT);
                 start = i;
 
             }
         }
-        moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, numOfcomponents);
+        moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, numOfcomponents, rowBaseline);
         fillRow(parent, width, start, numOfcomponents);
     }
 
@@ -161,7 +177,11 @@ public class FlowLayout extends Layout{
         }
     }
 
-    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd ) {
+    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd){
+        moveComponents(target, x, y, width, height, rowStart, rowEnd, -1);
+    }
+            
+    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline ) {
         switch (orientation) {
             case Component.CENTER:
                 // this will remove half of last gap
@@ -201,6 +221,10 @@ public class FlowLayout extends Layout{
                     } else {
                         m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
                     }
+                    break;
+                case Component.BASELINE:
+                    m.setY(y + Math.max(marginTop, baseline - m.getBaseline(m.getWidth(), m.getHeight())));
+                    
                     break;
                 default:
                     m.setY(y + marginTop);

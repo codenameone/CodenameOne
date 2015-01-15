@@ -122,7 +122,7 @@ public class Label extends Component {
      */
     public int getBaselineResizeBehavior() {
         switch(valign) {
-        case TOP:
+            case TOP:
             return BRB_CONSTANT_ASCENT;
         case BOTTOM:
             return BRB_CONSTANT_DESCENT;
@@ -131,6 +131,19 @@ public class Label extends Component {
         }
         return BRB_OTHER;
     }
+
+    @Override
+    public int getBaseline(int width, int height) {
+        Style s = getStyle();
+        Font f = s.getFont();
+        
+        int innerHeight = height-s.getPadding(TOP)-s.getPadding(BOTTOM);
+        return s.getPadding(TOP)+(innerHeight-f.getHeight())/2+f.getAscent();
+    }
+    
+    
+    
+    
 
     /**
      * Sets the Label text

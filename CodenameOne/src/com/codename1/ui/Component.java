@@ -255,6 +255,9 @@ public class Component implements Animation, StyleListener {
      * Box-orientation constant used to specify the right side of a box.
      */
     public static final int RIGHT = 3;
+    
+    public static final int BASELINE = 5;
+    
     private HashMap<String, Object> clientProperties;
     private Rectangle dirtyRegion = null;
     private final Object dirtyRegionLock = new Object();
