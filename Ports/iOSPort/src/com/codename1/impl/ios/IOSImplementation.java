@@ -1933,6 +1933,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         return stringWidthNative(fnt.peer, new String(ch, offset, length));
     }
 
+    @Override
+    public boolean isBaselineTextSupported() {
+        return true;
+    }
+
+    
+    
+    @Override
+    public int getFontAscent(Object nativeFont) {
+        NativeFont fnt = f(nativeFont);
+        return fontAscentNative(fnt.peer);
+    }
+
+    @Override
+    public int getFontDescent(Object nativeFont) {
+        NativeFont fnt = f(nativeFont);
+        return Math.abs(fontDescentNative(fnt.peer));
+    }
+
+    
+    
     private NativeFont f(Object o) {
         if(o == null) {
             return (NativeFont)getDefaultFont();
@@ -1981,6 +2002,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return nativeInstance.stringWidthNative(peer, str);
     }
+    
+    private int fontAscentNative(long peer){
+        return nativeInstance.fontAscentNative(peer);
+    }
+    
+    private int fontDescentNative(long peer){
+        return nativeInstance.fontDescentNative(peer);
+    }
+    
+    
 
     public int charWidth(Object nativeFont, char ch) {
         return f(nativeFont).charWidth(ch);

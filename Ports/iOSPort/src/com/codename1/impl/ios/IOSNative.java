@@ -71,6 +71,8 @@ public final class IOSNative {
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
     native int getFontHeightNative(long peer);
+    native int fontAscentNative(long peer);
+    native int fontDescentNative(long peer);
     native long createSystemFont(int face, int style, int size);
     byte[] loadResource(String name, String type) {
         int val = getResourceSize(name, type);

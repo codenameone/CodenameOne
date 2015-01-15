@@ -507,4 +507,12 @@ public class Font {
        }
        return false;
    }
+   
+   public int getAscent(){
+       return Display.getInstance().getImplementation().getFontAscent(font);
+   }
+   
+   public int getDescent(){
+       return Display.getInstance().getImplementation().getFontDescent(font);
+   }
 }

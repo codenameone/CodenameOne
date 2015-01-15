@@ -897,6 +897,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return font.getFontMetricsInt(font.getFontMetricsInt());
     }
 
+    @Override
+    public int getFontAscent(Object nativeFont) {
+        Paint font = (nativeFont == null ? this.defaultFont
+                : (Paint) ((NativeFont) nativeFont).font);
+        return -Math.round(font.getFontMetrics().ascent);
+    }
+
+    @Override
+    public int getFontDescent(Object nativeFont) {
+        Paint font = (nativeFont == null ? this.defaultFont
+                : (Paint) ((NativeFont) nativeFont).font);
+        return Math.abs(Math.round(font.getFontMetrics().descent));
+    }
+
+    @Override
+    public boolean isBaselineTextSupported() {
+        return true;
+    }
+    
+    
+    
+
+    
+    
     public int getFace(Object nativeFont) {
         if (nativeFont == null) {
             return Font.FACE_SYSTEM;

@@ -198,6 +198,11 @@ extern int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 extern int Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl
 (void* peer);
 
+extern int Java_com_codename1_impl_ios_IOSImplementation_getFontAscentNativeImpl
+(void* peer);
+
+extern int Java_com_codename1_impl_ios_IOSImplementation_getFontDescentNativeImpl
+(void* peer);
 
 extern void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
 (int face, int style, int size);
@@ -674,6 +679,26 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFontHeightNative___long(CN1_THREAD_
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getFontHeightNative___long]
     POOL_BEGIN();
     JAVA_INT i = Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl((void *)n1);
+    POOL_END();
+    return i;
+    //XMLVM_END_WRAPPER
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_fontAscentNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
+{
+    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getFontHeightNative___long]
+    POOL_BEGIN();
+    JAVA_INT i = Java_com_codename1_impl_ios_IOSImplementation_getFontAscentNativeImpl((void *)n1);
+    POOL_END();
+    return i;
+    //XMLVM_END_WRAPPER
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_fontDescentNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
+{
+    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_getFontHeightNative___long]
+    POOL_BEGIN();
+    JAVA_INT i = Java_com_codename1_impl_ios_IOSImplementation_getFontDescentNativeImpl((void *)n1);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
@@ -5116,6 +5141,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char_R_int(CN1_
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getFontHeightNative___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1) {
     return com_codename1_impl_ios_IOSNative_getFontHeightNative___long(CN1_THREAD_STATE_PASS_ARG instanceObject, n1);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_fontAscentNative___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1) {
+    return com_codename1_impl_ios_IOSNative_fontAscentNative___long(CN1_THREAD_STATE_PASS_ARG instanceObject, n1);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_fontDescentNative___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1) {
+    return com_codename1_impl_ios_IOSNative_fontDescentNative___long(CN1_THREAD_STATE_PASS_ARG instanceObject, n1);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3) {

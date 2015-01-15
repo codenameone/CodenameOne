@@ -950,6 +950,20 @@ public class BlackBerryImplementation extends CodenameOneImplementation {
         return font(nativeFont).getHeight();
     }
 
+    public int getFontAscent(Object nativeFont) {
+        return Math.abs(font(nativeFont).getAscent());
+    }
+
+    public int getFontDescent(Object nativeFont) {
+        return Math.abs(font(nativeFont).getDescent());
+    }
+
+    public boolean isBaselineTextSupported() {
+        return true;
+    }
+    
+    
+
     public Object getDefaultFont() {
         return Font.getDefault();
     }

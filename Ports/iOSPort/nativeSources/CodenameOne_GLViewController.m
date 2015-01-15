@@ -835,6 +835,18 @@ int Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl
     return (int)[f lineHeight];
 }
 
+int Java_com_codename1_impl_ios_IOSImplementation_getFontAscentNativeImpl
+(void* peer){
+    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    return (int)roundf([f ascender]);
+}
+
+int Java_com_codename1_impl_ios_IOSImplementation_getFontDescentNativeImpl
+(void* peer){
+    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    return (int)roundf([f descender]);
+}
+
 void vibrateDevice() {
     AudioServicesPlayAlertSound(kSystemSoundID_Vibrate);
 }

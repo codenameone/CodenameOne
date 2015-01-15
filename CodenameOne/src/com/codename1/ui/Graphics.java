@@ -409,6 +409,10 @@ public final class Graphics {
         }
     }
 
+    public void drawString(String str, int x, int y,int textDecoration){
+        drawString(str, x, y, textDecoration, Display.TEXT_VALIGN_TOP);
+    }
+    
     /**
      * Draw a string using the current font and color in the x,y coordinates. The font is drawn
      * from the top position and not the baseline.
@@ -418,10 +422,15 @@ public final class Graphics {
      * @param y the y coordinate.
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
      */
-    public void drawString(String str, int x, int y,int textDecoration) {
+    public void drawString(String str, int x, int y,int textDecoration, int valign) {
         if(str.length() == 0) {
             return;
         }
+        if ( !Display.getInstance().getImplementation().isBaselineTextSupported() && valign == Display.TEXT_VALIGN_BASELINE ){
+            throw new RuntimeException("Baseline Text is not supported in this port");
+        }
+        int ascentShift = valign == Display.TEXT_VALIGN_BASELINE ? -getFont().getAscent() : 0;
+        
         // this if has only the minor effect of providing a slighly faster execution path
         if(textDecoration != 0) {
             boolean raised = (textDecoration & Style.TEXT_DECORATION_3D)!=0;
@@ -445,10 +454,10 @@ public final class Graphics {
                 if(a == 0xff) {
                     setAlpha(140);
                 }
-                drawString(str, x, y + offset, textDecoration);
+                drawString(str, x, y + offset + ascentShift, textDecoration);
                 setAlpha(a);
                 setColor(c);
-                drawString(str, x, y, textDecoration);
+                drawString(str, x, y + ascentShift, textDecoration);
                 return;
             }
             drawStringImpl(str, x, y);
@@ -462,7 +471,7 @@ public final class Graphics {
                 drawLine(x, y, x+current.stringWidth(str), y);
             }
         } else {
-            drawStringImpl(str, x, y);
+            drawStringImpl(str, x, y + ascentShift);
         }
     }
 

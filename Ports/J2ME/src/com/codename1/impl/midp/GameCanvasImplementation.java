@@ -1429,6 +1429,18 @@ public class GameCanvasImplementation extends CodenameOneImplementation {
         return font(nativeFont).getHeight();
     }
 
+    public int getFontAscent(Object nativeFont) {
+        return Math.abs(font(nativeFont).getBaselinePosition());
+    }
+
+    public int getFontDescent(Object nativeFont) {
+        return Math.abs(getHeight(nativeFont)-getFontAscent(nativeFont));
+    }
+    
+    
+    
+    
+
     /**
      * @inheritDoc
      */

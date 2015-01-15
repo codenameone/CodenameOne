@@ -1678,6 +1678,23 @@ public abstract class CodenameOneImplementation {
      */
     public abstract int charsWidth(Object nativeFont, char[] ch, int offset, int length);
 
+   
+    /**
+     * Returns the ascent of the specified native font instance.
+     * @param nativeFont
+     * @return The ascent of the native font instance
+     */
+    public int getFontAscent(Object nativeFont){
+        return (int)(((float)getHeight(nativeFont))*0.7);
+    }
+    
+    public int getFontDescent(Object nativeFont){
+        return getHeight(nativeFont)-getFontAscent(nativeFont);
+    }
+    
+    public boolean isBaselineTextSupported(){
+        return false;
+    }
     /**
      * Return the width of the given string in this font instance
      * 

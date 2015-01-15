@@ -79,6 +79,9 @@ public final class Display {
     boolean codenameOneExited;
     private boolean inNativeUI;
 
+    public static final int TEXT_VALIGN_BASELINE = 0;
+    public static final int TEXT_VALIGN_TOP = 1;
+    
     /**
      * A common sound type that can be used with playBuiltinSound
      */
