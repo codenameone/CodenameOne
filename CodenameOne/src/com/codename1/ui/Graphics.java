@@ -421,6 +421,10 @@ public final class Graphics {
      * @param x the x coordinate.
      * @param y the y coordinate.
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
+     * @param valign The vertical alignment of the text. Possible values include {@link com.codename1.ui.Display#TEXT_VALIGN_BASELINE}
+     *      and {@link com.codename1.ui.Display#TEXT_VALIGN_TOP}.  The default value, if omitted, is {@literal Display.TEXT_VALIGN_TOP}.
+     *      Specifying Display.TEXT_VALIGN_BASELINE will cause the text to be drawn along its baseline.  I.e. ({@literal x}, {@literal y})
+     *      would be the starting point on the baseline of the text, rather than the upper left corner, as it would be for {@literal TEXT_VALIGN_TOP}
      */
     public void drawString(String str, int x, int y,int textDecoration, int valign) {
         if(str.length() == 0) {

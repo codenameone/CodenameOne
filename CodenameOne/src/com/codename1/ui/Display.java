@@ -79,7 +79,18 @@ public final class Display {
     boolean codenameOneExited;
     private boolean inNativeUI;
 
+    /**
+     * Constant used by {@link com.codename1.ui.Graphics#drawString} to specify
+     * that the text should be drawn along the baseline.  I.e. x,y is left most
+     * point on baseline of text being drawn.
+     */
     public static final int TEXT_VALIGN_BASELINE = 0;
+    
+    /**
+     * Constant used by {@link com.codename1.ui.Graphics#drawString} to specify
+     * that the text should be drawn along the top.  I.e. x,y is top left of 
+     * bounding box.
+     */
     public static final int TEXT_VALIGN_TOP = 1;
     
     /**

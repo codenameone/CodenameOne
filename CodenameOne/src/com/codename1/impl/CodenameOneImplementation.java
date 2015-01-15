@@ -1680,7 +1680,8 @@ public abstract class CodenameOneImplementation {
 
    
     /**
-     * Returns the ascent of the specified native font instance.
+     * Returns the ascent of the specified native font instance.  Should always
+     * return a non-negative value.
      * @param nativeFont
      * @return The ascent of the native font instance
      */
@@ -1688,10 +1689,20 @@ public abstract class CodenameOneImplementation {
         return (int)(((float)getHeight(nativeFont))*0.7);
     }
     
+    /**
+     * Returns the descent below the baseline that a font can span.  Should always
+     * be non-negative.
+     * @param nativeFont
+     * @return 
+     */
     public int getFontDescent(Object nativeFont){
         return getHeight(nativeFont)-getFontAscent(nativeFont);
     }
     
+    /**
+     * Checks whether the implementation supports drawing text on the baseline.
+     * @return 
+     */
     public boolean isBaselineTextSupported(){
         return false;
     }
