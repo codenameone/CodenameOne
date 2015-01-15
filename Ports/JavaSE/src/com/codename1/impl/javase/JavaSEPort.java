@@ -3960,6 +3960,25 @@ public class JavaSEPort extends CodenameOneImplementation {
         return (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
     }
 
+    @Override
+    public int getFontAscent(Object nativeFont) {
+        return canvas.getGraphics().getFontMetrics(font(nativeFont)).getAscent();
+    }
+
+    @Override
+    public int getFontDescent(Object nativeFont) {
+        return canvas.getGraphics().getFontMetrics(font(nativeFont)).getDescent();
+    }
+
+    @Override
+    public boolean isBaselineTextSupported() {
+        return true;
+    }
+    
+    
+    
+    
+
     /**
      * @inheritDoc
      */
