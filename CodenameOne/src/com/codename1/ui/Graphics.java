@@ -409,10 +409,6 @@ public final class Graphics {
         }
     }
 
-    public void drawString(String str, int x, int y,int textDecoration){
-        drawString(str, x, y, textDecoration, Display.TEXT_VALIGN_TOP);
-    }
-    
     /**
      * Draw a string using the current font and color in the x,y coordinates. The font is drawn
      * from the top position and not the baseline.
@@ -421,19 +417,11 @@ public final class Graphics {
      * @param x the x coordinate.
      * @param y the y coordinate.
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
-     * @param valign The vertical alignment of the text. Possible values include {@link com.codename1.ui.Display#TEXT_VALIGN_BASELINE}
-     *      and {@link com.codename1.ui.Display#TEXT_VALIGN_TOP}.  The default value, if omitted, is {@literal Display.TEXT_VALIGN_TOP}.
-     *      Specifying Display.TEXT_VALIGN_BASELINE will cause the text to be drawn along its baseline.  I.e. ({@literal x}, {@literal y})
-     *      would be the starting point on the baseline of the text, rather than the upper left corner, as it would be for {@literal TEXT_VALIGN_TOP}
      */
-    public void drawString(String str, int x, int y,int textDecoration, int valign) {
+    public void drawString(String str, int x, int y,int textDecoration) {
         if(str.length() == 0) {
             return;
         }
-        if ( !Display.getInstance().getImplementation().isBaselineTextSupported() && valign == Display.TEXT_VALIGN_BASELINE ){
-            throw new RuntimeException("Baseline Text is not supported in this port");
-        }
-        int ascentShift = valign == Display.TEXT_VALIGN_BASELINE ? -getFont().getAscent() : 0;
         
         // this if has only the minor effect of providing a slighly faster execution path
         if(textDecoration != 0) {
@@ -458,10 +446,10 @@ public final class Graphics {
                 if(a == 0xff) {
                     setAlpha(140);
                 }
-                drawString(str, x, y + offset + ascentShift, textDecoration);
+                drawString(str, x, y + offset, textDecoration);
                 setAlpha(a);
                 setColor(c);
-                drawString(str, x, y + ascentShift, textDecoration);
+                drawString(str, x, y, textDecoration);
                 return;
             }
             drawStringImpl(str, x, y);
@@ -475,8 +463,31 @@ public final class Graphics {
                 drawLine(x, y, x+current.stringWidth(str), y);
             }
         } else {
-            drawStringImpl(str, x, y + ascentShift);
+            drawStringImpl(str, x, y);
         }
+    }
+    
+    /**
+     * Draws a string using baseline coordinates. 
+     * @param str The string to be drawn.
+     * @param x The x-coordinate of the start of left edge of the text block.
+     * @param y The y-coordinate of the baseline of the text.
+     * @see #drawString(java.lang.String, int, int) 
+     */
+    public void drawStringBaseline(String str, int x, int y){
+        drawString(str, x, y-current.getAscent());
+    }
+    
+    /**
+     * Draws a string using baseline coordinates. 
+     * @param str The string to be drawn.
+     * @param x The x-coordinate of the start of left edge of the text block.
+     * @param y The y-coordinate of the baseline of the text.
+     * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
+     * @see #drawString(java.lang.String, int, int, int) 
+     */
+    public void drawStringBaseline(String str, int x, int y, int textDecoration){
+        drawString(str, x, y-current.getAscent(), textDecoration);
     }
 
     /**
