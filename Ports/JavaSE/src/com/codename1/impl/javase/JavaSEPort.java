@@ -3964,13 +3964,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public int getFontAscent(Object nativeFont) {
         checkEDT();
-        return Math.abs(canvas.getGraphics().getFontMetrics(font(nativeFont)).getAscent());
+        return Math.abs(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getAscent());
     }
 
     @Override
     public int getFontDescent(Object nativeFont) {
         checkEDT();
-        return Math.abs(canvas.getGraphics().getFontMetrics(font(nativeFont)).getDescent());
+        return Math.abs(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getDescent());
     }
 
     @Override
@@ -3987,16 +3987,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        if(canvas != null) {
-            java.awt.Graphics g = canvas.getGraphics();
-            if(g != null) {
-                FontMetrics fm = g.getFontMetrics(font(nativeFont));
-                if(fm != null) {
-                    return fm.getHeight();
-                }
-            }
-        }
-        return font(nativeFont).getSize() + 1;
+        return canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight();
     }
 
     /**
