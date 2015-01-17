@@ -251,6 +251,14 @@ public class Transform {
         return out;
     }
     
+    public static Transform makeRotation(float angle, float x, float y){
+        Transform t = makeTranslation(x, y, 0);
+        t.rotate(angle, 0, 0, 1);
+        t.translate(-x, -y, 0);
+        return t;
+        
+    }
+    
     /**
      * Makes a new translation transformation.
      * @param x The x component of the translation.
@@ -267,6 +275,10 @@ public class Transform {
         return out;
     }
     
+    public static Transform makeTranslation(float x, float y){
+        return makeTranslation(x, y, 0);
+    }
+    
     /**
      * Makes a new scale transformation.
      * @param x The x scale factor.
@@ -281,6 +293,10 @@ public class Transform {
         out.scaleZ = z;
         out.type = TYPE_SCALE;
         return out;
+    }
+    
+    public static Transform makeScale(float x, float y){
+        return makeScale(x, y, 1);
     }
     
     /**
@@ -353,6 +369,12 @@ public class Transform {
         type = TYPE_UNKNOWN;
     }
     
+    public void rotate(float angle, float px, float py){
+        translate(px, py, 0);
+        rotate(angle, 0, 0, 1);
+        translate(-px, -py, 0);
+    }
+    
     /**
      * Sets the transform to be the provided rotation. This replaces the current transform
      * whereas {@link #rotate()} further rotates the current transform.
@@ -369,6 +391,13 @@ public class Transform {
         type = TYPE_UNKNOWN;
     }
     
+    public void setRotation(float angle, float px, float py){
+        initNativeTransform();
+        setTransform(makeRotation(angle, px, py));
+        type = TYPE_UNKNOWN;
+    }
+    
+    
     /**
      * Sets the transform to the identity transform.
      */
@@ -376,6 +405,10 @@ public class Transform {
         type = TYPE_IDENTITY;
         scaleX = 1f; scaleY = 1f; scaleZ = 1f;
         translateX = 0f; translateY = 0f; translateZ = 0f;
+    }
+    
+    public String toString(){
+        return ""+nativeTransform;
     }
     
     /**
@@ -406,6 +439,10 @@ public class Transform {
         }
     }
     
+    public void translate(float x, float y){
+        translate(x, y, 0);
+    }
+    
     /**
      * Sets the current transform to be the specified translation.  This replaces the current
      * transform with the given translation whereas {@link #translate()} adds additional translation
@@ -428,6 +465,10 @@ public class Transform {
             }
         }
         
+    }
+    
+    public void setTranslation(float x, float y){
+        setTranslation(x, y, 0);
     }
     
     /**
@@ -456,6 +497,10 @@ public class Transform {
             type = TYPE_UNKNOWN;
             impl.transformScale(nativeTransform, x, y, z);
         }
+    }
+    
+    public void scale(float x, float y){
+        scale(x, y, 1);
     }
     
     /**
