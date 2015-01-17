@@ -1255,6 +1255,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((Matrix)nativeTransform).translate(x, y, z);
     }
 
+    
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         ((Matrix)nativeTransform).scale(x, y, z);
@@ -1759,6 +1760,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setNativeTransformGlobal(Transform transform){
         Matrix t = (Matrix)transform.getNativeTransform();
         float[] m = t.getData();
+        
         
         // Note that Matrix is stored in column-major format but GLKMatrix is stored in row-major
         // that's why we transpose it here.
@@ -2722,7 +2724,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void rotate(Object nativeGraphics, float angle, int x, int y) {
-        ((NativeGraphics)nativeGraphics).rotate(angle * 57.2957795f, x, y);
+        ((NativeGraphics)nativeGraphics).rotate(angle, x, y);
     }
 
     
@@ -3295,7 +3297,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         public void rotate(float angle) {
             if ( isTransformSupported() ){
-                this.transform.rotate(angle, 0, 0, 1);
+                this.transform.rotate(angle, 0, 0);
                 transformApplied = false;
             } else {
                 nativeInstance.rotateGlobal(angle);
@@ -3304,7 +3306,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         public void rotate(float angle, int x, int y) {
             if ( isTransformSupported() ){
-                this.transform.rotate(angle, x, y, 1);
+                this.transform.rotate(angle, x, y);
                 transformApplied = false;
             } else {
                 nativeInstance.rotateGlobal(angle, x, y);
