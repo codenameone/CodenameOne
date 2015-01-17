@@ -123,6 +123,7 @@ import java.net.*;
 import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.text.ParseException;
 import java.util.*;
 import java.util.List;
 import java.util.Locale;
@@ -3986,7 +3987,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        return canvas.getGraphics().getFontMetrics(font(nativeFont)).getHeight();
+        if(canvas != null) {
+            java.awt.Graphics g = canvas.getGraphics();
+            if(g != null) {
+                FontMetrics fm = g.getFontMetrics(font(nativeFont));
+                if(fm != null) {
+                    return fm.getHeight();
+                }
+            }
+        }
+        return font(nativeFont).getSize() + 1;
     }
 
     /**
@@ -6245,6 +6255,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
 
+                public double parseDouble(String localeFormattedDecimal) {
+                    try {
+                        return NumberFormat.getNumberInstance().parse(localeFormattedDecimal).doubleValue();
+                    } catch (ParseException err) {
+                        return Double.parseDouble(localeFormattedDecimal);
+                    }
+                }
+                
                 public String format(int number) {
                     return NumberFormat.getNumberInstance().format(number);
                 }
