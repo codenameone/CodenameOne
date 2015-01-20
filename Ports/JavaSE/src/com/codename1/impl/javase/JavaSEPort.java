@@ -4472,7 +4472,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         AffineTransform t = (AffineTransform)nativeTransform;
-        t.transform(in, 0, out, 0, 2);
+        t.transform(in, 0, out, 0, 1);
     }
 
     // END TRANSFORM STUFF
