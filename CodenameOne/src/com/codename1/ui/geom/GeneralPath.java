@@ -330,6 +330,10 @@ public final class GeneralPath implements Shape {
         }
     }
 
+    public void moveTo(double x, double y){
+        moveTo((float)x, (float)y);
+    }
+    
     /**
      * Adds a new point to a path.
      *
@@ -349,6 +353,10 @@ public final class GeneralPath implements Shape {
         dirty = true;
     }
 
+    
+    public void lineTo(double x, double y){
+        lineTo((float)x, (float)y);
+    }
     /**
      * Appends a straight line to the current path.
      *
@@ -363,6 +371,10 @@ public final class GeneralPath implements Shape {
         dirty = true;
     }
 
+    public void quadTo(double x1, double y1, double x2, double y2){
+        quadTo((float)x1, (float)y1, (float)x2, (float)y2);
+    }
+    
     /**
      * Appends a quadratic Bezier curve to the current path.
      *
@@ -381,6 +393,10 @@ public final class GeneralPath implements Shape {
         dirty = true;
     }
 
+    public void curveTo(double x1, double y1, double x2, double y2, double x3, double y3){
+        curveTo((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3);
+    }
+    
     /**
      * Appends a cubic Bezier curve to the current path.
      *
