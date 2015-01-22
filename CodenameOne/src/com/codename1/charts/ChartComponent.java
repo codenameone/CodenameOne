@@ -67,7 +67,7 @@ public class ChartComponent extends Component {
     /**
      * Flag to enable panning the chart.  Default is false.
      */
-    private boolean panEnabled = true;
+    private boolean panEnabled = false;
     
     /**
      * During a pan operation, used to store the transform as it was before
@@ -253,6 +253,9 @@ public class ChartComponent extends Component {
     @Override
     public void pointerDragged(int[] x, int[] y) {
         if ( x.length > 1 ){
+            if ( !zoomEnabled ){
+                return;
+            }
             // Pinch zoom
             if ( zoomStart == null ){
                 zoomStart = new Point((x[0]+x[1])/2, (y[0]+y[1])/2);
