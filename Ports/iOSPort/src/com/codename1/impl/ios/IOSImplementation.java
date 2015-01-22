@@ -334,7 +334,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         
                         current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                         current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                        current.animateLayout(500);
+                        current.revalidate();
                     }
                 });
             } else {
@@ -352,7 +352,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
             @Override
             public void run() {
-                Display.getInstance().getCurrent().animateLayout(500);
+                Display.getInstance().getCurrent().revalidate();
             }
             
         });
