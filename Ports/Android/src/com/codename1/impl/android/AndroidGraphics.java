@@ -359,20 +359,28 @@ class AndroidGraphics {
     }
     
     public void resetAffine() {
+        setTransform(Transform.makeIdentity());
         canvas.restore();
         canvas.save();
     }
 
     public void scale(float x, float y) {
-        canvas.scale(x, y);
+        Transform t = getTransform();
+        t.scale(x, y);
+        setTransform(t);
+
     }
 
     public void rotate(float angle) {
-        canvas.rotate((float)Math.toDegrees(angle));
+        Transform t = getTransform();
+        t.rotate(angle, 0, 0);
+        setTransform(t);
     }
 
     public void rotate(float angle, int x, int y) {
-        canvas.rotate((float)Math.toDegrees(angle), x, y);
+        Transform t = getTransform();
+        t.rotate(angle, x, y);
+        setTransform(t);
     }
     
     public final void fillBitmap(int color) {

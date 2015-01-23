@@ -6033,7 +6033,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
-        return CN1Matrix4f.makeTranslation(translateZ, translateZ, translateZ);
+        return CN1Matrix4f.makeTranslation(translateX, translateY, translateZ);
     }
 
     @Override
