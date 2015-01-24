@@ -4,8 +4,6 @@
 <dict>
 	<key>UIPrerenderedIcon</key>
 	<false/>
-	<key>UIFileSharingEnabled</key>
-	<true/>
 	<key>UIApplicationExitsOnSuspend</key>
 	<false/>
 	<key>CFBundleIconFiles</key>

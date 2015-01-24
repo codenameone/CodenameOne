@@ -8,11 +8,22 @@
 #include <setjmp.h>
 #include <math.h>
 
+//#define DEBUG_GC_ALLOCATIONS
+
 #define NUMBER_OF_SUPPORTED_THREADS 1024
 #define CN1_FINALIZER_QUEUE_SIZE 65536
 
 #define CN1_INCLUDE_NPE_CHECKS
 #define CN1_INCLUDE_ARRAY_BOUND_CHECKS
+
+#ifdef DEBUG_GC_ALLOCATIONS
+#define DEBUG_GC_VARIABLES int line; int className;
+#define DEBUG_GC_INIT 0, 0,
+#else
+#define DEBUG_GC_VARIABLES
+#define DEBUG_GC_INIT 
+#endif
+
 
 /**
  * header file containing global CN1 constants and structs
@@ -83,6 +94,7 @@ struct CN1ThreadData {
 };
 
 struct clazz {
+    DEBUG_GC_VARIABLES
     // these first  fields aren't really used but they allow us to treat a clazz as an object
     struct clazz *__codenameOneParentClsReference;
     int __codenameOneReferenceCount;
@@ -121,6 +133,7 @@ struct clazz {
 #define EMPTY_INTERFACES ((const struct clazz**)0)
 
 struct JavaObjectPrototype {
+    DEBUG_GC_VARIABLES
     struct clazz *__codenameOneParentClsReference;
     int __codenameOneReferenceCount;
     void* __codenameOneThreadData;
@@ -130,6 +143,7 @@ struct JavaObjectPrototype {
 };
 
 struct JavaArrayPrototype {
+    DEBUG_GC_VARIABLES
     struct clazz *__codenameOneParentClsReference;
     int __codenameOneReferenceCount;
     void* __codenameOneThreadData;

@@ -304,9 +304,9 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  0, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, &__FINALIZER_");
         } else {
-            b.append("  &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
         }
         b.append(clsName);
         b.append(" , &__RC_RELEASE_");
@@ -379,9 +379,9 @@ public class ByteCodeClass {
             b.append("__");
             b.append(clsName);
             if(clsName.equals("java_lang_Class")) {
-                b.append(" = {\n 0, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n &class__java_lang_Class, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");
@@ -1175,7 +1175,7 @@ public class ByteCodeClass {
         b.append(" {\n");
         // reference to the class, reference counter for the arc portion of the GC
         // and a mutex for synchronization code
-        b.append("    struct clazz *__codenameOneParentClsReference;\n");
+        b.append("    DEBUG_GC_VARIABLES\n    struct clazz *__codenameOneParentClsReference;\n");
         b.append("    int __codenameOneReferenceCount;\n");
         b.append("    void* __codenameOneThreadData;\n");
         b.append("    int __codenameOneGcMark;\n");
@@ -1498,7 +1498,7 @@ public class ByteCodeClass {
     
     public void appendStaticFieldsExtern(StringBuilder b) {
         for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && bf.isObjectType() && !bf.isFinal()) {
+            if(bf.isStaticField() && bf.isObjectType() && !isTrulyFinal(bf)) {
                 b.append("extern ");
                 b.append(bf.getCDefinition());
                 b.append(" STATIC_FIELD_");
@@ -1510,9 +1510,22 @@ public class ByteCodeClass {
         }
     }
 
+    private boolean isTrulyFinal(ByteCodeField bf) {
+        if(bf.isFinal()) {
+            if(bf.isObjectType()) {
+                if(bf.getType() != null) {
+                    return bf.getType().endsWith("String");
+                }
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public void appendStaticFieldsMark(StringBuilder b) {
         for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && bf.isObjectType() && !bf.isFinal()) {
+            if(bf.isStaticField() && bf.isObjectType() && !isTrulyFinal(bf)) {
                 b.append("    recursionBlockerPosition = 0;\n    gcMarkObject(threadStateData, STATIC_FIELD_");
                 b.append(clsName);
                 b.append("_");

@@ -148,4 +148,8 @@ public class ByteCodeField {
     public Object getValue() {
         return value;
     }
+    
+    public String getType() {
+        return type;
+    }
 }

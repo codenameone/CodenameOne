@@ -18,99 +18,99 @@
 int currentGcMarkValue = 1;
 
 struct clazz class_array1__JAVA_BOOLEAN = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BOOLEAN = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BOOLEAN = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_CHAR = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_CHAR = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_CHAR = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_BYTE = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BYTE = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BYTE = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_SHORT = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_SHORT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_SHORT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_INT = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_INT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_INT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_LONG = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_LONG = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_LONG = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_FLOAT = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_FLOAT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_FLOAT = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_DOUBLE = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_DOUBLE = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_DOUBLE = {
-   0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 void safeRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* es) {
@@ -177,7 +177,7 @@ int instanceofFunction(int sourceClass, int destId) {
 }
 
 void retainObj(JAVA_OBJECT o) {
-    if(o == JAVA_NULL) {
+/*    if(o == JAVA_NULL) {
         return;
     }
     if(o->__codenameOneReferenceCount > 999990) {
@@ -186,7 +186,7 @@ void retainObj(JAVA_OBJECT o) {
     
     //lockCriticalSection();
     (*o).__codenameOneReferenceCount++;
-    //unlockCriticalSection();
+    //unlockCriticalSection();*/
 }
 
 JAVA_OBJECT* releaseQueue = 0;
@@ -263,7 +263,7 @@ extern long gcThreadId;
 void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     // if this is a Class object we will never delete it, reference count might have already reached 0 and
     // we got here thru the GC
-    if(o == 0 || o->__codenameOneParentClsReference == 0 || (*o).__codenameOneReferenceCount == 0) {
+    /*if(o == 0 || o->__codenameOneParentClsReference == 0 || (*o).__codenameOneReferenceCount == 0) {
         return;
     }
     
@@ -279,12 +279,6 @@ void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     (*o).__codenameOneReferenceCount--;
     if((*o).__codenameOneReferenceCount == 0) {
         // remove object from local heap if its very short lived
-        /*for(int heapTrav = 0 ; heapTrav < threadStateData->heapAllocationSize ; heapTrav++) {
-            JAVA_OBJECT obj = (JAVA_OBJECT)threadStateData->pendingHeapAllocations[heapTrav];
-            if(obj == o) {
-                threadStateData->pendingHeapAllocations[heapTrav] = 0;
-            }
-        }*/
         if(threadStateData->heapReleaseSize == PER_THREAD_RELEASE_COUNT) {
             // overflow danger! We need to clean the release queue!
             // just disable RC for this case
@@ -310,7 +304,7 @@ void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
             usleep((JAVA_INT)(1000));
         }
         invokedGC = NO;
-    }
+    }*/
 }
 
 void gcReleaseObj(JAVA_OBJECT o) {
@@ -495,6 +489,39 @@ void codenameOneGCSweep() {
                 //if(o->__codenameOneReferenceCount > 0) {
                 //    NSLog(@"Sweped %X", (int)o);
                 //}
+                
+#ifdef DEBUG_GC_ALLOCATIONS
+                int classId = o->className;
+                NSString* whereIs;
+                if(classId > 0) {
+                    whereIs = (NSString*)((struct obj__java_lang_String*)STRING_FROM_CONSTANT_POOL_OFFSET(classId))->java_lang_String_nsString;
+                } else {
+                    whereIs = @"unknown";
+                }
+
+                if(o->__codenameOneParentClsReference->isArray) {
+                    JAVA_ARRAY arr = (JAVA_ARRAY)o;
+                    if(arr->__codenameOneParentClsReference == &class_array1__JAVA_CHAR) {
+                        JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)arr->data;
+                        char data[arr->length + 1];
+                        for(int iter = 0 ; iter < arr->length ; iter++) {
+                            data[iter] = ch[iter];
+                        }
+                        data[arr->length] = 0;
+                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], [NSString stringWithUTF8String:data]);
+                    } else {
+                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName]);
+                    }
+                } else {
+                    JAVA_OBJECT str = java_lang_Object_toString___R_java_lang_String(threadStateData, o);
+                    NSString* ns = toNSString(threadStateData, str);
+                    if(ns == nil) {
+                        ns = @"[NULL]";
+                    }
+                    NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
+                }
+#endif
+
                 removeObjectFromHeapCollection(threadStateData, o);
                 gcReleaseObj(o);
                 //counter++;
@@ -569,6 +596,10 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     o->__ownerThread = threadStateData;
     o->__heapPosition = -1;
     o->__codenameOneReferenceCount = 1;
+#ifdef DEBUG_GC_ALLOCATIONS
+    o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+    o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
     
     if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
         if(threadStateData->threadBlockedByGC) {
@@ -594,6 +625,16 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    if(obj->__heapPosition < 0) {
+        int t = currentSizeOfAllObjectsInHeap;
+        for(int iter = 0 ; iter < t ; iter++) {
+            if(obj == allObjectsInHeap[iter]) {
+                allObjectsInHeap[iter] = JAVA_NULL;
+                break;
+            }
+        }
+    }
+    
     if(obj->__codenameOneParentClsReference != 0 && obj->__codenameOneParentClsReference->isArray) {
         free(((JAVA_ARRAY)obj)->data);
         ((JAVA_ARRAY)obj)->data = 0;
@@ -738,7 +779,10 @@ JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
     memcpy((*dat).data, data, length * sizeof(JAVA_ARRAY_CHAR));
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
-    java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
+    java_lang_String___INIT____(threadStateData, o);
+    struct obj__java_lang_String* str = (struct obj__java_lang_String*)o;
+    str->java_lang_String_value = (JAVA_OBJECT)dat;
+    str->java_lang_String_count = length;
     return o;
 }
 
@@ -770,8 +814,12 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     }
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
     retainObj((JAVA_OBJECT)dat);
-    java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
+    //java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
     //releaseObj(threadStateData, (JAVA_OBJECT)dat);
+    java_lang_String___INIT____(threadStateData, o);
+    struct obj__java_lang_String* ss = (struct obj__java_lang_String*)o;
+    ss->java_lang_String_value = (JAVA_OBJECT)dat;
+    ss->java_lang_String_count = length;
     return o;
 }
 

@@ -58,9 +58,14 @@ public class Ldc extends Instruction {
                     dependencyList.add(t);
                 }
             } else if (sort == Type.ARRAY) {
-                String t = tp.getElementType().getInternalName().replace('/', '_').replace('$', '_');
-                if(!dependencyList.contains(t)) {
-                    dependencyList.add(t);
+                try {
+                    String t = tp.getElementType().getInternalName().replace('/', '_').replace('$', '_');
+                    if(!dependencyList.contains(t)) {
+                        dependencyList.add(t);
+                    }
+                } catch(Throwable t) {
+                    System.out.println("Non-fatal error when reading type: " + tp);
+                    t.printStackTrace();
                 }
             } 
         }

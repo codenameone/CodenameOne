@@ -26,7 +26,7 @@
  * The class representing classes
  */
 struct clazz ClazzClazz = {
-    0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 
@@ -44,6 +44,7 @@ JAVA_BOOLEAN compareStringToCharArray(const char* str, JAVA_ARRAY_CHAR* chrs, in
 
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
+    sourceData += (off * sizeof(JAVA_ARRAY_BYTE*));
     NSStringEncoding enc;
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)encoding;
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encString->java_lang_String_value)->data;
@@ -52,7 +53,14 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         enc = NSUTF8StringEncoding;
     } else {
         if(compareStringToCharArray("US-ASCII", encArr, arrLength)) {
-            enc = NSASCIIStringEncoding;
+            JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
+            retainObj(destArr);
+            JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+            for(int iter = 0 ; iter < len ; iter++) {
+                dest[iter] = sourceData[iter];
+            }
+            
+            return destArr;
         } else {
             if(compareStringToCharArray("UTF-16", encArr, arrLength)) {
                 enc = NSUTF16StringEncoding;
@@ -64,22 +72,24 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     }
     
     // first try to optimize encoding in case of US-ASCII characters
-    JAVA_BOOLEAN ascii = JAVA_TRUE;
-    for(int iter = 0 ; iter < len ; iter++) {
-        if(sourceData[iter] > 126) {
-            ascii = JAVA_FALSE;
-            break;
-        }
-    }
-    if(ascii) {
-        JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-        retainObj(destArr);
-        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    if(enc == NSUTF8StringEncoding) {
+        JAVA_BOOLEAN ascii = JAVA_TRUE;
         for(int iter = 0 ; iter < len ; iter++) {
-            dest[iter] = sourceData[iter];
+            if(sourceData[iter] < 0) {
+                ascii = JAVA_FALSE;
+                break;
+            }
         }
-        
-        return destArr;
+        if(ascii) {
+            JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
+            retainObj(destArr);
+            JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+            for(int iter = 0 ; iter < len ; iter++) {
+                dest[iter] = sourceData[iter];
+            }
+            
+            return destArr;
+        }
     }
 
     // this allows emojii to work with the Strings properly

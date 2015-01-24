@@ -326,15 +326,19 @@ public class Parser extends ClassVisitor {
     
     private static String encodeString(String con) {
         String str = con.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+        return encodeStringSlashU(str);
+    }
+    
+    private static String encodeStringSlashU(String str) {
         int len = str.length();
         for(int iter = 0 ; iter < len ; iter++) {
             char c = str.charAt(iter);
             if(c > 127) {
                 // needs encoding... Verify there are no more characters to encode
                 if(iter == len) {
-                    return str.replace("" + c, "\\u" + fourChars(Integer.toHexString(c)));
+                    return str.replace("" + c, "\\\\u" + fourChars(Integer.toHexString(c)));
                 }
-                return encodeString(str.replace("" + c, "\\u" + fourChars(Integer.toHexString(c))));
+                return encodeStringSlashU(str.replace("" + c, "\\\\u" + fourChars(Integer.toHexString(c))));
             }
         }
         return str;
