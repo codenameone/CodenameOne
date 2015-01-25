@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.Parser;
 import java.util.List;
 import org.objectweb.asm.Handle;
@@ -60,6 +61,7 @@ public class Ldc extends Instruction {
             } else if (sort == Type.ARRAY) {
                 try {
                     String t = tp.getElementType().getInternalName().replace('/', '_').replace('$', '_');
+                    ByteCodeClass.addArrayType(t, tp.getDimensions());
                     if(!dependencyList.contains(t)) {
                         dependencyList.add(t);
                     }
