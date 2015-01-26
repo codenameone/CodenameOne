@@ -60,17 +60,14 @@ public class FaceBookAccess {
     private static String clientId = "132970916828080";
     private static String redirectURI = "http://www.codenameone.com/";
     private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
-    private static String[] permissions = new String[]{"user_photos",
-        "friends_photos", "publish_stream", "read_stream", "user_relationships",
-        "user_birthday", "friends_birthday", "friends_relationships",
-        "read_mailbox", "user_events", "friends_events", "user_about_me"};
+    private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
     private static FaceBookAccess instance = new FaceBookAccess();
     private Slider slider;
     private ConnectionRequest current;
     private Vector responseCodeListeners = new Vector();
     private static String token;
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
-    private static String apiVersion = "";
+    private static String apiVersion = "v2.0";
     
     
     private FaceBookAccess() {
