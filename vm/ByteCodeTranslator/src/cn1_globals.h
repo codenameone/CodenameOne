@@ -1005,9 +1005,9 @@ extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* 
 
 
 #define swapStack(array, sp) { \
-    struct elementStruct t = array[sp]; \
-    array[sp] = array[sp - 1]; \
-    array[sp - 1] = t; \
+    struct elementStruct t = array[sp-1]; \
+    array[sp-1] = array[sp - 2]; \
+    array[sp - 2] = t; \
 }
 
 extern struct clazz class__java_lang_Class;
