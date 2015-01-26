@@ -202,6 +202,11 @@ public final class Display {
     public static final int DENSITY_HD = 60;
 
     /**
+     * Intermediate density for screens that sit somewhere between HD to 2HD
+     */
+    public static final int DENSITY_560 = 65;
+    
+    /**
      * Double the HD level density
      */
     public static final int DENSITY_2HD = 70;
