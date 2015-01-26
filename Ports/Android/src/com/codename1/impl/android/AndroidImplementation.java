@@ -521,6 +521,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Display.DENSITY_VERY_HIGH;
             case 480: // DisplayMetrics.DENSITY_XXHIGH
                 return Display.DENSITY_HD;
+            case 560: // DisplayMetrics.DENSITY_560
+                return Display.DENSITY_560;
             case 640: // DisplayMetrics.DENSITY_XXXHIGH 
                 return Display.DENSITY_2HD;
                  
