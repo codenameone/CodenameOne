@@ -866,7 +866,7 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
                 e--;
                 exp *= 10;
             }
-            db /= exp;
+            db *= exp;
         }
     }
     return db;
