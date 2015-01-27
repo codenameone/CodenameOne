@@ -1414,7 +1414,11 @@ public class Collections {
             return -1;
         }
 
-               
+        if (NumberComparator.isNumber(object)){
+            Comparator comparator = NumberComparator.createComparator(object.getClass());
+            return binarySearch(list, object, comparator);
+        }
+            
         if (!(list instanceof RandomAccess)) {
             ListIterator<? extends java.lang.Comparable<? super T>> it = list.listIterator();
             while (it.hasNext()) {
@@ -1587,8 +1591,12 @@ public class Collections {
      */
     public static <T extends Object & java.lang.Comparable<? super T>> T max(
             Collection<? extends T> collection) {
+        
         Iterator<? extends T> it = collection.iterator();
         T max = it.next();
+        if ( NumberComparator.isNumber(max)){
+            return (T)max(collection, NumberComparator.createComparator(max.getClass()));
+        }
         while (it.hasNext()) {
             T next = it.next();
             if (max.compareTo(next) < 0) {
@@ -1645,6 +1653,9 @@ public class Collections {
             Collection<? extends T> collection) {
         Iterator<? extends T> it = collection.iterator();
         T min = it.next();
+        if ( NumberComparator.isNumber(min)){
+            return (T)max(collection, NumberComparator.createComparator(min.getClass()));
+        }
         while (it.hasNext()) {
             T next = it.next();
             if (min.compareTo(next) > 0) {

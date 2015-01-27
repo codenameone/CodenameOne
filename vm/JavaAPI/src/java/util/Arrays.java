@@ -622,7 +622,9 @@ public class Arrays {
         if (array.length == 0) {
             return -1;
         }
-
+        if ( NumberComparator.isNumber(object)){
+            return binarySearch(array, startIndex, endIndex, object, NumberComparator.createComparator(object.getClass()));
+        }
         int low = startIndex, mid = -1, high = endIndex - 1, result = 0;
         while (low <= high) {
             mid = (low + high) >>> 1;
@@ -2642,6 +2644,12 @@ public class Arrays {
     private static void mergeSort(Object[] in, Object[] out, int start,
             int end) {
         int len = end - start;
+        
+        Object o = in[start];
+        if ( NumberComparator.isNumber(o)){
+            mergeSort(in, out, start, end, NumberComparator.createComparator(o.getClass()));
+            return;
+        }
         // use insertion sort for small arrays
         if (len <= SIMPLE_LENGTH) {
             for (int i = start + 1; i < end; i++) {
@@ -2810,6 +2818,9 @@ public class Arrays {
      */
     @SuppressWarnings("unchecked")
     private static int find(Object[] arr, java.lang.Comparable val, int bnd, int l, int r) {
+        if ( NumberComparator.isNumber(val)){
+            return find(arr, val, bnd, l, r, NumberComparator.createComparator(val.getClass()));
+        }
         int m = l;
         int d = 1;
         while (m <= r) {
