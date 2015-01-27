@@ -65,8 +65,16 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
             if(compareStringToCharArray("UTF-16", encArr, arrLength)) {
                 enc = NSUTF16StringEncoding;
             } else {
-                // need to throw an exception...
-                enc = NSUTF8StringEncoding;
+                if(compareStringToCharArray("ISO-8859-1", encArr, arrLength)) {
+                    enc = NSISOLatin1StringEncoding;
+                } else {
+                    if(compareStringToCharArray("ISO-8859-2", encArr, arrLength)) {
+                        enc = NSISOLatin1StringEncoding;
+                    } else {
+                        // need to throw an exception...
+                        enc = NSUTF8StringEncoding;
+                    }
+                }
             }
         }
     }
@@ -174,6 +182,14 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         colon->__codenameOneReferenceCount = 999999;
         indent = newStringFromCString(threadStateData, "    at ");
         indent->__codenameOneReferenceCount = 999999;
+        removeObjectFromHeapCollection(threadStateData, newline);
+        removeObjectFromHeapCollection(threadStateData, dot);
+        removeObjectFromHeapCollection(threadStateData, colon);
+        removeObjectFromHeapCollection(threadStateData, indent);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)newline)->java_lang_String_value);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)dot)->java_lang_String_value);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)colon)->java_lang_String_value);
+        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)indent)->java_lang_String_value);
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
     releaseObj(threadStateData, bld);
