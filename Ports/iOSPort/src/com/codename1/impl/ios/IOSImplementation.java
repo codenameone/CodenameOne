@@ -489,18 +489,19 @@ public class IOSImplementation extends CodenameOneImplementation {
                     textEditorHidden = false;
                 }
                 boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
-                
-                nativeInstance.editStringAt(x,
-                        y,
-                        w,
-                        h,
-                        fnt.peer, currentEditing.isSingleLineTextArea(),
-                        currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                        stl.getFgColor(), 0,//peer, 
-                        pt,
-                        pb,
-                        pl,
-                        pr, hint, showToolbar);
+                if ( currentEditing != null ){
+                    nativeInstance.editStringAt(x,
+                            y,
+                            w,
+                            h,
+                            fnt.peer, currentEditing.isSingleLineTextArea(),
+                            currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
+                            stl.getFgColor(), 0,//peer, 
+                            pt,
+                            pb,
+                            pl,
+                            pr, hint, showToolbar);
+                }
             }
         });
         if(isAsyncEditMode()) {
