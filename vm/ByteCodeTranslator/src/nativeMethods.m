@@ -313,15 +313,23 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
 }
 
 
-JAVA_OBJECT java_lang_Double_toString___double_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) {
+JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d, JAVA_BOOLEAN b) {
     char s[32];
-    sprintf(s, "%lf", d);
+    if ( !b ){
+        sprintf(s, "%lf", d);
+    } else {
+        sprintf(s, "%lE", d);
+    }
     return newStringFromCString(threadStateData, s);
 }
 
-JAVA_OBJECT java_lang_Float_toString___float_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT d) {
+JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT d, JAVA_BOOLEAN b) {
     char s[32];
-    sprintf(s, "%f", d);
+    if ( !b ){
+        sprintf(s, "%f", d);
+    } else {
+        sprintf(s, "%E", d);
+    }
     return newStringFromCString(threadStateData, s);
 }
 

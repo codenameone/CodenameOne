@@ -209,7 +209,35 @@ public final class Float{
      * a&lt10. The magnitude is then represented as the integer part of a, as a single decimal digit, followed by '.' (.), followed by decimal digits representing the fractional part of a, followed by the letter 'E' (E), followed by a representation of n as a decimal integer, as produced by the method
      * of one argument. How many digits must be printed for the fractional part of m or a? There must be at least one digit to represent the fractional part, and beyond that as many, but only as many, more digits as are needed to uniquely distinguish the argument value from adjacent values of type float. That is, suppose that x is the exact mathematical value represented by the decimal representation produced by this method for a finite nonzero argument f. Then f must be the float value nearest to x; or, if two float values are equally close to xthen f must be one of them and the least significant bit of the significand of f must be 0.
      */
-    public native static java.lang.String toString(float f);
+    public static java.lang.String toString(float d){
+        float m = Math.abs(d);
+        if ( d == POSITIVE_INFINITY ){
+            return "Infinity";
+        } else if ( d == NEGATIVE_INFINITY ){
+            return "-Infinity";
+        } else if ( d == 0 ){
+            return "0.0";
+        } else if ( m >= 1e-3 && m < 1e7 ){
+            String str = toStringImpl(d, false);
+            char[] chars = str.toCharArray();
+            int i = chars.length-1;
+            char c;
+            while ( i >=0 && (c = chars[i]) == '0' ){
+                i--;
+            }
+            if ( i < 0 || str.indexOf('.') == -1 ){
+                return str;
+            } else if ( chars[i] == '.' || chars[i] == ','){
+                i++;
+            }
+            
+            return str.substring(0, i+1);
+        } else {//if ( d < 1e-3 || d >= 1e7 ){
+            return toStringImpl(d, true);
+        }
+       
+    }
+    public native static java.lang.String toStringImpl(float f, boolean scientificNotation);
 
     /**
      * Returns the floating point value represented by the specified String. The string s is interpreted as the representation of a floating-point value and a Float object representing that value is created and returned.
