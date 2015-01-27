@@ -207,7 +207,8 @@ public class DefaultRenderer {
    * @return the simple renderers array
    */
   public SimpleSeriesRenderer[] getSeriesRenderers() {
-    return mRenderers.toArray(new SimpleSeriesRenderer[0]);
+    SimpleSeriesRenderer[] out = new SimpleSeriesRenderer[mRenderers.size()];
+    return mRenderers.toArray(out);
   }
 
   /**

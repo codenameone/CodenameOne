@@ -164,7 +164,8 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer {
    * @return the type of the outside fill of the line.
    */
   public FillOutsideLine[] getFillOutsideLine() {
-    return mFillBelowLine.toArray(new FillOutsideLine[0]);
+    FillOutsideLine[] out = new FillOutsideLine[mFillBelowLine.size()];
+    return mFillBelowLine.toArray(out);
   }
 
   /**

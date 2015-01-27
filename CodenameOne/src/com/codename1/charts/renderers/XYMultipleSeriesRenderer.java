@@ -571,7 +571,8 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the X text label locations
    */
   public synchronized Double[] getXTextLabelLocations() {
-    return mXTextLabels.keySet().toArray(new Double[0]);
+    Double[] out = new Double[mXTextLabels.keySet().size()];
+    return mXTextLabels.keySet().toArray(out);
   }
 
   /**
@@ -685,7 +686,8 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the Y text label locations
    */
   public synchronized Double[] getYTextLabelLocations(int scale) {
-    return mYTextLabels.get(scale).keySet().toArray(new Double[0]);
+    Double[] out = new Double[mYTextLabels.get(scale).keySet().size()];
+    return mYTextLabels.get(scale).keySet().toArray(out);
   }
 
   /**

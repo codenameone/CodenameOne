@@ -547,6 +547,7 @@ public abstract class AbstractChart  {
             throw new RuntimeException("Failed to find appropriate stop character");
         }
         List<String> parts = com.codename1.util.StringUtil.tokenize(input, sep);
-        return parts.toArray(new String[0]);
+        String[] out = new String[parts.size()];
+        return parts.toArray(out);
     }
 }

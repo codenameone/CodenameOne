@@ -103,7 +103,8 @@ public class XYMultipleSeriesDataset {
    * @return the XY series array
    */
   public synchronized XYSeries[] getSeries() {
-    return mSeries.toArray(new XYSeries[0]);
+    XYSeries[] out = new XYSeries[mSeries.size()];
+    return mSeries.toArray(out);
   }
 
 }
