@@ -39,6 +39,7 @@ import java.util.ArrayList;
 public class AutoCompleteTextField extends TextField {
 
     private Container popup;
+    private boolean dontCalcSize = false;
     private FilterProxyListModel<String> filter;
     private ActionListener listener = new FormPointerListener();
     private ListCellRenderer completionRenderer;
@@ -59,7 +60,17 @@ public class AutoCompleteTextField extends TextField {
      * @param listModel a list model containing potential string suggestions
      */ 
     public AutoCompleteTextField(ListModel<String> listModel) {
-        popup = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        popup = new Container(new BoxLayout(BoxLayout.Y_AXIS)){
+
+            @Override
+            public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
+                if(dontCalcSize){
+                    return;
+                }
+                super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
+            }
+        
+        };
         filter = new FilterProxyListModel<String>(listModel);                
         popup.setScrollable(false);
         popup.setUIID("AutoCompletePopup");
@@ -82,6 +93,13 @@ public class AutoCompleteTextField extends TextField {
     protected void initComponent() {
         super.initComponent();
         getComponentForm().addPointerReleasedListener(listener);
+        Display.getInstance().callSerially(new Runnable() {
+
+            @Override
+            public void run() {
+                addPopup();
+            }
+        });
     }
 
     /**
@@ -91,7 +109,13 @@ public class AutoCompleteTextField extends TextField {
     protected void deinitialize() {
         super.deinitialize();
         getComponentForm().removePointerReleasedListener(listener);
-        removePopup();
+        Display.getInstance().callSerially(new Runnable() {
+
+            @Override
+            public void run() {
+                removePopup();
+            }
+        });
     }
 
     void setParentText(String text) {
@@ -119,9 +143,6 @@ public class AutoCompleteTextField extends TextField {
      */
     protected void updateFilterList() {
         Form f = getComponentForm();
-        if (f != null && popup.getParent() == null) {
-            addPopup();
-        }
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if(v != popup.isVisible()) {
             popup.setVisible(v);
@@ -129,8 +150,11 @@ public class AutoCompleteTextField extends TextField {
             f.repaint();
         } 
         if(f != null) {
+            dontCalcSize = false;
             f.revalidate();
+            dontCalcSize = true;
         }
+
     }
     
     /**
@@ -241,7 +265,9 @@ public class AutoCompleteTextField extends TextField {
     private void addPopup() {
         final Form f = getComponentForm();
         popup.removeAll();
-        filterImpl(getText());        
+        popup.setVisible(false);
+        popup.setEnabled(false);
+        filter(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
         l.setScrollToSelected(false);
         l.setItemGap(0);
@@ -264,10 +290,12 @@ public class AutoCompleteTextField extends TextField {
                 if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
                     Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
                 }
-                removePopup();
+                popup.setVisible(false);
+                popup.setEnabled(false);
+                f.repaint();
             }
         });
-        popup.addComponent(l);
+        
         byte [] units = popup.getStyle().getMarginUnit();
         if(units != null){
             units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
@@ -293,6 +321,12 @@ public class AutoCompleteTextField extends TextField {
         popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
         popup.setPreferredW(getWidth());
+        popup.setHeight(popupHeight);
+        popup.setWidth(getWidth());
+        popup.addComponent(l);
+        popup.layoutContainer();
+        //block the reflow of this popup, which can cause painting problems
+        dontCalcSize = true;
         
         if (f != null) {
             if (popup.getParent() == null) {
@@ -329,11 +363,16 @@ public class AutoCompleteTextField extends TextField {
             if (f.getLayeredPane().getComponentCount() > 0 && popup.getComponentCount() > 0) {
                 if (!popup.getComponentAt(0).
                         contains(evt.getX(), evt.getY())) {
-                    removePopup();
+                    //removePopup();
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    f.repaint();
+                    
                 }
             } else {
                 if (contains(evt.getX(), evt.getY())) {
-                    addPopup();
+                    popup.setVisible(true);
+                    popup.setEnabled(true);
                     evt.consume();
                     pointerReleased(evt.getX(), evt.getY());
                 }
