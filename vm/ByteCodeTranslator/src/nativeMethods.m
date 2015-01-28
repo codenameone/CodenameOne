@@ -877,7 +877,7 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
     }
     data[length] = 0;
     JAVA_DOUBLE db = strtod(data, NULL);
-    int exp = 1;
+    JAVA_LONG exp = 1;
     if(e != 0) {
         if(e < 0) {
             while(e < 0) {
