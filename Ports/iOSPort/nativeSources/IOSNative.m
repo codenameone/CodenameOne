@@ -933,7 +933,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNSDataResource___java_lang_Stri
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
     NSString* nameNS = [NSString stringWithUTF8String:chrs];
     const char* chrs2 = stringToUTF8(CN1_THREAD_STATE_PASS_ARG type);
-    NSString* typeNS = [NSString stringWithUTF8String:chrs2];
+    NSString* typeNS = chrs2 == NULL ? nil : [NSString stringWithUTF8String:chrs2];
     NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
     NSData* iData = [NSData dataWithContentsOfFile:path];
 #ifndef CN1_USE_ARC

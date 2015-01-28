@@ -2084,18 +2084,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public InputStream getResourceAsStream(Class cls, String resource) {
-        StringTokenizer t = new StringTokenizer(resource, "/.");
-        int cnt = t.countTokens();
-        while(cnt > 2) {
-            t.nextToken();
+        // Flatten resources
+        int lastSlash = resource.lastIndexOf("/");
+        if ( lastSlash != -1 ){
+            resource = resource.substring(lastSlash+1);
         }
-        String name = t.nextToken();
-        String type = t.nextToken();
-        int val = nativeInstance.getResourceSize(name, type);
+        
+        int val = nativeInstance.getResourceSize(resource, null);
         if(val <= 0) {
             return null;
         }
-        return new BufferedInputStream(new NSDataInputStream(name, type), resource);
+        return new BufferedInputStream(new NSDataInputStream(resource, null), resource);
     }
 
     private static Map softReferenceMap = new HashMap();

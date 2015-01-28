@@ -1205,7 +1205,7 @@ void loadResourceFile
 
 int getResourceSize(const char* name, int nameLen, const char* type, int typeLen) {
     NSString* nameNS = [NSString stringWithUTF8String:name];
-    NSString* typeNS = [NSString stringWithUTF8String:type];
+    NSString* typeNS = type == NULL ? nil : [NSString stringWithUTF8String:type];
     //NSLog(@"getResourceSize %@ %@ started", nameNS, typeNS);
     NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
     if(path == nil) {
