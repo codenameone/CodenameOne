@@ -2224,12 +2224,21 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    // unsupported by API for some reason???
+    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+        MPMoviePlayerController* m = (MPMoviePlayerController*) obj;
+        return (int)m.currentPlaybackTime * 1000;
+    }
     return 0;
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
-    // unsupported by API for some reason???
+    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+        MPMoviePlayerController* m = (MPMoviePlayerController*) obj;
+        m.currentPlaybackTime = time/1000;
+        return (int)m.currentPlaybackTime * 1000;
+    }
     return 0;
 }
 
