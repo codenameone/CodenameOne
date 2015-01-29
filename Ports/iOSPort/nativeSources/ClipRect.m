@@ -126,6 +126,7 @@ static CGRect drawingRect;
         glStencilFunc(GL_EQUAL, 1, 0xff);
         clipIsTexture = YES;
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        [super clipBlock:NO];
         
         return;
     }
