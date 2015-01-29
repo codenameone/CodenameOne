@@ -319,12 +319,12 @@ void gcReleaseObj(JAVA_OBJECT o) {
     if(releaseQueue == 0) {
         releaseQueue = malloc(CN1_FINALIZER_QUEUE_SIZE * sizeof(JAVA_OBJECT));
     }
-    for(int iter = 0 ; iter < releaseQueueSize ; iter++) {
+    /*for(int iter = 0 ; iter < releaseQueueSize ; iter++) {
         if(releaseQueue[iter] == o) {
             //unlockCriticalSection();
             return;
         }
-    }
+    }*/
     releaseQueue[releaseQueueSize] = o;
     releaseQueueSize++;
     //unlockCriticalSection();
@@ -379,6 +379,7 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
     }
     if(currentSizeOfAllObjectsInHeap < sizeOfAllObjectsInHeap) {
         allObjectsInHeap[currentSizeOfAllObjectsInHeap] = obj;
+        obj->__heapPosition = currentSizeOfAllObjectsInHeap;
         currentSizeOfAllObjectsInHeap++;
     } else {
         int pos = findPointerPosInHeap(JAVA_NULL);
@@ -625,7 +626,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    if(obj->__heapPosition < 0) {
+    /*if(obj->__heapPosition < 0) {
         int t = currentSizeOfAllObjectsInHeap;
         for(int iter = 0 ; iter < t ; iter++) {
             if(obj == allObjectsInHeap[iter]) {
@@ -633,7 +634,7 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
                 break;
             }
         }
-    }
+    }*/
     
     if(obj->__codenameOneParentClsReference != 0 && obj->__codenameOneParentClsReference->isArray) {
         free(((JAVA_ARRAY)obj)->data);
@@ -659,9 +660,9 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(obj->__codenameOneGcMark == currentGcMarkValue) {
         if(force) {
             if(recursionBlocker == 0) {
-                recursionBlocker = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT*) * 512);
+                recursionBlocker = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT*) * 65536);
             }
-            if(recursionBlockerPosition > 511) {
+            if(recursionBlockerPosition > 65535) {
                 return;
             }
             for(int iter = 0 ; iter < recursionBlockerPosition ; iter++) {

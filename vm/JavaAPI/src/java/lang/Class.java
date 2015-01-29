@@ -44,6 +44,7 @@ public final class Class<T> {
      * class named java.lang.Thread: Classt= Class.forName("java.lang.Thread")
      */
     public static java.lang.Class forName(java.lang.String className) throws java.lang.ClassNotFoundException {
+        className = className.replace('$', '.');
         Class c = forNameImpl(className);
         if(c == null) {
             throw new ClassNotFoundException(className);

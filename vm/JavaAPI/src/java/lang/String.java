@@ -45,12 +45,13 @@ public final class String implements java.lang.CharSequence{
     
     // cached native string
     private long nsString;
+    private static final char[] ZERO_CHAR = new char[0];
     
     /**
      * Initializes a newly created String object so that it represents an empty character sequence.
      */
     public String(){
-        value = new char[0];
+        value = ZERO_CHAR;
         offset = 0;
         count = 0;        
     }
@@ -804,7 +805,7 @@ public final class String implements java.lang.CharSequence{
         return s;
     }
 
-    java.lang.String valueOf(char[] data){
+    public static java.lang.String valueOf(char[] data){
         return new String(data, 0, data.length);
     }
 

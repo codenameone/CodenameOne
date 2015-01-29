@@ -57,17 +57,19 @@ public final class System {
      */
     public static native void arraycopy(java.lang.Object src, int srcOffset, java.lang.Object dst, int dstOffset, int length);
 
+    // prevents the GC from collecting the GC thread itself... Since the GC doesn't traverse itself the GC object is 
+    // invisible and can be collected by the GC, however this static field places it in the GC (recursion much...).
+    private static Thread gcThreadInstance;
+    
     private static final Object LOCK = new Object();
-    private static boolean heavy;
     private static boolean startedGc;
     // invoked from native code
     private static void startGCThread() {
         if(!startedGc) {
             startedGc = true;
             // not ideal but does the job for now, since gc is pretty efficient the cost is very low
-            new Thread("GC Thread") {
+            gcThreadInstance = new Thread("GC Thread") {
                 public void run() {
-                    long counter = 0;
                     synchronized(LOCK) {
                         // wait two seconds initially so startup won't be hindered by slow waits
                         try {
@@ -77,13 +79,7 @@ public final class System {
                     }
                     while(true) {
                         try {
-                            counter++;
-                            if(heavy || counter % 10 == 0) {
-                                System.gcMarkSweep();
-                                heavy = false;
-                            } else {
-                                System.gcLight();
-                            }
+                            System.gcMarkSweep();
                             synchronized(LOCK) {
                                 LOCK.wait(1000);
                             }
@@ -91,7 +87,8 @@ public final class System {
                         }
                     }
                 }
-            }.start();
+            };
+            gcThreadInstance.start();
         }
     }
     
@@ -115,7 +112,6 @@ public final class System {
      * Runtime.getRuntime().gc()
      */
     public static void gc() {
-        heavy = true;
         startGCThread();
         synchronized(LOCK) {
             LOCK.notify();
