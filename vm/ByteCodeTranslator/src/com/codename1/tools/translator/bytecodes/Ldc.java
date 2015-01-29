@@ -60,7 +60,19 @@ public class Ldc extends Instruction {
                 }
             } else if (sort == Type.ARRAY) {
                 try {
-                    String t = tp.getElementType().getInternalName().replace('/', '_').replace('$', '_');
+                    Type ttt = tp.getElementType();
+                    switch(ttt.getSort()) {
+                        case Type.BOOLEAN:
+                        case Type.BYTE:
+                        case Type.CHAR:
+                        case Type.DOUBLE:
+                        case Type.FLOAT:
+                        case Type.INT:
+                        case Type.LONG:
+                        case Type.SHORT:
+                            return;
+                    }
+                    String t = ttt.getInternalName().replace('/', '_').replace('$', '_');
                     ByteCodeClass.addArrayType(t, tp.getDimensions());
                     if(!dependencyList.contains(t)) {
                         dependencyList.add(t);
@@ -145,7 +157,36 @@ public class Ldc extends Instruction {
                 b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class_array");
                 b.append(tp.getDimensions());
                 b.append("__");
-                b.append(tp.getElementType().getInternalName().replace('/', '_').replace('$', '_'));
+                Type ttt = tp.getElementType();
+                switch(ttt.getSort()) {
+                    case Type.BOOLEAN:
+                        b.append("JAVA_BOOLEAN");
+                        break;
+                    case Type.BYTE:
+                        b.append("JAVA_BYTE");
+                        break;
+                    case Type.CHAR:
+                        b.append("JAVA_CHAR");
+                        break;
+                    case Type.DOUBLE:
+                        b.append("JAVA_DOUBLE");
+                        break;
+                    case Type.FLOAT:
+                        b.append("JAVA_FLOAT");
+                        break;
+                    case Type.INT:
+                        b.append("JAVA_INT");
+                        break;
+                    case Type.LONG:
+                        b.append("JAVA_LONG");
+                        break;
+                    case Type.SHORT:
+                        b.append("JAVA_SHORT");
+                        break;
+                    default:
+                        b.append(ttt.getInternalName().replace('/', '_').replace('$', '_'));
+                        break;
+                }
                 b.append(");\n");
             } else if (sort == Type.METHOD) {
                 b.append("/* UNKNOWN CST type internal: ");
