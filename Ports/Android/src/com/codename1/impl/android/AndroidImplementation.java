@@ -6018,6 +6018,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
+    
+    
+    
+    @Override
+    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+        
+        if ( t1 != null ){
+            CN1Matrix4f m1 = (CN1Matrix4f)t1.getNativeTransform();
+            CN1Matrix4f m2 = (CN1Matrix4f)t2.getNativeTransform();
+            return m1.equals(m2);
+        } else {
+            return t2 == null;
+        }
+    }
+
     @Override
     public boolean isTransformSupported() {
         return true;

@@ -1755,6 +1755,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void setTransform(Object graphics, Transform transform) {
         ((NativeGraphics)graphics).transform = transform;
         ((NativeGraphics)graphics).transformApplied = false;
+        ((NativeGraphics)graphics).applyTransform();
         
     }
     
@@ -1775,6 +1776,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         );
     }
 
+    @Override
+    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+        if ( t1 != null ){
+            Matrix m1 = (Matrix)t1.getNativeTransform();
+            Matrix m2 = (Matrix)t2.getNativeTransform();
+            return m1.equals(m2);
+        } else {
+            return t2 == null;
+        }
+        
+    }
+    
     @Override
     public boolean isTransformSupported(Object graphics) {
         return ((NativeGraphics)graphics).isTransformSupported();

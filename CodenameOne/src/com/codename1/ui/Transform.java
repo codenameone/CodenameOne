@@ -51,6 +51,97 @@ public class Transform {
    
     private CodenameOneImplementation impl = null;
     
+    private static class ImmutableTransform extends Transform {
+
+        public ImmutableTransform(Object nativeTransform) {
+            super(nativeTransform);
+        }
+
+        private void unsupported(){
+            throw new RuntimeException("Cannot change immutable transform");
+        }
+        
+        @Override
+        public void setCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+            unsupported();
+        }
+
+        @Override
+        public void setIdentity() {
+            unsupported();
+        }
+
+        @Override
+        public void setOrtho(float left, float right, float bottom, float top, float near, float far) {
+            unsupported();
+        }
+
+        @Override
+        public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
+            unsupported();
+        }
+
+        @Override
+        public void setRotation(float angle, float px, float py) {
+            unsupported();
+        }
+
+        @Override
+        public void setTransform(Transform t) {
+            unsupported();
+        }
+
+        @Override
+        public void setRotation(float angle, float x, float y, float z) {
+            unsupported();
+        }
+
+        @Override
+        public void setTranslation(float x, float y) {
+            unsupported();
+        }
+
+        @Override
+        public void setTranslation(float x, float y, float z) {
+            unsupported();
+        }
+
+        @Override
+        public void rotate(float angle, float px, float py) {
+            unsupported();
+        }
+
+        @Override
+        public void rotate(float angle, float x, float y, float z) {
+            unsupported();
+        }
+        
+        
+
+        @Override
+        public void translate(float x, float y) {
+            unsupported();
+        }
+
+        @Override
+        public void translate(float x, float y, float z) {
+            unsupported();
+        }
+        
+        
+
+        @Override
+        public void scale(float x, float y) {
+            unsupported();
+        }
+
+        @Override
+        public void scale(float x, float y, float z) {
+            unsupported();
+        }
+        
+    }
+    
     
     /**
      * Constant for transform type. Transform is not a special matrix.
@@ -72,6 +163,14 @@ public class Transform {
      * Constant for transform type.  Transform is a scale transform only.
      */
     public static final int TYPE_SCALE=2;
+    
+    private static Transform _IDENTITY;
+    public static Transform IDENTITY(){
+        if ( _IDENTITY == null ){
+            _IDENTITY = new ImmutableTransform(Display.getInstance().getImplementation().makeTransformIdentity());
+        }
+        return _IDENTITY;
+    }
     
     /**
      * Private constructor
@@ -142,7 +241,7 @@ public class Transform {
      * @return True if the transform is the identity.
      */
     public boolean isIdentity(){
-        return (type == TYPE_IDENTITY);
+        return (type == TYPE_IDENTITY) || this.equals(IDENTITY());
     }
     
     
@@ -408,6 +507,7 @@ public class Transform {
     }
     
     public String toString(){
+        getNativeTransform();
         return ""+nativeTransform;
     }
     
@@ -711,5 +811,14 @@ public class Transform {
         return Display.getInstance().getImplementation().isPerspectiveTransformSupported();
     }
     
+    
+    public boolean equals(Transform t2){
+        if ( type == TYPE_IDENTITY && t2.type == TYPE_IDENTITY ){
+            // Since this will be *extremely* common, we will
+            // do this check first
+            return true;
+        }
+        return impl.transformEqualsImpl(this, t2);
+    }
     
 }

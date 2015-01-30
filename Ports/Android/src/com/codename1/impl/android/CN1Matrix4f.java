@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.opengl.Matrix;
+import java.util.Arrays;
 
 
 
@@ -147,7 +148,12 @@ public final class CN1Matrix4f {
         }
     }
 
-    
+    public boolean equals(CN1Matrix4f matrix){
+        if ( matrix == null ){
+            return false;
+        }
+        return Arrays.equals(data, matrix.data);
+    }
     
     public static CN1Matrix4f make(float[] data) {
         return Factory.getDefault().makeMatrix(data);

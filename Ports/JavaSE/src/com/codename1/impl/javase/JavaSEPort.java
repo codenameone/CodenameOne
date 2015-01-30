@@ -4202,6 +4202,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
+    @Override
+    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+        if ( t1 != null ){
+            AffineTransform at1 = (AffineTransform)t1.getNativeTransform();
+            AffineTransform at2 = (AffineTransform)t2.getNativeTransform();
+            return at1.equals(at2);
+        } else {
+            return t2 == null;
+        }
+    }
+    
+    
     
     
     @Override

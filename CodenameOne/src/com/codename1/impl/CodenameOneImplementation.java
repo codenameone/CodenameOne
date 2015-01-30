@@ -4921,6 +4921,10 @@ public abstract class CodenameOneImplementation {
         return false;
     }
     
+    public boolean transformEqualsImpl(Transform t1, Transform t2){
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.

@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.ios;
 
+import java.util.Arrays;
+
 
 
 /**
@@ -266,6 +268,15 @@ public final class Matrix {
 
     }
 
+    
+    public boolean equals(Matrix m2){
+        if ( m2 == null ){
+            return false;
+        }
+        return Arrays.equals(this.data, m2.data);
+        
+    }
+    
     public boolean isIdentity() {
         for (int i = 0; i < 16; i++) {
             if (i % 5 == 0 && data[i] != 1f) {
