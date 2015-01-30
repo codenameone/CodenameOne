@@ -960,7 +960,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @SuppressWarnings("unchecked")
     public synchronized <T> T[] toArray(T[] contents) {
         if (elementCount > contents.length) {
-            return null;
+            throw new RuntimeException("Collection.toArray(T[]) requires an array of the same size as the collection to be passed as a parameter. ");
         }
         System.arraycopy(elementData, 0, contents, 0, elementCount);
         if (elementCount < contents.length) {

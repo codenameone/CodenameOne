@@ -623,7 +623,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     public <T> T[] toArray(T[] contents) {
         Object[] arr = contents;
         if (size > arr.length) {
-            arr = new Object[size];
+            throw new RuntimeException("Collection.toArray(T[]) requires an array of the same size as the collection to be passed as a parameter. ");
         }
         System.arraycopy(array, firstIndex, arr, 0, size);
         if (size < arr.length) {
