@@ -154,6 +154,9 @@ public class BoxLayout extends Layout{
         }
     }
     
+    private Dimension dim = new Dimension(0, 0);
+
+
     /**
      * @inheritDoc
      */
@@ -176,9 +179,9 @@ public class BoxLayout extends Layout{
                 height = Math.max(height, cmp.getPreferredH() + stl.getMargin(false, Component.TOP) + stl.getMargin(false, Component.BOTTOM));
             }
         }
-        Dimension d = new Dimension(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT),
-        height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
-        return d;
+        dim.setWidth(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT));
+        dim.setHeight(height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
+        return dim;
     }  
 
     /**

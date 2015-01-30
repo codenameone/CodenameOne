@@ -84,7 +84,48 @@ public class ScatterChart extends XYChart {
       paint.setStyle(Style.STROKE);
     }
     int length = points.size();
-    switch (renderer.getPointStyle()) {
+    // switch on ENUM's generates reflection code that screws up J2ME
+    PointStyle ps = renderer.getPointStyle();
+    if(ps == PointStyle.X) {
+      paint.setStrokeWidth(renderer.getPointStrokeWidth());
+      for (int i = 0; i < length; i += 2) {
+        drawX(canvas, paint, points.get(i), points.get(i + 1));
+      }
+    } else {
+        if(ps == PointStyle.CIRCLE) {
+            for (int i = 0; i < length; i += 2) {
+              drawCircle(canvas, paint, points.get(i), points.get(i + 1));
+            }
+        } else {
+            if(ps == PointStyle.TRIANGLE) {
+                float[] path = new float[6];
+                for (int i = 0; i < length; i += 2) {
+                  drawTriangle(canvas, paint, path, points.get(i), points.get(i + 1));
+                }
+            } else {
+                if(ps == PointStyle.SQUARE) {
+                    for (int i = 0; i < length; i += 2) {
+                      drawSquare(canvas, paint, points.get(i), points.get(i + 1));
+                    }
+                } else {
+                    if(ps == PointStyle.DIAMOND) {
+                        float[] path = new float[8];
+                        for (int i = 0; i < length; i += 2) {
+                          drawDiamond(canvas, paint, path, points.get(i), points.get(i + 1));
+                        }
+                    } else {
+                        if(ps == PointStyle.POINT) {
+                            for (int i = 0; i < length; i += 2) {
+                              canvas.drawPoint(points.get(i), points.get(i + 1), paint);
+                            }
+                        } 
+                    }
+                }
+            }
+        }
+    }
+
+    /*switch (renderer.getPointStyle()) {
     case X:
       paint.setStrokeWidth(renderer.getPointStrokeWidth());
       for (int i = 0; i < length; i += 2) {
@@ -118,7 +159,7 @@ public class ScatterChart extends XYChart {
         canvas.drawPoint(points.get(i), points.get(i + 1), paint);
       }
       break;
-    }
+    }*/
     paint.setStrokeWidth(stroke);
   }
 
@@ -163,7 +204,33 @@ public class ScatterChart extends XYChart {
     } else {
       paint.setStyle(Style.STROKE);
     }
-    switch (((XYSeriesRenderer) renderer).getPointStyle()) {
+    
+    // switch on ENUM's generates reflection code that screws up J2ME
+    PointStyle ps = ((XYSeriesRenderer) renderer).getPointStyle();
+    if(ps == PointStyle.X) {
+        drawX(canvas, paint, x + SHAPE_WIDTH, y);
+    } else {
+        if(ps == PointStyle.CIRCLE) {
+          drawCircle(canvas, paint, x + SHAPE_WIDTH, y);
+        } else {
+            if(ps == PointStyle.TRIANGLE) {
+              drawTriangle(canvas, paint, new float[6], x + SHAPE_WIDTH, y);
+            } else {
+                if(ps == PointStyle.SQUARE) {
+                  drawSquare(canvas, paint, x + SHAPE_WIDTH, y);
+                } else {
+                    if(ps == PointStyle.DIAMOND) {
+                      drawDiamond(canvas, paint, new float[8], x + SHAPE_WIDTH, y);
+                    } else {
+                        if(ps == PointStyle.POINT) {
+                          drawDiamond(canvas, paint, new float[8], x + SHAPE_WIDTH, y);
+                        } 
+                    }
+                }
+            }
+        }
+    }
+    /*switch (((XYSeriesRenderer) renderer).getPointStyle()) {
     case X:
       drawX(canvas, paint, x + SHAPE_WIDTH, y);
       break;
@@ -182,7 +249,7 @@ public class ScatterChart extends XYChart {
     case POINT:
       canvas.drawPoint(x + SHAPE_WIDTH, y, paint);
       break;
-    }
+    }*/
   }
 
   /**

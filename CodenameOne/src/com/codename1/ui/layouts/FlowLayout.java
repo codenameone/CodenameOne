@@ -233,6 +233,8 @@ public class FlowLayout extends Layout{
         }
     }
 
+    private Dimension dim = new Dimension(0, 0);
+
     /**
      * @inheritDoc
      */
@@ -263,8 +265,9 @@ public class FlowLayout extends Layout{
 
         width = Math.max(w, width);
 
-        return new Dimension(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT),
-            height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
+        dim.setWidth(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT));
+        dim.setHeight(height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
+        return dim;
     }
 
 

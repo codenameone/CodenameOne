@@ -99,7 +99,24 @@ public class LineChart extends XYChart {
         }
 
         final float referencePoint;
-        switch (fill.getType()) {
+        
+        // switch on ENUM's generates reflection code that screws up J2ME
+        FillOutsideLine.Type tt = fill.getType();
+        if(tt == FillOutsideLine.Type.BOUNDS_ALL || tt == FillOutsideLine.Type.BOUNDS_BELOW || tt == FillOutsideLine.Type.BOUNDS_ABOVE) {
+            referencePoint = yAxisValue;
+        } else {
+            if(tt == FillOutsideLine.Type.BELOW) {
+                referencePoint = canvas.getHeight();
+            } else {
+                if(tt == FillOutsideLine.Type.ABOVE) {
+                    referencePoint = 0;
+                } else {
+                    throw new RuntimeException(
+                        "You have added a new type of filling but have not implemented.");
+                }
+            }
+        }
+        /*switch (fill.getType()) {
         case BOUNDS_ALL:
           referencePoint = yAxisValue;
           break;
@@ -118,7 +135,7 @@ public class LineChart extends XYChart {
         default:
           throw new RuntimeException(
               "You have added a new type of filling but have not implemented.");
-        }
+        }*/
         if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE
             || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW) {
           List<Float> boundsPoints = new ArrayList<Float>();

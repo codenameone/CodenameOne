@@ -347,13 +347,15 @@ public class BorderLayout extends Layout {
         }
         c.setHeight(Math.min(targetHeight, c.getPreferredH())); //verify I want to use tge prefered size
     }
+
+    private Dimension dim = new Dimension(0, 0);
     
     /**
      * @inheritDoc
      */
     public Dimension getPreferredSize(Container parent) {
-        Dimension dim = new Dimension(0, 0);
-
+        dim.setWidth(0);
+        dim.setHeight(0);
         Component east = getEast();
         Component west = getWest();
         Component south = getSouth();
