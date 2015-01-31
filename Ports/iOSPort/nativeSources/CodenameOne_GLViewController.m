@@ -229,6 +229,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.placeholder = hintString;
             }
             
+            // INITIAL_CAPS_WORD
+            if((constraint & 0x100000) == 0x100000) {
+                utf.autocapitalizationType = UITextAutocapitalizationTypeWords;
+            } else {
+                // INITIAL_CAPS_SENTENCE
+                if((constraint & 0x200000) == 0x200000) {
+                    utf.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+                } else {
+                    utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                }
+            }
+            
+            // NON_PREDICTIVE
             if((constraint & 0x80000) == 0x80000) {
                 utf.autocorrectionType = UITextAutocorrectionTypeNo;
             }
