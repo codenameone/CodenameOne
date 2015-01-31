@@ -806,15 +806,15 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     int offset = 0;
     for(int iter = 0 ; iter < length ; iter++) {
         arr[offset] = str[iter];
-        if(str[iter] == '\\' && iter + 5 < length && str[iter+1] == 'u') {
+        if(str[iter] == '~' && iter + 6 < length && str[iter+1] == '~' && str[iter+2] == 'u') {
             char constructB[5];
-            constructB[0] = str[iter + 2];
-            constructB[1] = str[iter + 3];
-            constructB[2] = str[iter + 4];
-            constructB[3] = str[iter + 5];
+            constructB[0] = str[iter + 3];
+            constructB[1] = str[iter + 4];
+            constructB[2] = str[iter + 5];
+            constructB[3] = str[iter + 6];
             constructB[4] = 0;
             arr[offset] = strtol(constructB, NULL, 16);
-            iter += 5;
+            iter += 6;
         }
         offset++;
     }

@@ -336,9 +336,9 @@ public class Parser extends ClassVisitor {
             if(c > 127) {
                 // needs encoding... Verify there are no more characters to encode
                 if(iter == len) {
-                    return str.replace("" + c, "\\\\u" + fourChars(Integer.toHexString(c)));
+                    return str.replace("" + c, "~~u" + fourChars(Integer.toHexString(c)));
                 }
-                return encodeStringSlashU(str.replace("" + c, "\\\\u" + fourChars(Integer.toHexString(c))));
+                return encodeStringSlashU(str.replace("" + c, "~~u" + fourChars(Integer.toHexString(c))));
             }
         }
         return str;
