@@ -1524,9 +1524,10 @@ public class ByteCodeClass {
     }
     
     public void appendStaticFieldsMark(StringBuilder b) {
+        b.append("        recursionKey++;\n");
         for(ByteCodeField bf : fields) {
             if(bf.isStaticField() && bf.isObjectType() && !isTrulyFinal(bf)) {
-                b.append("    recursionBlockerPosition = 0;\n    gcMarkObject(threadStateData, STATIC_FIELD_");
+                b.append("    gcMarkObject(threadStateData, STATIC_FIELD_");
                 b.append(clsName);
                 b.append("_");
                 b.append(bf.getFieldName());

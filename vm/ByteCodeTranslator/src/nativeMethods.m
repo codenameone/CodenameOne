@@ -671,7 +671,18 @@ JAVA_VOID java_lang_System_gcLight__(CODENAME_ONE_THREAD_STATE) {
     flushReleaseQueue();
 }
 
+JAVA_BOOLEAN firstTimeGcThread = JAVA_TRUE;
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
+    if(firstTimeGcThread) {
+        firstTimeGcThread = JAVA_FALSE;
+        
+        // reduce thread priority
+        int policy;
+        struct sched_param param;
+        pthread_getschedparam(pthread_self(), &policy, &param);
+        param.sched_priority--;
+        pthread_setschedparam(pthread_self(), policy, &param);
+    }
     flushReleaseQueue();
     codenameOneGCMark();
     codenameOneGCSweep();

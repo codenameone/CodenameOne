@@ -649,8 +649,9 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 
 typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
 
-JAVA_OBJECT* recursionBlocker = 0;
-int recursionBlockerPosition = 0;
+//JAVA_OBJECT* recursionBlocker = 0;
+//int recursionBlockerPosition = 0;
+int recursionKey = 1;
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
@@ -659,7 +660,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // if this is a Class object or already marked this should be ignored
     if(obj->__codenameOneGcMark == currentGcMarkValue) {
         if(force) {
-            if(recursionBlocker == 0) {
+            /*if(recursionBlocker == 0) {
                 recursionBlocker = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT*) * 65536);
             }
             if(recursionBlockerPosition > 65535) {
@@ -671,7 +672,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                 }
             }
             recursionBlocker[recursionBlockerPosition] = obj;
-            recursionBlockerPosition++;
+            recursionBlockerPosition++;*/
+            if(obj->__codenameOneReferenceCount == recursionKey) {
+                return;
+            }
+            obj->__codenameOneReferenceCount = recursionKey;
             obj->__codenameOneGcMark = currentGcMarkValue;
             gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
             if(fp != 0) {
