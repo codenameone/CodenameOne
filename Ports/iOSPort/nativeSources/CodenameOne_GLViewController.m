@@ -64,6 +64,7 @@ extern void stringEdit(int finished, int cursorPos, NSString* text);
 // important, this must stay as NO for the iphone builder to work properly during translation
 BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
+JAVA_BOOLEAN lowMemoryMode = 0;
 
 // keyboard width and height.  Updated when keyboard is shown and hidden
 int vkbHeight = 0;
@@ -1794,6 +1795,7 @@ int keyboardHeight;
 #ifndef NEW_CODENAME_ONE_VM
     GC_gcollect_and_unmap();
 #else
+    lowMemoryMode = 1;
     java_lang_System_gc__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
     
