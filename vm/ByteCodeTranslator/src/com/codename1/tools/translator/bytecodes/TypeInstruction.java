@@ -100,7 +100,7 @@ public class TypeInstruction extends Instruction {
             case Opcodes.NEW:
                 b.append("PUSH_POINTER(__NEW_");
                 b.append(type);
-                b.append("(threadStateData)); /* NEW */\n    releaseObj(threadStateData, stack[stackPointer - 1].data.o);\n");
+                b.append("(threadStateData)); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
                 if(type.startsWith("[")) {

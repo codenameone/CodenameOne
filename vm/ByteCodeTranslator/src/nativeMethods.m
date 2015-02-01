@@ -22,6 +22,8 @@
 #include "java_text_DateFormat.h"
 #include "CodenameOne_GLViewController.h"
 
+extern JAVA_BOOLEAN lowMemoryMode;
+
 /*
  * The class representing classes
  */
@@ -54,7 +56,6 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     } else {
         if(compareStringToCharArray("US-ASCII", encArr, arrLength)) {
             JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-            retainObj(destArr);
             JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
             for(int iter = 0 ; iter < len ; iter++) {
                 dest[iter] = sourceData[iter];
@@ -90,7 +91,6 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         }
         if(ascii) {
             JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-            retainObj(destArr);
             JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
             for(int iter = 0 ; iter < len ; iter++) {
                 dest[iter] = sourceData[iter];
@@ -105,7 +105,6 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:len encoding:enc];
 
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [nsStr length]);
-    retainObj(destArr);
     __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
     __block int length = 0;
     [nsStr enumerateSubstringsInRange:NSMakeRange(0, [nsStr length])
@@ -148,7 +147,6 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     
     NSData* data = [nsStr dataUsingEncoding:enc];
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-    retainObj(destArr);
     JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
     [data getBytes:dest length:[data length]];
     
@@ -172,7 +170,6 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
     JAVA_OBJECT classObj = java_lang_Object_getClass___R_java_lang_Class(threadStateData, me);
     JAVA_OBJECT className = java_lang_Class_getName___R_java_lang_String(threadStateData, classObj);
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, className);
-    releaseObj(threadStateData, bld);
     if(newline == JAVA_NULL) {
         newline = newStringFromCString(threadStateData, "\n");
         newline->__codenameOneReferenceCount = 999999;
@@ -192,36 +189,27 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)indent)->java_lang_String_value);
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
-    releaseObj(threadStateData, bld);
 
     for(int iter = threadStateData->callStackOffset - 1 ; iter >= 0 ; iter--) {
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, indent);
-        releaseObj(threadStateData, bld);
 
         int classId = threadStateData->callStackClass[iter];
         int methodId = threadStateData->callStackMethod[iter];
         int line = threadStateData->callStackLine[iter];
         
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(classId));
-        releaseObj(threadStateData, bld);
 
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, dot);
-        releaseObj(threadStateData, bld);
 
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(methodId));
-        releaseObj(threadStateData, bld);
 
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, colon);
-        releaseObj(threadStateData, bld);
 
         java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(threadStateData, bld, line);
-        releaseObj(threadStateData, bld);
         
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
-        releaseObj(threadStateData, bld);
     }
     JAVA_OBJECT o = java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, bld);
-    releaseObj(threadStateData, bld);
     o->__codenameOneReferenceCount = 0;
     return o;
 }
@@ -615,11 +603,6 @@ struct ThreadLocalData* getThreadLocalData() {
         i->heapAllocationSize = 0;
         i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
         
-        i->pendingHeapReleases = malloc(PER_THREAD_RELEASE_COUNT * sizeof(void *));
-        memset(i->pendingHeapReleases, 0, PER_THREAD_RELEASE_COUNT * sizeof(void *));
-        i->heapReleaseSize = 0;
-        i->heapReleaseTotalSize = PER_THREAD_RELEASE_COUNT;
-        
         i->blocks = malloc(500 * sizeof(struct TryBlock));
         pthread_setspecific(threadIdKey, i);
         
@@ -687,6 +670,7 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     codenameOneGCMark();
     codenameOneGCSweep();
     flushReleaseQueue();
+    lowMemoryMode = JAVA_FALSE;
 }
 
 JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
@@ -922,24 +906,24 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
 }
 
 void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals) {
-    for(int iter = 0 ; iter < stackPointer ; iter++) {
+    /*for(int iter = 0 ; iter < stackPointer ; iter++) {
         safeRelease(threadStateData, &stack[iter]);
     }
     for(int iter = 0 ; iter < cn1SizeOfLocals ; iter++) {
         safeRelease(threadStateData, &locals[iter]);
-    }
+    }*/
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
     threadStateData->callStackOffset--;
 }
 
 void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals, int methodBlockOffset) {
     threadStateData->tryBlockOffset = methodBlockOffset;
-    for(int iter = 0 ; iter < stackPointer ; iter++) {
+    /*for(int iter = 0 ; iter < stackPointer ; iter++) {
         safeRelease(threadStateData, &stack[iter]);
     }
     for(int iter = 0 ; iter < cn1SizeOfLocals ; iter++) {
         safeRelease(threadStateData, &locals[iter]);
-    }
+    }*/
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
     threadStateData->callStackOffset--;
 }

@@ -309,9 +309,7 @@ public class ByteCodeClass {
             b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
         }
         b.append(clsName);
-        b.append(" , &__RC_RELEASE_");
-        b.append(clsName);
-        b.append(" , &__GC_MARK_");
+        b.append(" ,0 , &__GC_MARK_");
         b.append(clsName);
         
         // initialized defaults to false
@@ -506,13 +504,9 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     if(bf.isObjectType()) {
                         if(bf.isFinal()) {
-                            b.append("(threadStateData);\n    retainObj(__cn1StaticVal);\n    STATIC_FIELD_");                        
+                            b.append("(threadStateData);\n    STATIC_FIELD_");                        
                         } else {
-                            b.append("(threadStateData);\n    retainObj(__cn1StaticVal);\n    releaseObj(threadStateData, STATIC_FIELD_");
-                            b.append(bf.getClsName());
-                            b.append("_");
-                            b.append(bf.getFieldName());
-                            b.append(");\n    STATIC_FIELD_");
+                            b.append("(threadStateData);\n    STATIC_FIELD_");
                         }
                     } else {
                         b.append("(threadStateData);\n    STATIC_FIELD_");
@@ -558,13 +552,7 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, ");
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
-                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    releaseObj(threadStateData, (*(struct obj__");
-                b.append(clsName);
-                b.append("*)__cn1T).");
-                b.append(fld.getClsName());
-                b.append("_");
-                b.append(fld.getFieldName());
-                b.append(");\n    retainObj(__cn1Val);\n    (*(struct obj__");
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    (*(struct obj__");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    (*(struct obj__");
             }
@@ -594,40 +582,7 @@ public class ByteCodeClass {
         }
         
         b.append("}\n\n");
-        
-        b.append("JAVA_VOID __RC_RELEASE_");
-        b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete) {\n");
-
-        b.append("    struct obj__");
-        b.append(clsName);
-        b.append("* objInstance = (struct obj__");
-        b.append(clsName);
-        b.append("*)objToDelete;\n");
-        for(ByteCodeField fld : fullFieldList) {
-            if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
-                b.append("    releaseObj(threadStateData, objInstance->");
-                b.append(fld.getClsName());
-                b.append("_");
-                b.append(fld.getFieldName());
-                b.append(");\n");
-                b.append("    objInstance->");
-                b.append(fld.getClsName());
-                b.append("_");
-                b.append(fld.getFieldName());
-                b.append(" = JAVA_NULL;\n");
-            }
-        }
-        
-        // invoke the finalize method of the base
-        if(baseClass != null) {
-            b.append("    __RC_RELEASE_");
-            b.append(baseClass.replace('/', '_').replace('$', '_'));
-            b.append("(threadStateData, objToDelete);\n");
-        }
-        
-        b.append("}\n\n");
-        
+                
         // mark function for the GC mark cycle to tag the objects that are reachable
         b.append("void __GC_MARK_");
         b.append(clsName);
@@ -1040,10 +995,6 @@ public class ByteCodeClass {
         b.append("(CODENAME_ONE_THREAD_STATE);\n");
         
         b.append("extern void __FINALIZER_");
-        b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");
-
-        b.append("extern void __RC_RELEASE_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");
 

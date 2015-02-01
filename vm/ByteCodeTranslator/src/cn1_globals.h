@@ -184,7 +184,6 @@ typedef struct clazz*       JAVA_CLASS;
 #define JAVA_FALSE ((JAVA_BOOLEAN) 0)
 #define JAVA_TRUE ((JAVA_BOOLEAN) 1)
 
-#define SAFE_RETAIN(offset) safeRetain(&stack[stackPointer - offset])
 
 #define BC_ILOAD(local) { \
     stack[stackPointer].type = CN1_TYPE_INT; \
@@ -215,35 +214,34 @@ typedef struct clazz*       JAVA_CLASS;
     stack[stackPointer].data.o = locals[local].data.o; \
     stack[stackPointer].type = CN1_TYPE_OBJECT; \
     stackPointer++; \
-    retainObj(locals[local].data.o); \
 }
 
 
-#define BC_ISTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, locals[local].data.o); } \
+#define BC_ISTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT)  \
     locals[local].type = CN1_TYPE_INT; \
     locals[local].data.i = stack[stackPointer].data.i; \
     }
 
-#define BC_LSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, locals[local].data.o); } \
+#define BC_LSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
     locals[local].type = CN1_TYPE_LONG; \
     locals[local].data.l = stack[stackPointer].data.l; \
     }
 
-#define BC_FSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, locals[local].data.o); } \
+#define BC_FSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
     locals[local].type = CN1_TYPE_FLOAT; \
     locals[local].data.f = stack[stackPointer].data.f; \
     }
 
-#define BC_DSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, locals[local].data.o); } \
+#define BC_DSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
     locals[local].type = CN1_TYPE_DOUBLE; \
     locals[local].data.d = stack[stackPointer].data.d; \
     }
 
-#define BC_ASTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, locals[local].data.o); } \
+#define BC_ASTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
     locals[local].type = CN1_TYPE_INVALID; \
     locals[local].data.o = stack[stackPointer].data.o; \
     locals[local].type = CN1_TYPE_OBJECT; \
-    retainObj(locals[local].data.o); }
+    }
 
 // todo map instanceof and throw typecast exception
 #define BC_CHECKCAST(type)
@@ -252,7 +250,7 @@ typedef struct clazz*       JAVA_CLASS;
 
 
 #define POP_INT() (*pop(stack, &stackPointer)).data.i
-#define POP_OBJ() (*popAndRelease(threadStateData, stack, &stackPointer)).data.o
+#define POP_OBJ() (*pop(stack, &stackPointer)).data.o
 #define POP_OBJ_NO_RELEASE() (*pop(stack, &stackPointer)).data.o
 #define POP_LONG() (*pop(stack, &stackPointer)).data.l
 #define POP_DOUBLE() (*pop(stack, &stackPointer)).data.d
@@ -399,11 +397,11 @@ typedef struct clazz*       JAVA_CLASS;
 // incomplete and the GC goes crazy
 #define PUSH_POINTER(value) { JAVA_OBJECT ppX = value; stack[stackPointer].type = CN1_TYPE_INVALID; \
     stack[stackPointer].data.o = ppX; stack[stackPointer].type = CN1_TYPE_OBJECT; \
-    retainObj(stack[stackPointer].data.o); stackPointer++; }
+    stackPointer++; }
 
 #define PUSH_OBJ(value)  { JAVA_OBJECT ppX = value; stack[stackPointer].type = CN1_TYPE_INVALID; \
     stack[stackPointer].data.o = ppX; stack[stackPointer].type = CN1_TYPE_OBJECT; \
-    retainObj(stack[stackPointer].data.o); stackPointer++; }
+    stackPointer++; }
 
 #define PUSH_INT(value) { JAVA_INT pInt = value; stack[stackPointer].type = CN1_TYPE_INT; \
     stack[stackPointer].data.i = pInt; \
@@ -421,28 +419,27 @@ typedef struct clazz*       JAVA_CLASS;
     stack[stackPointer].data.f = pFlo; \
     stackPointer++; }
 
-// we don't retain the object on purpose since the return value is never released!
-#define POP_MANY_AND_PUSH_OBJ(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, stack[acOff].data.o); } \
+#define POP_MANY_AND_PUSH_OBJ(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
     JAVA_OBJECT pObj = value; stack[stackPointer - offset].type = CN1_TYPE_INVALID; \
     stack[stackPointer - offset].data.o = pObj; stack[stackPointer - offset].type = CN1_TYPE_OBJECT; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_INT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, stack[acOff].data.o); } \
+#define POP_MANY_AND_PUSH_INT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
     JAVA_INT pInt = value; stack[stackPointer - offset].type = CN1_TYPE_INT; \
     stack[stackPointer - offset].data.i = pInt; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_LONG(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, stack[acOff].data.o); } \
+#define POP_MANY_AND_PUSH_LONG(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
     JAVA_LONG pLong = value; stack[stackPointer - offset].type = CN1_TYPE_LONG; \
     stack[stackPointer - offset].data.l = pLong; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_DOUBLE(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, stack[acOff].data.o); } \
+#define POP_MANY_AND_PUSH_DOUBLE(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
     JAVA_DOUBLE pDob = value; stack[stackPointer - offset].type = CN1_TYPE_DOUBLE; \
     stack[stackPointer - offset].data.d = pDob; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_FLOAT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) { releaseObj(threadStateData, stack[acOff].data.o); } \
+#define POP_MANY_AND_PUSH_FLOAT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
     JAVA_FLOAT pFlo = value; stack[stackPointer - offset].type = CN1_TYPE_FLOAT; \
     stack[stackPointer - offset].data.f = pFlo; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
@@ -503,8 +500,7 @@ typedef struct clazz*       JAVA_CLASS;
         stack[stackPointer].data.l = plong; stack[stackPointer].type = CN1_TYPE_LONG; \
         stackPointer++; \
     } \
-    stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
-    safeRetain(&stack[stackPointer - 1])
+    stack[stackPointer - 1].type = stack[stackPointer - 2].type; 
 
 #define BC_DUP2()  \
 if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type == CN1_TYPE_DOUBLE) {\
@@ -521,8 +517,6 @@ if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type
     } \
     stack[stackPointer - 1].type = stack[stackPointer - 3].type; \
     stack[stackPointer - 2].type = stack[stackPointer - 4].type; \
-    safeRetain(&stack[stackPointer - 1]); \
-    safeRetain(&stack[stackPointer - 2]); \
 }
 
 #define BC_DUP2_X1() {\
@@ -532,8 +526,6 @@ if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type
     stack[stackPointer].type = stack[stackPointer - 1].type; \
     stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
     stack[stackPointer - 2].type = stack[stackPointer].type; \
-    safeRetain(&stack[stackPointer]); \
-    safeRetain(&stack[stackPointer - 1]); \
     stackPointer++; \
 }
 
@@ -546,8 +538,6 @@ if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type
     stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
     stack[stackPointer - 2].type = stack[stackPointer - 3].type; \
     stack[stackPointer - 3].type = stack[stackPointer].type; \
-    safeRetain(&stack[stackPointer]); \
-    safeRetain(&stack[stackPointer - 1]); \
     stackPointer++; \
 }
 
@@ -599,7 +589,6 @@ extern int instanceofFunction(int sourceClass, int destId);
     if(stack[stackPointer - 1].data.o != JAVA_NULL) { \
         int tmpInstanceOfId = GET_CLASS_ID(stack[stackPointer - 1].data.o); \
         stack[stackPointer - 1].type = CN1_TYPE_INVALID; \
-        releaseObj(threadStateData, stack[stackPointer - 1].data.o); \
         stack[stackPointer - 1].data.i = instanceofFunction( typeOfInstanceOf, tmpInstanceOfId ); \
     } \
     stack[stackPointer - 1].type = CN1_TYPE_INT; \
@@ -628,7 +617,7 @@ extern int instanceofFunction(int sourceClass, int destId);
 #define BC_AALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
     stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INVALID; \
     stack[stackPointer - 1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
-    stack[stackPointer - 1].type = CN1_TYPE_OBJECT; retainObj(stack[stackPointer - 1].data.o); }
+    stack[stackPointer - 1].type = CN1_TYPE_OBJECT;  }
 
 #define BC_BALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
     stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \
@@ -670,8 +659,6 @@ extern int instanceofFunction(int sourceClass, int destId);
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); { \
     JAVA_OBJECT aastoreTmp = stack[stackPointer - 3].data.o; \
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.o; \
-    releaseObj(threadStateData, aastoreTmp); \
-    retainObj(stack[stackPointer - 1].data.o); \
     stackPointer -= 3; \
 }
 
@@ -724,9 +711,6 @@ struct ThreadLocalData {
     void** pendingHeapAllocations;
     JAVA_INT heapAllocationSize;
     JAVA_INT threadHeapTotalSize;
-    void** pendingHeapReleases;
-    JAVA_INT heapReleaseSize;
-    JAVA_INT heapReleaseTotalSize;
 
     // used to construct stack trace
     int* callStackClass;
@@ -855,8 +839,6 @@ extern void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array)
 #define MONITOR_ENTER() monitorEnter(threadStateData, POP_OBJ())
 #define MONITOR_EXIT() monitorExit(threadStateData, POP_OBJ())
 
-extern void retainObj(JAVA_OBJECT o);
-extern void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 extern void gcReleaseObj(JAVA_OBJECT o);
 
 extern JAVA_OBJECT allocObj(int size);
@@ -987,20 +969,9 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
         countVal--; \
     } \
 }
+*/
 
-#define safeRetain(es) { \
-    if(es != 0) { \
-        CODENAME_ONE_ASSERT((es)->type != CN1_TYPE_INVALID); \
-        if((es)->type == CN1_TYPE_OBJECT) { \
-            retainObj((es)->data.o); \
-        } \
-    } \
-}*/
-
-extern void safeRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* es);
-extern void safeRetain(struct elementStruct* es);
 extern struct elementStruct* pop(struct elementStruct* array, int* sp);
-extern struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* array, int* sp);
 extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* array, int* sp);
 
 

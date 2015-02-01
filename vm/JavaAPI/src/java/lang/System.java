@@ -81,7 +81,7 @@ public final class System {
                         try {
                             System.gcMarkSweep();
                             synchronized(LOCK) {
-                                LOCK.wait(1000);
+                                LOCK.wait(60000);
                             }
                         } catch (InterruptedException ex) {
                         }
@@ -115,6 +115,11 @@ public final class System {
         startGCThread();
         synchronized(LOCK) {
             LOCK.notify();
+        }
+        if(Thread.currentThread() != gcThreadInstance) {
+            try {
+                Thread.sleep(2);
+            } catch(InterruptedException er) {}
         }
     }
     

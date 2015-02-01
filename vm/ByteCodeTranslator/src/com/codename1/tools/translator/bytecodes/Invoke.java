@@ -202,21 +202,7 @@ public class Invoke extends Instruction {
         }
         if(returnVal != null) {
             b.append(");\n");
-            offset = args.size();
-            for(String a : args) {
-                if(a.equals("o")) {
-                    b.append("    releaseObj(threadStateData, stack[stackPointer - ");
-                    b.append(offset);
-                    b.append("].data.o);\n");
-                }
-                offset--;
-            }
             if(opcode != Opcodes.INVOKESTATIC) {
-                if(opcode != Opcodes.INVOKESTATIC) {
-                        b.append("    releaseObj(threadStateData, stack[stackPointer - ");
-                        b.append(args.size() + 1);
-                        b.append("].data.o);\n");
-                }
                 if(args.size() > 0) {
                     b.append("    stackPointer -= ");
                     b.append(args.size());
@@ -230,7 +216,7 @@ public class Invoke extends Instruction {
                 }
             }
             if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    retainObj(tmpResult);\n    stack[stackPointer - 1].data.o = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_OBJECT; }\n");
+                b.append("    stack[stackPointer - 1].data.o = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_OBJECT; }\n");
             } else {
                 if(returnVal.equals("JAVA_INT")) {
                     b.append("    stack[stackPointer - 1].data.i = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_INT; }\n");
@@ -271,20 +257,6 @@ public class Invoke extends Instruction {
             /*b.append("popMany(threadStateData, ");            
             b.append(val);
             b.append(", stack, &stackPointer); \n"); */
-            offset = args.size();
-            for(String a : args) {
-                if(a.equals("o")) {
-                    b.append("    releaseObj(threadStateData, stack[stackPointer - ");
-                    b.append(offset);
-                    b.append("].data.o);\n");
-                }
-                offset--;
-            }
-            if(opcode != Opcodes.INVOKESTATIC) {
-                    b.append("    releaseObj(threadStateData, stack[stackPointer - ");
-                    b.append(val);
-                    b.append("].data.o);\n");
-            }
             b.append("    stackPointer -= ");
             b.append(val);
             b.append(";\n");

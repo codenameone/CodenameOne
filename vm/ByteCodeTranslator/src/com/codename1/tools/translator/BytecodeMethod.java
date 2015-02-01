@@ -468,7 +468,7 @@ public class BytecodeMethod {
                 }
             }
             if(!staticMethod) {
-                b.append("    locals[0].data.o = __cn1ThisObject; locals[0].type = CN1_TYPE_OBJECT; retainObj(__cn1ThisObject);\n");
+                b.append("    locals[0].data.o = __cn1ThisObject; locals[0].type = CN1_TYPE_OBJECT; ");
                 startOffset++;
             }
             int localsOffset = startOffset;
@@ -482,9 +482,6 @@ public class BytecodeMethod {
                 b.append(iter + 1);
                 b.append(";\n");
                 if(arg.isObject()) {
-                    b.append("    retainObj(__cn1Arg");                
-                    b.append(iter + 1);
-                    b.append(");\n");
                     b.append("    locals[");
                     b.append(localsOffset);
                     b.append("].type = CN1_TYPE_OBJECT;\n");
@@ -1005,19 +1002,19 @@ public class BytecodeMethod {
                                                 instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
                                                         "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
                                                         "    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    retainObj(" + varName + 
-                                                        ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
+                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    " +
+                                                        "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
                                             } else {
                                                 instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, __cn1ThisObject);\n" +
                                                         "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
                                                         "    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    retainObj(" + varName + 
-                                                        ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
+                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n" + 
+                                                        "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
                                             }
                                         } else {
                                             instructions.add(iter, new CustomIntruction("if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    retainObj(" + varName + 
-                                                        ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
+                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    " +
+                                                        "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
                                         }
                                         iter = 0;
                                         instructionCount = instructions.size();
@@ -1189,21 +1186,21 @@ public class BytecodeMethod {
                                 if(synchronizedMethod) {
                                     if(staticMethod) {
                                         instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + ");\n    return " + varName + "; }\n", 
+                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
                                                     "    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                            "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + 
-                                                    ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
+                                                            "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    " +
+                                                    "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
                                     } else {
                                         instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + ");\n    return " + varName + "; }\n", 
+                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
                                                 "    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + 
-                                                ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
+                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n" +
+                                                "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
                                     }
                                 } else {
-                                    instructions.add(iter, new CustomIntruction("    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + ");\n    return " + varName + "; }\n", 
-                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    retainObj(" + varName + 
-                                                ");\n    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
+                                    instructions.add(iter, new CustomIntruction("    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
+                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    " +
+                                                "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
                                 }
                                 iter = 0;
                                 instructionCount = instructions.size();

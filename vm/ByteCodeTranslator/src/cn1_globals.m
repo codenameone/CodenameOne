@@ -16,6 +16,7 @@
 #include "java_lang_System.h"
 
 int currentGcMarkValue = 1;
+extern JAVA_BOOLEAN lowMemoryMode;
 
 struct clazz class_array1__JAVA_BOOLEAN = {
     DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
@@ -113,20 +114,6 @@ struct clazz class_array3__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
-void safeRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* es) {
-    if(es != 0 && es->type == CN1_TYPE_OBJECT) {
-        releaseObj(threadStateData, es->data.o);
-    }
-}
-
-void safeRetain(struct elementStruct* es) {
-    if(es != 0) {
-        CODENAME_ONE_ASSERT(es->type != CN1_TYPE_INVALID);
-        if(es->type == CN1_TYPE_OBJECT) {
-            retainObj(es->data.o);
-        }
-    }
-}
 
 struct elementStruct* pop(struct elementStruct* array, int* sp) {
     --(*sp);
@@ -134,19 +121,10 @@ struct elementStruct* pop(struct elementStruct* array, int* sp) {
     return retVal;
 }
 
-struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, struct elementStruct* array, int* sp) {
-    --(*sp);
-    struct elementStruct* retVal = &array[*sp];
-    releaseObj(threadStateData, retVal->data.o);
-    retVal->type = CN1_TYPE_INVALID;
-    return retVal;
-}
-
 void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* array, int* sp) {
     while(count > 0) {
         --(*sp);
         javaTypes t = array[*sp].type;
-        safeRelease(threadStateData, &array[*sp]);
         if(t == CN1_TYPE_DOUBLE || t == CN1_TYPE_LONG) {
             count -= 2;
         } else {
@@ -176,18 +154,6 @@ int instanceofFunction(int sourceClass, int destId) {
     return JAVA_FALSE;
 }
 
-void retainObj(JAVA_OBJECT o) {
-/*    if(o == JAVA_NULL) {
-        return;
-    }
-    if(o->__codenameOneReferenceCount > 999990) {
-        return;
-    }
-    
-    //lockCriticalSection();
-    (*o).__codenameOneReferenceCount++;
-    //unlockCriticalSection();*/
-}
 
 JAVA_OBJECT* releaseQueue = 0;
 JAVA_INT releaseQueueSize = 0;
@@ -247,65 +213,19 @@ label_continueToDeletion:
  * Invoked to destroy an array and release all the objects within it
  */
 void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
-    JAVA_ARRAY arr = (JAVA_ARRAY)array;
+    /*JAVA_ARRAY arr = (JAVA_ARRAY)array;
     int l = arr->length;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)arr->data;
     for(int iter = 0 ; iter < l ; iter++) {
         releaseObj(threadStateData, data[iter]);
         data[iter] = JAVA_NULL;
-    }
+    }*/
 }
 
 BOOL invokedGC = NO;
 extern int findPointerPosInHeap(JAVA_OBJECT obj);
 extern pthread_mutex_t* getMemoryAccessMutex();
 extern long gcThreadId;
-void releaseObj(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
-    // if this is a Class object we will never delete it, reference count might have already reached 0 and
-    // we got here thru the GC
-    /*if(o == 0 || o->__codenameOneParentClsReference == 0 || (*o).__codenameOneReferenceCount == 0) {
-        return;
-    }
-    
-    if(o->__codenameOneReferenceCount > 999990) {
-        return;
-    }
-    if(o->__ownerThread != threadStateData) {
-        o->__ownerThread = 0;
-        o->__codenameOneReferenceCount = 999999;
-        return;
-    }
-        
-    (*o).__codenameOneReferenceCount--;
-    if((*o).__codenameOneReferenceCount == 0) {
-        // remove object from local heap if its very short lived
-        if(threadStateData->heapReleaseSize == PER_THREAD_RELEASE_COUNT) {
-            // overflow danger! We need to clean the release queue!
-            // just disable RC for this case
-            (*o).__codenameOneReferenceCount = 1;
-            return;
-        }
-        
-        // release the child objects
-        finalizerFunctionPointer ptr = (finalizerFunctionPointer)o->__codenameOneParentClsReference->releaseFieldsFunction;
-        if(ptr != 0) {
-            ptr(threadStateData, o);
-        }
-        
-        threadStateData->pendingHeapReleases[threadStateData->heapReleaseSize] = o;
-        threadStateData->heapReleaseSize++;
-    }
-
-    // if we are going overboard with object creation/release e.g. creating objects in loops without giving GC time to work
-    if(gcThreadId != threadStateData->threadId && !invokedGC && releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE / 2) {
-        invokedGC = YES;
-        java_lang_System_gc__(getThreadLocalData());
-        while(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE - 200) {
-            usleep((JAVA_INT)(1000));
-        }
-        invokedGC = NO;
-    }*/
-}
 
 void gcReleaseObj(JAVA_OBJECT o) {
     // if we are going overboard with object creation/release e.g. creating objects in loops without giving GC time to work
@@ -333,7 +253,6 @@ void gcReleaseObj(JAVA_OBJECT o) {
 JAVA_OBJECT allocObj(int size) {
     JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
     memset(o, 0, size);
-    //retainObj(o);
     return o;
 }
 
@@ -440,18 +359,7 @@ void codenameOneGCMark() {
                 }
             }
             t->heapAllocationSize = 0;
-            
-            // delete all the objects released by the threads reference counter
-            for(int heapTrav = 0 ; heapTrav < t->heapReleaseSize ; heapTrav++) {
-                JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapReleases[heapTrav];
-                if(obj) {
-                    removeObjectFromHeapCollection(d, obj);
-                    t->pendingHeapReleases[heapTrav] = 0;
-                    gcReleaseObj(obj);
-                }
-            }
-            t->heapReleaseSize = 0;
-            
+                        
             int stackSize = t->threadObjectStackOffset;
             for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
                 struct elementStruct* current = &t->threadObjectStack[stackIter];
@@ -546,7 +454,6 @@ void codenameOneGCSweep() {
                 free(current->callStackLine);
                 free(current->callStackMethod);
                 free(current->pendingHeapAllocations);
-                free(current->pendingHeapReleases);
                 free(current);
                 threadsToDelete[i] = 0;
             }
@@ -578,13 +485,21 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 }
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    // low memory warning sent to app
+    if(lowMemoryMode) {
+        threadStateData->threadActive = JAVA_FALSE;
+        usleep((JAVA_INT)(100));
+        while(threadStateData->threadBlockedByGC) {
+            usleep((JAVA_INT)(1000));
+        }
+    }
     JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
         invokedGC = YES;
         threadStateData->threadActive = JAVA_FALSE;
         java_lang_System_gc__(getThreadLocalData());
-        while(threadStateData->heapReleaseSize > 0 || threadStateData->threadBlockedByGC) {
+        while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(1000));
         }
         invokedGC = NO;
@@ -729,7 +644,6 @@ JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length2, int length1, st
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, primitiveSize, 1);
-            retainObj(objs[iter]);
         }
     }
     return (JAVA_OBJECT)base;
@@ -741,7 +655,6 @@ JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length3, int length2, in
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, sizeof(JAVA_OBJECT), 2);
-            retainObj(objs[iter]);
             if(length3 > -1) {
                 JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)objs[iter])->data;
                 for(int inner = 0 ; inner < length2 ; inner++) {
@@ -759,7 +672,6 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, sizeof(JAVA_OBJECT), 3);
-            retainObj(objs[iter]);
             if(length3 > -1) {
                 JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)objs[iter])->data;
                 for(int inner = 0 ; inner < length2 ; inner++) {
@@ -819,7 +731,6 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
         offset++;
     }
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
-    retainObj((JAVA_OBJECT)dat);
     //java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
     //releaseObj(threadStateData, (JAVA_OBJECT)dat);
     java_lang_String___INIT____(threadStateData, o);
@@ -880,9 +791,7 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     memcpy((*dat).data, chars, length * sizeof(JAVA_ARRAY_BYTE));
-    retainObj((JAVA_OBJECT)dat);
     java_lang_String___INIT_____byte_1ARRAY_java_lang_String(threadStateData, s, (JAVA_OBJECT)dat, utf8String);
-    releaseObj(threadStateData, (JAVA_OBJECT)dat);
     return s;
 }
 

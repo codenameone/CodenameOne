@@ -179,7 +179,7 @@ public class BasicInstruction extends Instruction {
                 b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* AALOAD */\n" +
                         "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INVALID; \n" +
                         "    stack[stackPointer - 1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \n" +
-                        "    stack[stackPointer - 1].type = CN1_TYPE_OBJECT; retainObj(stack[stackPointer - 1].data.o);\n");
+                        "    stack[stackPointer - 1].type = CN1_TYPE_OBJECT; \n");
                 break;
 
             case Opcodes.BASTORE:
@@ -221,8 +221,6 @@ public class BasicInstruction extends Instruction {
                 b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); { /* BC_AASTORE */\n" +
                         "    JAVA_OBJECT aastoreTmp = stack[stackPointer - 3].data.o; \n" +
                         "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.o; \n" +
-                        "    releaseObj(threadStateData, aastoreTmp); \n" +
-                        "    retainObj(stack[stackPointer - 1].data.o); \n" +
                         "    stackPointer -= 3; }\n");
                 break;
 
@@ -551,15 +549,14 @@ public class BasicInstruction extends Instruction {
             case Opcodes.ARETURN:
                 appendSynchronized(b);
                 
-                b.append("    retainObj(PEEK_OBJ(1));\n");
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
                     b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return POP_OBJ_NO_RELEASE();\n");
+                    b.append(", stack, locals, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
                     b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
                     b.append(maxLocals);
-                    b.append(", stack, locals); \n    return POP_OBJ_NO_RELEASE();\n");
+                    b.append(", stack, locals); \n    return POP_OBJ();\n");
                 }
                 break;
                 

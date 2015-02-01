@@ -145,7 +145,7 @@ public class Field extends Instruction {
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
-                        b.append("PEEK_OBJ(1));\n    releaseObj(threadStateData, PEEK_OBJ(1)); stackPointer--;\n");
+                        b.append("PEEK_OBJ(1));\n    stackPointer--;\n");
                         return;
                     case 'D':
                         b.append("POP_DOUBLE");
@@ -203,7 +203,7 @@ public class Field extends Instruction {
                     case '[':
                         b.append("PEEK_OBJ");
                         if(useThis) {
-                            b.append("(1), __cn1ThisObject);\n    releaseObj(threadStateData, PEEK_OBJ(1)); stackPointer--;\n");
+                            b.append("(1), __cn1ThisObject);\n    stackPointer--;\n");
                         } else {
                             b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
                         }
