@@ -123,9 +123,28 @@ JAVA_OBJECT java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_la
     return java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(threadStateData, b, off, len, encoding);
 }
 
+JAVA_BOOLEAN isAsciiArray(JAVA_ARRAY sourceArr) {
+    JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
+    for(int iter = 0 ; iter < sourceArr->length ; iter++) {
+        if(arr[iter] > 127) {
+            return JAVA_FALSE;
+        }
+    }
+    return JAVA_TRUE;
+}
+
 JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_OBJECT encoding) {
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     JAVA_ARRAY sourceArr = (JAVA_ARRAY)arr;
+    if(isAsciiArray(sourceArr)) {
+        JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, sourceArr->length);
+        JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
+        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+        for(int iter = 0 ; iter < sourceArr->length ; iter++) {
+            dest[iter] = (JAVA_ARRAY_BYTE)arr[iter];
+        }
+        return destArr;
+    }
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString* nsStr = [[NSString alloc] initWithCharacters:sourceArr->data length:sourceArr->length];
     NSStringEncoding enc;
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encoding)->data;
@@ -139,8 +158,16 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
             if(compareStringToCharArray("UTF-16", encArr, arrLength)) {
                 enc = NSUTF16StringEncoding;
             } else {
-                // need to throw an exception...
-                enc = NSUTF8StringEncoding;
+                if(compareStringToCharArray("ISO-8859-1", encArr, arrLength)) {
+                    enc = NSISOLatin1StringEncoding;
+                } else {
+                    if(compareStringToCharArray("ISO-8859-2", encArr, arrLength)) {
+                        enc = NSISOLatin1StringEncoding;
+                    } else {
+                        // need to throw an exception...
+                        enc = NSUTF8StringEncoding;
+                    }
+                }
             }
         }
     }
