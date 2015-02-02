@@ -761,9 +761,12 @@ void initConstantPool() {
         }
     }
     invokedGC = YES;
+    JAVA_OBJECT internedStrings = get_static_java_lang_String_str();
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
-        tmpConstantPoolObjects[iter] = newStringFromCString(threadStateData, constantPool[iter]);
+        JAVA_OBJECT oo = newStringFromCString(threadStateData, constantPool[iter]);;
+        tmpConstantPoolObjects[iter] = oo;
         tmpConstantPoolObjects[iter]->__codenameOneReferenceCount = 999999;
+        java_util_ArrayList_add___java_lang_Object_R_boolean(threadStateData, internedStrings, oo);
     }
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
