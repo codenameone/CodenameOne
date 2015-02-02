@@ -419,27 +419,27 @@ typedef struct clazz*       JAVA_CLASS;
     stack[stackPointer].data.f = pFlo; \
     stackPointer++; }
 
-#define POP_MANY_AND_PUSH_OBJ(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
+#define POP_MANY_AND_PUSH_OBJ(value, offset) { int acOff = stackPointer - offset; \
     JAVA_OBJECT pObj = value; stack[stackPointer - offset].type = CN1_TYPE_INVALID; \
     stack[stackPointer - offset].data.o = pObj; stack[stackPointer - offset].type = CN1_TYPE_OBJECT; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_INT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
+#define POP_MANY_AND_PUSH_INT(value, offset) { int acOff = stackPointer - offset; \
     JAVA_INT pInt = value; stack[stackPointer - offset].type = CN1_TYPE_INT; \
     stack[stackPointer - offset].data.i = pInt; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_LONG(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
+#define POP_MANY_AND_PUSH_LONG(value, offset) { int acOff = stackPointer - offset; \
     JAVA_LONG pLong = value; stack[stackPointer - offset].type = CN1_TYPE_LONG; \
     stack[stackPointer - offset].data.l = pLong; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_DOUBLE(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
+#define POP_MANY_AND_PUSH_DOUBLE(value, offset) { int acOff = stackPointer - offset; \
     JAVA_DOUBLE pDob = value; stack[stackPointer - offset].type = CN1_TYPE_DOUBLE; \
     stack[stackPointer - offset].data.d = pDob; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
 
-#define POP_MANY_AND_PUSH_FLOAT(value, offset) { int acOff = stackPointer - offset; if(stack[acOff].data.o != 0 && stack[acOff].type == CN1_TYPE_OBJECT) \
+#define POP_MANY_AND_PUSH_FLOAT(value, offset) { int acOff = stackPointer - offset; \
     JAVA_FLOAT pFlo = value; stack[stackPointer - offset].type = CN1_TYPE_FLOAT; \
     stack[stackPointer - offset].data.f = pFlo; \
     popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
