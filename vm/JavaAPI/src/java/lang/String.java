@@ -35,6 +35,8 @@ import java.util.ArrayList;
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
 public final class String implements java.lang.CharSequence, Comparable<String> {
+    private static ArrayList<String> str = new ArrayList<String>();
+    
     private final char[] value;
 
     private final int offset;
@@ -421,8 +423,6 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return start < _count ? start : _count;
     }
 
-    private static ArrayList<String> str = new ArrayList<String>();
-    
     /**
      * Returns a canonical representation for the string object.
      * A pool of strings, initially empty, is maintained privately by the class String.
@@ -861,4 +861,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return substring(start, end);
     }
 
+    protected void finalize() {
+        releaseNSString(nsString);
+    }
+    
+    private native static void releaseNSString(long ns);
 }
