@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.android;
 
+import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.view.MotionEvent;
@@ -4031,7 +4032,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        return AndroidLocationManager.getInstance(activity);
+        boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
+        if (includesPlayServices) {
+            try {
+                Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
+                return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
+            } catch (Exception e) {
+                return AndroidLocationManager.getInstance(activity);
+            }
+        } else {
+            return AndroidLocationManager.getInstance(activity);
+        }
     }
 
     private String fixAttachmentPath(String attachment) {

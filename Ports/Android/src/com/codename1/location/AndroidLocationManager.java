@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
+package com.codename1.location;
 
 import android.content.Context;
 import android.location.Criteria;
@@ -32,14 +32,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import com.codename1.io.Log;
-import com.codename1.location.Location;
 import static com.codename1.location.LocationManager.AVAILABLE;
 import static com.codename1.location.LocationManager.OUT_OF_SERVICE;
 import static com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
 import com.codename1.ui.Display;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -60,7 +57,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
     }
 
-    static AndroidLocationManager getInstance(Context context) {
+    public static AndroidLocationManager getInstance(Context context) {
         if (instance == null) {
             instance = new AndroidLocationManager(context);
         }
