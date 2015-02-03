@@ -736,7 +736,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     java_lang_String___INIT____(threadStateData, o);
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)o;
     ss->java_lang_String_value = (JAVA_OBJECT)dat;
-    ss->java_lang_String_count = length;
+    ss->java_lang_String_count = offset;
     return o;
 }
 

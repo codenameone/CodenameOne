@@ -307,7 +307,7 @@ public class Parser extends ClassVisitor {
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsExtern(bldM);
         }        
-        bldM.append("\n\nextern int recursionKey;\nvoid markStatics(CODENAME_ONE_THREAD_STATE) {\n");
+        bldM.append("\n\nextern int recursionKey;\nvoid markStatics(CODENAME_ONE_THREAD_STATE) {\n    recursionKey++;\n");
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsMark(bldM);
         }        
