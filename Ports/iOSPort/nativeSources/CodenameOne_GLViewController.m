@@ -62,7 +62,7 @@ extern bool datepickerPopover;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 
 // important, this must stay as NO for the iphone builder to work properly during translation
-BOOL vkbAlwaysOpen = NO;
+BOOL vkbAlwaysOpen = YES;
 BOOL viewDidAppearRepaint = YES;
 JAVA_BOOLEAN lowMemoryMode = 0;
 
@@ -2776,17 +2776,16 @@ extern JAVA_LONG defaultDatePickerDate;
 }
 
 - (void)datePickerCancel {
-    repaintUI();
     com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
     currentDatePickerDate = nil;
     pickerStringArray = nil;
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
     UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
+    repaintUI();
 }
 
 - (void)datePickerDismiss {
-    repaintUI();
     if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
@@ -2805,6 +2804,8 @@ extern JAVA_LONG defaultDatePickerDate;
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
     UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
+    repaintUI();
+    
 }
 
 - (void)datePickerDismissActionSheet:(id)sender {
