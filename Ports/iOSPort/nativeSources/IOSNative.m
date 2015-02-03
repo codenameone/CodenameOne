@@ -4178,7 +4178,8 @@ JAVA_LONG defaultDatePickerDate;
 
 void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
-    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-300, 320, 246)];
+    int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-300, SCREEN_WIDTH, 246)];
     [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
     
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
