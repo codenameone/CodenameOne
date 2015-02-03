@@ -40,7 +40,7 @@ public class IOException extends java.lang.Exception{
      * s - the detail message.
      */
     public IOException(java.lang.String s){
-         //TODO codavaj!!
+         super(s);
     }
 
 }
