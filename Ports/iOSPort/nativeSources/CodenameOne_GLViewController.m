@@ -62,7 +62,7 @@ extern bool datepickerPopover;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 
 // important, this must stay as NO for the iphone builder to work properly during translation
-BOOL vkbAlwaysOpen = YES;
+BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
 JAVA_BOOLEAN lowMemoryMode = 0;
 
