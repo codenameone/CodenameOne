@@ -352,10 +352,8 @@ void codenameOneGCMark() {
                 JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
                 if(obj) {
                     t->pendingHeapAllocations[heapTrav] = 0;
-                    if(obj->__codenameOneReferenceCount > 0) {
-                        gcMarkObject(d, obj, JAVA_FALSE);
-                        placeObjectInHeapCollection(obj);
-                    }
+                    gcMarkObject(d, obj, JAVA_FALSE);
+                    placeObjectInHeapCollection(obj);
                 }
             }
             t->heapAllocationSize = 0;
@@ -525,13 +523,24 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
-            void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-            memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-            memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
-            threadStateData->threadHeapTotalSize *= 2;
-            free(threadStateData->pendingHeapAllocations);
-            threadStateData->pendingHeapAllocations = tmp;
+        if(threadStateData->heapAllocationSize > 65536) {
+            invokedGC = YES;
+            threadStateData->threadActive = JAVA_FALSE;
+            java_lang_System_gc__(getThreadLocalData());
+            while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+                usleep((JAVA_INT)(1000));
+            }
+            invokedGC = NO;
+            threadStateData->threadActive = JAVA_TRUE;
+        } else {
+            if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
+                void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+                memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+                memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
+                threadStateData->threadHeapTotalSize *= 2;
+                free(threadStateData->pendingHeapAllocations);
+                threadStateData->pendingHeapAllocations = tmp;
+            }
         }
     }
     threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize] = o;
