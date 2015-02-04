@@ -39,7 +39,7 @@ public class Field extends Instruction {
     public Field(int opcode, String owner, String name, String desc) {
         super(opcode);
         this.owner = owner;
-        this.name = name;
+        this.name = name.replace('$', '_');
         this.desc = desc;
     }
 

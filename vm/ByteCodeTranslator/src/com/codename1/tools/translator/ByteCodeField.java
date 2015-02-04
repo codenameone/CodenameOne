@@ -52,7 +52,7 @@ public class ByteCodeField {
         }
         staticField = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalField = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
-        fieldName = name;
+        fieldName = name.replace('$', '_');
 
         arrayDimensions = 0;
         while(desc.startsWith("[")) {
