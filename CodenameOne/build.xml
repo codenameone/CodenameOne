@@ -73,7 +73,7 @@
     -->
     <target depends="init" if="have.sources" name="-javadoc-build">
         <mkdir dir="${dist.javadoc.dir}"/>
-        <javadoc additionalparam="${javadoc.additionalparam}" author="${javadoc.author}" charset="UTF-8" destdir="${dist.javadoc.dir}" docencoding="UTF-8" encoding="${javadoc.encoding.used}" failonerror="true" noindex="${javadoc.noindex}" nonavbar="${javadoc.nonavbar}" notree="${javadoc.notree}" private="${javadoc.private}" source="${javac.source}" splitindex="${javadoc.splitindex}" use="${javadoc.use}" useexternalfile="true" version="${javadoc.version}" windowtitle="${javadoc.windowtitle}">
+        <!-- javadoc additionalparam="${javadoc.additionalparam}" author="${javadoc.author}" charset="UTF-8" destdir="${dist.javadoc.dir}" docencoding="UTF-8" encoding="${javadoc.encoding.used}" failonerror="true" noindex="${javadoc.noindex}" nonavbar="${javadoc.nonavbar}" notree="${javadoc.notree}" private="${javadoc.private}" source="${javac.source}" splitindex="${javadoc.splitindex}" use="${javadoc.use}" useexternalfile="true" version="${javadoc.version}" windowtitle="${javadoc.windowtitle}">
             <classpath>
                 <path path="${javac.classpath}"/>
             </classpath>
@@ -87,7 +87,9 @@
                 <include name="**/*.java"/>
                 <exclude name="*.java"/>
             </fileset>
-        </javadoc>
+        </javadoc -->
+        <exec executable="./build_javadoc.sh" />
+        
         <copy todir="${dist.javadoc.dir}">
             <fileset dir="${src.dir}" excludes="${excludes}" includes="${includes}">
                 <filename name="**/doc-files/**"/>
@@ -142,6 +144,36 @@
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Mapper" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CN1Poker" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/PushDemo" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/NativeDemo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CameraDemo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Tipster/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/Tipster/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/KitchenSink/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/MapsDemo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/ZXing/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/ZXing/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/SQLSample/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/SQLSample/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Chrome/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/Chrome/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/SocialBoo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Mapper/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/Mapper/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CN1Poker/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/override/.dummy" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/PushDemo/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/PushDemo/override/.dummy" />
         <mkdir dir="../nightly_builds" />
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
@@ -150,8 +182,11 @@
         <ant inheritall="false" antfile="../Ports/BlackBerryOS_4_2/build.xml" target="jar" />
         <ant inheritall="false" antfile="../Ports/BlackBerryOS_5/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/BlackBerryOS_5/build.xml" target="jar" />
-        <ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="clean" />
-        <ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="jar" />
+        
+        <!-- fucking J2ME doesn't work on new Mac OS/NetBeans 8 build -->
+        <!-- ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="clean" />
+        <ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="jar" / -->
+        
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="jar" />
         <ant inheritall="false" antfile="../../CodenameOne/CLDC11/build.xml" target="clean" />
@@ -160,7 +195,7 @@
         <ant inheritall="false" antfile="../Ports/JavaSEWithSVGSupport/build.xml" target="jar" />
 
         <copy file="../LICENSE" todir="build/CodenameOneDist/CodenameOne" />
-        <copy file="../Docs/release-notes.html" todir="build/CodenameOneDist/CodenameOne" />
+        <!-- copy file="../Docs/release-notes.html" todir="build/CodenameOneDist/CodenameOne" / -->
         <copy file="../Docs/CodenameOneDevelopersGuide.pdf" todir="build/CodenameOneDist/CodenameOne" />
         <copydir src="../Docs/docs" dest="build/CodenameOneDist/CodenameOne/docs" />
         <copydir src="../Docs/docs/.css" dest="build/CodenameOneDist/CodenameOne/docs/.css" />
@@ -178,6 +213,8 @@
         <copydir src="../Demos/Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <copydir src="../Demos/SocialBoo" dest="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
         <copydir src="../Demos/Mapper" dest="build/CodenameOneDist/CodenameOne/demos/Mapper" />
+        <copydir src="../Demos/CN1Poker" dest="build/CodenameOneDist/CodenameOne/demos/CN1Poker" />
+        <copydir src="../Demos/PushDemo" dest="build/CodenameOneDist/CodenameOne/demos/PushDemo" />
         
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
@@ -185,6 +222,21 @@
         <zip basedir="src" destfile="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../demos" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../demos" />
+        <copy file="dist/CodenameOne.jar" todir="../demos" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../demos" />
+
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../../CodenameOne/IdeaPlugin/depedencies" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../../CodenameOne/IdeaPlugin/depedencies" />
+        <copy file="dist/CodenameOne.jar" todir="../../CodenameOne/IdeaPlugin/depedencies" />
+        <copy file="../../CodenameOne/BuildClient/dist/CodenameOneBuildClient.jar" tofile="../../CodenameOne/IdeaPlugin/depedencies/CodeNameOneBuildClient.jar" />
+
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../../CodenameOne/IdeaPlugin/resources/dependencies" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../../CodenameOne/IdeaPlugin/resources/dependencies" />
+        <copy file="dist/CodenameOne.jar" todir="../../CodenameOne/IdeaPlugin/resources/dependencies" />
+        <copy file="../../CodenameOne/BuildClient/dist/CodenameOneBuildClient.jar" tofile="../../CodenameOne/IdeaPlugin/resources/dependencies/CodeNameOneBuildClient.jar" />
+
         <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/JavaSE.jar" />
         <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/JavaSE.jar" />
         <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CLDC11.jar" />
@@ -245,6 +297,16 @@
         <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CLDC11.jar" />
         <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne.jar" />
         <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CodenameOne_SRC.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/JavaSE.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CLDC11.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CodenameOne.jar" />
+        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CodenameOne_SRC.jar" />
 
         <deltree dir="build/tmp"/>
         <mkdir dir="build/tmp"/>
@@ -252,8 +314,7 @@
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
-        <zip basedir="build/tmp" compress="true" file="/Users/user2/Dropbox/updatedLibs.zip" />
-        <copy file="/Users/user2/Dropbox/updatedLibs.zip" todir="/Users/user2/dev/cn1/CodenameOne/repo" overwrite="true"/>
+        <zip basedir="build/tmp" compress="true" file="//Users/shai/dev/cn1/CodenameOne/repo/updatedLibs.zip" />
         <deltree dir="build/tmp"/>
 
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        
@@ -276,17 +337,25 @@
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/FacebookDemo/dist" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/Chrome/build" />        
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/Chrome/dist" />       
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/SocialBoo/build" />               
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/SocialBoo/dist" />               
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/Mapper/build" />               
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/Mapper/dist" />               
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/CN1Poker/build" />               
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/CN1Poker/dist" />               
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/PushDemo/build" />               
+        <delete dir="build/CodenameOneDist/CodenameOne/Demos/PushDemo/dist" />               
         
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
         <!-- zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" / -->
+        <copy file="../CodenameOneDesigner/dist/designer.jar" todir="../../CodenameOne/IdeaPlugin/depedencies" />
 
-        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" />
+        <!-- ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
+        <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
         <!-- ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="build" / -->
-        <zip basedir="../../CodenameOne/NBPlugin/CodenameOnePlugin/build/" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
+        <zip basedir="../../CodenameOne/NBPlugin/CodenameOneSuite/build/updates" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
                 
         <!-- Windows Version -->
         <!-- zip basedir="../CodenameOneDesigner/" includes="designer.exe" file="../nightly_builds/CodenameOneDesignerWindows_${tstamp}.zip" / -->
