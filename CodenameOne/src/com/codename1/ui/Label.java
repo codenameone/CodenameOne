@@ -71,6 +71,8 @@ public class Label extends Component {
     private EventDispatcher textBindListeners = null;
     private boolean shouldLocalize = true;
     
+    private int shiftMillimeters;
+    
     /** 
      * Constructs a new label with the specified string of text, left justified.
      * 
@@ -533,9 +535,9 @@ public class Label extends Component {
         if(tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()){
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
-                shiftText-=2;
+                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
             }else{
-                shiftText+=2;
+                shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
             }     
             animateTicker = true;
         }                
@@ -743,5 +745,23 @@ public class Label extends Component {
      */
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
+    }
+
+    /**
+     * Returns the number of millimeters that should be shifted in tickering
+     * 
+     * @return the shiftMillimeters
+     */
+    public int getShiftMillimeters() {
+        return shiftMillimeters;
+    }
+
+    /**
+     * Sets the millimeters that should be shifted in tickering
+     * 
+     * @param shiftMillimeters the shiftMillimeters to set
+     */
+    public void setShiftMillimeters(int shiftMillimeters) {
+        this.shiftMillimeters = shiftMillimeters;
     }
 }
