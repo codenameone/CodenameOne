@@ -6192,8 +6192,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                         @Override
                         public void run() {
-                            cnt.setBounds((int) ((x + getScreenCoordinates().x + canvas.x) * zoomLevel),
-                                    (int) ((y + getScreenCoordinates().y + canvas.y) * zoomLevel),
+                            int screenX = 0;
+                            int screenY = 0;
+                            if(getScreenCoordinates() != null) {
+                                screenX = getScreenCoordinates().x;
+                                screenY = getScreenCoordinates().y;
+                            }
+                            cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                                    (int) ((y + screenY + canvas.y) * zoomLevel),
                                     (int) (w * zoomLevel),
                                     (int) (h * zoomLevel));
                             cnt.validate();
