@@ -291,6 +291,9 @@ int findPointerPosInHeap(JAVA_OBJECT obj) {
     return -1;*/
 }
 
+// this is an optimization allowing us to continue searching for available space in RAM from the previous position
+// that way we avoid looping over elements that we already probably checked
+int lastOffsetInRam = 0;
 void placeObjectInHeapCollection(JAVA_OBJECT obj) {
     if(allObjectsInHeap == 0) {
         allObjectsInHeap = malloc(sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
@@ -304,13 +307,23 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
         int pos = -1;
         JAVA_OBJECT* currentAllObjectsInHeap = allObjectsInHeap;
         int currentSize = currentSizeOfAllObjectsInHeap;
-        for(int iter = 0 ; iter < currentSize ; iter++) {
+        for(int iter = lastOffsetInRam ; iter < currentSize ; iter++) {
             if(currentAllObjectsInHeap[iter] == JAVA_NULL) {
                 pos = iter;
+                lastOffsetInRam = pos;
                 break;
             }
         }
-        
+        if(pos < 0 && lastOffsetInRam > 0) {
+            // just make sure there is nothing at the start
+            for(int iter = 0 ; iter < lastOffsetInRam ; iter++) {
+                if(currentAllObjectsInHeap[iter] == JAVA_NULL) {
+                    pos = iter;
+                    lastOffsetInRam = pos;
+                    break;
+                }
+            }
+        }
         if(pos < 0) {
             // we need to enlarge the block
             JAVA_OBJECT* tmpAllObjectsInHeap = malloc(sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap * 2);
