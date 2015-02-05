@@ -440,14 +440,15 @@ JAVA_LONG java_lang_Math_abs___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG 
 }
 
 JAVA_DOUBLE java_lang_Math_ceil___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
-    if(a - ((long)a) >= 0) {
-        return ((long)a) + 1;
-    }
-    return a;
+    JAVA_LONG la = (JAVA_LONG)a;
+    if ( a == la || a < 0) return la;
+    return la+1;
 }
 
 JAVA_DOUBLE java_lang_Math_floor___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
-    return (long)a;        
+    JAVA_LONG la = (JAVA_LONG)a;
+    if ( a >= 0 || a == la ) return la;
+    return la-1;
 }
 
 JAVA_DOUBLE java_lang_Math_max___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a, JAVA_DOUBLE b){
