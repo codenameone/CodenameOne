@@ -689,7 +689,9 @@ JAVA_VOID java_lang_System_gcLight__(CODENAME_ONE_THREAD_STATE) {
 }
 
 JAVA_BOOLEAN firstTimeGcThread = JAVA_TRUE;
+JAVA_BOOLEAN gcCurrentlyRunning = JAVA_FALSE;
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
+    gcCurrentlyRunning = JAVA_TRUE;
     if(firstTimeGcThread) {
         firstTimeGcThread = JAVA_FALSE;
         
@@ -705,6 +707,7 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     codenameOneGCSweep();
     flushReleaseQueue();
     lowMemoryMode = JAVA_FALSE;
+    gcCurrentlyRunning = JAVA_FALSE;
 }
 
 JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {

@@ -287,8 +287,8 @@ int findPointerPosInHeap(JAVA_OBJECT obj) {
         if(currentAllObjectsInHeap[iter] == obj) {
             return iter;
         }
-    }*/
-    return -1;
+    }
+    return -1;*/
 }
 
 void placeObjectInHeapCollection(JAVA_OBJECT obj) {
@@ -301,7 +301,16 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
         obj->__heapPosition = currentSizeOfAllObjectsInHeap;
         currentSizeOfAllObjectsInHeap++;
     } else {
-        int pos = findPointerPosInHeap(JAVA_NULL);
+        int pos = -1;
+        JAVA_OBJECT* currentAllObjectsInHeap = allObjectsInHeap;
+        int currentSize = currentSizeOfAllObjectsInHeap;
+        for(int iter = 0 ; iter < currentSize ; iter++) {
+            if(currentAllObjectsInHeap[iter] == JAVA_NULL) {
+                pos = iter;
+                break;
+            }
+        }
+        
         if(pos < 0) {
             // we need to enlarge the block
             JAVA_OBJECT* tmpAllObjectsInHeap = malloc(sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap * 2);
@@ -316,7 +325,7 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
             allObjectsInHeap[pos] = obj;
         }
         obj->__heapPosition = pos;
-    }    
+    }
 }
 
 extern struct ThreadLocalData** allThreads; 
@@ -377,6 +386,35 @@ void codenameOneGCMark() {
         gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
     }
 }
+
+/*void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    
+    // this should be the last class used
+    int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
+    memset(classTypeCount, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    int nullSpaces = 0;
+    
+    int t = currentSizeOfAllObjectsInHeap;
+    for(int iter = 0 ; iter < t ; iter++) {
+        JAVA_OBJECT o = allObjectsInHeap[iter];
+        if(o != JAVA_NULL) {
+            classTypeCount[o->__codenameOneParentClsReference->classId]++;
+        } else {
+            nullSpaces++;
+        }
+    }
+    NSLog(@"There are %i null available entries out of %i objects in heap", nullSpaces, t);
+    for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
+        if(classTypeCount[iter] > 0) {
+            float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
+            JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+            NSLog(@"There are %i instances of %@ which is %i percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f);
+        }
+    }
+    
+    [pool release];
+}*/
 
 /**
  * The sweep GC phase iterates the memory block and deletes unmarked memory
@@ -482,6 +520,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     return JAVA_TRUE;
 }
 
+extern JAVA_BOOLEAN gcCurrentlyRunning;
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     // low memory warning sent to app
     if(lowMemoryMode) {
@@ -525,14 +564,19 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             threadStateData->threadActive = JAVA_TRUE;
         }
         if(threadStateData->heapAllocationSize > 65536) {
-            invokedGC = YES;
-            java_lang_System_gc__(getThreadLocalData());
-            threadStateData->threadActive = JAVA_FALSE;
-            while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+            while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
             }
-            invokedGC = NO;
-            threadStateData->threadActive = JAVA_TRUE;
+            if(threadStateData->heapAllocationSize > 0) {
+                invokedGC = YES;
+                java_lang_System_gc__(getThreadLocalData());
+                threadStateData->threadActive = JAVA_FALSE;
+                while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+                    usleep((JAVA_INT)(1000));
+                }
+                invokedGC = NO;
+                threadStateData->threadActive = JAVA_TRUE;
+            }
         } else {
             if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
                 void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
