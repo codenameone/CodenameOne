@@ -4982,6 +4982,89 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 }
 
 
+float clamp_float_to_int(float val){
+    JAVA_FLOAT absVal = abs(val);
+    JAVA_INT absIntVal = round(absVal);
+    if ( abs(absVal-absIntVal) < 0.001 ){
+        return (float)round(val);
+    }
+    return (JAVA_FLOAT)val;
+}
+
+void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT result, JAVA_INT resultOffset, JAVA_OBJECT lhs, JAVA_INT lhsOffset, JAVA_OBJECT rhs, JAVA_INT rhsOffset)
+{
+#ifdef USE_ES2
+#ifndef NEW_CODENAME_ONE_VM
+    //org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
+    //JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+    JAVA_ARRAY_FLOAT* lhsData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)lhs)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* rhsData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)rhs)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* resultData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)result)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_FLOAT* lhsData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)lhs)->data;
+    JAVA_ARRAY_FLOAT* rhsData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)rhs)->data;
+    JAVA_ARRAY_FLOAT* resultData = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)result)->data;
+    
+#endif
+    
+    
+    GLKMatrix4 mLeft = GLKMatrix4MakeWithArray(lhsData+lhsOffset*sizeof(JAVA_FLOAT));
+    GLKMatrix4 mRight = GLKMatrix4MakeWithArray(rhsData+rhsOffset*sizeof(JAVA_FLOAT));
+    GLKMatrix4 mResult = GLKMatrix4Multiply(mLeft, mRight);
+    
+    for ( int i=0; i<16; i++){
+        resultData[i+resultOffset] = clamp_float_to_int(mResult.m[i]);
+    }
+    //memcpy(resultData+resultOffset*sizeof(JAVA_FLOAT), &mResult, 16*sizeof(JAVA_FLOAT));
+#endif
+}
+
+
+JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT mInv, JAVA_INT mInvOffset, JAVA_OBJECT m, JAVA_INT mOffset)
+{
+#ifdef USE_ES2
+#ifndef NEW_CODENAME_ONE_VM
+    //org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
+    //JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)m)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* mInvData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)mInv)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)m)->data;
+    JAVA_ARRAY_FLOAT* mInvData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)mInv)->data;
+    
+    
+#endif
+    
+    
+    GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData+mOffset*sizeof(JAVA_FLOAT));
+    bool isInvertible = NO;
+    GLKMatrix4 mInvMat = GLKMatrix4Invert(mMat, &isInvertible);
+    if ( !isInvertible ){
+        return NO;
+    } else {
+        for ( int i=0; i<16; i++){
+            mInvData[i+mInvOffset] = mInvMat.m[i];
+        }
+        return YES;
+    }
+    
+#endif
+    
+}
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT mInv, JAVA_INT mInvOffset, JAVA_OBJECT m, JAVA_INT mOffset)
+{
+    return com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_PASS_ARG mInv, mInvOffset, m, mOffset);
+}
+#endif
+
+
 //native void nativeSetTransform(
 //                               float a0, float a1, float a2, float a3,
 //                               float b0, float b1, float b2, float b3,

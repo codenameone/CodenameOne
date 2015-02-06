@@ -48,7 +48,7 @@ public class Transform {
     
     private float translateX=0, translateY=0, translateZ=0;
     private float scaleX=1f, scaleY=1f, scaleZ=1f;
-   
+    private boolean dirty = true;
     private CodenameOneImplementation impl = null;
     
     private static class ImmutableTransform extends Transform {
@@ -168,6 +168,7 @@ public class Transform {
     public static Transform IDENTITY(){
         if ( _IDENTITY == null ){
             _IDENTITY = new ImmutableTransform(Display.getInstance().getImplementation().makeTransformIdentity());
+            _IDENTITY.type = TYPE_IDENTITY;
         }
         return _IDENTITY;
     }
@@ -224,6 +225,7 @@ public class Transform {
                 impl().copyTransform(nativeT, nativeTransform);
             }
         }
+        dirty = false;
     }
     
     /**
@@ -241,7 +243,12 @@ public class Transform {
      * @return True if the transform is the identity.
      */
     public boolean isIdentity(){
-        return (type == TYPE_IDENTITY) || this.equals(IDENTITY());
+        if (type == TYPE_IDENTITY) return true;
+        if ( this.equals(IDENTITY())){
+            setIdentity();
+            return true;
+        }
+        return false;
     }
     
     
@@ -504,6 +511,7 @@ public class Transform {
         type = TYPE_IDENTITY;
         scaleX = 1f; scaleY = 1f; scaleZ = 1f;
         translateX = 0f; translateY = 0f; translateZ = 0f;
+        dirty = true;
     }
     
     public String toString(){
@@ -532,6 +540,7 @@ public class Transform {
             if ( translateX == 0 && translateY == 0 && translateZ == 0 ){
                 type = TYPE_IDENTITY;
             }
+            dirty = true;
         } else {
             initNativeTransform();
             type = TYPE_UNKNOWN;
@@ -563,6 +572,7 @@ public class Transform {
             if ( translateX == 0 && translateY == 0 && translateZ == 0 ){
                 type = TYPE_IDENTITY;
             }
+            dirty = true;
         }
         
     }
@@ -591,12 +601,15 @@ public class Transform {
             
             if ( scaleZ == 1f && scaleY == 1f && scaleZ == 1f ){
                 type = TYPE_IDENTITY;
+                
             }
+            dirty = true;
         } else {
             initNativeTransform();
             type = TYPE_UNKNOWN;
             impl.transformScale(nativeTransform, x, y, z);
         }
+        
     }
     
     public void scale(float x, float y){
@@ -645,6 +658,7 @@ public class Transform {
             case TYPE_TRANSLATION:
             case TYPE_SCALE:
                 // do nothing here
+                dirty = true;
                 break;
             default:
                 initNativeTransform();
@@ -762,7 +776,7 @@ public class Transform {
                 }
                 break;
             default:
-                impl.transformPoint(nativeTransform, in, out);
+                impl.transformPoint(getNativeTransform(), in, out);
                 
         }
         
@@ -776,7 +790,9 @@ public class Transform {
      * @return The native transform object.
      */
     public Object getNativeTransform(){
-        initNativeTransform();
+        if ( dirty ){
+            initNativeTransform();
+        }
         return nativeTransform;
     }
     
@@ -814,11 +830,10 @@ public class Transform {
     
     public boolean equals(Transform t2){
         if ( type == TYPE_IDENTITY && t2.type == TYPE_IDENTITY ){
-            // Since this will be *extremely* common, we will
-            // do this check first
             return true;
-        }
-        return impl.transformEqualsImpl(this, t2);
+        } 
+        boolean out = impl.transformEqualsImpl(this, t2);
+        return out;
     }
     
 }

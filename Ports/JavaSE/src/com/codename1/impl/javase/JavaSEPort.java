@@ -4202,12 +4202,52 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
+    
+    private AffineTransform clamp(AffineTransform at){
+        double[] mat = new double[6];
+        at.getMatrix(mat);
+        for ( int i=0; i<6; i++){
+            mat[i] = clamp(mat[i]);
+        }
+        at.setTransform(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
+        return at;
+    }
+    
+    private double clamp(double d){
+        double abs = Math.abs(d);
+        if ( Math.abs(abs-Math.round(abs)) < 0.001){
+            return Math.round(d);
+        }
+        return d;
+    }
+    private float clamp(float d){
+        float abs = Math.abs(d);
+        if ( Math.abs(abs-Math.round(abs)) < 0.001){
+            return Math.round(d);
+        }
+        return d;
+    }
+    
+    private double[] clamp(double[] in){
+        for ( int i=0; i<in.length; i++){
+            in[i] = clamp(in[i]);
+        }
+        return in;
+    }
+    private float[] clamp(float[] in){
+        for ( int i=0; i<in.length; i++){
+            in[i] = clamp(in[i]);
+        }
+        return in;
+    }
+    
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
         if ( t1 != null ){
             AffineTransform at1 = (AffineTransform)t1.getNativeTransform();
             AffineTransform at2 = (AffineTransform)t2.getNativeTransform();
             return at1.equals(at2);
+            
         } else {
             return t2 == null;
         }
@@ -4277,7 +4317,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
-        return AffineTransform.getTranslateInstance(translateX, translateY);
+        return clamp(AffineTransform.getTranslateInstance(translateX, translateY));
     }
 
     /**
@@ -4292,7 +4332,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
-        return AffineTransform.getScaleInstance(scaleX, scaleY);
+        return clamp(AffineTransform.getScaleInstance(scaleX, scaleY));
     }
 
     /**
@@ -4308,7 +4348,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public Object makeTransformRotation(float angle, float x, float y, float z) {
-        return AffineTransform.getRotateInstance(angle, x, y);
+        return clamp(AffineTransform.getRotateInstance(angle, x, y));
     }
 
     /**
@@ -4380,6 +4420,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
        ((AffineTransform)nativeTransform).rotate(angle, x, y);
+       clamp((AffineTransform)nativeTransform);
     }
 
     
@@ -4397,6 +4438,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         ((AffineTransform)nativeTransform).translate(x, y);
+        clamp((AffineTransform)nativeTransform);
     }
 
     /**
@@ -4412,6 +4454,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         ((AffineTransform)nativeTransform).scale(x, y);
+        clamp((AffineTransform)nativeTransform);
     }
 
     /**
@@ -4427,7 +4470,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object makeTransformInverse(Object nativeTransform) {
        try {
-           return ((AffineTransform)nativeTransform).createInverse();
+           return clamp(((AffineTransform)nativeTransform).createInverse());
        } catch ( Exception ex){
            return null;
        }
@@ -4469,6 +4512,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void concatenateTransform(Object t1, Object t2) {
         ((AffineTransform)t1).concatenate((AffineTransform)t2);
+        clamp((AffineTransform)t1);
     }
 
     
@@ -4485,6 +4529,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         AffineTransform t = (AffineTransform)nativeTransform;
         t.transform(in, 0, out, 0, 1);
+        clamp(out);
     }
 
     // END TRANSFORM STUFF
@@ -4494,6 +4539,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D g = getGraphics(graphics);
         AffineTransform t = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
         t.concatenate((AffineTransform)transform.getNativeTransform());
+        clamp(t);
         g.setTransform(t);
         
         setNativeScreenGraphicsTransform(graphics, transform);

@@ -74,7 +74,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
-import com.codename1.io.Log;
 import com.codename1.media.MediaManager;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
@@ -3293,6 +3292,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if ( isTransformSupported() ){
                 this.transform.setIdentity();
                 transformApplied = false;
+                this.applyTransform();
             } else {
                 nativeInstance.resetAffineGlobal();
             }
@@ -3302,6 +3302,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if ( isTransformSupported() ){
                 this.transform.scale(x, y, 1);
                 transformApplied = false;
+                this.applyTransform();
             } else {
                 nativeInstance.scaleGlobal(x, y);
             }
@@ -3320,6 +3321,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if ( isTransformSupported() ){
                 this.transform.rotate(angle, x, y);
                 transformApplied = false;
+                this.applyTransform();
             } else {
                 nativeInstance.rotateGlobal(angle, x, y);
             }
@@ -5750,7 +5752,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     static void restoreRequestComplete() {
-        Log.p("In restoreRequestComplete "+restoreCallback);
         if(restoreCallback != null) {
             safeCallSerially(new Runnable() {
                 @Override
