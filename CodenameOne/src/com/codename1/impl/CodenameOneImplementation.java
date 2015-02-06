@@ -4845,6 +4845,24 @@ public abstract class CodenameOneImplementation {
      * @param mimeType type of the image or null if no image to share
      */
     public void share(String text, String image, String mimeType){
+        share(text, image, mimeType, null);
+    }
+    
+    /**
+     * Share the required information using the platform sharing services.
+     * a Sharing service can be: mail, sms, facebook, twitter,...
+     * This method is implemented if isNativeShareSupported() returned true for 
+     * a specific platform.
+     * 
+     * @param text String to share.
+     * @param image file path to the image or null
+     * @param mimeType type of the image or null if no image to share
+     * @param sourceRect The bounds of the button that was clicked to initiate 
+     * the share.  This is used by some platforms (e.g. iPad2 on iOS 8 or 
+     * higher) to dictate where the popover dialog should be placed.
+     */
+    public void share(String text, String image, String mimeType, Rectangle sourceRect){
+        
     }
 
     /**

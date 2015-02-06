@@ -34,6 +34,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.List;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.Resources;
 import java.util.Vector;
@@ -121,7 +122,12 @@ public class ShareButton extends Button implements ActionListener{
      */
     public void actionPerformed(ActionEvent evt) {
         if(Display.getInstance().isNativeShareSupported()){
-            Display.getInstance().share(textToShare, imageToShare, imageMimeType);                
+            Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(
+                    ShareButton.this.getAbsoluteX(),
+                    ShareButton.this.getAbsoluteY(),
+                    ShareButton.this.getWidth(),
+                    ShareButton.this.getHeight()
+            ));                
             return;
         }
         Vector sharing;

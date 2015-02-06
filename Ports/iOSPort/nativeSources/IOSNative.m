@@ -59,6 +59,7 @@
 #include "com_codename1_ui_Image.h"
 #include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
 #import "SocketImpl.h"
+#import "com_codename1_ui_geom_Rectangle.h"
 
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
@@ -4485,14 +4486,32 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
 
 
 
-void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer) {
+CGRect cn1RectToCGRect(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT rect){
+#ifndef NEW_CODENAME_ONE_VM
+    return CGRectMake(
+                      com_codename1_ui_geom_Rectangle_getX__(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getY__(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getWidth__(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getHeight__(CN1_THREAD_STATE_PASS_ARG rect)
+                      );
+#else
+    return CGRectMake(
+                      com_codename1_ui_geom_Rectangle_getX___R_int(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getY___R_int(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getWidth___R_int(CN1_THREAD_STATE_PASS_ARG rect),
+                      com_codename1_ui_geom_Rectangle_getHeight___R_int(CN1_THREAD_STATE_PASS_ARG rect)
+                      );
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
         if(imagePeer != 0) {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-            UIImage* i = [glll getImage];        
+            UIImage* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
             } else {
@@ -4501,9 +4520,33 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long(CN1_TH
         } else {
             dataToShare = [NSArray arrayWithObjects:someText, nil];
         }
-
-        UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare 
-                                      applicationActivities:nil];
+        
+        UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare
+                                                                                             applicationActivities:nil];
+        
+        if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
+            //iOS8
+            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
+            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
+            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            if ( rectangle ){
+                
+                CGRect cgrect =cn1RectToCGRect(CN1_THREAD_STATE_PASS_ARG rectangle);
+                if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
+                    cgrect = CGRectMake(
+                                        cgrect.origin.x,
+                                        cgrect.origin.y+cgrect.size.height/2-10,
+                                        cgrect.size.width,
+                                        10
+                                        );  // The top bar somewhere
+                }
+                activityViewController.popoverPresentationController.sourceRect = cgrect;
+            } else {
+                CGRect cgrect = CGRectMake(0, 0, SCREEN_WIDTH, 60);  // The top bar somewhere
+                activityViewController.popoverPresentationController.sourceRect = cgrect;
+            }
+            
+        }
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();

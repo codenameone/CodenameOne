@@ -25,6 +25,7 @@ package com.codename1.impl.ios;
 import com.codename1.contacts.Contact;
 import com.codename1.payment.Product;
 import com.codename1.social.LoginCallback;
+import com.codename1.ui.geom.Rectangle;
 import java.io.Writer;
 import java.util.Vector;
 
@@ -398,7 +399,7 @@ public final class IOSNative {
     native void openDatePicker(int type, long time, int x, int y, int w, int h);
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h);
 
-    native void socialShare(String text, long imagePeer);
+    native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
     // facebook connect
     public native void facebookLogin(Object callback);

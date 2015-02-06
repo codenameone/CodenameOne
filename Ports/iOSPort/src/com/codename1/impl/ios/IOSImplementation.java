@@ -5678,23 +5678,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
     
+    
+    
     @Override
-    public void share(String text, String image, String mimeType){
+    public void share(String text, String image, String mimeType, Rectangle sourceRect){
         if(image != null && image.length() > 0) {
             try {
                 Image img = Image.createImage(image);
                 if(img == null) {
-                    nativeInstance.socialShare(text, 0);
+                    nativeInstance.socialShare(text, 0, sourceRect );
                     return;
                 }
                 NativeImage n = (NativeImage)img.getImage();
-                nativeInstance.socialShare(text, n.peer);
+                nativeInstance.socialShare(text, n.peer, sourceRect);
             } catch(IOException err) {
                 err.printStackTrace();
                 Dialog.show("Error", "Error loading image: " + image, "OK", null);
             }
         } else {
-            nativeInstance.socialShare(text, 0);
+            nativeInstance.socialShare(text, 0, sourceRect);
         }
     }
 

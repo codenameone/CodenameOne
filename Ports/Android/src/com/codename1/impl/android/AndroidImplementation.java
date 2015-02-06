@@ -4297,7 +4297,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void share(String text, String image, String mimeType){   
+    public void share(String text, String image, String mimeType, Rectangle sourceRect){   
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
             shareIntent.setType("text/plain");

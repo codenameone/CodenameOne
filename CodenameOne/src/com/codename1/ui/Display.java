@@ -44,6 +44,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
@@ -3315,7 +3316,7 @@ public final class Display {
         share(toShare, null, null);
     }
     
-   /**
+    /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
@@ -3326,8 +3327,29 @@ public final class Display {
      * @param mime type of the image or null if no image to share
      */
     public void share(String text, String image, String mimeType){
-        impl.share(text, image, mimeType);
+        share(text, image, mimeType, null);
+        
     }
+    
+    
+   /**
+     * Share the required information using the platform sharing services.
+     * a Sharing service can be: mail, sms, facebook, twitter,...
+     * This method is implemented if isNativeShareSupported() returned true for 
+     * a specific platform.
+     * 
+     * @param text String to share.
+     * @param image file path to the image or null
+     * @param mime type of the image or null if no image to share
+     * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
+     * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+     * on the iPad with iOS 8 and higher.
+     */
+    public void share(String text, String image, String mimeType, Rectangle sourceRect){
+        impl.share(text, image, mimeType, sourceRect);
+    }
+    
+    
     
      /**
      * Returns the localization manager instance for this platform
