@@ -161,7 +161,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * Returns the character at the specified index. An index ranges from 0 to length() - 1. The first character of the sequence is at index 0, the next at index 1, and so on, as for array indexing.
      */
-    public char charAt(int index){
+    public final char charAt(int index){
         return value[offset + index];
     }
 
@@ -177,8 +177,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         int minL = Math.min(anotherString.length(), length());
         for(int iter = 0 ; iter < minL ; iter++) {
-            char a = charAt(iter);
-            char b = anotherString.charAt(iter);
+            char a = value[offset + iter];
+            char b = anotherString.value[offset + iter];
             if(a != b) {
                 return a - b;
             }
@@ -208,7 +208,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         int offset = suffix.length() - 1;
         for(int iter = length() - 1 ; offset >= 0 ; iter--) {
-            if(charAt(iter) != suffix.charAt(offset)) {
+            if(value[offset + iter] != suffix.value[offset + iter]) {
                 return false;
             }
             offset--;
@@ -231,7 +231,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return false;
         }
         for(int iter = 0 ; iter < count ; iter++) {
-            if(charAt(iter) != s.charAt(iter)) {
+            if(value[offset + iter] != s.value[offset + iter]) {
                 return false;
             }
         }
@@ -247,7 +247,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return false;
         }
         for(int iter = 0 ; iter < count ; iter++) {
-            if(Character.toLowerCase(charAt(iter)) != Character.toLowerCase(s.charAt(iter))) {
+            if(Character.toLowerCase(value[offset + iter]) != Character.toLowerCase(s.value[offset + iter])) {
                 return false;
             }
         }
@@ -291,7 +291,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin){
         for(int iter = srcBegin ; iter < srcEnd ; iter++) {
-            dst[dstBegin] = charAt(iter);
+            dst[dstBegin] = value[offset + iter];
             dstBegin++;
         }
     }
@@ -523,7 +523,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
                         return -1;
                     }
                     int o1 = i, o2 = subOffset;
-                    while (++o2 < end && charAt(++o1) == target[o2]) {
+                    while (++o2 < end && value[offset + (++o1)] == target[o2]) {
                         // Intentionally empty
                     }
                     if (o2 == end) {
@@ -743,7 +743,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public java.lang.String toLowerCase(){
         char[] c = new char[length()];
         for(int iter = 0 ; iter < count ; iter++) {
-            c[iter] = Character.toLowerCase(charAt(iter));
+            c[iter] = Character.toLowerCase(value[offset + iter]);
         }
         return new String(c);
     }
@@ -761,7 +761,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public java.lang.String toUpperCase(){
         char[] c = new char[length()];
         for(int iter = 0 ; iter < count ; iter++) {
-            c[iter] = Character.toUpperCase(charAt(iter));
+            c[iter] = Character.toUpperCase(value[offset + iter]);
         }
         return new String(c);
     }
