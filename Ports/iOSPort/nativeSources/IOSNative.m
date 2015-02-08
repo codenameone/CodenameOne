@@ -4541,12 +4541,12 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
                                         );  // The top bar somewhere
                 }
                 activityViewController.popoverPresentationController.sourceRect = cgrect;
-            } else {*/
+            } else {
                 CGRect cgrect = CGRectMake(0, 0, SCREEN_WIDTH, 60);  // The top bar somewhere
                 activityViewController.popoverPresentationController.sourceRect = cgrect;
-            //}
+            }
             
-        }
+        }*/
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
