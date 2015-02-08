@@ -1549,6 +1549,7 @@ extern GLKMatrix4 CN1transformMatrix;
         [dr execute];
 #ifndef CN1_USE_ARC
         [gl release];
+        [dr release];
 #endif
         
         _glTranslatef(0, he, 0);
