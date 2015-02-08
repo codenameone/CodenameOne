@@ -17,6 +17,7 @@
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;
+//#define DEBUG_GC_OBJECTS_IN_HEAP
 
 struct clazz class_array1__JAVA_BOOLEAN = {
     DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
@@ -250,12 +251,6 @@ void gcReleaseObj(JAVA_OBJECT o) {
     //unlockCriticalSection();
 }
 
-JAVA_OBJECT allocObj(int size) {
-    JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
-    memset(o, 0, size);
-    return o;
-}
-
 // memory map of all the heap objects which we can walk over to delete/deallocate
 // unused objects
 JAVA_OBJECT* allObjectsInHeap = 0; 
@@ -334,6 +329,7 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
             allObjectsInHeap = tmpAllObjectsInHeap;
             allObjectsInHeap[currentSizeOfAllObjectsInHeap] = obj;
             currentSizeOfAllObjectsInHeap++;
+            free(oldAllObjectsInHeap);
         } else {
             allObjectsInHeap[pos] = obj;
         }
@@ -400,34 +396,58 @@ void codenameOneGCMark() {
     }
 }
 
-/*void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
+#ifdef DEBUG_GC_OBJECTS_IN_HEAP
+int totalAllocatedHeap = 0;
+int getObjectSize(JAVA_OBJECT o) {
+    int* ptr = (int*)o;
+    ptr--;
+    return *ptr;
+}
+void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     
     // this should be the last class used
     int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
+    int sizeInHeapForType[cn1_array_3_id_java_util_Vector + 1];
     memset(classTypeCount, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    memset(sizeInHeapForType, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
     int nullSpaces = 0;
+    const char** arrayOfNames = malloc(sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
+    memset(arrayOfNames, 0, sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
     
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
             classTypeCount[o->__codenameOneParentClsReference->classId]++;
+            sizeInHeapForType[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
+            if(o->__codenameOneParentClsReference->classId > cn1_array_start_offset) {
+                if(arrayOfNames[o->__codenameOneParentClsReference->classId] == 0) {
+                    arrayOfNames[o->__codenameOneParentClsReference->classId] = o->__codenameOneParentClsReference->clsName;
+                }
+            }
         } else {
             nullSpaces++;
         }
     }
-    NSLog(@"There are %i null available entries out of %i objects in heap", nullSpaces, t);
+    NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
-            JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
-            NSLog(@"There are %i instances of %@ which is %i percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f);
+            float f2 = ((float)sizeInHeapForType[iter]) / ((float)totalAllocatedHeap) * 100.0f;
+            if(iter > cn1_array_start_offset) {
+                NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], (int)f, sizeInHeapForType[iter], (int)f2);
+            } else {
+                JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+                NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f, sizeInHeapForType[iter], (int)f2);
+            }
         }
     }
     
+    free(arrayOfNames);
     [pool release];
-}*/
+}
+#endif
 
 /**
  * The sweep GC phase iterates the memory block and deletes unmarked memory
@@ -509,6 +529,9 @@ void codenameOneGCSweep() {
         }
         unlockCriticalSection();
     }
+#ifdef DEBUG_GC_OBJECTS_IN_HEAP
+    printObjectTypesInHeap(threadStateData);
+#endif
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
@@ -544,7 +567,15 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         }
         threadStateData->threadActive = JAVA_TRUE;
     }
+#ifdef DEBUG_GC_OBJECTS_IN_HEAP
+    totalAllocatedHeap += size;
+    int* ptr = (int*)malloc(size + sizeof(int));
+    *ptr = size;
+    ptr++;
+    JAVA_OBJECT o = (JAVA_OBJECT)ptr;
+#else
     JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
+#endif
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
         invokedGC = YES;
@@ -603,7 +634,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize] = o;
     threadStateData->heapAllocationSize++;
-    
     return o;
 }
 
@@ -626,7 +656,14 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         free(obj->__codenameOneThreadData);
         obj->__codenameOneThreadData = 0;
     }
+#ifdef DEBUG_GC_OBJECTS_IN_HEAP
+    int* ptr = (int*)obj;
+    ptr--;
+    totalAllocatedHeap -= *ptr;
+    free(ptr);
+#else
     free(obj);
+#endif
 }
 
 typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
@@ -828,13 +865,19 @@ void initConstantPool() {
         }
     }
     invokedGC = YES;
+    //int cStringSize = CN1_CONSTANT_POOL_SIZE * sizeof(char*);
+    //int jStringSize = CN1_CONSTANT_POOL_SIZE * sizeof(JAVA_ARRAY);
     //JAVA_OBJECT internedStrings = get_static_java_lang_String_str();
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
-        JAVA_OBJECT oo = newStringFromCString(threadStateData, constantPool[iter]);;
+        //long length = strlen(constantPool[iter]);
+        //cStringSize += length + 1;
+        //jStringSize += length * sizeof(JAVA_ARRAY_CHAR) + sizeof(struct JavaArrayPrototype) + sizeof(struct obj__java_lang_String);
+        JAVA_OBJECT oo = newStringFromCString(threadStateData, constantPool[iter]);
         tmpConstantPoolObjects[iter] = oo;
         tmpConstantPoolObjects[iter]->__codenameOneReferenceCount = 999999;
        // java_util_ArrayList_add___java_lang_Object_R_boolean(threadStateData, internedStrings, oo);
     }
+    //NSLog(@"Size of constant pool in c: %i and j: %i", cStringSize, jStringSize);
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
 
@@ -866,6 +909,8 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
 }
 
 
+char* utf8Buffer = 0;
+int utf8BufferSize = 0;
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     if(str == NULL) {
         return NULL;
@@ -883,8 +928,15 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
 
     JAVA_INT len = byteArray->length;
 
-    // TODO: fix memory leak!
-    char* cs = malloc(len + 1);
+    if(utf8Buffer == 0) {
+        utf8Buffer = malloc(len + 1);
+    } else {
+        if(utf8BufferSize < len + 1) {
+            free(utf8Buffer);
+            utf8Buffer = malloc(len + 1);
+        }
+    }
+    char* cs = utf8Buffer;
     memcpy(cs, data, len);
     cs[len] = '\0';
     return cs;
