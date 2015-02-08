@@ -63,6 +63,7 @@ public final class System {
     
     private static final Object LOCK = new Object();
     private static boolean startedGc;
+    private static boolean forceGc;
     // invoked from native code
     private static void startGCThread() {
         if(!startedGc) {
@@ -81,7 +82,12 @@ public final class System {
                         try {
                             System.gcMarkSweep();
                             synchronized(LOCK) {
-                                LOCK.wait(60000);
+                                if(forceGc) {
+                                    forceGc = false;
+                                    LOCK.wait(500);
+                                } else {
+                                    LOCK.wait(60000);
+                                }
                             }
                         } catch (InterruptedException ex) {
                         }
@@ -112,6 +118,9 @@ public final class System {
      * Runtime.getRuntime().gc()
      */
     public static void gc() {
+        if(startedGc) {
+            forceGc = true;
+        }
         startGCThread();
         synchronized(LOCK) {
             LOCK.notify();
