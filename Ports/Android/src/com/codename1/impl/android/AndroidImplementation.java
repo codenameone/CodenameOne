@@ -1158,7 +1158,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 o.inJustDecodeBounds = true;
                 o.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-                FileInputStream fis = new FileInputStream(path);
+                InputStream fis = createFileInputStream(path);
                 BitmapFactory.decodeStream(fis, null, o);
                 fis.close();
 
@@ -1183,7 +1183,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 o2.inPurgeable = true;
                 o2.inInputShareable = true;
-                fis = new FileInputStream(path);
+                fis = createFileInputStream(path);
                 b = BitmapFactory.decodeStream(fis, null, o2);
                 fis.close();
                 
@@ -1748,7 +1748,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     String filePath = getAppHomePath()
                                             + getFileSystemSeparator() + name;
                                     File f = new File(filePath);
-                                    FileOutputStream tmp = new FileOutputStream(f);
+                                    OutputStream tmp = createFileOuputStream(f);
                                     byte[] buffer = new byte[1024];
                                     while (attachment.read(buffer) > 0) {
                                         tmp.write(buffer);
@@ -2101,7 +2101,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         final File temp = File.createTempFile("mtmp", "dat");
         temp.deleteOnExit();
-        FileOutputStream out = new FileOutputStream(temp);
+        OutputStream out = createFileOuputStream(temp);
        
         byte buf[] = new byte[256];
         int len = 0;
@@ -2159,7 +2159,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             return retVal[0];
         } else {
-            return createMedia(new FileInputStream(temp), mimeType, finish);
+            return createMedia(createFileInputStream(temp), mimeType, finish);
         }
 
     }
@@ -2739,18 +2739,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void setNativeBrowserScrollingEnabled(PeerComponent browserPeer, boolean e) {
+    public void setNativeBrowserScrollingEnabled(final PeerComponent browserPeer, final boolean e) {
         super.setNativeBrowserScrollingEnabled(browserPeer, e);
-        AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
-        bc.setScrollingEnabled(e);
-        
+        activity.runOnUiThread(new Runnable() {
+            public void run() {
+                AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+                bc.setScrollingEnabled(e);
+            }
+        });
     }
 
     @Override
-    public void setPinchToZoomEnabled(PeerComponent browserPeer, boolean e) {
+    public void setPinchToZoomEnabled(final PeerComponent browserPeer, final boolean e) {
         super.setPinchToZoomEnabled(browserPeer, e);
-        AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
-        bc.setPinchZoomEnabled(e);
+        activity.runOnUiThread(new Runnable() {
+            public void run() {
+                AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+                bc.setPinchZoomEnabled(e);
+            }
+        });
     }
 
     public PeerComponent createBrowserComponent(final Object parent) {
@@ -3578,7 +3585,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 con = con.substring(7);
             }
 
-            FileOutputStream fc = new FileOutputStream((String) con);
+            OutputStream fc = createFileOuputStream((String) con);
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) con);
             return o;
         }
@@ -3626,7 +3633,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (con.startsWith("file://")) {
                 con = con.substring(7);
             }
-            FileInputStream fc = new FileInputStream(con);
+            InputStream fc = createFileInputStream(con);
             BufferedInputStream o = new BufferedInputStream(fc, con);
             return o;
         }
@@ -3947,14 +3954,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
-        return new FileOutputStream(file);
+        return createFileOuputStream(file);
     }
 
     /**
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
-        return new FileInputStream(file);
+        return createFileInputStream(file);
     }
 
     @Override
@@ -3982,6 +3989,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         new File(file).renameTo(new File(new File(file).getParentFile(), newName));
     }
 
+    protected File createFileObject(String fileName) {
+        return new File(fileName);
+    }
+    
+    protected InputStream createFileInputStream(String fileName) throws FileNotFoundException {
+        return new FileInputStream(fileName);
+    }
+    
+    protected InputStream createFileInputStream(File f) throws FileNotFoundException {
+        return new FileInputStream(f);
+    }
+
+    protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
+        return new FileOutputStream(fileName);
+    }
+        
+    protected OutputStream createFileOuputStream(java.io.File f) throws FileNotFoundException {
+        return new FileOutputStream(f);
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4934,7 +4961,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     o.inJustDecodeBounds = true;
                     o.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-                    FileInputStream fis = new FileInputStream(imageFilePath);
+                    InputStream fis = createFileInputStream(imageFilePath);
                     BitmapFactory.decodeStream(fis, null, o);
                     fis.close();
 
@@ -4953,7 +4980,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     o.inJustDecodeBounds = true;
                     o.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-                    FileInputStream fis = new FileInputStream(imageFilePath);
+                    InputStream fis = createFileInputStream(imageFilePath);
                     BitmapFactory.decodeStream(fis, null, o);
                     fis.close();
 
