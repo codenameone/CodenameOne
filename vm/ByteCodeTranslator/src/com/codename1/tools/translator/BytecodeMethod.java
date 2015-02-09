@@ -965,9 +965,6 @@ public class BytecodeMethod {
     private int varCounter = 0;
     
     boolean optimize() {
-        if(clsName.endsWith("ExecuteCursor") && methodName.indexOf("_INIT") > -1) {
-            System.out.println("Break");
-        }
         int instructionCount = instructions.size();
         boolean astoreCalls = false;
         boolean hasInstructions = false; 

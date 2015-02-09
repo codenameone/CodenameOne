@@ -437,7 +437,7 @@ public class Parser extends ClassVisitor {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
-                if(mtd.isEliminated() || mtd.isUsedByNative() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.isNative()) {
+                if(mtd.isEliminated() || mtd.isUsedByNative() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
                     continue;
                 }
 
