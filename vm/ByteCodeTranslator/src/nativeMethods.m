@@ -863,6 +863,7 @@ void* threadRunner(void *x)
             for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
                 if(threadsToDelete[i] == 0) {
                     threadsToDelete[i] = d;
+                    d->threadActive = JAVA_FALSE;
                     break;
                 }
             }

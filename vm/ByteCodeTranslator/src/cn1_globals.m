@@ -638,20 +638,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    /*if(obj->__heapPosition < 0) {
-        int t = currentSizeOfAllObjectsInHeap;
-        for(int iter = 0 ; iter < t ; iter++) {
-            if(obj == allObjectsInHeap[iter]) {
-                allObjectsInHeap[iter] = JAVA_NULL;
-                break;
-            }
-        }
-    }*/
-    
-    if(obj->__codenameOneParentClsReference != 0 && obj->__codenameOneParentClsReference->isArray) {
-        free(((JAVA_ARRAY)obj)->data);
-        ((JAVA_ARRAY)obj)->data = 0;
-    }
     if(obj->__codenameOneThreadData) {
         free(obj->__codenameOneThreadData);
         obj->__codenameOneThreadData = 0;
@@ -729,13 +715,14 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
 }
 
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype), type);
+    int actualSize = length * primitiveSize;
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*), type);
     (*array).length = length;
     (*array).dimensions = dim;
-    int actualSize = length * primitiveSize;
     if(actualSize > 0) {
-        (*array).data = malloc(actualSize);
-        memset((*array).data, 0, actualSize);
+        void* arr = &(array->data);
+        arr += sizeof(void*);
+        (*array).data = arr;
     } else {
         (*array).data = 0;
     }
