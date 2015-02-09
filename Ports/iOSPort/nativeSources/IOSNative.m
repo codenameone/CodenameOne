@@ -5091,17 +5091,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
     
     
     GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData+mOffset*sizeof(JAVA_FLOAT));
-    bool isInvertible = NO;
+    JAVA_BOOLEAN isInvertible = JAVA_FALSE;
     GLKMatrix4 mInvMat = GLKMatrix4Invert(mMat, &isInvertible);
     if ( !isInvertible ){
-        return NO;
+        return JAVA_FALSE;
     } else {
         for ( int i=0; i<16; i++){
             mInvData[i+mInvOffset] = mInvMat.m[i];
         }
-        return YES;
+        return JAVA_TRUE;
     }
-    
+#else 
+    return JAVA_FALSE;
 #endif
     
 }
