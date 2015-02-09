@@ -374,13 +374,13 @@
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/CodenameOne_Template/lib" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/LibraryProject/lib" />
 
-        <!-- Libs for Demos                 
+        <!-- Libs for Demos -->
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../CodenameOneSuite/Demos/src" />
         <copy file="dist/CodenameOne.jar" todir="../../CodenameOne/NBPlugin/CodenameOneSuite/Demos/src"/>
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../../CodenameOne/NBPlugin/CodenameOneSuite/Demos/src"/>
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../../CodenameOne/NBPlugin/CodenameOneSuite/Demos/src" />
         <copy file="../../CodenameOne/BuildClient/dist/CodenameOneBuildClient.jar" todir="../../CodenameOne/NBPlugin/CodenameOneSuite/Demos/src" />
-        -->
+        
         
         <!-- zip the projects to the plugin-->
         <zip basedir="${nbplugin}/CodenameOne_Template" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/CodenameOneProject.zip" compress="false">
@@ -394,6 +394,101 @@
             <exclude name="**/dist/"/>
         </zip>
         
+        
+        <!-- zip the demos to the plugin-->
+        <zip basedir="../Demos/DrSbaitso" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/drsbaitso/DrSbaitsoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        
+        <zip basedir="../Demos/Flickr" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/flickr/FlickrProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        
+        <zip basedir="../Demos/Charts" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/charts/ChartsProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+                        
+        <zip basedir="../Demos/MapsDemo" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/maps/MapsDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/CameraDemo" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/Chrome" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/chrome/ChromeProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/CN1Poker" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/poker/CN1PokerProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/KitchenSink" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/SQLSample" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/sql/SQLSampleProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../Demos/NativeDemo" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/nativedemo/NativeDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
 
         <!-- ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
         <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
