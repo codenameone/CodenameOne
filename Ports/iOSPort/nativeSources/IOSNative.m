@@ -1388,9 +1388,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
+    __block NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
+#ifdef CN1_USE_ARC
+    [ns retain];
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
         if([ns hasPrefix:@"file:"]) {
             ns = [ns substringFromIndex:5];
             UIDocumentInteractionController* preview = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:ns]];
@@ -1398,6 +1401,9 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
         } else {
             [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
         }
+#ifdef CN1_USE_ARC
+        [ns release];
+#endif
         POOL_END();
     });
 }
