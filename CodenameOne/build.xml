@@ -416,7 +416,7 @@
             <exclude name="**/JavaSE.jar"/>
         </zip>
         
-        <zip basedir="../Demos/Charts" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/charts/ChartsProject.zip" compress="false">
+        <zip basedir="../Demos/ChartsDemo" destfile="${nbplugin}/CodenameOneSuite/Demos/src/com/codename1/demos/charts/ChartsProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
