@@ -347,12 +347,34 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
 extern struct ThreadLocalData** allThreads; 
 extern struct ThreadLocalData** threadsToDelete;
 
+JAVA_BOOLEAN hasAgressiveAllocator;
+
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 void codenameOneGCMark() {
+    hasAgressiveAllocator = JAVA_FALSE;
     struct ThreadLocalData* d = getThreadLocalData();
     //int marked = 0;
+    
+    // copy the allocated objects from already deleted threads so we can delete that data
+    if(threadsToDelete != 0) {
+        for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
+            if(threadsToDelete[i] != 0) {
+                //NSLog(@"Deleting thread: %i", i);
+                struct ThreadLocalData* current = threadsToDelete[i];
+                for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
+                    JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
+                    if(obj) {
+                        current->pendingHeapAllocations[heapTrav] = 0;
+                        //gcMarkObject(d, obj, JAVA_FALSE);
+                        placeObjectInHeapCollection(obj);
+                    }
+                }
+            }
+        }
+    }
+
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -377,10 +399,14 @@ void codenameOneGCMark() {
                 JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
                 if(obj) {
                     t->pendingHeapAllocations[heapTrav] = 0;
-                    gcMarkObject(d, obj, JAVA_FALSE);
+                    //gcMarkObject(d, obj, JAVA_FALSE);
                     placeObjectInHeapCollection(obj);
                 }
             }
+            
+            // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
+            JAVA_BOOLEAN agressiveAllocator = t->heapAllocationSize > 5000;
+            
             t->heapAllocationSize = 0;
                         
             int stackSize = t->threadObjectStackOffset;
@@ -393,7 +419,11 @@ void codenameOneGCMark() {
                 }
             }
             markStatics(d);
-            t->threadBlockedByGC = JAVA_FALSE;
+            if(!agressiveAllocator) {
+                t->threadBlockedByGC = JAVA_FALSE;
+            } else {
+                hasAgressiveAllocator = JAVA_TRUE;
+            }
         }
     }
     //NSLog(@"Mark set %i objects to %i", marked, currentGcMarkValue);
@@ -410,6 +440,74 @@ int getObjectSize(JAVA_OBJECT o) {
     ptr--;
     return *ptr;
 }
+
+int classTypeCountPreSweep[cn1_array_3_id_java_util_Vector + 1];
+int sizeInHeapForTypePreSweep[cn1_array_3_id_java_util_Vector + 1];
+int nullSpacesPreSweep = 0;
+int preSweepRam;
+void preSweepCount(CODENAME_ONE_THREAD_STATE) {
+    preSweepRam = totalAllocatedHeap;
+    memset(classTypeCountPreSweep, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    memset(sizeInHeapForTypePreSweep, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    int t = currentSizeOfAllObjectsInHeap;
+    int nullSpacesPreSweep = 0;
+    for(int iter = 0 ; iter < t ; iter++) {
+        JAVA_OBJECT o = allObjectsInHeap[iter];
+        if(o != JAVA_NULL) {
+            classTypeCountPreSweep[o->__codenameOneParentClsReference->classId]++;
+            sizeInHeapForTypePreSweep[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
+        } else {
+            nullSpacesPreSweep++;
+        }
+    }
+}
+
+void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    
+    // this should be the last class used
+    int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
+    int sizeInHeapForType[cn1_array_3_id_java_util_Vector + 1];
+    memset(classTypeCount, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    memset(sizeInHeapForType, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
+    int nullSpaces = 0;
+    const char** arrayOfNames = malloc(sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
+    memset(arrayOfNames, 0, sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
+    
+    int t = currentSizeOfAllObjectsInHeap;
+    for(int iter = 0 ; iter < t ; iter++) {
+        JAVA_OBJECT o = allObjectsInHeap[iter];
+        if(o != JAVA_NULL) {
+            classTypeCount[o->__codenameOneParentClsReference->classId]++;
+            sizeInHeapForType[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
+            if(o->__codenameOneParentClsReference->classId > cn1_array_start_offset) {
+                if(arrayOfNames[o->__codenameOneParentClsReference->classId] == 0) {
+                    arrayOfNames[o->__codenameOneParentClsReference->classId] = o->__codenameOneParentClsReference->clsName;
+                }
+            }
+        } else {
+            nullSpaces++;
+        }
+    }
+    int actualTotalMemory = 0;
+    NSLog(@"There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
+    for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
+        if(classTypeCount[iter] > 0) {
+            if(iter > cn1_array_start_offset) {
+                NSLog(@"There are %i instances of %@ taking its %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter], sizeInHeapForTypePreSweep[iter]);
+            } else {
+                JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+                NSLog(@"There are %i instances of %@ taking its %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter], sizeInHeapForTypePreSweep[iter]);
+            }
+            actualTotalMemory += sizeInHeapForType[iter];
+        }
+    }
+    //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    
+    free(arrayOfNames);
+    [pool release];
+}
+
 void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     
@@ -437,6 +535,7 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
             nullSpaces++;
         }
     }
+    int actualTotalMemory = 0;
     NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
@@ -448,8 +547,10 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
                 JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
                 NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f, sizeInHeapForType[iter], (int)f2);
             }
+            actualTotalMemory += sizeInHeapForType[iter];
         }
     }
+    NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
     
     free(arrayOfNames);
     [pool release];
@@ -463,6 +564,9 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
  */
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifdef DEBUG_GC_OBJECTS_IN_HEAP
+    preSweepCount(threadStateData);
+#endif
     //int counter = 0;
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
@@ -536,8 +640,22 @@ void codenameOneGCSweep() {
         }
         unlockCriticalSection();
     }
+    
+    // we had a thread that really ripped into the GC so we only release that thread now after cleaning RAM
+    if(hasAgressiveAllocator) {
+        for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+            lockCriticalSection();
+            struct ThreadLocalData* t = allThreads[iter];
+            unlockCriticalSection();
+            if(t != 0) {
+                t->threadBlockedByGC = JAVA_FALSE;
+            }
+        }
+    }
+    
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
-    printObjectTypesInHeap(threadStateData);
+    //printObjectTypesInHeap(threadStateData);
+    printObjectsPostSweep(threadStateData);
 #endif
 }
 
@@ -568,7 +686,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // low memory warning sent to app
     if(lowMemoryMode) {
         threadStateData->threadActive = JAVA_FALSE;
-        usleep((JAVA_INT)(100));
+        usleep((JAVA_INT)(1000));
         while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(1000));
         }
@@ -672,19 +790,6 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // if this is a Class object or already marked this should be ignored
     if(obj->__codenameOneGcMark == currentGcMarkValue) {
         if(force) {
-            /*if(recursionBlocker == 0) {
-                recursionBlocker = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT*) * 65536);
-            }
-            if(recursionBlockerPosition > 65535) {
-                return;
-            }
-            for(int iter = 0 ; iter < recursionBlockerPosition ; iter++) {
-                if(recursionBlocker[iter] == obj) {
-                    return;
-                }
-            }
-            recursionBlocker[recursionBlockerPosition] = obj;
-            recursionBlockerPosition++;*/
             if(obj->__codenameOneReferenceCount == recursionKey) {
                 return;
             }
