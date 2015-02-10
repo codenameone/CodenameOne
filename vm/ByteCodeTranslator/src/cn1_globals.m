@@ -163,7 +163,7 @@ typedef void (*finalizerFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 // invokes finalizers and iterates over the release queue
 void flushReleaseQueue() {
     // double locking pattern, check first to save the lock cost
-    if(releaseQueueSize == 0) {
+    /*if(releaseQueueSize == 0) {
         return;
     }
     lockCriticalSection();
@@ -191,11 +191,6 @@ void flushReleaseQueue() {
             continue;
         }
         
-        // double deletion can occur because of GC/ARC
-        /*if(!removeObjectFromHeapCollection(localQueue[iter])) {
-            continue;
-        }*/
-        
 
         finalizerFunctionPointer ptr = (finalizerFunctionPointer)localQueue[iter]->__codenameOneParentClsReference->finalizerFunction;
         if(ptr != 0) {
@@ -207,7 +202,25 @@ label_continueToDeletion:
         codenameOneGcFree(threadStateData, localQueue[iter]);
     }
     free(localQueue);
-    RETURN_FROM_VOID(1);
+    RETURN_FROM_VOID(1);*/
+}
+
+void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
+    if(ptr != 0) {
+        DEFINE_METHOD_STACK(1, 1, 0, cn1_class_id_java_lang_Object, 1);
+        // exceptions might be thrown by the finalizer methods
+        DEFINE_EXCEPTION_HANDLING_CONSTANTS();
+        
+        DEFINE_CATCH_BLOCK(grabAllExceptions, label_continueToDeletion, 0);
+        BEGIN_TRY(-1, grabAllExceptions);
+        ptr(threadStateData, obj);
+        END_TRY();
+    label_continueToDeletion:
+        codenameOneGcFree(threadStateData, obj);
+        RETURN_FROM_VOID(1);
+    }
+    codenameOneGcFree(threadStateData, obj);
 }
 
 /**
@@ -231,7 +244,7 @@ extern long gcThreadId;
 void gcReleaseObj(JAVA_OBJECT o) {
     // if we are going overboard with object creation/release e.g. creating objects in loops without giving GC time to work
     //NSLog(@"Freeing object %@", [NSString stringWithUTF8String:__codenameOneParentClsReference->clsName]);
-    if(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE - 200) {
+    /*if(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE - 200) {
         // this is on the GC queue so we can just invoke it directly
         flushReleaseQueue();
     }
@@ -240,15 +253,9 @@ void gcReleaseObj(JAVA_OBJECT o) {
     if(releaseQueue == 0) {
         releaseQueue = malloc(CN1_FINALIZER_QUEUE_SIZE * sizeof(JAVA_OBJECT));
     }
-    /*for(int iter = 0 ; iter < releaseQueueSize ; iter++) {
-        if(releaseQueue[iter] == o) {
-            //unlockCriticalSection();
-            return;
-        }
-    }*/
     releaseQueue[releaseQueueSize] = o;
     releaseQueueSize++;
-    //unlockCriticalSection();
+    //unlockCriticalSection();*/
 }
 
 // memory map of all the heap objects which we can walk over to delete/deallocate
@@ -501,7 +508,7 @@ void codenameOneGCSweep() {
 #endif
 
                 removeObjectFromHeapCollection(threadStateData, o);
-                gcReleaseObj(o);
+                freeAndFinalize(threadStateData, o);
                 //counter++;
             }
         }
