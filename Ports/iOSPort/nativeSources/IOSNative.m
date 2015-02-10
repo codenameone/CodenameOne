@@ -4529,8 +4529,8 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         
         UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare
                                                                                              applicationActivities:nil];
-        
-        /*if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
+#ifdef NEW_CODENAME_ONE_VM
+        if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
             //iOS8
             activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
             int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
@@ -4552,12 +4552,14 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
                 activityViewController.popoverPresentationController.sourceRect = cgrect;
             }
             
-        }*/
+        }
+#endif
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
     });
 }
+
 
 extern BOOL vkbAlwaysOpen;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
