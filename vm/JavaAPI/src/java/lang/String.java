@@ -178,7 +178,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         int minL = Math.min(anotherString.length(), length());
         for(int iter = 0 ; iter < minL ; iter++) {
             char a = value[offset + iter];
-            char b = anotherString.value[offset + iter];
+            char b = anotherString.value[anotherString.offset + iter];
             if(a != b) {
                 return a - b;
             }
@@ -208,7 +208,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         int offset = suffix.length() - 1;
         for(int iter = length() - 1 ; offset >= 0 ; iter--) {
-            if(value[offset + iter] != suffix.value[offset + iter]) {
+            if(value[this.offset + iter] != suffix.value[suffix.offset + offset]) {
                 return false;
             }
             offset--;
@@ -231,7 +231,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return false;
         }
         for(int iter = 0 ; iter < count ; iter++) {
-            if(value[offset + iter] != s.value[offset + iter]) {
+            if(value[offset + iter] != s.value[s.offset + iter]) {
                 return false;
             }
         }
@@ -247,7 +247,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return false;
         }
         for(int iter = 0 ; iter < count ; iter++) {
-            if(Character.toLowerCase(value[offset + iter]) != Character.toLowerCase(s.value[offset + iter])) {
+            if(Character.toLowerCase(value[offset + iter]) != Character.toLowerCase(s.value[s.offset + iter])) {
                 return false;
             }
         }
