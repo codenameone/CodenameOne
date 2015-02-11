@@ -39,6 +39,9 @@ public class Ldc extends Instruction {
     public Ldc(Object o) {
         super(Opcodes.LDC);
         cst = o;
+    }
+
+    public void addToConstantPool() {
         if (cst instanceof String) {
             Parser.addToConstantPool((String)cst);
         }

@@ -82,4 +82,7 @@ public abstract class Instruction {
     public boolean isComplexInstruction() {
         return false;
     }
+    
+    public void addToConstantPool() {
+    }
 }

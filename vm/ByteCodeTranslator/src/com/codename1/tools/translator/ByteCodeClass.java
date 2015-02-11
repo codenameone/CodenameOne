@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator;
 
+import com.codename1.tools.translator.bytecodes.Instruction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -162,7 +163,10 @@ public class ByteCodeClass {
         // look them up in case of a stack trace exception
         Parser.addToConstantPool(clsName);
         for(BytecodeMethod bm : methods) {
-            Parser.addToConstantPool(bm.getMethodName());
+            if(!bm.isEliminated()) {
+                Parser.addToConstantPool(bm.getMethodName());
+                bm.addToConstantPool();
+            }
         }
         
         for(String s : dependsClassesInterfaces) {

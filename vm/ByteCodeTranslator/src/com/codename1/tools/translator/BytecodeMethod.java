@@ -411,6 +411,12 @@ public class BytecodeMethod {
         b.append(")");
     }
     
+    public void addToConstantPool() {
+        for(Instruction i : instructions) {
+            i.addToConstantPool();
+        }
+    }
+    
     public boolean isSynchronizedMethod() {
         return synchronizedMethod;
     }
