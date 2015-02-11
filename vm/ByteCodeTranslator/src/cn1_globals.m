@@ -162,47 +162,6 @@ typedef void (*finalizerFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 
 // invokes finalizers and iterates over the release queue
 void flushReleaseQueue() {
-    // double locking pattern, check first to save the lock cost
-    /*if(releaseQueueSize == 0) {
-        return;
-    }
-    lockCriticalSection();
-    if(releaseQueueSize == 0) {
-        unlockCriticalSection();
-        return;
-    }
-    JAVA_OBJECT* localQueue = releaseQueue;
-    JAVA_INT localCount = releaseQueueSize;
-    releaseQueue = 0;
-    releaseQueueSize = 0;
-    unlockCriticalSection();
-    
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    
-    DEFINE_METHOD_STACK(1, 1, 0, cn1_class_id_java_lang_Object, 1);
-    // exceptions might be thrown by the finalizer methods
-    DEFINE_EXCEPTION_HANDLING_CONSTANTS();
-
-    DEFINE_CATCH_BLOCK(grabAllExceptions, label_continueToDeletion, 0);
-
-    // now we can just free asynchronously...
-    for(int iter = 0 ; iter < localCount ; iter++) {
-        if(localQueue[iter] == JAVA_NULL) {
-            continue;
-        }
-        
-
-        finalizerFunctionPointer ptr = (finalizerFunctionPointer)localQueue[iter]->__codenameOneParentClsReference->finalizerFunction;
-        if(ptr != 0) {
-            BEGIN_TRY(-1, grabAllExceptions);
-            ptr(threadStateData, localQueue[iter]);
-            END_TRY();
-        }
-label_continueToDeletion:
-        codenameOneGcFree(threadStateData, localQueue[iter]);
-    }
-    free(localQueue);
-    RETURN_FROM_VOID(1);*/
 }
 
 void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
@@ -227,13 +186,6 @@ void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
  * Invoked to destroy an array and release all the objects within it
  */
 void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
-    /*JAVA_ARRAY arr = (JAVA_ARRAY)array;
-    int l = arr->length;
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)arr->data;
-    for(int iter = 0 ; iter < l ; iter++) {
-        releaseObj(threadStateData, data[iter]);
-        data[iter] = JAVA_NULL;
-    }*/
 }
 
 BOOL invokedGC = NO;
@@ -242,20 +194,6 @@ extern pthread_mutex_t* getMemoryAccessMutex();
 extern long gcThreadId;
 
 void gcReleaseObj(JAVA_OBJECT o) {
-    // if we are going overboard with object creation/release e.g. creating objects in loops without giving GC time to work
-    //NSLog(@"Freeing object %@", [NSString stringWithUTF8String:__codenameOneParentClsReference->clsName]);
-    /*if(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE - 200) {
-        // this is on the GC queue so we can just invoke it directly
-        flushReleaseQueue();
-    }
-    
-    //lockCriticalSection();
-    if(releaseQueue == 0) {
-        releaseQueue = malloc(CN1_FINALIZER_QUEUE_SIZE * sizeof(JAVA_OBJECT));
-    }
-    releaseQueue[releaseQueueSize] = o;
-    releaseQueueSize++;
-    //unlockCriticalSection();*/
 }
 
 // memory map of all the heap objects which we can walk over to delete/deallocate
@@ -279,18 +217,6 @@ int findPointerPosInHeap(JAVA_OBJECT obj) {
         return -1;
     }
     return obj->__heapPosition;
-    /*if(oldAllObjectsInHeap != 0) {
-        free(oldAllObjectsInHeap);
-        oldAllObjectsInHeap = 0;
-    }
-    JAVA_OBJECT* currentAllObjectsInHeap = allObjectsInHeap;
-    int currentSize = currentSizeOfAllObjectsInHeap;
-    for(int iter = 0 ; iter < currentSize ; iter++) {
-        if(currentAllObjectsInHeap[iter] == obj) {
-            return iter;
-        }
-    }
-    return -1;*/
 }
 
 // this is an optimization allowing us to continue searching for available space in RAM from the previous position
@@ -361,13 +287,11 @@ void codenameOneGCMark() {
     if(threadsToDelete != 0) {
         for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
             if(threadsToDelete[i] != 0) {
-                //NSLog(@"Deleting thread: %i", i);
                 struct ThreadLocalData* current = threadsToDelete[i];
                 for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
                     JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
                     if(obj) {
                         current->pendingHeapAllocations[heapTrav] = 0;
-                        //gcMarkObject(d, obj, JAVA_FALSE);
                         placeObjectInHeapCollection(obj);
                     }
                 }
@@ -387,9 +311,6 @@ void codenameOneGCMark() {
             // we don't have much control and who barely call into Java anyway
             if(t->lightweightThread) {
                 while(t->threadActive) {
-                    if(releaseQueueSize > CN1_FINALIZER_QUEUE_SIZE / 2) {
-                        flushReleaseQueue();
-                    }
                     usleep(500);
                 }
             }
@@ -399,7 +320,6 @@ void codenameOneGCMark() {
                 JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
                 if(obj) {
                     t->pendingHeapAllocations[heapTrav] = 0;
-                    //gcMarkObject(d, obj, JAVA_FALSE);
                     placeObjectInHeapCollection(obj);
                 }
             }
@@ -572,7 +492,7 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
+            if(o->__codenameOneGcMark < currentGcMarkValue) {
                 CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
                 allObjectsInHeap[iter] = JAVA_NULL;
                 //if(o->__codenameOneReferenceCount > 0) {
