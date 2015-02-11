@@ -124,6 +124,9 @@ public class CodenameOneActivity extends Activity {
                 if (pc != null) {
                     pc.itemPurchased(sku);     
                     inventory.addPurchase(purchase);
+                    //This is a temp hack to get the last purchase raw data
+                    //The IAP API needs to be modified to support this on all platforms
+                    Display.getInstance().setProperty("lastPurchaseData", purchase.getOriginalJson());
                 }            
             }
 
