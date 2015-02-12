@@ -98,7 +98,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static RestoreCallback restoreCallback;
     private int timeout = 120000;
     private static final Object CONNECTIONS_LOCK = new Object();
-    private static Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
+    private Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
     private NativeFont defaultFont;
     private NativeGraphics currentlyDrawingOn;
     //private NativeImage backBuffer;
@@ -107,7 +107,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private TextArea currentEditing;
     private static boolean initialized;
     private Lifecycle life;
-    private static CodeScannerImpl scannerInstance;
+    private CodeScannerImpl scannerInstance;
     private static boolean minimized;
     private String userAgent;
     private TextureCache textureCache = new TextureCache();
@@ -2109,9 +2109,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new BufferedInputStream(new NSDataInputStream(resource, null), resource);
     }
 
-    private static Map softReferenceMap = new HashMap();
+    private Map softReferenceMap = new HashMap();
     public static void flushSoftRefMap() {
-        softReferenceMap = new HashMap();
+        instance.softReferenceMap = new HashMap();
     }
     
     /**
@@ -4065,7 +4065,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void fireWebViewError(BrowserComponent bc, int code) {
-        bc.fireWebEvent("onError", new ActionEvent(new Integer(code), code));
+        bc.fireWebEvent("onError", new ActionEvent("", code));
     }
 
     /**
@@ -4601,7 +4601,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void appendData(long peer, byte[] data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
-            n = connections.get(peer);
+            n = instance.connections.get(peer);
         }
         if(n != null) {
             synchronized(n.LOCK) {
@@ -4615,7 +4615,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void streamComplete(long peer) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
-            n = connections.get(peer);
+            n = instance.connections.get(peer);
         }
         if(n != null) {
             synchronized(n.LOCK) {
@@ -4629,7 +4629,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void networkError(long peer, String error) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
-            n = connections.get(peer);
+            n = instance.connections.get(peer);
         }
         synchronized(n.LOCK) {
             if(error == null) {
@@ -4693,7 +4693,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public NetworkConnection(long peer) {
             this.peer = peer;
             synchronized(CONNECTIONS_LOCK) {
-                connections.put(peer, this);
+                instance.connections.put(peer, this);
             }
         }
         
@@ -4780,7 +4780,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.closeConnection(peer);
             }
             synchronized(CONNECTIONS_LOCK) {
-                connections.remove(peer);
+                instance.connections.remove(peer);
             }
         }
 
@@ -5408,6 +5408,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         nativeInstance.nsDataToByteArray(p, b);
                         nativeInstance.releasePeer(p);
                         os.write(b);
+                        os.close();
                     } else {
                         NSDataInputStream ni = new NSDataInputStream(p, size);
                         Util.copy(ni, os);
@@ -5858,8 +5859,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                scannerInstance.callback.scanCompleted(contents, formatName, null);
-                scannerInstance.callback = null;
+                instance.scannerInstance.callback.scanCompleted(contents, formatName, null);
+                instance.scannerInstance.callback = null;
                 Display.getInstance().getCurrent().revalidate();
                 Display.getInstance().getCurrent().repaint();
             }
@@ -5870,8 +5871,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                scannerInstance.callback.scanError(errorCode, message);
-                scannerInstance.callback = null;
+                instance.scannerInstance.callback.scanError(errorCode, message);
+                instance.scannerInstance.callback = null;
                 Display.getInstance().getCurrent().revalidate();
                 Display.getInstance().getCurrent().repaint();
             }
@@ -5882,8 +5883,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                scannerInstance.callback.scanCanceled();
-                scannerInstance.callback = null;
+                instance.scannerInstance.callback.scanCanceled();
+                instance.scannerInstance.callback = null;
                 Display.getInstance().getCurrent().revalidate();
                 Display.getInstance().getCurrent().repaint();
             }
