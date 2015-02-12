@@ -46,8 +46,12 @@ JAVA_BOOLEAN compareStringToCharArray(const char* str, JAVA_ARRAY_CHAR* chrs, in
 
 JAVA_VOID java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ns) {
     if(ns != 0) {
-        NSString* n = (NSString*)ns;
-        [n release];
+        // this prevents a race condition where the string might get GC'd and the NSString is still pending
+        // on a call in the native thread
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSString* n = (NSString*)ns;
+            [n release];
+        });
     }
 }
 

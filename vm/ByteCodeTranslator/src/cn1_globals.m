@@ -602,8 +602,18 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 }
 
 extern JAVA_BOOLEAN gcCurrentlyRunning;
+int allocationsSinceLastGC = 0;
+long long totalAllocations = 0;
+
+JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    int alloc = allocationsSinceLastGC;
+    allocationsSinceLastGC = 0;
+    return alloc > 1024 * 1024 && totalAllocations > 10 * 1024 * 1024;
+}
+
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
-    // low memory warning sent to app
+    allocationsSinceLastGC += size;
+    totalAllocations += size;
     if(lowMemoryMode) {
         threadStateData->threadActive = JAVA_FALSE;
         usleep((JAVA_INT)(1000));
@@ -652,7 +662,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize > 65536) {
+        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0) {
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));

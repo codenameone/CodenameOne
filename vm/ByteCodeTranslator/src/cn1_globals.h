@@ -687,8 +687,7 @@ struct TryBlock {
 #define CN1_MAX_STACK_CALL_DEPTH 256
 #define CN1_MAX_OBJECT_STACK_DEPTH 16536
 
-#define PER_THREAD_ALLOCATION_COUNT 35536
-#define PER_THREAD_RELEASE_COUNT 16536
+#define PER_THREAD_ALLOCATION_COUNT 4096
 
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {
