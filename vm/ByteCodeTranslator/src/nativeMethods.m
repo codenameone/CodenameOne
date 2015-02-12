@@ -796,6 +796,10 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         struct timespec   ts;
         ts.tv_sec = tv.tv_sec + (long)(timeout / 1000);
         ts.tv_nsec = tv.tv_usec * 1000 + (timeout % 1000) * 1000000 + nanos;
+        if ( ts.tv_nsec > 1000000000 ){
+            ts.tv_nsec -= 1000000000;
+            ts.tv_sec++;
+        }
         pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
     }
     
@@ -805,6 +809,10 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         struct timespec   ts;
         ts.tv_sec = tv.tv_sec;
         ts.tv_nsec = (tv.tv_usec * 1000) + 2000000;
+        if ( ts.tv_nsec > 1000000000 ){
+            ts.tv_nsec -= 1000000000;
+            ts.tv_sec++;
+        }
         pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
     }
     
