@@ -34,6 +34,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.WeakHashMap;
 
 /**
  * Shows a "Washing Machine" infinite progress indication animation
@@ -44,7 +45,7 @@ public class InfiniteProgress extends Component {
     private Image animation;
     private int angle = 0;
     private int tick;
-    
+    private WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
     private int tintColor = 0x90000000;
     
     /**
@@ -134,7 +135,14 @@ public class InfiniteProgress extends Component {
             g.drawImage(getAnimation(), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
             g.resetAffine();
         } else {*/
-            g.drawImage(animation.rotate(v), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));            
+        
+        Integer angle = new Integer(v);
+        Image rotated = cache.get(angle);
+        if(rotated == null) {
+            rotated = animation.rotate(v);
+            cache.put(v, rotated);
+        }
+        g.drawImage(rotated, getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));            
         //}
     }
     

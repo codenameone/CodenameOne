@@ -73,6 +73,7 @@ public class InteractionDialog extends Container {
         super.addComponent(BorderLayout.NORTH, titleArea);
         titleArea.addComponent(BorderLayout.CENTER, title);
         super.addComponent(BorderLayout.CENTER, contentPane);
+        setGrabsPointerEvents(true);
     }
 
     /**

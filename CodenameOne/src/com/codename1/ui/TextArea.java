@@ -166,7 +166,7 @@ public class TextArea extends Component {
      * Input constraint which should be one of ANY, NUMERIC,
      * PHONENUMBER, URL or EMAIL
      */
-    private int constraint = ANY;
+    private int constraint = INITIAL_CAPS_SENTENCE;
     
     private  String text="";
     
