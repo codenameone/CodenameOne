@@ -352,7 +352,11 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                 JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
 {
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10), 0, forceSlide, color, imagePeer,
+    const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
+    int l = strlen(chr) + 1;
+    char cc[l];
+    memcpy(cc, chr, l);
+    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
             padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
     POOL_END();
 }
@@ -719,7 +723,22 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_jav
 {
     //XMLVM_BEGIN_NATIVE[com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String]
     POOL_BEGIN();
-    JAVA_INT i = getResourceSize(stringToUTF8(CN1_THREAD_STATE_PASS_ARG n1), 0, stringToUTF8(CN1_THREAD_STATE_PASS_ARG n2), 0);
+    const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n1);
+    int l = strlen(chr) + 1;
+    char cc[l];
+    memcpy(cc, chr, l);
+
+    JAVA_INT i;
+    const char* chr2 = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n2);
+    if(chr2 != 0) {
+        l = strlen(chr) + 1;
+        char cc2[l];
+        memcpy(cc2, chr2, l);
+        i = getResourceSize(cc, 0, cc2, 0);
+    } else {
+        i = getResourceSize(cc, 0, 0, 0);
+    }
+    
     POOL_END();
     return i;
     //XMLVM_END_NATIVE
@@ -734,7 +753,21 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
 #else
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)n3)->data;
 #endif
-    loadResourceFile(stringToUTF8(CN1_THREAD_STATE_PASS_ARG n1), 0, stringToUTF8(CN1_THREAD_STATE_PASS_ARG n2), 0, data);
+    const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n1);
+    int l = strlen(chr) + 1;
+    char cc[l];
+    memcpy(cc, chr, l);
+    
+    const char* chr2 = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n2);
+    if(chr2 != 0) {
+        l = strlen(chr) + 1;
+        char cc2[l];
+        memcpy(cc2, chr2, l);
+        loadResourceFile(cc, 0, cc2, 0, data);
+    } else {
+        loadResourceFile(cc, 0, 0, 0, data);
+    }
+
     POOL_END();
 }
 
@@ -906,8 +939,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(CN1_THREAD_STATE_MULTI_AR
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG file);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     } else {
@@ -931,10 +963,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSDataResource___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_OBJECT type) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
-    NSString* nameNS = [NSString stringWithUTF8String:chrs];
-    const char* chrs2 = stringToUTF8(CN1_THREAD_STATE_PASS_ARG type);
-    NSString* typeNS = chrs2 == NULL ? nil : [NSString stringWithUTF8String:chrs2];
+    NSString* nameNS = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    NSString* typeNS = nameNS == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG type);
     NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
     NSData* iData = [NSData dataWithContentsOfFile:path];
 #ifndef CN1_USE_ARC
@@ -971,8 +1001,7 @@ void com_codename1_impl_ios_IOSNative_read___long_byte_1ARRAY_int_int_int(CN1_TH
 
 JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT path) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG path);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     }
@@ -998,8 +1027,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
 
 JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT path) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG path);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     }
@@ -1022,8 +1050,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_S
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG path);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     }
@@ -1043,8 +1070,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THR
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG path);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     }
@@ -1066,8 +1092,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
 
 void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_OBJECT n1) {
     POOL_BEGIN();
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG path);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     NSData* d = [NSData dataWithContentsOfFile:ns];
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
@@ -1109,8 +1134,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResourcesDir__(CN1_THREAD_STATE_
 void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG file);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
     }
@@ -1128,8 +1152,7 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(CN1_THREAD_S
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG file);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
     JAVA_BOOLEAN b = [fm fileExistsAtPath:ns];
 #ifndef CN1_USE_ARC
     [fm release];
@@ -1141,8 +1164,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_fileExists___java_lang_String(CN1_
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG file);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
     BOOL b = NO;
     BOOL* isDir = (&b);
     [fm fileExistsAtPath:ns isDirectory:isDir];
@@ -1156,8 +1178,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectory___java_lang_String(CN1
 JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dir) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG dir);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
     if(error != nil) {  
@@ -1174,8 +1195,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(CN1_
 void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dir, JAVA_OBJECT files) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG dir);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
     if(error != nil) {  
@@ -1204,8 +1224,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
 void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dir) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG dir);
-    NSString* ns = [NSString stringWithUTF8String:chrs];
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     [fm createDirectoryAtPath:ns attributes:nil];
 #ifndef CN1_USE_ARC
     [fm release];
@@ -1216,10 +1235,8 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THR
 void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dest) {
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG src);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
-    const char* chrsDest = stringToUTF8(CN1_THREAD_STATE_PASS_ARG dest);
-    NSString* nsDst = [NSString stringWithUTF8String:chrsDest];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG src);
+    NSString* nsDst = toNSString(CN1_THREAD_STATE_PASS_ARG dest);
     if([nsSrc hasPrefix:@"file:"]) {
         nsSrc = [nsSrc substringFromIndex:5];
     }
@@ -1250,8 +1267,7 @@ void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(CN1_T
 JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_INT timeout) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = [[NetworkConnectionImpl alloc] init];
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG url);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG url);
     void* response = [impl openConnection:nsSrc timeout:timeout];
     POOL_END();    
     return (JAVA_LONG)response;
@@ -1267,8 +1283,7 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
 void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT mtd) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG mtd);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG mtd);
     [impl setMethod:nsSrc];
     POOL_END();    
 }
@@ -1294,8 +1309,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContentLength___long(CN1_THREAD_STA
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT name) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG [impl getResponseHeader:nsSrc]);
     POOL_END();    
     return str;
@@ -1320,10 +1334,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(CN
 void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT key, JAVA_OBJECT value) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
-    NSString* nsKey = [NSString stringWithUTF8String:chrs];
-    chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG value);
-    NSString* nsValue = [NSString stringWithUTF8String:chrs];
+    NSString* nsKey = toNSString(CN1_THREAD_STATE_PASS_ARG key);
+    NSString* nsValue = toNSString(CN1_THREAD_STATE_PASS_ARG value);
     [impl addHeader:nsKey value:nsValue];
     POOL_END();    
 }
@@ -1674,8 +1686,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG uri);
-        NSString* ns = [NSString stringWithUTF8String:chrs];
+        NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG uri);
         if([ns hasPrefix:@"file:/"]) {
             ns = fixFilePath(ns);
             NSURL* nu = [NSURL fileURLWithPath:ns];
@@ -3409,8 +3420,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(CN1
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
     
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
     BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:foofile];
@@ -3423,8 +3433,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
     
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
 
@@ -3440,8 +3449,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];    
     
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
-    NSString* nsSrc = [NSString stringWithUTF8String:chrs];
+    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
     [[NSFileManager defaultManager] removeItemAtPath:foofile error:nil];
