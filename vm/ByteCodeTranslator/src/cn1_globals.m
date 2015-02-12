@@ -653,9 +653,12 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             threadStateData->threadActive = JAVA_TRUE;
         }
         if(threadStateData->heapAllocationSize > 65536) {
+            threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
             }
+            threadStateData->threadActive=JAVA_TRUE;
+            
             if(threadStateData->heapAllocationSize > 0) {
                 invokedGC = YES;
                 java_lang_System_gc__(getThreadLocalData());
