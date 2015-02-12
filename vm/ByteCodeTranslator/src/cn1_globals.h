@@ -716,6 +716,9 @@ struct ThreadLocalData {
     int* callStackLine;
     int* callStackMethod;
     int callStackOffset;
+    
+    char* utf8Buffer;
+    int utf8BufferSize;
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }

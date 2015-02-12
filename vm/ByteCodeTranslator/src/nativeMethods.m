@@ -622,6 +622,9 @@ struct ThreadLocalData* getThreadLocalData() {
         i->threadActive = JAVA_FALSE;
         i->currentThreadObject = 0;
         
+        i->utf8Buffer = 0;
+        i->utf8BufferSize = 0;
+        
         i->threadObjectStack = malloc(CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
         memset(i->threadObjectStack, 0, CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
         i->threadObjectStackOffset = 0;

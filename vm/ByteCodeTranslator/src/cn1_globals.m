@@ -940,9 +940,6 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     return s;
 }
 
-
-char* utf8Buffer = 0;
-int utf8BufferSize = 0;
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     if(str == NULL) {
         return NULL;
@@ -960,15 +957,15 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
 
     JAVA_INT len = byteArray->length;
 
-    if(utf8Buffer == 0) {
-        utf8Buffer = malloc(len + 1);
+    if(threadStateData->utf8Buffer == 0) {
+        threadStateData->utf8Buffer = malloc(len + 1);
     } else {
-        if(utf8BufferSize < len + 1) {
-            free(utf8Buffer);
-            utf8Buffer = malloc(len + 1);
+        if(threadStateData->utf8BufferSize < len + 1) {
+            free(threadStateData->utf8Buffer);
+            threadStateData->utf8Buffer = malloc(len + 1);
         }
     }
-    char* cs = utf8Buffer;
+    char* cs = threadStateData->utf8Buffer;
     memcpy(cs, data, len);
     cs[len] = '\0';
     return cs;
