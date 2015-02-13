@@ -82,11 +82,11 @@ public final class System {
                         try {
                             System.gcMarkSweep();
                             synchronized(LOCK) {
-                                if(forceGc) {
+                                if(forceGc || isHighFrequencyGC()) {
                                     forceGc = false;
-                                    LOCK.wait(500);
+                                    LOCK.wait(200);
                                 } else {
-                                    LOCK.wait(60000);
+                                    LOCK.wait(30000);
                                 }
                             }
                         } catch (InterruptedException ex) {
@@ -97,6 +97,8 @@ public final class System {
             gcThreadInstance.start();
         }
     }
+    
+    private native static boolean isHighFrequencyGC();
     
     /**
      * Returns the current time in milliseconds.
