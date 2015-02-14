@@ -662,7 +662,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0) {
+        if(threadStateData->heapAllocationSize > 20000 && constantPoolObjects != 0) {
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
