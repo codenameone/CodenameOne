@@ -217,27 +217,27 @@ typedef struct clazz*       JAVA_CLASS;
 }
 
 
-#define BC_ISTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT)  \
+#define BC_ISTORE(local) { stackPointer--; \
     locals[local].type = CN1_TYPE_INT; \
     locals[local].data.i = stack[stackPointer].data.i; \
     }
 
-#define BC_LSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
+#define BC_LSTORE(local) { stackPointer--; \
     locals[local].type = CN1_TYPE_LONG; \
     locals[local].data.l = stack[stackPointer].data.l; \
     }
 
-#define BC_FSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
+#define BC_FSTORE(local) { stackPointer--; \
     locals[local].type = CN1_TYPE_FLOAT; \
     locals[local].data.f = stack[stackPointer].data.f; \
     }
 
-#define BC_DSTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
+#define BC_DSTORE(local) { stackPointer--; \
     locals[local].type = CN1_TYPE_DOUBLE; \
     locals[local].data.d = stack[stackPointer].data.d; \
     }
 
-#define BC_ASTORE(local) { stackPointer--; if(locals[local].data.o != 0 && locals[local].type == CN1_TYPE_OBJECT) \
+#define BC_ASTORE(local) { stackPointer--; \
     locals[local].type = CN1_TYPE_INVALID; \
     locals[local].data.o = stack[stackPointer].data.o; \
     locals[local].type = CN1_TYPE_OBJECT; \

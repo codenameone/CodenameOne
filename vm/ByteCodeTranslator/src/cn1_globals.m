@@ -279,6 +279,8 @@ JAVA_BOOLEAN hasAgressiveAllocator;
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 void codenameOneGCMark() {
+    currentGcMarkValue++;
+
     hasAgressiveAllocator = JAVA_FALSE;
     struct ThreadLocalData* d = getThreadLocalData();
     //int marked = 0;
@@ -540,8 +542,6 @@ void codenameOneGCSweep() {
     
     //NSLog(@"Sweep removed %i objects", counter);
      
-    currentGcMarkValue++;
-
     if(threadsToDelete != 0) {
         lockCriticalSection();
         for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
