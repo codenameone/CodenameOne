@@ -274,7 +274,13 @@ public class Parser extends ClassVisitor {
                 bldM.append(",\n    \"");
             }
             first = false;            
-            bldM.append(encodeString(con));
+            try {
+                bldM.append(encodeString(con));
+            } catch(Throwable t) {
+                t.printStackTrace();
+                System.out.println("Error writing the constant pool string: '" + con + "'");
+                System.exit(1);
+            }
             bldM.append("\" /* ");
             bldM.append(offset);
             offset++;
@@ -331,14 +337,22 @@ public class Parser extends ClassVisitor {
     
     private static String encodeStringSlashU(String str) {
         int len = str.length();
+        char[] chr = str.toCharArray();
         for(int iter = 0 ; iter < len ; iter++) {
-            char c = str.charAt(iter);
+            char c = chr[iter];
             if(c > 127) {
                 // needs encoding... Verify there are no more characters to encode
-                if(iter == len) {
-                    return str.replace("" + c, "~~u" + fourChars(Integer.toHexString(c)));
+                StringBuilder d = new StringBuilder();
+                for(int internal = 0 ; internal < len ; internal++) {
+                    c = chr[internal];
+                    if(c > 127) {
+                        d.append("~~u");
+                        d.append(fourChars(Integer.toHexString(c)));
+                    } else {
+                        d.append(c);
+                    }
                 }
-                return encodeStringSlashU(str.replace("" + c, "~~u" + fourChars(Integer.toHexString(c))));
+                return d.toString();
             }
         }
         return str;
