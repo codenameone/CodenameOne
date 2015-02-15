@@ -745,7 +745,6 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         // we already own the lock...
         if(currentlyHeldBy == own) {
             ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
-            unlockCriticalSection();
             return;
         }
         err = pthread_mutex_lock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
