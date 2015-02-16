@@ -306,15 +306,18 @@ void codenameOneGCMark() {
         struct ThreadLocalData* t = allThreads[iter];
         unlockCriticalSection();
         if(t != 0 && t != d) {
-            t->threadBlockedByGC = JAVA_TRUE;
             struct elementStruct* objects = t->threadObjectStack;
             
             // wait for the thread to pause so we can traverse its stack but not for native threads where
             // we don't have much control and who barely call into Java anyway
             if(t->lightweightThread) {
+                t->threadBlockedByGC = JAVA_TRUE;
                 while(t->threadActive) {
                     usleep(500);
                 }
+            } else {
+                // we skip the heavyweight threads for mark we assume they always use shared objects
+                continue;
             }
             
             // place allocations from the local thread into the global heap list
@@ -494,7 +497,7 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(o->__codenameOneGcMark < currentGcMarkValue) {
+            if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
                 CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
                 allObjectsInHeap[iter] = JAVA_NULL;
                 //if(o->__codenameOneReferenceCount > 0) {
@@ -662,7 +665,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize > 20000 && constantPoolObjects != 0) {
+        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0) {
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
@@ -671,7 +674,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             
             if(threadStateData->heapAllocationSize > 0) {
                 invokedGC = YES;
-                java_lang_System_gc__(getThreadLocalData());
+                java_lang_System_gc__(threadStateData);
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
                     usleep((JAVA_INT)(1000));
