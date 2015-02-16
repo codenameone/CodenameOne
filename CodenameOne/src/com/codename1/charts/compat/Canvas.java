@@ -170,6 +170,7 @@ public class Canvas  {
         Paint.Style style = paint.getStyle();
         if ( style.equals(Paint.Style.FILL)){
             g.fillShape(p);
+            //g.drawShape(p, getStroke(paint));
         } else if ( style.equals(Paint.Style.STROKE)){
             g.drawShape(p, getStroke(paint));
         } else if ( style.equals(Paint.Style.FILL_AND_STROKE)){
@@ -207,69 +208,88 @@ public class Canvas  {
     }
 
     public void drawCircle(float cx, float cy, float r, Paint paint) {
-        int inc = 1;
-        if ( r < 50 ){
-            inc = 5;
-        }
-        if ( r < 20 ){
-            inc = 20;
-        }
-        
-        GeneralPath circle = new GeneralPath();
-        for(int theta = 0; theta < 360; theta+=inc)
-        {
-            float x = (float)(cx + r * Math.cos(Math.toRadians(theta)));
-            float y = (float)(cy + r * Math.sin(Math.toRadians(theta)));
-            if(theta == 0)
-                circle.moveTo(x,y);
-            else
-                circle.lineTo(x, y);
-        }
-        circle.closePath();
-        
-        drawPath(circle, paint);
+        drawArc(new Rectangle2D(cx-r, cy-r, 2*r, 2*r), 0, 360, true, paint);
  
     }
 
+    
     public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
-        
         float cx = 0;
         float cy = 0;
+        cx = (float)(oval.getX()+oval.getWidth()/2f);
+        cy = (float)(oval.getY()+oval.getHeight()/2f);
         float r = (float)oval.getWidth()/2f;
-        float inc = 1;
-       
-        
-        
+        float inc = 45f;
+        float prevX=0; float prevY=0;
         GeneralPath circle = new GeneralPath();
         if ( useCenter ){
             circle.moveTo(cx, cy);
         }
-        for(float theta = currentAngle; theta < currentAngle+sweepAngle; theta+=inc)
+        float theta = currentAngle;
+        float endAngle = currentAngle+sweepAngle;
+        for(; theta <= endAngle; theta+=inc)
         {
-            float x = (int)(cx + r * Math.cos(Math.toRadians(theta)));
-            float y = (int)(cy + r * Math.sin(Math.toRadians(theta)));
-            if(theta == currentAngle && !useCenter)
+            float x = (float)(cx + r * Math.cos(Math.toRadians(theta)));
+            float y = (float)(cy + r * Math.sin(Math.toRadians(theta)));
+            
+            if(theta == currentAngle && !useCenter){
                 circle.moveTo(x,y);
-            else
-                circle.lineTo(x,y);
+            } else if ( theta == currentAngle ){
+                circle.lineTo(x, y);
+            }else{
+                
+                //circle.lineTo(x,y);
+                addBezierArcToPath(circle, cx, cy, prevX, prevY, x, y);
+                
+            }
+            prevX = x;
+            prevY = y;
         }
+        
+        
+        float x = (float)(cx + r * Math.cos(Math.toRadians(endAngle)));
+        float y = (float)(cy + r * Math.sin(Math.toRadians(endAngle)));
+        addBezierArcToPath(circle, cx, cy, prevX, prevY, x, y);
+        //circle.lineTo(x, y);
+       
         if ( useCenter ){
             circle.closePath();
         }
-        
+        /*
         cx = (float)(oval.getX()+oval.getWidth()/2f);
         cy = (float)(oval.getY()+oval.getHeight()/2f);
         
         //Matrix at = Matrix.getTranslateInstance(cx, cy);
-        Transform at = Transform.makeScale((float)1.0,(float)((oval.getHeight())/ (2.0*r)) );
+        Transform at = Transform.makeIdentity();//Transform.makeScale((float)1.0,(float)((oval.getHeight())/ (2.0*r)) );
         //at.scale(1.0, (oval.bottom-oval.top)/ (2.0*r));
         at.translate(cx, cy);
         
         Shape tCircle = circle.createTransformedShape(at);
-        
-        drawPath(tCircle, paint);
+        */
+        drawPath(circle, paint);
     }
 
+    
+    private static void addBezierArcToPath(GeneralPath path, float cx, float cy,
+                                          float startX, float startY, float endX, float endY)
+    {
+        if ( startX != endX || startY != endY ){
+            final double ax = startX - cx;
+            final double ay = startY - cy;
+            final double bx = endX - cx;
+            final double by = endY- cy;
+            final double q1 = ax * ax + ay * ay;
+            final double q2 = q1 + ax * bx + ay * by;
+            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
+            final float x2 = (float)(cx + ax - k2 * ay);
+            final float y2 = (float)(cy + ay + k2 * ax);
+            final float x3 = (float)(cx + bx + k2 * by);
+            final float y3 = (float)(cy + by - k2 * bx);
+            //Log.p("Curve: "+startX+","+startY+" -> "+x2+","+y2+" -> "+x3+","+y3+" -> "+endX+","+endY);
+
+            path.curveTo(x2, y2, x3, y3, endX, endY);
+        }
+    }
     public void drawPoint(Float get, Float get0, Paint paint) {
         throw new RuntimeException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
