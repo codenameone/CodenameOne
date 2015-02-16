@@ -4193,16 +4193,18 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
 UIPopoverController* popoverControllerInstance;
+extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
 
 void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
     int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
-    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-300, SCREEN_WIDTH, 246)];
+    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-246, SCREEN_WIDTH, 246)];
     [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
-    
+    [fakeActionSheet setAutoresizesSubviews:YES];
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
     pickerToolbar.tintColor = [UIColor whiteColor];
+    [pickerToolbar setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
     [pickerToolbar sizeToFit];
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
@@ -4253,12 +4255,13 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     
     [pickerToolbar setItems:itemArray animated:YES];
     [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
+    [pickerView setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
     [fakeActionSheet addSubview:pickerToolbar];
     [fakeActionSheet addSubview:pickerView];
     [[CodenameOne_GLViewController instance].view addSubview:fakeActionSheet];
+    currentActionSheet = fakeActionSheet;
     repaintUI();
-}
-
+}D
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;

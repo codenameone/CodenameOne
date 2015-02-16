@@ -81,6 +81,13 @@ int nextPowerOf2(int val) {
 int displayWidth = -1;
 int displayHeight = -1;
 UIView *editingComponent;
+
+// Currently used only for datepicker but could be used for
+// other things.  A persistent reference to the action sheet
+// so that it can be resized and manipulated as necessary
+// on things like orientation changes.
+UIView *currentActionSheet;
+
 float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 int editComponentPadTop, editComponentPadLeft;
 BOOL firstTime = YES;
@@ -1976,6 +1983,15 @@ int keyboardHeight;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
     lockDrawing = NO;
     screenSizeChanged(displayWidth, displayHeight);
+    
+    if ( currentActionSheet != nil ){
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.5];
+        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        
+        currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
+        [UIView commitAnimations];
+    }
 #ifdef INCLUDE_MOPUB
     CGSize size = [self.adView adContentViewSize];
     CGFloat centeredX = (self.view.bounds.size.width - size.width) / 2;
@@ -2783,6 +2799,7 @@ extern JAVA_LONG defaultDatePickerDate;
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
     UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
+    currentActionSheet = nil;
     repaintUI();
 }
 
@@ -2805,6 +2822,7 @@ extern JAVA_LONG defaultDatePickerDate;
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
     UIView* v = (UIView*)[arr objectAtIndex:0];
     [v removeFromSuperview];
+    currentActionSheet = nil;
     repaintUI();
     
 }
