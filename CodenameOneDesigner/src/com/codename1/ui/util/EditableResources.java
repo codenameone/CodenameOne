@@ -82,6 +82,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -121,6 +122,8 @@ public class EditableResources extends Resources implements TreeModel {
     private File overrideFile;
     private EditableResources parentResource;
     private static boolean xmlEnabled;
+    
+    private HashSet themeLoadingErrors;
     
     public static void setXMLEnabled(boolean b) {
         xmlEnabled = b;
@@ -1669,21 +1672,33 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     public Hashtable<String, Object> getTheme(String id) {
-        if(overrideResource != null) {
-            Hashtable h = overrideResource.getTheme(id);
-            if(h != null) {
-                return h;
+        try {
+            if (overrideResource != null) {
+                Hashtable h = overrideResource.getTheme(id);
+                if (h != null) {
+                    return h;
+                }
+            }
+            if (loadingMode) {
+                return new Hashtable();
+            }
+            Hashtable h = super.getTheme(id);
+            if (h != null) {
+                removeMultiConstants(h);
+                h.remove("name");
+            }
+            return h;
+
+        } catch (Exception e) {
+            if (themeLoadingErrors == null) {
+                themeLoadingErrors = new HashSet();
+            }
+            if (!themeLoadingErrors.contains(e.getMessage())) {
+                JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0], e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                themeLoadingErrors.add(e.getMessage());
             }
         }
-        if(loadingMode) {
-            return new Hashtable();
-        }
-        Hashtable h = super.getTheme(id);
-        if(h != null) {
-            removeMultiConstants(h);
-            h.remove("name");
-        }
-        return h;
+        return new Hashtable<String, Object>();
     }
     
     private String[] mergeArrays(String[] a, String[] b) {
