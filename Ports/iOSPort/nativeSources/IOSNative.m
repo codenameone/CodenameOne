@@ -4402,6 +4402,9 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
         datePickerView.tag = 10;
         datePickerView.date = date;
         currentDatePickerDate = date;
+#ifndef CN1_USE_ARC
+        [currentDatePickerDate retain];
+#endif
         defaultDatePickerDate = time;
         [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
         if(isIPad()) {
