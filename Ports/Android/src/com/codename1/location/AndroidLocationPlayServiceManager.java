@@ -61,25 +61,52 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     protected void bindListener() {
-        Handler mHandler = new Handler(Looper.getMainLooper());
-        mHandler.post(new Runnable() {
+        new Thread(new Runnable() {
 
+            @Override
             public void run() {
-                LocationServices.FusedLocationApi.requestLocationUpdates(
-                        mGoogleApiClient, locationRequest, AndroidLocationPlayServiceManager.this);
+                //wait until the client is connected, otherwise the call to
+                //requestLocationUpdates will fail
+                while(!mGoogleApiClient.isConnected()){
+                    try {
+                        Thread.sleep(300);
+                    } catch (Exception ex) {                        
+                    }
+                }
+                Handler mHandler = new Handler(Looper.getMainLooper());
+                mHandler.post(new Runnable() {
+
+                    public void run() {
+                        LocationServices.FusedLocationApi.requestLocationUpdates(
+                                mGoogleApiClient, locationRequest, AndroidLocationPlayServiceManager.this);
+                    }
+                });
             }
-        });
+        }).start();
     }
 
     @Override
     protected void clearListener() {
-        Handler mHandler = new Handler(Looper.getMainLooper());
-        mHandler.post(new Runnable() {
+        new Thread(new Runnable() {
 
+            @Override
             public void run() {
-                LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, AndroidLocationPlayServiceManager.this);
+                //mGoogleApiClient must be connected
+                while(!mGoogleApiClient.isConnected()){
+                    try {
+                        Thread.sleep(300);
+                    } catch (Exception ex) {                        
+                    }
+                }
+                Handler mHandler = new Handler(Looper.getMainLooper());
+                mHandler.post(new Runnable() {
+
+                    public void run() {
+                        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, AndroidLocationPlayServiceManager.this);
+                    }
+                });
             }
-        });
+        }).start();
     }
 
     @Override
