@@ -140,9 +140,11 @@ static CGRect drawingRect;
     int orY = drawingRect.origin.y;
     if(x < orX) {
         x = orX;
+        width = x2 - x;
     }
     if(y < orY) {
         y = orY;
+        height = y2 - y;
     }
     int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
     int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
@@ -167,9 +169,18 @@ static CGRect drawingRect;
             
             return;
         }
+#ifdef USE_ES2
+        // This is a hack!!!  I don't know why the clip needs to be one
+        // bigger in ES2 on each horizontal side, but it seems to .  R
+        // Requires more investigation
+        // https://code.google.com/p/codenameone/issues/detail?id=1223
+        clipX = x-1;
+        clipW = width+1;
+#else
         clipX = x;
-        clipY = y;
         clipW = width;
+#endif
+        clipY = y;
         clipH = height;
         [ClipRect updateClipToScale];
         _glEnable(GL_SCISSOR_TEST);

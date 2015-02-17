@@ -106,10 +106,10 @@ static GLuint getOGLProgram(){
     
     //GLKVector4 colorV = GLKVector4FromRGB(color, alpha);
     GLfloat vertexes[] = {
-        x + 1, y + 1,
-        x + width, y + 1,
+        x+1, y,
+        x + width, y,
         x + width, y + height,
-        x + 1, y + height,
+        x+1, y + height,
     };
     //_glEnableClientState(GL_VERTEX_ARRAY);
     glEnableVertexAttribArray(vertexCoordAtt);
