@@ -29,6 +29,7 @@ import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.renderers.DefaultRenderer;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.geom.Shape;
 
 
 
@@ -153,6 +154,16 @@ public class PieChart extends RoundChart {
 
   public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
     return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);
+  }
+  
+  
+  /**
+   * Gets the shape of a pie segment given its point index.
+   * @param pointIndex The point index representing the pie segment.
+   * @return A shape of the outline of the segment.
+   */
+  public Shape getSegmentShape(int pointIndex){
+      return mPieMapper.getSegmentShape(pointIndex);
   }
 
 }

@@ -21,13 +21,14 @@ import com.codename1.util.MathUtil;
 
 import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
+import com.codename1.ui.geom.Shape;
 
 /**
  * PieChart Segment Selection Management.
  */
 public class PieMapper {
 
-  private List<PieSegment> mPieSegmentList = new ArrayList<PieSegment>();
+  private final List<PieSegment> mPieSegmentList = new ArrayList<PieSegment>();
 
   private int mPieChartRadius;
 
@@ -136,4 +137,27 @@ public class PieMapper {
     }
     return null;
   }
+  
+  private Shape getSegmentShape(PieSegment segment){
+      return segment.getShape(mCenterX, mCenterY, mPieChartRadius);
+  }
+  
+  private PieSegment getSegment(int dataIndex){
+      for ( PieSegment s : mPieSegmentList ){
+          if ( dataIndex == s.getDataIndex() ){
+              return s;
+          }
+      }
+      return null;
+  }
+  
+  public Shape getSegmentShape(int dataIndex){
+      PieSegment seg = getSegment(dataIndex);
+      if ( seg != null ){
+          return getSegmentShape(seg);
+      }
+      return null;
+  }
+  
+  
 }

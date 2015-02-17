@@ -639,6 +639,7 @@ public class DefaultRenderer {
    * Returns the enabled state of the zoom.
    * 
    * @return if zoom is enabled
+   * @deprecated
    */
   public boolean isZoomEnabled() {
     return mZoomEnabled;
@@ -648,6 +649,7 @@ public class DefaultRenderer {
    * Sets the enabled state of the zoom.
    * 
    * @param enabled zoom enabled
+   * @deprecated
    */
   public void setZoomEnabled(boolean enabled) {
     mZoomEnabled = enabled;
@@ -657,6 +659,7 @@ public class DefaultRenderer {
    * Returns the visible state of the zoom buttons.
    * 
    * @return if zoom buttons are visible
+   * @deprecated
    */
   public boolean isZoomButtonsVisible() {
     return mZoomButtonsVisible;
@@ -666,6 +669,7 @@ public class DefaultRenderer {
    * Sets the visible state of the zoom buttons.
    * 
    * @param visible if the zoom buttons are visible
+   * @deprecated
    */
   public void setZoomButtonsVisible(boolean visible) {
     mZoomButtonsVisible = visible;
@@ -675,6 +679,7 @@ public class DefaultRenderer {
    * Returns the enabled state of the external (application implemented) zoom.
    * 
    * @return if external zoom is enabled
+   * @deprecated
    */
   public boolean isExternalZoomEnabled() {
     return mExternalZoomEnabled;
@@ -684,6 +689,7 @@ public class DefaultRenderer {
    * Sets the enabled state of the external (application implemented) zoom.
    * 
    * @param enabled external zoom enabled
+   * @deprecated
    */
   public void setExternalZoomEnabled(boolean enabled) {
     mExternalZoomEnabled = enabled;
@@ -693,6 +699,7 @@ public class DefaultRenderer {
    * Returns the zoom rate.
    * 
    * @return the zoom rate
+   * @deprecated
    */
   public float getZoomRate() {
     return mZoomRate;
@@ -702,6 +709,7 @@ public class DefaultRenderer {
    * Returns the enabled state of the pan.
    * 
    * @return if pan is enabled
+   * @deprecated
    */
   public boolean isPanEnabled() {
     return mPanEnabled;
@@ -711,6 +719,7 @@ public class DefaultRenderer {
    * Sets the enabled state of the pan.
    * 
    * @param enabled pan enabled
+   * @deprecated
    */
   public void setPanEnabled(boolean enabled) {
     mPanEnabled = enabled;
@@ -720,6 +729,7 @@ public class DefaultRenderer {
    * Sets the zoom rate.
    * 
    * @param rate the zoom rate
+   * @deprecated
    */
   public void setZoomRate(float rate) {
     mZoomRate = rate;
@@ -729,6 +739,7 @@ public class DefaultRenderer {
    * Returns the enabled state of the click.
    * 
    * @return if click is enabled
+   * @deprecated
    */
   public boolean isClickEnabled() {
     return mClickEnabled;
@@ -738,6 +749,7 @@ public class DefaultRenderer {
    * Sets the enabled state of the click.
    * 
    * @param enabled click enabled
+   * @deprecated
    */
   public void setClickEnabled(boolean enabled) {
     mClickEnabled = enabled;

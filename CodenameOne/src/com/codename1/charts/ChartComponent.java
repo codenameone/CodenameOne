@@ -26,8 +26,16 @@ import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.ui.Component;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Transform;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
+import java.util.LinkedList;
+import java.util.Queue;
 
 
 /**
@@ -35,6 +43,8 @@ import com.codename1.ui.Transform;
  * @author shannah
  */
 public class ChartComponent extends Component {
+    
+    private Queue<ZoomTransition> animations = new LinkedList<ZoomTransition>();
     
     /**
      * The chart that is to be rendered in this component.
@@ -179,6 +189,63 @@ public class ChartComponent extends Component {
     
     
     
+    public Point chartToScreenCoord(int x, int y){
+        x += getAbsoluteX();
+        y += getAbsoluteY();
+        if ( currentTransform != null ){
+            float[] pt = currentTransform.transformPoint(new float[]{x,y, 0});
+            x = (int)pt[0];
+            y = (int)pt[1];
+            
+        }
+        return new Point(x, y);
+    }
+    
+    public Shape screenToChartShape(Shape s){
+        GeneralPath p = new GeneralPath();
+        Transform t = Transform.makeIdentity();
+        if ( currentTransform != null ){
+            t.concatenate(currentTransform.getInverse());
+        }
+        t.translate(-getAbsoluteX(), -getAbsoluteY());
+        p.append(s.getPathIterator(t), false);
+        return p;
+    }
+    
+    public Shape chartToScreenShape(Shape s){
+        GeneralPath p = new GeneralPath();
+        Transform inverse = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+        if ( currentTransform != null ){
+            inverse.concatenate(currentTransform);
+        }
+        
+        p.append(s.getPathIterator(inverse), false);
+        return p;
+    }
+    
+    
+    
+    /**
+     * Zooms the view port to show a specified shape.  The shape should be 
+     * expressed in chart coordinates (not screen coordinates).
+     * @param s The shape that should be shown.
+     */
+    public void zoomToShapeInChartCoords(Shape s){
+        zoomToShapeInChartCoords(s, 1);
+        
+    }
+    
+    /**
+     * Zooms the view port to show a specified shape.  The shape should be 
+     * expressed in chart coordinates (not screen coordinates).
+     * @param s The shape that should be shown.
+     * @param duration The duration of the transition.
+     */
+    public void zoomToShapeInChartCoords(Shape s, int duration){
+        zoomTransition(s.getBounds(), duration);
+    }
+    
+    
     @Override
     public void pointerPressed(int x, int y) {
        
@@ -201,6 +268,7 @@ public class ChartComponent extends Component {
     protected void seriesPressed(SeriesSelection sel){
         
     }
+    
 
     @Override
     public void pointerReleased(int x, int y) {
@@ -210,7 +278,7 @@ public class ChartComponent extends Component {
         zoomDistStart = 0;
         zoomTransformStart = null;
         
-       Point chartCoord = screenToChartCoord(x, y);
+        Point chartCoord = screenToChartCoord(x, y);
         SeriesSelection sel = chart.getSeriesAndPointForScreenCoordinate(chartCoord);
         if ( sel == null ){
             return;
@@ -340,6 +408,121 @@ public class ChartComponent extends Component {
     }
     
     
+    
+    
+    private void zoomTransition(Rectangle newViewPort, int duration){
+        Shape currentViewPort = screenToChartShape(new Rectangle(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight()));
+        float[] currentRect = currentViewPort.getBounds2D();
+        float[] newRect = newViewPort.getBounds2D();
+        
+        float currentAspect =currentRect[2]/currentRect[3];
+        float newAspect = newRect[3]/newRect[3];
+        
+        if ( newAspect != currentAspect ){
+            newViewPort.setHeight((int)(((double)newViewPort.getWidth())/currentAspect));
+            newRect = newViewPort.getBounds2D();
+            newAspect = newRect[2]/newRect[3];
+        }
+        
+        ZoomTransition zt = new ZoomTransition(currentViewPort.getBounds(), newViewPort, duration);
+        
+        animations.add(zt);
+        if ( animations.size() == 1 ){
+            zt.start();
+        }
+    }
+    
+    private class ZoomTransition implements Animation {
+        private final Rectangle currentViewPort;
+        private final Rectangle newViewPort;
+        private Motion motion;
+        private final Transform origTransform;
+        private boolean finished = false;
+        
+        ZoomTransition(Rectangle currentViewPort, Rectangle newViewPort, int duration){
+            
+            this.currentViewPort = currentViewPort;
+            this.newViewPort = newViewPort;
+            this.motion = Motion.createLinearMotion(0, 100, duration);
+            this.origTransform = Transform.makeIdentity();
+            if ( transform != null ){
+                this.origTransform.setTransform(transform);
+            }
+            
+        }
+        
+        public void start(){
+            Form f = ChartComponent.this.getComponentForm();
+            if ( f != null ){
+                f.registerAnimated(this);
+                this.motion.start();
+            } else {
+                animations.remove();
+            }
+        }
+        
+        public void cleanup(){
+            Form f = ChartComponent.this.getComponentForm();
+            if ( f != null ){
+                f.deregisterAnimated(this);
+            }
+        }
+
+        public boolean animate() {
+            
+            if (finished){
+                animations.remove();
+                if ( !animations.isEmpty() ){
+                    animations.peek().start();
+                }
+                cleanup();
+                return false;
+            } else if ( motion.isFinished() ){
+                finished = true;
+                
+            }
+            return true;
+        }
+
+        public void paint(Graphics g) {
+            Rectangle newBounds = new Rectangle(newViewPort.getBounds());
+            Rectangle currentBounds = new Rectangle(currentViewPort.getBounds());
+            
+            
+            double nW = newBounds.getWidth();
+            double nH = newBounds.getHeight();
+            double cW = currentBounds.getWidth();
+            double cH = currentBounds.getHeight();
+            
+            double scale = cW/nW;
+            if ( nH * scale > cH){
+                scale = cH/nH;
+            }
+            Point newCenter = new Point(newBounds.getX()+newBounds.getWidth()/2, newBounds.getY()+newBounds.getHeight()/2);
+            Point currentCenter = new Point(currentBounds.getX()+currentBounds.getWidth()/2, currentBounds.getY()+currentBounds.getHeight()/2);
+            double motionVal = motion.getValue();
+            
+            double tx = ((double)newCenter.getX()-currentCenter.getX())*motionVal/100.0;
+            double ty = ((double)newCenter.getY()-currentCenter.getY())*motionVal/100.0;
+            
+            scale = 1.0 + (scale - 1f)*motionVal/100.0;
+            
+            Transform t = Transform.makeIdentity();
+            t.setTransform(origTransform);
+            
+            int cX = (int)(currentCenter.getX()+tx);
+            int cY = (int)(currentCenter.getY()+ty);
+            
+            t.translate(currentCenter.getX(), currentCenter.getY());
+            t.scale((float)scale, (float)scale);
+            t.translate(-cX, -cY);
+            
+            setTransform(t);
+            ChartComponent.this.repaint();
+            
+        }
+        
+    }
     
     
     

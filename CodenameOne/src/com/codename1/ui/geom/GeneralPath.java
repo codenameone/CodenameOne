@@ -272,6 +272,12 @@ public final class GeneralPath implements Shape {
                 case PathIterator.SEG_LINETO:
                     sb.append("Line ("+buf[0]+","+buf[1]+"), ");
                     break;
+                case PathIterator.SEG_CUBICTO:
+                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+".."+buf[4]+","+buf[5]+")");
+                    break;
+                case PathIterator.SEG_QUADTO:
+                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+")");
+                    break;
                 case PathIterator.SEG_CLOSE:
                     sb.append(" CLOSE]");
                     break;
@@ -417,6 +423,48 @@ public final class GeneralPath implements Shape {
         points[pointSize++] = x3;
         points[pointSize++] = y3;
         dirty = true;
+    }
+    
+    private static void addBezierArcToPath(GeneralPath path, float cx, float cy,
+                                          float startX, float startY, float endX, float endY)
+    {
+        if ( startX != endX || startY != endY ){
+            final double ax = startX - cx;
+            final double ay = startY - cy;
+            final double bx = endX - cx;
+            final double by = endY- cy;
+            final double q1 = ax * ax + ay * ay;
+            final double q2 = q1 + ax * bx + ay * by;
+            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
+            final float x2 = (float)(cx + ax - k2 * ay);
+            final float y2 = (float)(cy + ay + k2 * ax);
+            final float x3 = (float)(cx + bx + k2 * by);
+            final float y3 = (float)(cy + by - k2 * bx);
+            path.curveTo(x2, y2, x3, y3, endX, endY);
+        } 
+    }
+    
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
+    public void arcTo(float cX, float cY, float endX, float endY){
+        if ( pointSize < 3 ){
+            throw new RuntimeException("Cannot add arc to path if it doesn't already have a starting point.");
+            
+        }
+        float startX = points[pointSize-2];
+        float startY = points[pointSize-1];
+        Log.p("Arc start "+startX+","+startY+" Arc end: "+endX+","+endY+", Center: "+cX+", "+cY);
+        addBezierArcToPath(this, cX, cY, startX, startY, endX, endY);
+    }
+    
+    public void arcTo(double cX, double cY, double endX, double endY){
+        arcTo((float)cX, (float)cY, (float)endX, (float)endY);
     }
 
     /**

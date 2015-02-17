@@ -15,6 +15,9 @@
  */
 package com.codename1.charts.views;
 
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Shape;
+
 
 /**
  * Holds An PieChart Segment
@@ -27,6 +30,7 @@ public class PieSegment  {
   private int mDataIndex;
 
   private float mValue;
+  
 
   public PieSegment(int dataIndex, float value, float startAngle, float angle) {
     mStartAngle = startAngle;
@@ -74,6 +78,15 @@ public class PieSegment  {
   public String toString() {
     return "mDataIndex=" + mDataIndex + ",mValue=" + mValue + ",mStartAngle=" + mStartAngle
         + ",mEndAngle=" + mEndAngle;
+  }
+  
+  public Shape getShape(float cX, float cY, float radius){
+      GeneralPath out = new GeneralPath();
+      out.moveTo(cX, cY);
+      out.lineTo(cX + radius * Math.cos(Math.toRadians(mStartAngle)) , cY + radius *  Math.sin(Math.toRadians(mStartAngle)));
+      out.arcTo(cX, cY, cX + radius * Math.cos(Math.toRadians(mEndAngle)), cY + radius*Math.sin(Math.toRadians(mEndAngle)));
+      out.closePath();
+      return out;
   }
 
 }
