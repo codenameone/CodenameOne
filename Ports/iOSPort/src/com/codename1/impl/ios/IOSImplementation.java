@@ -656,6 +656,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    private static final int[] widthHeight = new int[2];
     public Object createImage(String path) throws IOException {
         long ns;
         if(path.startsWith("file:")) {
@@ -663,11 +664,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             ns = getResourceNSData(path);
         }
-        int[] wh = new int[2];
         NativeImage n = new NativeImage(path);
-        n.peer = nativeInstance.createImageNSData(ns, wh);
-        n.width = wh[0];
-        n.height = wh[1];
+        n.peer = nativeInstance.createImageNSData(ns, widthHeight);
+        n.width = widthHeight[0];
+        n.height = widthHeight[1];
         nativeInstance.releasePeer(ns);
         return n;
     }
@@ -739,7 +739,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object createImage(InputStream i) throws IOException {
         long ns = getNSData(i);
         if(ns > 0) {
-            int[] wh = new int[2];
+            int[] wh = widthHeight;
             NativeImage n = new NativeImage("Image created from stream");
             n.peer = nativeInstance.createImageNSData(ns, wh);
             n.width = wh[0];
@@ -761,7 +761,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public Object createImage(byte[] bytes, int offset, int len) {
-        int[] wh = new int[2];
+        int[] wh = widthHeight;
         if(offset != 0 || len != bytes.length) {
             byte[] b = new byte[len];
             System.arraycopy(bytes, offset, b, 0, len);
@@ -2109,9 +2109,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new BufferedInputStream(new NSDataInputStream(resource, null), resource);
     }
 
-    private Map softReferenceMap = new HashMap();
+    // this might be accessed on multiple threads
+    private Hashtable softReferenceMap = new Hashtable();
     public static void flushSoftRefMap() {
-        instance.softReferenceMap = new HashMap();
+        instance.softReferenceMap = new Hashtable();
     }
     
     /**
@@ -2126,6 +2127,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             return w.get();
         }
         return null;*/
+        if(o == null) {
+            return null;
+        }
         Object val = softReferenceMap.get(o);
         if(val != null) {
             return val;
@@ -4518,7 +4522,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(nativePeer == null || nativePeer[0] == 0) {
                 return new Dimension();
             }
-            int[] p = new int[2];
+            int[] p = widthHeight;
             nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
@@ -4553,7 +4557,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         protected Image generatePeerImage() {
-            int[] wh = new int[2];
+            int[] wh = widthHeight;
             long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
             if(imagePeer == 0) {
                 return null;
