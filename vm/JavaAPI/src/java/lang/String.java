@@ -862,7 +862,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
 
     protected void finalize() {
-        releaseNSString(nsString);
+        if(nsString != 0) {
+            releaseNSString(nsString);
+        }
+        nsString = 0;
     }
     
     private native static void releaseNSString(long ns);
