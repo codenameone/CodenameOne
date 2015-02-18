@@ -940,6 +940,9 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     memcpy((*dat).data, chars, length * sizeof(JAVA_ARRAY_BYTE));
     java_lang_String___INIT_____byte_1ARRAY_java_lang_String(threadStateData, s, (JAVA_OBJECT)dat, utf8String);
+    struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
+    nnn->java_lang_String_nsString = str;
+    [str retain];
     return s;
 }
 
