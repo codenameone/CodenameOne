@@ -105,12 +105,26 @@ static GLuint getOGLProgram(){
                    ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
     
     //GLKVector4 colorV = GLKVector4FromRGB(color, alpha);
+#if !TARGET_IPHONE_SIMULATOR
+    // For some reason we need to make the vertexes different on
+    // device than in simulator.
+    // See https://code.google.com/p/codenameone/issues/detail?id=1223
+    GLfloat vertexes[] = {
+        x+1, y+1,
+        x + width, y+1,
+        x + width, y + height,
+        x+1, y + height,
+    };
+
+#else
     GLfloat vertexes[] = {
         x+1, y,
         x + width, y,
         x + width, y + height,
         x+1, y + height,
     };
+#endif
+   
     //_glEnableClientState(GL_VERTEX_ARRAY);
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
