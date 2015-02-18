@@ -3562,6 +3562,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
     JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)str;
     NSString* ns = [NSString stringWithUTF8String:result];
+    [ns retain];
     ss->java_lang_String_nsString = (JAVA_LONG)ns;
     
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [ns length]);
