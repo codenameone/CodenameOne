@@ -121,8 +121,15 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     [nsStr enumerateSubstringsInRange:NSMakeRange(0, [nsStr length])
                                options:NSStringEnumerationByComposedCharacterSequences
                             usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
-                                dest[length] = (JAVA_CHAR)[nsStr characterAtIndex:length];
+                                unichar ch = [nsStr characterAtIndex:length];
+                                dest[length] = (JAVA_ARRAY_CHAR)ch;
                                 length++;
+                                if([substring length] > 1) {
+                                    // we have surrogate pairs here...
+                                    ch = [substring characterAtIndex:1];
+                                    dest[length] = (JAVA_ARRAY_CHAR)ch;
+                                    length++;
+                                }
                             }];
 
     [nsStr release];
