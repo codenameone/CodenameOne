@@ -127,11 +127,9 @@ public final class System {
         synchronized(LOCK) {
             LOCK.notify();
         }
-        if(Thread.currentThread() != gcThreadInstance) {
-            try {
-                Thread.sleep(2);
-            } catch(InterruptedException er) {}
-        }
+        try {
+            Thread.sleep(2);
+        } catch(InterruptedException er) {}
     }
     
     private native static void gcLight();
