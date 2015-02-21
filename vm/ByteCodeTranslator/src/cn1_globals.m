@@ -315,10 +315,7 @@ void codenameOneGCMark() {
                 while(t->threadActive) {
                     usleep(500);
                 }
-            } else {
-                // we skip the heavyweight threads for mark we assume they always use shared objects
-                continue;
-            }
+            } 
             
             // place allocations from the local thread into the global heap list
             for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
