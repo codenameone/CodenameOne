@@ -511,6 +511,9 @@ public class Button extends Label {
         if(state == STATE_PRESSED) {
             released(x, y);
         }
+        if(restoreDragPercentage > -1) {
+            Display.getInstance().setDragStartPercentage(restoreDragPercentage);
+        }
     }
     
     /**

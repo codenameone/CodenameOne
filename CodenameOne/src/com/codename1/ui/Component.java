@@ -283,7 +283,7 @@ public class Component implements Animation, StyleListener {
     boolean noBind;
     private Runnable refreshTask;
     private double pinchDistance;
-    private static int restoreDragPercentage = -1;
+    static int restoreDragPercentage = -1;
 
     private Component[] sameWidth;
     private Component[] sameHeight;

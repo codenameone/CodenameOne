@@ -802,6 +802,9 @@ public final class Display {
      * paint or event handling).
      */
     public void callSeriallyAndWait(Runnable r){
+        if(isEdt()) {
+            throw new RuntimeException("This method MUST NOT be invoked on the EDT");
+        }
         RunnableWrapper c = new RunnableWrapper(r, 0);
         callSerially(c);
         flushEdt();

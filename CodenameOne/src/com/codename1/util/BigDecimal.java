@@ -16,7 +16,7 @@ package com.codename1.util;
  * result of a multiplication of two <code>BigDecimal</code>s returns a
  * <code>BigDecimal</code> with double scale.
  */
-class BigDecimal {
+public class BigDecimal {
     private static final BigInteger ZERO = BigInteger.valueOf(0);
     private static final BigInteger ONE = BigInteger.valueOf(1);
 

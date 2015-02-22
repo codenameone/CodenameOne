@@ -59,11 +59,13 @@ public class Picker extends Button {
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 if(Display.getInstance().isNativePickerTypeSupported(type)) {
+                    setEnabled(false);
                     Object val = Display.getInstance().showNativePicker(type, Picker.this, value, metaData);
                     if(val != null) {
                         value = val;
                         updateValue();
                     }
+                    setEnabled(true);
                 } else {
                     Dialog pickerDlg = new Dialog();
                     pickerDlg.setDisposeWhenPointerOutOfBounds(true);
