@@ -50,6 +50,8 @@ public class FlipTransition extends Transition {
     private float zNear;
     private float zFar;
 
+    private int duration = 200;
+    
     /**
      * Creates  a Flip Transition
      */ 
@@ -60,12 +62,24 @@ public class FlipTransition extends Transition {
      * Creates  a Flip Transition
      * 
      * @param bgColor the color to paint in the background when the transition 
-     * paints
+     * paints, use -1 to not paint a background color
      */ 
     public FlipTransition(int bgColor) {
         this.bgColor = bgColor;
     }
 
+    /**
+     * Creates  a Flip Transition
+     * 
+     * @param bgColor the color to paint in the background when the transition 
+     * paints
+     * @param duration the duration of the transition
+     */ 
+    public FlipTransition(int bgColor, int duration) {
+        this.bgColor = bgColor;
+        this.duration = duration;
+    }
+    
     @Override
     public void initTransition() {
         flipState = 0f;
@@ -91,7 +105,7 @@ public class FlipTransition extends Transition {
         
 
         if (source instanceof Form) {
-            bgColor = 0;
+            setBgColor(0);
         }
         
         
@@ -100,7 +114,7 @@ public class FlipTransition extends Transition {
         //motion = Motion.createLinearMotion(0, 180, 500);
         //motion.start();
         
-        motion = Motion.createLinearMotion(0, 100, 200);
+        motion = Motion.createLinearMotion(0, 100, duration);
         motion.start();
 
     }
@@ -127,7 +141,7 @@ public class FlipTransition extends Transition {
                 if (motion.isFinished()) {
                     transitionState = STATE_MOVE_CLOSER;
                     if ( perspectiveSupported ){
-                        motion = Motion.createLinearMotion(100, 0, 200);
+                        motion = Motion.createLinearMotion(100, 0, duration);
                         motion.start();
                     } else {
                         return false;
@@ -178,7 +192,7 @@ public class FlipTransition extends Transition {
         
         
         
-        if (bgColor >= 0) {
+        if (getBgColor() >= 0) {
             int c = g.getColor();
             g.setColor(0);
             g.fillRect(x, y, w, h);
@@ -300,6 +314,38 @@ public class FlipTransition extends Transition {
         sourceBuffer = null;
         destBuffer = null;
         
+    }
+
+    /**
+     * The duration for the flip transition
+     * @return the duration
+     */
+    public int getDuration() {
+        return duration;
+    }
+
+    /**
+     * The duration for the flip transition
+     * @param duration the duration to set
+     */
+    public void setDuration(int duration) {
+        this.duration = duration;
+    }
+
+    /**
+     * The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
+     * @return the bgColor
+     */
+    public int getBgColor() {
+        return bgColor;
+    }
+
+    /**
+     * The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
+     * @param bgColor the bgColor to set
+     */
+    public void setBgColor(int bgColor) {
+        this.bgColor = bgColor;
     }
 
 }
