@@ -1675,13 +1675,8 @@ int keyboardHeight;
     CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
 
     keyboardHeight = keyboardFrame.size.height;
-    
-    // This may be redundant... vkbHeight and vkbWidth are exposed to java using
-    // the getVKBWidth() and getVKBHeight() native methods.  I think vkbHeight
-    // is the same as keyboardHeight though, so may be room for some consolidation.
-    CGSize kbSize = [[userInfo objectForKey:UIKeyboardFrameBeginUserInfoKey] CGRectValue].size;
-    vkbHeight = (int)kbSize.height;
-    vkbWidth = (int)kbSize.width;
+    vkbHeight = (JAVA_INT)keyboardHeight;
+    vkbWidth = (JAVA_INT)keyboardFrame.size.width;
     
     // Callback to Java for async editing so that it can resize the form to account for the
     // keyboard taking up space.
