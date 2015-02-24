@@ -403,7 +403,7 @@ public class ResourceEditorView extends FrameView {
         uiList = new HorizontalList(loadedResources, this) {
             @Override
             public Icon getIconImage(String current) {
-                UIBuilder uib = new UIBuilder();
+                UIBuilder uib = new UIBuilderOverride();
                 try {
                     com.codename1.ui.Component cmp = uib.createContainer(loadedResources, current);
                     if(cmp instanceof com.codename1.ui.Dialog){
