@@ -125,12 +125,23 @@ static GLuint getOGLProgram(){
     //GLErrorLog;
     glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
     GLErrorLog;
+    
+    if (alpha<255){
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        GLErrorLog;
+    }
+    
     glDrawArrays(GL_LINES, 0, 2);
     GLErrorLog;
     //_glDisableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
+    
+    if (alpha<255){
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        GLErrorLog;
+    }
     
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
