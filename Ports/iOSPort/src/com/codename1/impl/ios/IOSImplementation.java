@@ -2139,6 +2139,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public Object createSoftWeakRef(Object o) {
         Object key = new Object();
+        if(o == null) {
+            return key;
+        }
         softReferenceMap.put(key, o);
         return key;
         //return new SoftReference(o);
