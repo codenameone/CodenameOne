@@ -105,7 +105,10 @@ public class XYSeries{
     mMaxX = Math.max(mMaxX, x);
     mMinY = Math.min(mMinY, y);
     mMaxY = Math.max(mMaxY, y);
+    
+   
   }
+  
 
   /**
    * Returns the series title.
@@ -409,19 +412,22 @@ private static class IndexXYMap<K, V> extends TreeMap<K, V> {
   private final List<K> indexList = new ArrayList<K>();
 
   private double maxXDifference = 0;
-
+  private boolean sorted = false;
+  
   public IndexXYMap() {
     super();
   }
 
   public V put(K key, V value) {
     indexList.add(key);
+    sorted = false;
     updateMaxXDifference();
     return super.put(key, value);
   }
 
   public V put(int index, K key, V value) {
     indexList.add(index, key);
+    sorted = false;
     updateMaxXDifference();
     return super.put(key, value);
   }
@@ -491,7 +497,12 @@ private static class IndexXYMap<K, V> extends TreeMap<K, V> {
   }
 
   public int getIndexForKey(K key) {
-    return Collections.binarySearch(indexList, key, null);
+    if (!sorted){
+        Collections.sort(indexList, null);
+        sorted = true;
+    }
+    int out = Collections.binarySearch(indexList, key, null);
+    return out;
   }
 }
 
