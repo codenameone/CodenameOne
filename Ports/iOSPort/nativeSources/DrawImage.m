@@ -103,12 +103,12 @@ static GLuint getOGLProgram(){
     
     //_glEnable(GL_TEXTURE_2D);
     
-    int w = width;
-    int h = height;
+    float w = width;
+    float h = height;
     float actualImageWidth = [img getImage].size.width;
     float actualImageHeight = [img getImage].size.height;
-    int actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
-    int actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    float actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+    float actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
     GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
@@ -116,11 +116,21 @@ static GLuint getOGLProgram(){
     GLErrorLog;
     float blankPixelsW = actualImageWidthP2 - actualImageWidth;
     float blankPixelsH = actualImageHeightP2 - actualImageHeight;
-    w += blankPixelsW * (w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
-    h += blankPixelsH * (h / actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
+    w += ceil(blankPixelsW * w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
+    h += ceil(blankPixelsH * h/ actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
+    
+    // offset from y coord... to deal with differences between simulator and
+    // device
+    float dy = 0;
+#if TARGET_IPHONE_SIMULATOR
+    // for some lame reason, the simulator positions things just a tad different
+    // than the device.  This is an attempt to play an out-of-tune piano.
+    dy=0.5;
+#endif
+    
     GLfloat vertexes[] = {
-        x, y,
-        x + w, y,
+        x, y+dy,
+        x + w, y+dy,
         x, y + h,
         x + w, y + h
     };

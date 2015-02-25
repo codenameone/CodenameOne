@@ -175,13 +175,26 @@ static CGRect drawingRect;
         // Requires more investigation
         // https://code.google.com/p/codenameone/issues/detail?id=1223
         clipX = x-1;
+        
         clipW = width+1;
+        if (clipX<0){
+            clipX=0;
+            clipW=width;
+        }
+        
+        clipY = y-1;
+        clipH = height+1;
+        if (clipY<0){
+            clipY=0;
+            clipH=height;
+        }
 #else
         clipX = x;
         clipW = width;
-#endif
         clipY = y;
         clipH = height;
+#endif
+        
         [ClipRect updateClipToScale];
         _glEnable(GL_SCISSOR_TEST);
         GLErrorLog;

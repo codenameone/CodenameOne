@@ -105,8 +105,8 @@ static GLuint getOGLProgram(){
                                        ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
     //GlColorFromRGB(color, alpha);
     GLfloat vertexes[] = {
-        x1, y1,
-        x2, y2,
+        x1+0.5, y1+0.5,
+        x2+0.5, y2+0.5,
     };
     //_glEnableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
