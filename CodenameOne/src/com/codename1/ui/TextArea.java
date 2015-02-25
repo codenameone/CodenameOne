@@ -293,9 +293,23 @@ public class TextArea extends Component {
      * string "" will be displayed
      */
     public TextArea(String text) {
-        this(text, Math.max(defaultMaxSize, nl(text)), 1, 3, ANY);
+        this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
     }
 
+    private static int numCols(String t) {
+        if(t == null) {
+            return 3;
+        }
+        int s = t.length();
+        if(s < 3) {
+            return 3;
+        }
+        if(s > 80) {
+            return 80;
+        }
+        return s;
+    }
+    
     private static int nl(String t) {
         if(t == null) return 0;
         return t.length();
