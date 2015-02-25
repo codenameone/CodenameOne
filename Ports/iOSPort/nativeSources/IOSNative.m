@@ -4380,7 +4380,11 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
     });
 }
 
+
+extern void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject);
+
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_PASS_ARG instanceObject);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
