@@ -48,6 +48,7 @@ public class ByteCodeClass {
     private List<String> baseInterfaces;
     private boolean isInterface;
     private boolean isAbstract;
+    private boolean usedByNative;
 
     private static Set<String> arrayTypes = new TreeSet<String>();
     
@@ -115,6 +116,9 @@ public class ByteCodeClass {
                 bc.markDependent(lst);
             }
             if(bc.clsName.equals("java_lang_Float")) {
+                bc.markDependent(lst);
+            }
+            if(!bc.marked && bc.isUsedByNative()){
                 bc.markDependent(lst);
             }
         }
@@ -1489,4 +1493,21 @@ public class ByteCodeClass {
             }
         }
     }
+
+    /**
+     * @return the isUsedByNative
+     */
+    public boolean isUsedByNative() {
+        if (!usedByNative){
+            for (BytecodeMethod m : methods){
+                if (m.isUsedByNative()){
+                    usedByNative = true;
+                    break;
+                }
+            }
+        }
+        return usedByNative;
+    }
+
+    
 }
