@@ -26,11 +26,13 @@ import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -129,6 +131,16 @@ public class ChartComponent extends Component {
     public AbstractChart getChart(){
         return chart;
     }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+        return new Dimension(
+                Display.getInstance().convertToPixels(100, true),
+                Display.getInstance().convertToPixels(100, false)
+        );
+    }
+    
+    
     
     /**
      * Sets the chart to be displayed in this component.
