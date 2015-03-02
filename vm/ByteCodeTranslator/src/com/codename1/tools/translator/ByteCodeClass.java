@@ -1358,7 +1358,12 @@ public class ByteCodeClass {
     public int getMethodCountIncludingBase() {
         int size = methods.size();
         if(baseClassObject != null) {
-            return size + baseClassObject.getMethodCountIncludingBase();
+            size += baseClassObject.getMethodCountIncludingBase();
+        }
+        if(baseInterfacesObject != null) {
+            for(ByteCodeClass bo : baseInterfacesObject) {
+                size += bo.getMethodCountIncludingBase();
+            }
         }
         return size;
     }
