@@ -134,6 +134,15 @@ public class FileSystemStorage {
     public void mkdir(String directory) {
         Util.getImplementation().mkdir(directory);
     }
+    
+    /**
+     * Removes the given directory
+     *
+     * @param directory the directory name to create
+     */
+    public void rmdir(String directory) {
+        Util.getImplementation().rmdir(directory);
+    }
 
     /**
      * Deletes the specific file

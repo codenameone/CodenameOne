@@ -4216,6 +4216,35 @@ public abstract class CodenameOneImplementation {
      * @param directory the directory name to create
      */
     public abstract void mkdir(String directory);
+    
+    /**
+     * Removes the given directory
+     *
+     * @param directory the directory name to remove
+     */
+    public void rmdir(String directory) {
+        if (this.isDirectory(directory)){
+            char sep = this.getFileSystemSeparator();
+            try {
+                String[] children = this.listFiles(directory);
+                for (int i=0; i<children.length; i++){
+                    if (".".equals(children[i]) || "..".equals(children[i])){
+                        continue;
+                    }
+                    String path = directory+sep+children[i];
+                    if (this.isDirectory(path)){
+                        this.rmdir(path);
+                    } else {
+                        this.deleteFile(path);
+                    }
+                }
+            } catch (IOException ex){
+                ex.printStackTrace();
+                return;
+            }
+            this.deleteFile(directory);
+        }
+    }
 
     /**
      * Deletes the specific file
