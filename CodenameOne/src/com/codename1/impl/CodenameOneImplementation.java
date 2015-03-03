@@ -4224,6 +4224,8 @@ public abstract class CodenameOneImplementation {
      */
     public void rmdir(String directory) {
         if (this.isDirectory(directory)){
+            /*
+            // rmdir shouldn't be recursive, so this is removed.
             char sep = this.getFileSystemSeparator();
             try {
                 String[] children = this.listFiles(directory);
@@ -4242,6 +4244,7 @@ public abstract class CodenameOneImplementation {
                 ex.printStackTrace();
                 return;
             }
+            */
             this.deleteFile(directory);
         }
     }
