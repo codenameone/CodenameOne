@@ -24,7 +24,6 @@
 
 package com.codename1.io;
 
-import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -135,28 +134,20 @@ public class FileSystemStorage {
         Util.getImplementation().mkdir(directory);
     }
     
-    /**
-     * Removes the given directory
-     *
-     * @param directory the directory name to create
-     */
-    public void rmdir(String directory) {
-        Util.getImplementation().rmdir(directory);
-    }
 
     /**
-     * Deletes the specific file
+     * Deletes the specific file or empty directory.
      *
-     * @param file file to delete
+     * @param file file or empty directory to delete
      */
     public void delete(String file) {
         Util.getImplementation().deleteFile(file);
     }
 
     /**
-     * Deletes the specific file, if the platform supports a delete on exit this
-     * method will activate it. Regardless it will retry deleting (with delay) several
-     * times to allow streams time to close.
+     * Deletes the specific file or empty directory, if the platform supports a 
+     * delete on exit this method will activate it. Regardless it will retry 
+     * deleting (with delay) several times to allow streams time to close.
      *
      * @param file file to delete
      * @param retryCount the number of times to retry

@@ -4218,41 +4218,9 @@ public abstract class CodenameOneImplementation {
     public abstract void mkdir(String directory);
     
     /**
-     * Removes the given directory
+     * Deletes the specific file or empty directory.
      *
-     * @param directory the directory name to remove
-     */
-    public void rmdir(String directory) {
-        if (this.isDirectory(directory)){
-            /*
-            // rmdir shouldn't be recursive, so this is removed.
-            char sep = this.getFileSystemSeparator();
-            try {
-                String[] children = this.listFiles(directory);
-                for (int i=0; i<children.length; i++){
-                    if (".".equals(children[i]) || "..".equals(children[i])){
-                        continue;
-                    }
-                    String path = directory+sep+children[i];
-                    if (this.isDirectory(path)){
-                        this.rmdir(path);
-                    } else {
-                        this.deleteFile(path);
-                    }
-                }
-            } catch (IOException ex){
-                ex.printStackTrace();
-                return;
-            }
-            */
-            this.deleteFile(directory);
-        }
-    }
-
-    /**
-     * Deletes the specific file
-     *
-     * @param file file to delete
+     * @param file file or empty directory to delete
      */
     public abstract void deleteFile(String file);
 
