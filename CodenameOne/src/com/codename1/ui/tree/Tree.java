@@ -275,16 +275,18 @@ public class Tree extends Container {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
-            BorderLayout bl = (BorderLayout)((Container)current).getLayout();
-            
-            // the tree component is always at north expanded or otherwise
-            current = bl.getNorth();
-            Object o = current.getClientProperty(KEY_OBJECT);
-            if(o != null && o.equals(node)) {
-                if(isExpanded(current)) {
-                    return (Container)bl.getCenter();
+            if(current instanceof Container) {
+                BorderLayout bl = (BorderLayout)((Container)current).getLayout();
+
+                // the tree component is always at north expanded or otherwise
+                current = bl.getNorth();
+                Object o = current.getClientProperty(KEY_OBJECT);
+                if(o != null && o.equals(node)) {
+                    if(isExpanded(current)) {
+                        return (Container)bl.getCenter();
+                    }
+                    return expandNode(current, null);
                 }
-                return expandNode(current, null);
             }
         }
         return null;

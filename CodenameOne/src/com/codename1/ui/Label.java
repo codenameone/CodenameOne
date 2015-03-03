@@ -71,7 +71,7 @@ public class Label extends Component {
     private EventDispatcher textBindListeners = null;
     private boolean shouldLocalize = true;
     
-    private int shiftMillimeters;
+    private int shiftMillimeters = 1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
