@@ -243,7 +243,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Two characters c1 and c2 are considered the same, ignoring case if at least one of the following is true: The two characters are the same (as compared by the == operator). Applying the method Character.toUpperCase(char) to each character produces the same result. Applying the method Character.toLowerCase(char) to each character produces the same result.
      */
     public boolean equalsIgnoreCase(java.lang.String s){
-        if(s.length() != length()) {
+        if(s == null || s.length() != length()) {
             return false;
         }
         for(int iter = 0 ; iter < count ; iter++) {
