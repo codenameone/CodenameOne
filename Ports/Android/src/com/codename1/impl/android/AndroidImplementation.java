@@ -4734,6 +4734,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
         this.activity.startActivityForResult(galleryIntent, OPEN_GALLERY);
     }
+    
+    public void openGallery(final ActionListener response, int type){
+        callback = new EventDispatcher();
+        callback.addListener(response);
+        Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+        if(type == Display.GALLERY_VIDEO){
+            galleryIntent.setType("video/*");
+        }else if(type == Display.GALLERY_IMAGE){
+            galleryIntent.setType("image/*");
+        }else{
+            galleryIntent.setType("*/*");
+        }
+        this.activity.startActivityForResult(galleryIntent, OPEN_GALLERY);        
+    }
 
     class NativeImage extends Image {
 
