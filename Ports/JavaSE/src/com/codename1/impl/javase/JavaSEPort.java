@@ -5872,6 +5872,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
         capturePhoto(response);
     }
+    
+    @Override
+    public void openGallery(final com.codename1.ui.events.ActionListener response, int type){
+        if(type == Display.GALLERY_VIDEO){
+            capture(response, new String[] {"mp4", "h264", "3pg", "mov"}, "*.mp4;*.h264;*.3gp;*.mov");
+        }else if(type == Display.GALLERY_IMAGE){
+            capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+        }else{
+            capture(response, new String[] {"png", "jpg", "jpeg", "mp4", "h264", "3pg", "mov" }, "*.png;*.jpg;*.jpeg;*.mp4;*.h264;*.3gp;*.mov");
+        }
+    }
 
     @Override
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
