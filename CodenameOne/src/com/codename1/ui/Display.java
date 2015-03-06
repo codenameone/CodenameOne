@@ -155,7 +155,21 @@ public final class Display {
      */
     public static final int SMS_BOTH = 4;
     
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_IMAGE = 0;
+    
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_VIDEO = 1;
 
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_ALL = 2;
+    
     private static final int POINTER_PRESSED = 1;
     private static final int POINTER_RELEASED = 2;
     private static final int POINTER_DRAGGED = 3;
@@ -3032,9 +3046,26 @@ public final class Display {
      * 
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @deprecated see openGallery instead
      */
     public void openImageGallery(ActionListener response){
         impl.openImageGallery(response);
+    }
+    
+    /**
+     * Opens the device gallery
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @param type one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
+    public void openGallery(ActionListener response, int type){
+        impl.openGallery(response, type);
     }
 
     /**

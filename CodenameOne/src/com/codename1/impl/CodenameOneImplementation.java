@@ -4536,15 +4536,38 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
-     * Opens the device image gallery
-     * @param response callback for the resulting image
+     * Opens the device gallery
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @param type one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
+     * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public void openImageGallery(final ActionListener response){    
+    public void openGallery(final ActionListener response, int type){
         final Dialog d = new Dialog("Select a picture");
         d.setLayout(new BorderLayout());
         FileTreeModel model = new FileTreeModel(true);
-        model.addExtensionFilter("jpg");
-        model.addExtensionFilter("png");
+        if(type == Display.GALLERY_IMAGE){
+            model.addExtensionFilter("jpg");
+            model.addExtensionFilter("png");
+        } else if(type == Display.GALLERY_VIDEO){
+            model.addExtensionFilter("mp4");
+            model.addExtensionFilter("3pg");
+            model.addExtensionFilter("avi");
+            model.addExtensionFilter("mov");
+        } else if(type == Display.GALLERY_ALL){
+            model.addExtensionFilter("jpg");
+            model.addExtensionFilter("png");
+            model.addExtensionFilter("mp4");
+            model.addExtensionFilter("3pg");
+            model.addExtensionFilter("avi");
+            model.addExtensionFilter("mov");
+        }
+        
         FileTree t = new FileTree(model){
 
             protected Button createNodeComponent(final Object node, int depth) {
@@ -4604,6 +4627,13 @@ public abstract class CodenameOneImplementation {
             response.actionPerformed(null);   
         }
         
+    }
+    /**
+     * Opens the device image gallery
+     * @param response callback for the resulting image
+     */
+    public void openImageGallery(final ActionListener response){    
+        openGallery(response, Display.GALLERY_IMAGE);
     }
 
     /**
