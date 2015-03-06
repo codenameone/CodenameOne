@@ -1581,13 +1581,8 @@ public class SideMenuBar extends MenuBar {
             }
             closeMenu();
             clean();
-            Display.getInstance().scheduleBackgroundTask(new Runnable() {
-
-                public void run() {
-                    parent.addShowListener(pointerDragged);
-                    new Thread(new ShowWaiter()).start();
-                }
-            });
+            parent.addShowListener(pointerDragged);
+            new Thread(new ShowWaiter()).start();
 
         }
     }
