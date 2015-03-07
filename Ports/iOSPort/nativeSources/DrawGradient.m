@@ -173,17 +173,17 @@ static GLuint getOGLProgram(){
                 float myRadius = MIN(width, height) * relativeSize;
                 CGContextDrawRadialGradient (context, myGradient, myCentrePoint,
                                              0, myCentrePoint, myRadius,
-                                             0);
+                                             kCGGradientDrawsAfterEndLocation);
                 break;
                 
             case GRADIENT_TYPE_HORIZONTAL:
                 CGContextDrawLinearGradient(context, myGradient,
-                                            CGPointMake(0, 0), CGPointMake(0, width), 0);
+                                            CGPointMake(0, 0), CGPointMake(0, width), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
                 
             case GRADIENT_TYPE_VERTICAL:
                 CGContextDrawLinearGradient(context, myGradient,
-                                            CGPointMake(0, 0), CGPointMake(height, 0), 0);
+                                            CGPointMake(0, 0), CGPointMake(height, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
         }
         UIGraphicsPopContext();
