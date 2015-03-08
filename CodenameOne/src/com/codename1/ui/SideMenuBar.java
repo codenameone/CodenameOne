@@ -249,11 +249,13 @@ public class SideMenuBar extends MenuBar {
         });
         addOpenButton(null, true);
         UIManager uim = parent.getUIManager();
+        final boolean [] hasSideMenus = new boolean[2];
+        
 
         if (uim.isThemeConstant("sideMenuFoldedSwipeBool", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
             pointerDragged = new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    if (sideSwipePotential) {
+                    if (sideSwipePotential && hasSideMenus[0]) {
                         final int x = evt.getX();
                         final int y = evt.getY();
                         if (Math.abs(y - initialDragY) > x - initialDragX) {
@@ -269,7 +271,7 @@ public class SideMenuBar extends MenuBar {
                         }
                         return;
                     }
-                    if (rightSideSwipePotential) {
+                    if (rightSideSwipePotential && hasSideMenus[1]) {
                         final int x = evt.getX();
                         final int y = evt.getY();
                         if (Math.abs(y - initialDragY) > initialDragX - x) {
@@ -313,6 +315,17 @@ public class SideMenuBar extends MenuBar {
                     if (parent.getCommandCount() == 1) {
                         if (parent.getCommand(0) == parent.getBackCommand()) {
                             return;
+                        }
+                    }
+                    for (int iter = 0; iter < getCommandCount(); iter++) {
+                        Command c = getCommand(iter);
+                        String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);
+                        if (p == null) {
+                            //has left menu
+                            hasSideMenus[0] = true;
+                        }else if( p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)){
+                            //has right menu
+                            hasSideMenus[1] = true;            
                         }
                     }
                     int displayWidth = Display.getInstance().getDisplayWidth();
@@ -615,7 +628,26 @@ public class SideMenuBar extends MenuBar {
                     return;
                 }
             }
-            openMenu(null);
+            
+            boolean [] hasSideMenus = new boolean[2];
+
+            for (int iter = 0; iter < getCommandCount(); iter++) {
+                Command c = getCommand(iter);
+                String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);
+                if (p == null) {
+                    //has left menu
+                    hasSideMenus[0] = true;
+                }else if( p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)){
+                    //has right menu
+                    hasSideMenus[1] = true;            
+                }
+            }
+            
+            if(hasSideMenus[0]){
+                openMenu(null);
+            }else if(hasSideMenus[1]){
+                openMenu(COMMAND_PLACEMENT_VALUE_RIGHT);
+            }
         }
         super.keyReleased(keyCode);
     }
@@ -677,7 +709,22 @@ public class SideMenuBar extends MenuBar {
         if (parent != null && getCommandCount() > 0 && openButton.getParent() == null) {
             Container titleArea = getTitleAreaContainer();
             titleArea.removeAll();
-            if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
+            String placement = null;
+            if(cmd != null){
+                placement = (String) cmd.getClientProperty(COMMAND_PLACEMENT_KEY);
+            }
+            if (checkCommands) {
+                for (int iter = 0; iter < getCommandCount(); iter++) {
+                    Command c = getCommand(iter);
+                    String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);
+                    if (p != null) {
+                        placement = p;
+                        break;
+                    }
+                }
+            }
+            
+            if (placement == null && !parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
                 titleArea.addComponent(BorderLayout.WEST, openButton);
             }
             Component l = getTitleComponent();
