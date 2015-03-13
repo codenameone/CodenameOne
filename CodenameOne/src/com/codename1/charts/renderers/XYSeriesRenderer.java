@@ -22,6 +22,7 @@ import com.codename1.charts.views.PointStyle;
 import com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type;
 import com.codename1.ui.Component;
 import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.Font;
 
 
 
@@ -311,12 +312,27 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer {
   }
 
   /**
-   * Sets the chart values text size.
+   * Sets the chart values text size. Consider using  {@link #setChartValuesTextFont(com.codename1.ui.Font) }
+   * instead to allow the font size to to be adjusted appropriately for the display
+   * resolution.
    * 
    * @param textSize the chart values text size
    */
   public void setChartValuesTextSize(float textSize) {
     mChartValuesTextSize = textSize;
+  }
+  
+  /**
+   * Sets the chart values title text font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setChartValuesTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setChartValuesTextFont(Font font){
+      setChartValuesTextSize(font.getHeight());
   }
 
   /**
@@ -366,12 +382,27 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer {
   }
 
   /**
-   * Sets the annotations text size.
+   * Sets the annotations text size. Consider using  {@link #setAnnotationsTextFont(com.codename1.ui.Font) }
+   * instead to allow the font size to to be adjusted appropriately for the display
+   * resolution.
    * 
    * @param textSize the annotations text size
    */
   public void setAnnotationsTextSize(float textSize) {
     mAnnotationsTextSize = textSize;
+  }
+  
+  /**
+   * Sets the annotations text font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setAnnotationsTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setAnnotationsTextFont(Font font){
+      setAnnotationsTextSize(font.getHeight());
   }
 
   /**

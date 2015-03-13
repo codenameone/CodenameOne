@@ -106,9 +106,9 @@ public abstract class XYChart extends AbstractChart {
    */
   public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
     paint.setAntiAlias(mRenderer.isAntialiasing());
-    int legendSize = getLegendSize(mRenderer, height / 5, mRenderer.getAxisTitleTextSize());
+    int legendSize = getLegendSize(mRenderer, height / 5, mRenderer.getAxisTitleTextSize() );
     int[] margins = mRenderer.getMargins();
-    int left = x + margins[1];
+    int left = x + margins[1] + (int)mRenderer.getAxisTitleTextSize() + (mRenderer.isShowLabels() ? (int)mRenderer.getLabelsTextSize():0);
     int top = y + margins[0];
     int right = x + width - margins[3];
     int sLength = mDataset.getSeriesCount();
@@ -120,7 +120,7 @@ public abstract class XYChart extends AbstractChart {
       legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,
           paint, true);
     }
-    int bottom = y + height - margins[2] - legendSize;
+    int bottom = y + height - margins[2] - legendSize - (int)mRenderer.getAxisTitleTextSize() - (mRenderer.isShowLabels()?(int)mRenderer.getLabelsTextSize():0);
     if (mScreenR == null) {
       mScreenR = new Rectangle();
     }
@@ -447,11 +447,11 @@ public abstract class XYChart extends AbstractChart {
       }
     }
     if (or == Orientation.HORIZONTAL) {
-      drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding(),
+      drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding() ,
           width, height, legendSize, paint, false);
     } else if (or == Orientation.VERTICAL) {
       transform(canvas, angle, true);
-      drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding(),
+      drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding() ,
           width, height, legendSize, paint, false);
       transform(canvas, angle, false);
     }
@@ -928,6 +928,8 @@ public abstract class XYChart extends AbstractChart {
     }
   }
 
+  
+  
   public SeriesSelection getSeriesAndPointForScreenCoordinate(final Point screenPoint) {
     if (clickableAreas != null)
       for (int seriesIndex = clickableAreas.size() - 1; seriesIndex >= 0; seriesIndex--) {

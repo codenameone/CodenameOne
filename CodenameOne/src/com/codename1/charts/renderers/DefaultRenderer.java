@@ -137,14 +137,33 @@ public class DefaultRenderer {
   public float getChartTitleTextSize() {
     return mChartTitleTextSize;
   }
+  
+  
 
   /**
-   * Sets the chart title text size.
+   * Sets the chart title text size in pixels.  Consider using {@link #setChartTitleTextFont(com.codename1.ui.Font) }
+   * instead of this method to allow the text to be sized appropriately for the
+   * device resolution.
+   * 
    * 
    * @param textSize the chart title text size
    */
   public void setChartTitleTextSize(float textSize) {
     mChartTitleTextSize = textSize;
+  }
+  
+  /**
+   * Sets the chart title font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setChartTitleTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setChartTitleTextFont(Font font){
+      setChartTitleTextSize(font.getHeight());
+      
   }
 
   /**
@@ -334,12 +353,28 @@ public class DefaultRenderer {
   }
 
   /**
-   * Sets the labels text size.
+   * Sets the labels text size.  Consider using  {@link #setLabelsTextFont(com.codename1.ui.Font) }
+   * instead to allow the font size to to be adjusted appropriately for the display
+   * resolution.
+   * 
    * 
    * @param textSize the labels text size
    */
   public void setLabelsTextSize(float textSize) {
     mLabelsTextSize = textSize;
+  }
+  
+  /**
+   * Sets the label title font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setLabelsTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setLabelsTextFont(Font font){
+      setLabelsTextSize(font.getHeight());
   }
 
   /**
@@ -559,14 +594,31 @@ public class DefaultRenderer {
   public float getLegendTextSize() {
     return mLegendTextSize;
   }
+  
+  
 
   /**
-   * Sets the legend text size.
+   * Sets the legend text size. Consider using  {@link #setLegendTextFont(com.codename1.ui.Font) }
+   * instead to allow the font size to to be adjusted appropriately for the display
+   * resolution.
    * 
    * @param textSize the legend text size
    */
   public void setLegendTextSize(float textSize) {
     mLegendTextSize = textSize;
+  }
+  
+  /**
+   * Sets the legend text font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setLegendTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setLegendTextFont(Font font){
+      setLegendTextSize(font.getHeight());
   }
 
   /**

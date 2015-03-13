@@ -22,6 +22,7 @@ import java.util.Map;
 import com.codename1.charts.util.NumberFormat;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.charts.util.MathHelper;
+import com.codename1.ui.Font;
 
 
 /**
@@ -259,12 +260,28 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
   }
 
   /**
-   * Sets the axis title text size.
+   * Sets the axis title text size. Consider using  {@link #setAxisTitleTextFont(com.codename1.ui.Font) }
+   * instead to allow the font size to to be adjusted appropriately for the display
+   * resolution.
    * 
    * @param textSize the chart axis text size
    */
   public void setAxisTitleTextSize(float textSize) {
     mAxisTitleTextSize = textSize;
+  }
+  
+  
+  /**
+   * Sets the Axis title text font size using a Font object instead of a point size.
+   * This method is the preferred way to set font size because it allows you to 
+   * more easily have fonts appear in an appropriate size for the target device.
+   * 
+   * Alternatively check out {@link #setAxisTitleTextSize(float) } to set the text
+   * size in pixels.
+   * @param font 
+   */
+  public void setAxisTitleTextFont(Font font){
+      setAxisTitleTextSize(font.getHeight());
   }
 
   /**

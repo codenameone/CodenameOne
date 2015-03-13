@@ -431,7 +431,7 @@ public abstract class AbstractChart  {
       legendSize = defaultHeight;
     }
     if (!renderer.isShowLegend() && renderer.isShowLabels()) {
-      legendSize = (int) (renderer.getLabelsTextSize() * 4 / 3 + extraHeight);
+      legendSize = (int) (renderer.getLabelsTextSize() * 4 / 3 + extraHeight );
     }
     return legendSize;
   }
