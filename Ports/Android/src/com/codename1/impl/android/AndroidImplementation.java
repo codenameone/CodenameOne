@@ -4644,8 +4644,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             } else if (requestCode == OPEN_GALLERY) {
                 Uri selectedImage = intent.getData();
+                String scheme = intent.getScheme();
+                
                 String[] filePathColumn = {MediaStore.Images.Media.DATA};
-
                 Cursor cursor = activity.getContentResolver().query(selectedImage, filePathColumn, null, null, null);
                 
                 // this happens on Android devices, not exactly sure what the use case is
@@ -4658,6 +4659,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                
+                if (filePath == null && "content".equals(scheme)) {
+                    //if the file is not on the filesystem download it and save it 
+                    //locally
+                    try {
+                        InputStream inputStream = activity.getContentResolver().openInputStream(selectedImage);
+                        if (inputStream != null) {
+                            String name = getContentName(activity.getContentResolver(), selectedImage);
+                            if (name != null) {
+                                filePath = getAppHomePath()
+                                        + getFileSystemSeparator() + name;
+                                File f = new File(filePath);
+                                OutputStream tmp = createFileOuputStream(f);
+                                byte[] buffer = new byte[1024];
+                                while (inputStream.read(buffer) > 0) {
+                                    tmp.write(buffer);
+                                }
+                                tmp.close();
+                                inputStream.close();                                                           
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                
                 callback.fireActionEvent(new ActionEvent(filePath));
                 return;
             } else {
