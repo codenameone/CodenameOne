@@ -184,6 +184,22 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
     private static String appHomeDir = ".cn1";
+    
+    /**
+     * Allowed video extensions for the gallery.
+     */
+    private String[] videoExtensions = new String[] {
+        "mp4", "h264", "3pg", "mov", "scmov", "gbmov",
+        "f4v", "m2ts", "mts", "ts", "wmv", "vob", "m4v", 
+        "flv", "mod", "mkv", "avi", "mpg", "3gp"
+    };
+    
+    /**
+     * Allowed image extensions for the gallery.
+     */
+    private String[] imageExtensions = new String[] {"png", "jpg", "jpeg"};
+    
+    
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
      * used, this is important when running a real application rather than just a simulator skin
@@ -5523,7 +5539,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void mkdir(String directory) {
         new File(unfile(directory)).mkdirs();
     }
-
+    
     private String unfile(String file) {
         if(file.startsWith("file://home")) {
             return System.getProperty("user.home").replace('\\', '/') + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
@@ -5873,14 +5889,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         capturePhoto(response);
     }
     
+    
+    private String getGlobsForExtensions(String[] extensions, String separator){
+        StringBuilder sb = new StringBuilder();
+        for (String ext : extensions){
+            sb.append("*.").append(ext).append(separator);
+        }
+        return sb.substring(0, sb.length()-separator.length());
+    }
+    
     @Override
     public void openGallery(final com.codename1.ui.events.ActionListener response, int type){
         if(type == Display.GALLERY_VIDEO){
-            capture(response, new String[] {"mp4", "h264", "3pg", "mov"}, "*.mp4;*.h264;*.3gp;*.mov");
+            capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
-            capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+            capture(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
         }else{
-            capture(response, new String[] {"png", "jpg", "jpeg", "mp4", "h264", "3pg", "mov" }, "*.png;*.jpg;*.jpeg;*.mp4;*.h264;*.3gp;*.mov");
+            String[] exts = new String[videoExtensions.length+imageExtensions.length];
+            System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
+            System.arraycopy(imageExtensions, 0, exts, videoExtensions.length, imageExtensions.length);
+            capture(response, exts, getGlobsForExtensions(exts, ";"));
         }
     }
 
