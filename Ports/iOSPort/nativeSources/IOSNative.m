@@ -60,6 +60,7 @@
 #include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
 #import "SocketImpl.h"
 #import "com_codename1_ui_geom_Rectangle.h"
+#import <MobileCoreServices/MobileCoreServices.h>
 
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
@@ -2536,7 +2537,7 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
     });
 }
 
-void com_codename1_impl_ios_IOSNative_openImageGallery__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
@@ -2556,6 +2557,13 @@ void com_codename1_impl_ios_IOSNative_openImageGallery__(CN1_THREAD_STATE_MULTI_
         
         pickerController.delegate = [CodenameOne_GLViewController instance];
         pickerController.sourceType = sourceType;
+        if (type==0){
+            pickerController.mediaTypes = [[NSArray alloc] initWithObjects:(NSString*)kUTTypeImage, nil];
+        } else if (type==1){
+            pickerController.mediaTypes = [[NSArray alloc] initWithObjects:(NSString*)kUTTypeMovie, nil];
+        } else if (type==2){
+            pickerController.mediaTypes = [[NSArray alloc] initWithObjects:(NSString*)kUTTypeMovie, (NSString*)kUTTypeImage,  nil];
+        }
                 
         if(popoverSupported()) {
 #ifndef CN1_USE_ARC
@@ -2579,7 +2587,6 @@ void com_codename1_impl_ios_IOSNative_openImageGallery__(CN1_THREAD_STATE_MULTI_
         POOL_END();
     });
 }
-
 int popoverSupported()
 {
 	return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);

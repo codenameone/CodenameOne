@@ -2462,10 +2462,18 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openImageGallery(ActionListener response) {    
+        openGallery(response, Display.GALLERY_IMAGE);
+    }
+
+    @Override
+    public void openGallery(ActionListener response, int type) {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.openImageGallery();
+        nativeInstance.openGallery(type);
+        
     }
+    
+    
     
     
     class IOSMedia implements Media {

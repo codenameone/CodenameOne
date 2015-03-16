@@ -266,6 +266,7 @@ public class ByteCodeTranslator {
             includeFrameworks.add("iAd.framework");
             includeFrameworks.add("CoreMedia.framework");
             includeFrameworks.add("libz.dylib");
+            includeFrameworks.add("MobileCoreServices.framework");
             
             if(!addFrameworks.equalsIgnoreCase("none")) {
                 includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
