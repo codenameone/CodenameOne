@@ -616,7 +616,17 @@ JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_
     return alloc > 1024 * 1024 && totalAllocations > 10 * 1024 * 1024;
 }
 
+extern int mallocWhileSuspended;
+extern BOOL isAppSuspended;
+
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    if(isAppSuspended) {
+        mallocWhileSuspended += size;
+        if(mallocWhileSuspended > 100000) {
+            java_lang_System_startGCThread__(threadStateData);
+            isAppSuspended = NO;
+        }
+    }
     allocationsSinceLastGC += size;
     totalAllocations += size;
     if(lowMemoryMode) {

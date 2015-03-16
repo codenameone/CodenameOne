@@ -64,6 +64,7 @@ public final class System {
     private static final Object LOCK = new Object();
     private static boolean startedGc;
     private static boolean forceGc;
+    private static boolean gcShouldLoop = true;
     // invoked from native code
     private static void startGCThread() {
         if(!startedGc) {
@@ -78,7 +79,8 @@ public final class System {
                         } catch (InterruptedException ex) {
                         }
                     }
-                    while(true) {
+                    gcShouldLoop = true;
+                    while(gcShouldLoop) {
                         try {
                             System.gcMarkSweep();
                             synchronized(LOCK) {
@@ -92,9 +94,21 @@ public final class System {
                         } catch (InterruptedException ex) {
                         }
                     }
+                    startedGc = false;
+                    gcThreadInstance = null;
                 }
             };
             gcThreadInstance.start();
+        }
+    }
+
+    /**
+     * Invoked from native code
+     */
+    private static void stopGC() {
+        gcShouldLoop = false;
+        synchronized(LOCK) {
+            LOCK.notify();
         }
     }
     
