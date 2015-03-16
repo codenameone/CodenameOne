@@ -2647,7 +2647,10 @@ public class Component implements Animation, StyleListener {
         }
         clearDrag();
         if(isDragAndDropOperation(x, y)) {
-            restoreDragPercentage = Display.getInstance().getDragStartPercentage();
+            int restore = Display.getInstance().getDragStartPercentage();
+            if(restore > 1){
+                restoreDragPercentage = restore;
+            }
             Display.getInstance().setDragStartPercentage(1);
         }
     }
@@ -2916,6 +2919,7 @@ public class Component implements Animation, StyleListener {
     
     private void pointerReleaseImpl(int x, int y) {
         if(restoreDragPercentage > -1) {
+            System.out.println("pointerReleaseImpl " + restoreDragPercentage);
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
         pinchDistance = -1;
