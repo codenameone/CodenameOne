@@ -2258,8 +2258,14 @@ public class Component implements Animation, StyleListener {
     }
 
     void clearDrag() {
-        draggedMotionX = null;
-        draggedMotionY = null;
+        //if this is a tesile animation don't interrupt.
+        if(draggedMotionX != null && draggedMotionX.getValue() > 0 && draggedMotionX.getValue() < getScrollDimension().getWidth() - getWidth()){
+            draggedMotionX = null;
+        }
+        //if this is a tesile animation don't interrupt.
+        if(draggedMotionY != null && draggedMotionY.getValue() > 0 && draggedMotionY.getValue() < getScrollDimension().getHeight()- getHeight()){
+            draggedMotionY = null;
+        }
         Component parent = getParent();
         if(parent != null){
             parent.clearDrag();
@@ -2726,6 +2732,7 @@ public class Component implements Animation, StyleListener {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
             draggedMotion.start();
         }
+        
         if(vertical){
             draggedMotionY = draggedMotion;
         }else{
