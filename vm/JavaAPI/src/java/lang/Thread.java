@@ -202,4 +202,9 @@ public class Thread implements java.lang.Runnable{
         } catch(InterruptedException i) {}
     }
 
+    protected void finalize() {
+        releaseThreadNativeResources(nativeThreadId);
+    }
+    
+    private static native void releaseThreadNativeResources(long nativeThreadId);
 }

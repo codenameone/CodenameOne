@@ -292,22 +292,6 @@ public class Timer {
 
     }
     
-	private static final class FinalizerHelper {
-		private final TimerImpl impl;
-		
-		FinalizerHelper(TimerImpl impl) {
-			super();
-			this.impl = impl;
-		}
-		
-		protected void finalize() {
-			synchronized (impl) {
-				impl.finished = true;
-				impl.notify();
-			}
-		}
-	}
-	
 	private static long timerId;
 	
 	private synchronized static long nextId() {
@@ -316,10 +300,6 @@ public class Timer {
 
     /* This object will be used in synchronization purposes */
     private final TimerImpl impl;
-
-    // Used to finalize thread
-    @SuppressWarnings("unused")
-    private final FinalizerHelper finalizer;
 
     /**
      * Creates a new named {@code Timer} which may be specified to be run as a
@@ -335,7 +315,6 @@ public class Timer {
     		throw new NullPointerException("name is null");
     	}
         this.impl = new TimerImpl(name, isDaemon);
-        this.finalizer = new FinalizerHelper(impl);
     }
     
     /**
