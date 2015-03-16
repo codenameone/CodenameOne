@@ -25,7 +25,12 @@
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#ifdef NEW_CODENAME_ONE_VM
+#include "java_lang_System.h"
+int mallocWhileSuspended = 0;
+#endif
 
+BOOL isAppSuspended = NO;
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
@@ -104,6 +109,7 @@ extern UIView *editingComponent;
 
 // required for URL opening
 - (BOOL)application:(UIApplication *)application willFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    isAppSuspended = NO;
     if(launchOptions != nil) {
         NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
         if(url != nil) {
@@ -164,6 +170,11 @@ extern UIView *editingComponent;
      */
     com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     //----application_will_resign_active
+    isAppSuspended = YES;
+#ifdef NEW_CODENAME_ONE_VM
+    java_lang_System_stopGC__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    mallocWhileSuspended = 0;
+#endif
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
