@@ -305,46 +305,51 @@ void codenameOneGCMark() {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
         unlockCriticalSection();
-        if(t != 0 && t != d) {
-            struct elementStruct* objects = t->threadObjectStack;
-            
-            // wait for the thread to pause so we can traverse its stack but not for native threads where
-            // we don't have much control and who barely call into Java anyway
-            if(t->lightweightThread) {
-                t->threadBlockedByGC = JAVA_TRUE;
-                while(t->threadActive) {
-                    usleep(500);
-                }
-            } 
-            
-            // place allocations from the local thread into the global heap list
-            for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
-                JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
-                if(obj) {
-                    t->pendingHeapAllocations[heapTrav] = 0;
-                    placeObjectInHeapCollection(obj);
-                }
+        if(t != 0) {
+            if(t->currentThreadObject != JAVA_NULL) {
+                gcMarkObject(t, t->currentThreadObject, JAVA_FALSE);
             }
-            
-            // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
-            JAVA_BOOLEAN agressiveAllocator = t->heapAllocationSize > 5000;
-            
-            t->heapAllocationSize = 0;
-                        
-            int stackSize = t->threadObjectStackOffset;
-            for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
-                struct elementStruct* current = &t->threadObjectStack[stackIter];
-                CODENAME_ONE_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE);
-                if(current != 0 && current->type == CN1_TYPE_OBJECT && current->data.o != JAVA_NULL) {
-                    gcMarkObject(t, current->data.o, JAVA_FALSE);
-                    //marked++;
+            if(t != d) {
+                struct elementStruct* objects = t->threadObjectStack;
+                
+                // wait for the thread to pause so we can traverse its stack but not for native threads where
+                // we don't have much control and who barely call into Java anyway
+                if(t->lightweightThread) {
+                    t->threadBlockedByGC = JAVA_TRUE;
+                    while(t->threadActive) {
+                        usleep(500);
+                    }
                 }
-            }
-            markStatics(d);
-            if(!agressiveAllocator) {
-                t->threadBlockedByGC = JAVA_FALSE;
-            } else {
-                hasAgressiveAllocator = JAVA_TRUE;
+                
+                // place allocations from the local thread into the global heap list
+                for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
+                    JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
+                    if(obj) {
+                        t->pendingHeapAllocations[heapTrav] = 0;
+                        placeObjectInHeapCollection(obj);
+                    }
+                }
+                
+                // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
+                JAVA_BOOLEAN agressiveAllocator = t->heapAllocationSize > 5000;
+                
+                t->heapAllocationSize = 0;
+                
+                int stackSize = t->threadObjectStackOffset;
+                for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
+                    struct elementStruct* current = &t->threadObjectStack[stackIter];
+                    CODENAME_ONE_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE);
+                    if(current != 0 && current->type == CN1_TYPE_OBJECT && current->data.o != JAVA_NULL) {
+                        gcMarkObject(t, current->data.o, JAVA_FALSE);
+                        //marked++;
+                    }
+                }
+                markStatics(d);
+                if(!agressiveAllocator) {
+                    t->threadBlockedByGC = JAVA_FALSE;
+                } else {
+                    hasAgressiveAllocator = JAVA_TRUE;
+                }
             }
         }
     }
