@@ -547,7 +547,7 @@ void codenameOneGCSweep() {
     
     //NSLog(@"Sweep removed %i objects", counter);
      
-    if(threadsToDelete != 0) {
+    /*if(threadsToDelete != 0) {
         lockCriticalSection();
         for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
             if(threadsToDelete[i] != 0) {
@@ -564,7 +564,7 @@ void codenameOneGCSweep() {
             }
         }
         unlockCriticalSection();
-    }
+    }*/
     
     // we had a thread that really ripped into the GC so we only release that thread now after cleaning RAM
     if(hasAgressiveAllocator) {

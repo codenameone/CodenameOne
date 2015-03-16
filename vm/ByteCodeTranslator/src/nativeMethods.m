@@ -844,13 +844,20 @@ JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA
 }
 
 JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadId) {
-    free(threadStateData->blocks);
-    free(threadStateData->threadObjectStack);
-    free(threadStateData->callStackClass);
-    free(threadStateData->callStackLine);
-    free(threadStateData->callStackMethod);
-    free(threadStateData->pendingHeapAllocations);
-    free(threadStateData);
+    for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
+        if(threadsToDelete[i] != 0 && threadsToDelete[i]->threadId == nativeThreadId) {
+            free(threadsToDelete[i]->blocks);
+            free(threadsToDelete[i]->threadObjectStack);
+            free(threadsToDelete[i]->callStackClass);
+            free(threadsToDelete[i]->callStackLine);
+            free(threadsToDelete[i]->callStackMethod);
+            free(threadsToDelete[i]->pendingHeapAllocations);
+            free(threadsToDelete[i]);
+           
+            threadsToDelete[i] = 0;
+            break;
+        }
+    }
 }
 
 JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
@@ -882,22 +889,22 @@ void* threadRunner(void *x)
     // we remove the thread here since this is the only place we can do this
     // we add the thread in the getThreadLocalData() method to handle native threads
     // too. Hopefully we won't spawn too many of those...
-    /*if(threadsToDelete == 0) {
+    if(threadsToDelete == 0) {
         threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
         memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-    }*/
+    }
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         if(allThreads[iter] == d) {
             NSLog(@"Deleting thread %i", iter);
             allThreads[iter] = 0;
-            /*for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
+            for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
                 if(threadsToDelete[i] == 0) {
                     threadsToDelete[i] = d;
                     d->threadActive = JAVA_FALSE;
                     break;
                 }
-            }*/
+            }
             break;
         }
     }
