@@ -792,7 +792,13 @@ public final class Display {
                                 }
                                 backgroundTasks.remove(0);
                             }
-                            nextTask.run();
+                            //preent a runtime exception to crash the 
+                            //backgroundThread
+                            try {
+                                nextTask.run();                                
+                            } catch (Throwable e) {
+                                e.printStackTrace();
+                            }
                             try {
                                 Thread.sleep(10);
                             } catch (InterruptedException ex) {
