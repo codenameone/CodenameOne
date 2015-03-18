@@ -181,8 +181,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
     }
+    
+    private javafx.embed.swing.JFXPanel mediaContainer;
+
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+    private static final String DEFAULT_SKINS
+            = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
     private static String appHomeDir = ".cn1";
     
     /**
@@ -1020,8 +1024,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 getParent().repaint();
-            } else {
-                JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+            } else {                
+                if(mediaContainer != null){
+                    JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
+                }else{
+                    JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                }
             }
         }
 
@@ -4855,7 +4863,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel mediaContainer = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        mediaContainer = m;
         Platform.runLater(new Runnable() {
 
             @Override
@@ -4919,7 +4928,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel mediaContainer = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        mediaContainer = m;
 
         Platform.runLater(new Runnable() {
 
