@@ -49,9 +49,6 @@ import java.awt.FontFormatException;
 import javax.swing.JFrame;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
-//import java.awt.Menu;
-//import java.awt.MenuBar;
-//import java.awt.MenuItem;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -2323,7 +2320,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         skinMenu.addSeparator();
-        JMenuItem addSkin = new JMenuItem("Add");
+        JMenuItem addSkin = new JMenuItem("Add New...");
         skinMenu.add(addSkin);
         addSkin.addActionListener(new ActionListener() {
 
@@ -2363,6 +2360,42 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
 
+        skinMenu.addSeparator();
+        JMenuItem reset = new JMenuItem("Reset Skins");
+        skinMenu.add(reset);
+        reset.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                    if(JOptionPane.showConfirmDialog(frm,
+                            "Are you sure you want to reset skins to default?", 
+                            "Clean Storage", 
+                            JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION){
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        pref.put("skins", DEFAULT_SKINS);
+                        
+                        if (netMonitor != null) {
+                            netMonitor.dispose();
+                            netMonitor = null;
+                        }
+                        if (perfMonitor != null) {
+                            perfMonitor.dispose();
+                            perfMonitor = null;
+                        }
+                        String mainClass = System.getProperty("MainClass");
+                        if (mainClass != null) {
+                            pref.put("skin", "/iphone3gs.skin");
+                            deinitializeSync();
+                            frm.dispose();
+                            System.setProperty("reload.simulator", "true");
+                        } else {
+                            loadSkinFile("/iphone3gs.skin", frm);
+                            refreshSkin(frm);
+                        }
+                        
+                    }
+                
+            }
+        });
         return skinMenu;
     }
 
@@ -2601,7 +2634,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 window.add(java.awt.BorderLayout.EAST, vSelector);
             }
             window.add(java.awt.BorderLayout.CENTER, canvas);
-
+            
+            String reset = System.getProperty("resetSkins");
+            if(reset != null && reset.equals("true")){
+                System.setProperty("resetSkins", "");
+                pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.put("skins", DEFAULT_SKINS);
+           }
+            
             if (hasSkins()) {
                 String f = System.getProperty("skin");
                 if (f != null) {

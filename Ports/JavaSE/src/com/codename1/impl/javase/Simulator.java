@@ -47,12 +47,21 @@ public class Simulator {
         if (skin == null) {
             System.setProperty("dskin", "/iphone3gs.skin");
         }
+        for (int i = 0; i < argv.length; i++) {
+            String argv1 = argv[i];
+            if(argv1.equals("resetSkins")){
+                System.setProperty("resetSkins", "true");
+                System.setProperty("skin", "/iphone3gs.skin");
+                System.setProperty("dskin", "/iphone3gs.skin");            
+            }
+        }
         StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
         System.setProperty("MainClass", argv[0]);
         File[] files = new File[t.countTokens()];
         for (int iter = 0; iter < files.length; iter++) {
             files[iter] = new File(t.nextToken());
         }
+        
         loadFXRuntime();
         ClassLoader ldr = new ClassPathLoader(files);
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
