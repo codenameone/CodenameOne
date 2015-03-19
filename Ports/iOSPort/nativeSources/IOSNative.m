@@ -3643,8 +3643,9 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
 
 SKPayment *paymentInstance = nil;
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
+    NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
     dispatch_async(dispatch_get_main_queue(), ^{
-        paymentInstance = [SKPayment paymentWithProductIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG sku)];
+        paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
 }
