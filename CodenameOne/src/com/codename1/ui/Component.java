@@ -119,7 +119,7 @@ public class Component implements Animation, StyleListener {
     private boolean grabsPointerEvents;
 
     /**
-     * Indicates whether tensile drag (dragging beyond the boundry of the component and
+     * Indicates whether tensile drag (dragging beyond the boundary of the component and
      * snapping back) is enabled for this component.
      */
     private boolean tensileDragEnabled;

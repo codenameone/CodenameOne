@@ -75,7 +75,9 @@ public class Button extends Label {
     private boolean toggle;
 
     private int releaseRadius;
-    
+
+    private boolean autoRelease;
+
     /** 
      * Constructs a button with an empty string for its text.
      */
@@ -675,5 +677,24 @@ public class Button extends Label {
      */
     public void setReleaseRadius(int releaseRadius) {
         this.releaseRadius = releaseRadius;
+    }
+    
+    /**
+     * Returns if this is an auto released Button.
+     * Auto released Buttons will are been disarmed when a drag is happening 
+     * within the Button.
+     * 
+     * @return true if it's an auto released Button.
+     */ 
+    public boolean isAutoRelease(){
+        return autoRelease;
+    }
+    
+    /**
+     * Sets the auto released mode of this button, by default it's not an auto 
+     * released Button
+     */ 
+    public void setAutoRelease(boolean autoRelease){
+        this.autoRelease = autoRelease;
     }
 }

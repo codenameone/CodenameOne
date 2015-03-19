@@ -275,7 +275,9 @@ public class ContainerList extends Container {
      * @param evt the event to fire
      */ 
     protected void fireActionEvent(ActionEvent evt) {
-        dispatcher.fireActionEvent(evt);
+        if(isEnabled() && !Display.getInstance().hasDragOccured()){
+            dispatcher.fireActionEvent(evt);
+        }
     }
     
     /**

@@ -2082,17 +2082,17 @@ public class Form extends Container {
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
-            if(atXY instanceof Container) {
+            if (atXY instanceof Container) {
                 atXY = atXY.getLeadComponent();
             }
             Component pendingButton = buttonsAwatingRelease.get(0);
-            if(atXY != pendingButton) {
-                if(pendingButton instanceof Button) {
-                    Button b = (Button)pendingButton;
+            if (atXY != pendingButton) {
+                if (pendingButton instanceof Button) {
+                    Button b = (Button) pendingButton;
                     int relRadius = b.getReleaseRadius();
-                    if(relRadius > 0) {
+                    if (relRadius > 0) {
                         Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
-                        if(!r.contains(x, y)) {
+                        if (!r.contains(x, y)) {
                             buttonsAwatingRelease = null;
                             b.dragInitiated();
                         }
@@ -2101,7 +2101,10 @@ public class Form extends Container {
                     buttonsAwatingRelease = null;
                     b.dragInitiated();
                 }
-            }            
+            } else if (pendingButton instanceof Button && ((Button) pendingButton).isAutoRelease()) {
+                buttonsAwatingRelease = null;
+                ((Button) pendingButton).dragInitiated();
+            }
         }
     }
     
