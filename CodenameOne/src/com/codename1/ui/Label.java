@@ -70,7 +70,7 @@ public class Label extends Component {
     private String maskName;
     private EventDispatcher textBindListeners = null;
     private boolean shouldLocalize = true;
-    
+    private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
     
     /** 
@@ -764,4 +764,22 @@ public class Label extends Component {
     public void setShiftMillimeters(int shiftMillimeters) {
         this.shiftMillimeters = shiftMillimeters;
     }
+
+    /**
+     * By default labels and subclasses become 0 sized when they are blank even ignoring their padding
+     * setting this to true makes the padding take effect even in a blank field.
+     * @return the showEvenIfBlank
+     */
+    public boolean isShowEvenIfBlank() {
+        return showEvenIfBlank;
+    }
+
+    /**
+     * By default labels and subclasses become 0 sized when they are blank even ignoring their padding
+     * setting this to true makes the padding take effect even in a blank field.
+     * @param showEvenIfBlank the showEvenIfBlank to set
+     */
+    public void setShowEvenIfBlank(boolean showEvenIfBlank) {
+        this.showEvenIfBlank = showEvenIfBlank;
+    }    
 }

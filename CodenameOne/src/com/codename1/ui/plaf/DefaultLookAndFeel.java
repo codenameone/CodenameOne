@@ -705,11 +705,16 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
         }
 
-        if (prefH != 0) {
+        if(l.isShowEvenIfBlank()) {
             prefH += (style.getPadding(false, Component.TOP) + style.getPadding(false, Component.BOTTOM));
-        }
-        if (prefW != 0) {
             prefW += (style.getPadding(l.isRTL(), Component.RIGHT) + style.getPadding(l.isRTL(), Component.LEFT));
+        } else {
+            if (prefH != 0) {
+                prefH += (style.getPadding(false, Component.TOP) + style.getPadding(false, Component.BOTTOM));
+            }
+            if (prefW != 0) {
+                prefW += (style.getPadding(l.isRTL(), Component.RIGHT) + style.getPadding(l.isRTL(), Component.LEFT));
+            }
         }
 
         if(style.getBorder() != null) {

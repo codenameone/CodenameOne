@@ -245,13 +245,49 @@ public class Form extends Container {
         if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
-                Container bar = new Container();
-                bar.setUIID("StatusBar");
-                titleArea.addComponent(BorderLayout.NORTH, bar);
+                if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+                    Button bar = new Button();
+                    bar.setShowEvenIfBlank(true);
+                    bar.setUIID("StatusBar");
+                    titleArea.addComponent(BorderLayout.NORTH, bar);
+                    bar.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            Component c = findScrollableChild(getContentPane());
+                            if(c != null) {
+                                c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                            }
+                        }
+                    });
+                } else {
+                    Container bar = new Container();
+                    bar.setUIID("StatusBar");
+                    titleArea.addComponent(BorderLayout.NORTH, bar);
+                }
             }
         }
     }
 
+    Component findScrollableChild(Container c) {
+        if(c.isScrollableY()) {
+            return c;
+        }
+        int count = c.getComponentCount();
+        for(int iter = 0 ; iter < count ; iter++) {
+            Component comp = c.getComponentAt(iter);
+            if(comp.isScrollableY()) {
+                return comp;
+            }
+            if(comp instanceof Container) {
+                Component chld = findScrollableChild((Container)comp);
+                if(chld != null) {
+                    return chld;
+                }
+            }
+        }
+        return null;
+    }
+    
     /**
      * @inheritDoc
      */

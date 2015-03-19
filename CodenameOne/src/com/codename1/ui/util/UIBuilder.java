@@ -2140,6 +2140,9 @@ public class UIBuilder { //implements Externalizable {
      */
     protected String getBackCommandText(String previousFormTitle) {
         if(UIManager.getInstance().isThemeConstant("backUsesTitleBool", false)) {
+            if(previousFormTitle == null || previousFormTitle.equals("") || previousFormTitle.equals(" ")) {
+                return "Back";
+            }
             return previousFormTitle;
         }
         return "Back";
