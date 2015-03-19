@@ -86,6 +86,20 @@ public final class Long{
     }
 
     /**
+     * Returns the value of this Long as an int value.
+     */
+    public int intValue() {
+        return (int)value;
+    }
+
+    /**
+     * Returns the value of this Long as a byte value.
+     */
+    public int byteValue() {
+        return (byte)value;
+    }
+    
+    /**
      * Parses the string argument as a signed decimal long. The characters in the string must all be decimal digits, except that the first character may be an ASCII minus sign '-' (
      * u002d') to indicate a negative value. The resulting long value is returned, exactly as if the argument and the radix 10 were given as arguments to the
      * method that takes two arguments.
