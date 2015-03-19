@@ -204,11 +204,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void onPause() {
-        mGoogleApiClient.disconnect();
     }
 
     @Override
     public void onDestroy() {
+        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+            mGoogleApiClient.disconnect();
+        }        
     }
 
     @Override
