@@ -1868,12 +1868,11 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT ua) {
-    retainCN1(CN1_THREAD_STATE_PASS_ARG ua);
+    NSString *_ua = toNSString(CN1_THREAD_GET_STATE_PASS_ARG ua);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         //UIWebView* w = (UIWebView*)peer;
-        NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:toNSString(CN1_THREAD_GET_STATE_PASS_ARG ua), @"UserAgent", nil];
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG ua);
+        NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:_ua, @"UserAgent", nil];
         [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];        
         POOL_END();
     });
@@ -2298,7 +2297,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT artist) {
-    retainCN1(CN1_THREAD_STATE_PASS_ARG artist);
+    NSString *_artist = toNSString(CN1_THREAD_GET_STATE_PASS_ARG artist);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if ([MPNowPlayingInfoCenter class])  {
@@ -2307,19 +2306,18 @@ void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_TH
                              MPNowPlayingInfoPropertyPlaybackRate,
                              nil];
             NSArray *values = [NSArray arrayWithObjects:
-                               toNSString(CN1_THREAD_GET_STATE_PASS_ARG artist),
+                               _artist,
                                [NSNumber numberWithInt:1],
                                nil];
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG artist);
         POOL_END();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
-    retainCN1(CN1_THREAD_STATE_PASS_ARG title);
+    NSString *_title = toNSString(CN1_THREAD_GET_STATE_PASS_ARG title);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if ([MPNowPlayingInfoCenter class])  {
@@ -2328,13 +2326,12 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
                              MPNowPlayingInfoPropertyPlaybackRate,
                              nil];
             NSArray *values = [NSArray arrayWithObjects:
-                               toNSString(CN1_THREAD_GET_STATE_PASS_ARG title),
+                               _title,
                                [NSNumber numberWithInt:1],
                                nil];
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG title);
         POOL_END();
     });
 }
@@ -3062,8 +3059,8 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT  number, JAVA_OBJECT  text) {
-    retainCN1(CN1_THREAD_STATE_PASS_ARG number);
-    retainCN1(CN1_THREAD_STATE_PASS_ARG text);
+    NSString *recipient = toNSString(CN1_THREAD_STATE_PASS_ARG number);
+    NSString *smsBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if([MFMessageComposeViewController canSendText]) {
@@ -3071,13 +3068,13 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             picker.messageComposeDelegate = [CodenameOne_GLViewController instance];
             
             // Recipient.
-            NSString *recipient = toNSString(CN1_THREAD_STATE_PASS_ARG number);
+            
             NSArray *recipientsArray = [NSArray arrayWithObject:recipient];
             
             [picker setRecipients:recipientsArray];
             
             // Body.
-            NSString *smsBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
+            
             [picker setBody:smsBody];
             
             [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
@@ -3086,8 +3083,6 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             [picker release];
 #endif
         }
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG number);
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG text);
         POOL_END();
     });
 }
@@ -4134,20 +4129,17 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
 
 void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_java_lang_String_boolean_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_DOUBLE amount, JAVA_OBJECT currency, JAVA_OBJECT appKey, JAVA_BOOLEAN sandbox, JAVA_OBJECT invoiceNumber) {
 #ifdef INCLUDE_ZOOZ
-    retainCN1(CN1_THREAD_STATE_PASS_ARG currency);
-    retainCN1(CN1_THREAD_STATE_PASS_ARG appKey);
-    retainCN1(CN1_THREAD_STATE_PASS_ARG invoiceNumber);
+    NSString *_currency = toNSString(CN1_THREAD_GET_STATE_PASS_ARG currency);
+    NSString *_appKey = toNSString(CN1_THREAD_GET_STATE_PASS_ARG appKey);
+    NSString *_invoiceNumber = toNSString(CN1_THREAD_GET_STATE_PASS_ARG invoiceNumber);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         ZooZ *zooz = [ZooZ sharedInstance];
         zooz.sandbox = sandbox;//set this if working in Sandbox mode
-        ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:toNSString(CN1_THREAD_GET_STATE_PASS_ARG invoiceNumber) delegate:[CodenameOne_GLViewController instance]];
-        req.currencyCode = toNSString(CN1_THREAD_GET_STATE_PASS_ARG currency);
+        ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:_invoiceNumber delegate:[CodenameOne_GLViewController instance]];
+        req.currencyCode = _currency;
 //        req.payerDetails.email = @"test@test.com";
-        [zooz openPayment:req forAppKey:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appKey)];
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG currency);
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG appKey);
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG invoiceNumber);
+        [zooz openPayment:req forAppKey:_appKey];
         POOL_END();
     });
 #endif
@@ -4575,7 +4567,11 @@ CGRect cn1RectToCGRect(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT rect){
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
-    retainCN1(CN1_THREAD_STATE_PASS_ARG rectangle);
+    BOOL useRect = rectangle ? YES:NO;
+    __block CGRect cgrect = CGRectMake(0,0,0,0);
+    if (useRect){
+        cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
@@ -4599,9 +4595,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
             int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
             int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
-            if ( rectangle ){
-                
-                CGRect cgrect =cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+            if ( useRect ){
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
                                         cgrect.origin.x,
@@ -4618,7 +4612,6 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             
         }
 #endif
-        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
