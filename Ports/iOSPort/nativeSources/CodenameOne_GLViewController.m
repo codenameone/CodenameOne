@@ -299,7 +299,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
             JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
 #else
-            JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent___R_boolean(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
             if (isLastEdit) {
                 utf.returnKeyType = UIReturnKeyDone;
@@ -344,7 +344,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                     JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
 #else
-                    JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                    JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
                     JAVA_OBJECT str;
                     UIBarButtonItem *doneButton;
@@ -353,7 +353,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                         str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
 #else
-                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
+                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
@@ -361,7 +361,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                         str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
 #else
-                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next"));
+                        str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next"));
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
@@ -372,7 +372,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                             str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
 #else
-                            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
+                            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
 #endif
                             buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                             UIBarButtonItem *anotherButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
@@ -430,8 +430,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent__();
                 JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
 #else
-                JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent___R_boolean(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                JAVA_BOOLEAN isLastEdit = com_codename1_impl_ios_TextEditUtil_isLastEditComponent___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+                JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
                 JAVA_OBJECT str;
                 UIBarButtonItem *doneButton;
@@ -439,7 +439,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"done"), fromNSString(@"Done"));
 #else
-                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"done"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Done"));
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneClicked)];
@@ -447,7 +447,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
 #else
-                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next"));
+                    str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next"));
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardNextClicked)];

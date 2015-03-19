@@ -1400,7 +1400,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
     __block JAVA_BOOLEAN result;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG url);
+        NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
         result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
         POOL_END();
     });
@@ -1695,7 +1695,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG uri);
+        NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG uri);
         if([ns hasPrefix:@"file:/"]) {
             ns = fixFilePath(ns);
             NSURL* nu = [NSURL fileURLWithPath:ns];
@@ -1862,7 +1862,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w loadHTMLString:toNSString(CN1_THREAD_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
+        [w loadHTMLString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
         POOL_END();
     });
 }
@@ -1872,8 +1872,8 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         //UIWebView* w = (UIWebView*)peer;
-        NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:toNSString(CN1_THREAD_STATE_PASS_ARG ua), @"UserAgent", nil];
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG ua);
+        NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:toNSString(CN1_THREAD_GET_STATE_PASS_ARG ua), @"UserAgent", nil];
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG ua);
         [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];        
         POOL_END();
     });
@@ -1907,7 +1907,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        NSString *str = toNSString(CN1_THREAD_STATE_PASS_ARG url);
+        NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
         NSURL* nu = [NSURL URLWithString:str];
         NSURLRequest* r = [NSURLRequest requestWithURL:nu];
         [w loadRequest:r];
@@ -1940,7 +1940,7 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_STATE_PASS_ARG javaScript)];
+        [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
         POOL_END();
     });
 }
@@ -1990,7 +1990,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_S
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         NSString* theTitle = [w stringByEvaluatingJavaScriptFromString:@"document.title"];
-        returnString = fromNSString(CN1_THREAD_STATE_PASS_ARG theTitle);
+        returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG theTitle);
         POOL_END();
     });
     return returnString;
@@ -2000,7 +2000,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        returnString = fromNSString(CN1_THREAD_STATE_PASS_ARG w.request.URL.absoluteString);
+        returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.request.URL.absoluteString);
         POOL_END();
     });
     return returnString;
@@ -2010,7 +2010,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSString* s = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+        NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
         NSURL* u;
         if([s hasPrefix:@"file:"]) {
             u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
@@ -2032,7 +2032,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG str)];
+        NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG str)];
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
         
 #ifndef AUTO_PLAY_VIDEO
@@ -2176,11 +2176,11 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 #ifndef CN1_USE_ARC
             [picker release];
 #endif
-            releaseCN1(CN1_THREAD_STATE_PASS_ARG recipients);
-            releaseCN1(CN1_THREAD_STATE_PASS_ARG subject);
-            releaseCN1(CN1_THREAD_STATE_PASS_ARG content);
-            releaseCN1(CN1_THREAD_STATE_PASS_ARG attachment);
-            releaseCN1(CN1_THREAD_STATE_PASS_ARG attachmentMimeType);
+            releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG recipients);
+            releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG subject);
+            releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG content);
+            releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG attachment);
+            releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG attachmentMimeType);
             return;
         }
         POOL_BEGIN();
@@ -2197,16 +2197,16 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         int recipientCount = ((JAVA_ARRAY)recipients)->length;
 #endif
         for(int iter = 0 ; iter < recipientCount ; iter++) {
-            [recipientsArray addObject:toNSString(CN1_THREAD_STATE_PASS_ARG data[iter])];
+            [recipientsArray addObject:toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[iter])];
         }
         
         [picker setToRecipients:recipientsArray];
         
         // Subject.
-        [picker setSubject:toNSString(CN1_THREAD_STATE_PASS_ARG subject)];
+        [picker setSubject:toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject)];
         
         // Body.
-        NSString *emailBody = toNSString(CN1_THREAD_STATE_PASS_ARG content);
+        NSString *emailBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG content);
         [picker setMessageBody:emailBody isHTML:htmlMail];
         if(attachment != nil) {
 #ifndef NEW_CODENAME_ONE_VM
@@ -2223,8 +2223,8 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 #endif
 
             for(int iter = 0 ; iter < attachmentCount ; iter++) {
-                NSString* file = toNSString(CN1_THREAD_STATE_PASS_ARG attachmentData[iter]);
-                NSString* mime = toNSString(CN1_THREAD_STATE_PASS_ARG mimeData[iter]);
+                NSString* file = toNSString(CN1_THREAD_GET_STATE_PASS_ARG attachmentData[iter]);
+                NSString* mime = toNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeData[iter]);
 
                 int pos = [file rangeOfString:@"/" options:NSBackwardsSearch].location + 1;
                 NSString* fileComponent = [file substringFromIndex:pos];
@@ -2240,11 +2240,11 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 #ifndef CN1_USE_ARC
         [picker release];
 #endif
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG recipients);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG subject);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG content);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG attachment);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG attachmentMimeType);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG recipients);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG subject);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG content);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG attachment);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG attachmentMimeType);
         POOL_END();
     });
 }
@@ -2307,13 +2307,13 @@ void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_TH
                              MPNowPlayingInfoPropertyPlaybackRate,
                              nil];
             NSArray *values = [NSArray arrayWithObjects:
-                               toNSString(CN1_THREAD_STATE_PASS_ARG artist),
+                               toNSString(CN1_THREAD_GET_STATE_PASS_ARG artist),
                                [NSNumber numberWithInt:1],
                                nil];
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG artist);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG artist);
         POOL_END();
     });
 }
@@ -2328,13 +2328,13 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
                              MPNowPlayingInfoPropertyPlaybackRate,
                              nil];
             NSArray *values = [NSArray arrayWithObjects:
-                               toNSString(CN1_THREAD_STATE_PASS_ARG title),
+                               toNSString(CN1_THREAD_GET_STATE_PASS_ARG title),
                                [NSNumber numberWithInt:1],
                                nil];
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG title);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG title);
         POOL_END();
     });
 }
@@ -3077,7 +3077,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             [picker setRecipients:recipientsArray];
             
             // Body.
-            NSString *smsBody = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+            NSString *smsBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
             [picker setBody:smsBody];
             
             [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
@@ -3086,8 +3086,8 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             [picker release];
 #endif
         }
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG number);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG text);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG number);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG text);
         POOL_END();
     });
 }
@@ -3276,7 +3276,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
             [audioSession requestRecordPermission:^(BOOL granted) {
                 POOL_BEGIN();
                 if (granted) {
-                    NSString * filePath = toNSString(CN1_THREAD_STATE_PASS_ARG destinationFile);
+                    NSString * filePath = toNSString(CN1_THREAD_GET_STATE_PASS_ARG destinationFile);
                     
                     // cleanup older file if it exists in this location
                     NSFileManager* fm = [[NSFileManager alloc] init];
@@ -3305,7 +3305,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                 POOL_END();
             }];
         } else {
-            NSString * filePath = toNSString(CN1_THREAD_STATE_PASS_ARG destinationFile);
+            NSString * filePath = toNSString(CN1_THREAD_GET_STATE_PASS_ARG destinationFile);
             
             // cleanup older file if it exists in this location
             NSFileManager* fm = [[NSFileManager alloc] init];
@@ -4145,9 +4145,9 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         req.currencyCode = toNSString(CN1_THREAD_GET_STATE_PASS_ARG currency);
 //        req.payerDetails.email = @"test@test.com";
         [zooz openPayment:req forAppKey:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appKey)];
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG currency);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG appKey);
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG invoiceNumber);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG currency);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG appKey);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG invoiceNumber);
         POOL_END();
     });
 #endif
@@ -4158,7 +4158,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        out = fromNSString(CN1_THREAD_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_STATE_PASS_ARG javaScript)]);
+        out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
         POOL_END();
     });
     return out;
@@ -4221,7 +4221,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STA
         POOL_BEGIN();
         UIWebView* webView = [[UIWebView alloc] initWithFrame:CGRectZero];
         NSString* userAgentString = [webView stringByEvaluatingJavaScriptFromString:@"navigator.userAgent"];
-        c = fromNSString(CN1_THREAD_STATE_PASS_ARG userAgentString);
+        c = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userAgentString);
 #ifndef CN1_USE_ARC
         [webView release];
 #endif
@@ -4354,7 +4354,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 #ifndef NEW_CODENAME_ONE_VM
             JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
 #else
-            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
             JAVA_OBJECT str;
             UIBarButtonItem *doneButton;
@@ -4362,9 +4362,9 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 #ifndef NEW_CODENAME_ONE_VM
             str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"OK"), fromNSString(@"OK"));
 #else
-            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"));
+            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"OK"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"OK"));
 #endif
-            NSString* buttonTitle = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+            NSString* buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
             doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(pickerComponentDismiss)];
             
             itemsArray = [NSArray arrayWithObjects: doneButton, nil];
@@ -4484,7 +4484,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
 #ifndef NEW_CODENAME_ONE_VM
             JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance__();
 #else
-            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            JAVA_OBJECT obj = com_codename1_ui_plaf_UIManager_getInstance___R_com_codename1_ui_plaf_UIManager(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
             JAVA_OBJECT str;
             UIBarButtonItem *doneButton;
@@ -4492,9 +4492,9 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(
 #ifndef NEW_CODENAME_ONE_VM
             str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"OK"), fromNSString(@"OK"));
 #else
-            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"OK"));
+            str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"OK"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"OK"));
 #endif
-            NSString* buttonTitle = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+            NSString* buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
             doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:[CodenameOne_GLViewController instance] action:@selector(pickerComponentDismiss)];
             
             itemsArray = [NSArray arrayWithObjects: doneButton, nil];
@@ -4601,7 +4601,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
             if ( rectangle ){
                 
-                CGRect cgrect =cn1RectToCGRect(CN1_THREAD_STATE_PASS_ARG rectangle);
+                CGRect cgrect =cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
                                         cgrect.origin.x,
@@ -4618,7 +4618,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             
         }
 #endif
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG rectangle);
+        releaseCN1(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
