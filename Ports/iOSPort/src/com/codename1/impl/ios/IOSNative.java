@@ -27,6 +27,7 @@ import com.codename1.payment.Product;
 import com.codename1.social.LoginCallback;
 import com.codename1.ui.geom.Rectangle;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Vector;
 
 /**
@@ -35,6 +36,8 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public final class IOSNative {
+    
+    
     //native void startMainThread(Runnable r);
     native void initVM();
     static native void deinitializeVM();

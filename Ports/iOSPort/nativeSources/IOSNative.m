@@ -311,6 +311,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
     //XMLVM_END_WRAPPER
 }
 
+void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
+    com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
+}
+
+void releaseCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
+    com_codename1_impl_ios_IOSImplementation_release___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
+}
+
 #ifndef NEW_CODENAME_ONE_VM
 NSString* toNSString(JAVA_OBJECT str) {
     if(str == JAVA_NULL) {
@@ -1860,10 +1868,12 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT ua) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG ua);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         //UIWebView* w = (UIWebView*)peer;
         NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:toNSString(CN1_THREAD_STATE_PASS_ARG ua), @"UserAgent", nil];
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG ua);
         [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];        
         POOL_END();
     });
@@ -2155,12 +2165,22 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG recipients);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG subject);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG content);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG attachment);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG attachmentMimeType);
     dispatch_async(dispatch_get_main_queue(), ^{
         MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
         if(picker == nil || ![MFMailComposeViewController canSendMail]) {
 #ifndef CN1_USE_ARC
             [picker release];
 #endif
+            releaseCN1(CN1_THREAD_STATE_PASS_ARG recipients);
+            releaseCN1(CN1_THREAD_STATE_PASS_ARG subject);
+            releaseCN1(CN1_THREAD_STATE_PASS_ARG content);
+            releaseCN1(CN1_THREAD_STATE_PASS_ARG attachment);
+            releaseCN1(CN1_THREAD_STATE_PASS_ARG attachmentMimeType);
             return;
         }
         POOL_BEGIN();
@@ -2220,6 +2240,11 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 #ifndef CN1_USE_ARC
         [picker release];
 #endif
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG recipients);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG subject);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG content);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG attachment);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG attachmentMimeType);
         POOL_END();
     });
 }
@@ -2273,6 +2298,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT artist) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG artist);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if ([MPNowPlayingInfoCenter class])  {
@@ -2287,11 +2313,13 @@ void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_TH
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG artist);
         POOL_END();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG title);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if ([MPNowPlayingInfoCenter class])  {
@@ -2306,6 +2334,7 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG title);
         POOL_END();
     });
 }
@@ -3033,6 +3062,8 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT  number, JAVA_OBJECT  text) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG number);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG text);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if([MFMessageComposeViewController canSendText]) {
@@ -3055,6 +3086,8 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             [picker release];
 #endif
         }
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG number);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG text);
         POOL_END();
     });
 }
@@ -4101,6 +4134,9 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
 
 void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_java_lang_String_boolean_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_DOUBLE amount, JAVA_OBJECT currency, JAVA_OBJECT appKey, JAVA_BOOLEAN sandbox, JAVA_OBJECT invoiceNumber) {
 #ifdef INCLUDE_ZOOZ
+    retainCN1(CN1_THREAD_STATE_PASS_ARG currency);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG appKey);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG invoiceNumber);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         ZooZ *zooz = [ZooZ sharedInstance];
@@ -4109,6 +4145,9 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         req.currencyCode = toNSString(CN1_THREAD_GET_STATE_PASS_ARG currency);
 //        req.payerDetails.email = @"test@test.com";
         [zooz openPayment:req forAppKey:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appKey)];
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG currency);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG appKey);
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG invoiceNumber);
         POOL_END();
     });
 #endif
@@ -4536,6 +4575,7 @@ CGRect cn1RectToCGRect(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT rect){
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    retainCN1(CN1_THREAD_STATE_PASS_ARG rectangle);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
@@ -4578,6 +4618,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             
         }
 #endif
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG rectangle);
         [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();

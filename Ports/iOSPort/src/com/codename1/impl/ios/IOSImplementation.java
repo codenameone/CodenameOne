@@ -114,6 +114,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
+    
+    /**
+     * A pool that will cause java objects to be retained if they are passed 
+     * to a non-managed thread via a mechanism like dispatch_async
+     */
+    private static ArrayList autoreleasePool = new ArrayList();
+    
+    static void retain(Object o){
+        if (o != null){
+            autoreleasePool.add(o);
+        }
+    }
+    
+    static void release(Object o){
+        if (o != null){
+            autoreleasePool.remove(o);
+        }
+    }
+    
 
     public void initEDT() {
         while(!initialized) {

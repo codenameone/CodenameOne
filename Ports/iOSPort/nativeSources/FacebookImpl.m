@@ -37,14 +37,18 @@ JAVA_BOOLEAN publishPermission = 0;
 #include "com_codename1_social_FacebookImpl.h"
 #import "FBSession.h"
 
-
 #ifdef NEW_CODENAME_ONE_VM
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
+extern void retainCN1(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+extern void releaseCN1(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 #else
 extern JAVA_OBJECT fromNSString(NSString* str);
+extern void retainCN1(JAVA_OBJECT o);
+extern void releaseCN1(JAVA_OBJECT o);
 #endif
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
+    retainCN1(CN1_THREAD_STATE_PASS_ARG instance);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         FBSession* s = [FBSession activeSession];
@@ -61,10 +65,12 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREA
                     com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
                     impl->fields.com_codename1_social_FacebookImpl.loginCompleted_ = TRUE;
 #endif
+                    releaseCN1(CN1_THREAD_STATE_PASS_ARG instance);
                     return;
                 }
             }];
         }
+        releaseCN1(CN1_THREAD_STATE_PASS_ARG instance);
         POOL_END();
     });
 }
