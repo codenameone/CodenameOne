@@ -117,6 +117,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.io.*;
 import java.net.*;
+import java.nio.channels.FileChannel;
 import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
@@ -140,7 +141,6 @@ import javafx.util.Duration;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.filechooser.FileFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -5978,11 +5978,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     try {
                         File tmp = File.createTempFile("temp", "." + imageTypes[0]);
                         tmp.deleteOnExit();
-                        FileOutputStream fos = new FileOutputStream(tmp);
-                        FileInputStream fis = new FileInputStream(selected);
-                        Util.copy(fis, fos);
-                        Util.cleanup(fis);
-                        Util.cleanup(fos);
+                        copyFile(selected, tmp);
                         result = new com.codename1.ui.events.ActionEvent("file:/" + tmp.getAbsolutePath().replace('\\', '/'));
                     } catch(IOException err) {
                         err.printStackTrace();
@@ -6076,7 +6072,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             File temp = File.createTempFile("mtmp", suffix);
             temp.deleteOnExit();
             FileOutputStream out = new FileOutputStream(temp);
-            byte buf[] = new byte[256];
+            byte buf[] = new byte[1024];
             int len = 0;
             while ((len = stream.read(buf, 0, buf.length)) > -1) {
                 out.write(buf, 0, len);
@@ -7449,5 +7445,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
         ((SocketImpl)socket).writeToStream(data);
+    }
+    
+    private static void copyFile(File sourceFile, File destFile) throws IOException {
+        if (!destFile.exists()) {
+            destFile.createNewFile();
+        }
+
+        FileChannel source = null;
+        FileChannel destination = null;
+        try {
+            source = new FileInputStream(sourceFile).getChannel();
+            destination = new FileOutputStream(destFile).getChannel();
+            destination.transferFrom(source, 0, source.size());
+        } finally {
+            if (source != null) {
+                source.close();
+            }
+            if (destination != null) {
+                destination.close();
+            }
+        }
     }
 }
