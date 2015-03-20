@@ -629,7 +629,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     allocationsSinceLastGC += size;
     totalAllocations += size;
-    if(lowMemoryMode) {
+    if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
         threadStateData->threadActive = JAVA_FALSE;
         usleep((JAVA_INT)(1000));
         while(threadStateData->threadBlockedByGC) {
@@ -670,14 +670,14 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 #endif
     
     if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
-        if(threadStateData->threadBlockedByGC) {
+        if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
             threadStateData->threadActive = JAVA_FALSE;
             while(threadStateData->threadBlockedByGC) {
                 usleep(1000);
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0) {
+        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
@@ -845,6 +845,7 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
  * for the constant pool
  */
 JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
+    enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
     memcpy((*dat).data, data, length * sizeof(JAVA_ARRAY_CHAR));
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
@@ -852,6 +853,7 @@ JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
     struct obj__java_lang_String* str = (struct obj__java_lang_String*)o;
     str->java_lang_String_value = (JAVA_OBJECT)dat;
     str->java_lang_String_count = length;
+    finishedNativeAllocations();
     return o;
 }
 
@@ -862,6 +864,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     if(str == 0) {
         return JAVA_NULL;
     }
+    enteringNativeAllocations();
     int length = (int)strlen(str);
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*) (*dat).data;
@@ -888,6 +891,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)o;
     ss->java_lang_String_value = (JAVA_OBJECT)dat;
     ss->java_lang_String_count = offset;
+    finishedNativeAllocations();
     return o;
 }
 
@@ -938,6 +942,7 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     if (str == nil) {
         return JAVA_NULL;
     }
+    enteringNativeAllocations();
     if (utf8String == JAVA_NULL) {
         utf8String = newStringFromCString(threadStateData, "UTF-8");
         removeObjectFromHeapCollection(threadStateData, utf8String);
@@ -955,6 +960,7 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
     nnn->java_lang_String_nsString = str;
     [str retain];
+    finishedNativeAllocations();
     return s;
 }
 

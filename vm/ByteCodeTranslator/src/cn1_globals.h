@@ -689,6 +689,9 @@ struct TryBlock {
 
 #define PER_THREAD_ALLOCATION_COUNT 4096
 
+#define enteringNativeAllocations() threadStateData->nativeAllocationMode = JAVA_TRUE
+#define finishedNativeAllocations() threadStateData->nativeAllocationMode = JAVA_FALSE
+
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {
     JAVA_LONG threadId;
@@ -700,6 +703,7 @@ struct ThreadLocalData {
     JAVA_BOOLEAN lightweightThread;
     JAVA_BOOLEAN threadActive;
     JAVA_BOOLEAN threadBlockedByGC;
+    JAVA_BOOLEAN nativeAllocationMode;
 
     // used by the GC to traverse the objects pointed to by this thread
     struct elementStruct* threadObjectStack;
