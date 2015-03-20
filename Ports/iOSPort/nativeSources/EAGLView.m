@@ -376,7 +376,9 @@ extern int currentlyEditingMaxLength;
 - (void)layoutSubviews
 {
     // The framebuffer will be re-created at the beginning of the next setFramebuffer method call.
-    [self deleteFramebuffer];
+    // Not sure why this is here.  Deleting the framebuffer on layoutSubviews
+    // seems excessive as it makes us recreate it quite frequently.
+    //[self deleteFramebuffer];
     [super layoutSubviews];
 }
 
