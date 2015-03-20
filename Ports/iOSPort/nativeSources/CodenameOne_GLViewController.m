@@ -1906,6 +1906,7 @@ int keyboardHeight;
         [currentTarget addObjectsFromArray:upcomingTarget];
         [upcomingTarget removeAllObjects];
     }
+    
     [self drawFrame:CGRectMake(0, 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl())];
 #ifdef INCLUDE_MOPUB
     [self.adView rotateToOrientation:toInterfaceOrientation];
@@ -1974,6 +1975,8 @@ int keyboardHeight;
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    [(EAGLView *)self.view deleteFramebuffer];
+    
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
     lockDrawing = NO;
