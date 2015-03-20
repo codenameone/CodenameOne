@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 // Pisces imports
@@ -31,6 +31,8 @@
 
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
+#else
+#include "cn1_globals.h"
 #endif
 
 #import <UIKit/UIKit.h>
@@ -74,23 +76,23 @@ extern int popoverSupported();
 #define INCLUDE_CN1_PUSH2
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
-JAVA_OBJECT fromNSString(NSString* str)
-{
-    if (str == nil) {
-        return JAVA_NULL;
-    }
-    if (utf8_constant == JAVA_NULL) {
-        utf8_constant = xmlvm_create_java_string("UTF-8");
-    }
-    NSAutoreleasePool* p = [[NSAutoreleasePool alloc] init];
-    java_lang_String* s = __NEW_java_lang_String();
-    const char* chars = [str UTF8String];
-    int length = strlen(chars);
-    org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimensionWithData(__CLASS_byte, length, chars);
-    java_lang_String___INIT____byte_1ARRAY_java_lang_String(s, data, utf8_constant);
-    [p release];
-    return s;
-}*/
+ JAVA_OBJECT fromNSString(NSString* str)
+ {
+ if (str == nil) {
+ return JAVA_NULL;
+ }
+ if (utf8_constant == JAVA_NULL) {
+ utf8_constant = xmlvm_create_java_string("UTF-8");
+ }
+ NSAutoreleasePool* p = [[NSAutoreleasePool alloc] init];
+ java_lang_String* s = __NEW_java_lang_String();
+ const char* chars = [str UTF8String];
+ int length = strlen(chars);
+ org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimensionWithData(__CLASS_byte, length, chars);
+ java_lang_String___INIT____byte_1ARRAY_java_lang_String(s, data, utf8_constant);
+ [p release];
+ return s;
+ }*/
 
 extern UIView *editingComponent;
 
@@ -223,8 +225,8 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize,
-        int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
-        int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
+ int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
+ int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -256,7 +258,7 @@ const char* stringToUTF8(JAVA_OBJECT str) {
     }
     org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-
+    
     JAVA_ARRAY_INT len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     char* cs = XMLVM_ATOMIC_MALLOC(len + 1);
     memcpy(cs, data, len);
@@ -355,10 +357,10 @@ NSString* toNSString(JAVA_OBJECT str) {
 }
 #endif
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG 
-        JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7, 
-        JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG
+                                                                                                                                                                         JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7,
+                                                                                                                                                                         JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
+                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
 {
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
@@ -366,7 +368,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     char cc[l];
     memcpy(cc, chr, l);
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
-            padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
+                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
     POOL_END();
 }
 
@@ -386,7 +388,7 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-#else 
+#else
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
 #endif
     Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl((void *)n1, data, n3, n4, n5, n6);
@@ -431,7 +433,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT n2)
 {
     POOL_BEGIN();
-
+    
     NSData* nd = (BRIDGE_CAST NSData*) ((void*)nsData);
     UIImage* img = [UIImage imageWithData:nd];
 #ifndef NEW_CODENAME_ONE_VM
@@ -736,7 +738,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_jav
     int l = strlen(chr) + 1;
     char cc[l];
     memcpy(cc, chr, l);
-
+    
     JAVA_INT i;
     const char* chr2 = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n2);
     if(chr2 != 0) {
@@ -776,7 +778,7 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
     } else {
         loadResourceFile(cc, 0, 0, 0, data);
     }
-
+    
     POOL_END();
 }
 
@@ -872,12 +874,14 @@ void pointerPressed(int* x, int* y, int length) {
         memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
         com_codename1_impl_ios_IOSImplementation_pointerPressed___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
 #else
-        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        enteringNativeAllocations();
+        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_INT));
-        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_INT));
-        com_codename1_impl_ios_IOSImplementation_pointerPressed___int_1ARRAY_int_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG 
-            get_static_com_codename1_impl_ios_IOSImplementation_instance(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG), xArray, yArray);
+        com_codename1_impl_ios_IOSImplementation_pointerPressed___int_1ARRAY_int_1ARRAY(threadStateData,get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
+        finishedNativeAllocations();
 #endif
     }
 }
@@ -893,12 +897,15 @@ void pointerDragged(int* x, int* y, int length) {
         memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
         com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
 #else
-        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        enteringNativeAllocations();
+        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
-        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
-        com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG 
-            get_static_com_codename1_impl_ios_IOSImplementation_instance(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG), xArray, yArray);
+        com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(threadStateData,
+                                                                                        get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
+        finishedNativeAllocations();
 #endif
     }
 }
@@ -914,12 +921,15 @@ void pointerReleased(int* x, int* y, int length) {
         memcpy(yArray->fields.org_xmlvm_runtime_XMLVMArray.array_, y, length * sizeof(JAVA_INT));
         com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(com_codename1_impl_ios_IOSImplementation_GET_instance(), xArray, yArray);
 #else
-        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        enteringNativeAllocations();
+        JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
-        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG length);
+        JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
         memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
-        com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG 
-            get_static_com_codename1_impl_ios_IOSImplementation_instance(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG), xArray, yArray);
+        com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(threadStateData,
+                                                                                         get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
+        finishedNativeAllocations();
 #endif
     }
 }
@@ -995,12 +1005,12 @@ JAVA_INT com_codename1_impl_ios_IOSNative_read___long_int(CN1_THREAD_STATE_MULTI
 void com_codename1_impl_ios_IOSNative_read___long_byte_1ARRAY_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT destination, JAVA_INT offset, JAVA_INT length, JAVA_INT pointer) {
     POOL_BEGIN();
     NSData* n = (BRIDGE_CAST NSData*)((void*)nsData);
-
+    
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* byteArray = destination;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    void* data = ((JAVA_ARRAY)destination)->data;    
+    void* data = ((JAVA_ARRAY)destination)->data;
 #endif
     void* actual = &(data[offset]);
     [n getBytes:actual range:NSMakeRange(pointer, length)];
@@ -1016,9 +1026,9 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     }
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int length = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else 
+#else
     void *data = ((JAVA_ARRAY)n1)->data;
     int length = ((JAVA_ARRAY)n1)->length;
 #endif
@@ -1066,8 +1076,8 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THR
     NSFileManager *man = [[NSFileManager alloc] init];
     NSError *error = nil;
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
-    if(error != nil) {  
-        NSLog(@"Error getFileSize: %@ for the file %@", [error localizedDescription], ns);        
+    if(error != nil) {
+        NSLog(@"Error getFileSize: %@ for the file %@", [error localizedDescription], ns);
     }
     UInt32 result = (UInt32)[attrs fileSize];
 #ifndef CN1_USE_ARC
@@ -1086,8 +1096,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
     NSFileManager *man = [[NSFileManager alloc] init];
     NSError *error = nil;
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
-    if(error != nil) {  
-        NSLog(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);        
+    if(error != nil) {
+        NSLog(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);
     }
     NSDate* modDate = [attrs objectForKey:NSFileModificationDate];
     NSTimeZone *tzone = [NSTimeZone timeZoneWithName:@"GMT"];
@@ -1105,7 +1115,7 @@ void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN
     NSData* d = [NSData dataWithContentsOfFile:ns];
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
     void *data = ((JAVA_ARRAY)n1)->data;
 #endif
@@ -1116,7 +1126,7 @@ void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsDir__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];    
+    NSString *documentsPath = [writablePaths lastObject];
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG documentsPath);
     POOL_END();
     return str;
@@ -1125,7 +1135,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsDir__(CN1_THREAD_STATE_
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCachesDir__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];    
+    NSString *documentsPath = [writablePaths lastObject];
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG documentsPath);
     POOL_END();
     return str;
@@ -1149,7 +1159,7 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(CN1_THREAD_S
     }
     NSError *error = nil;
     [fm removeItemAtPath:ns error:&error];
-    if(error != nil) {  
+    if(error != nil) {
         NSLog(@"Error in deleteFile: %@ for the file %@", [error localizedDescription], ns);
     }
 #ifndef CN1_USE_ARC
@@ -1190,15 +1200,15 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(CN1_
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
-    if(error != nil) {  
-        NSLog(@"Error in fileCountInDir: %@", [error localizedDescription]);        
+    if(error != nil) {
+        NSLog(@"Error in fileCountInDir: %@", [error localizedDescription]);
     }
     int i = nsArr.count;
 #ifndef CN1_USE_ARC
     [fm release];
 #endif
     POOL_END();
-    return i;   
+    return i;
 }
 
 void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dir, JAVA_OBJECT files) {
@@ -1207,14 +1217,14 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
-    if(error != nil) {  
-        NSLog(@"Error in listing files: %@", [error localizedDescription]);        
+    if(error != nil) {
+        NSLog(@"Error in listing files: %@", [error localizedDescription]);
     }
     
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* strArray = files;
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
-#else 
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)files)->data;
 #endif
     
@@ -1254,13 +1264,13 @@ void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_Stri
     }
     NSError *error = nil;
     [fm moveItemAtPath:nsSrc toPath:nsDst error:&error];
-    if(error != nil) {  
-        NSLog(@"Error in moving file: %@", [error localizedDescription]);        
+    if(error != nil) {
+        NSLog(@"Error in moving file: %@", [error localizedDescription]);
     }
 #ifndef CN1_USE_ARC
     [fm release];
 #endif
-    POOL_END();    
+    POOL_END();
 }
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImage, const char* name);
@@ -1270,7 +1280,7 @@ void com_codename1_impl_ios_IOSNative_setImageName___long_java_lang_String(CN1_T
     POOL_BEGIN();
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG name);
     Java_com_codename1_impl_ios_IOSImplementation_setImageName((void *)nativeImage, chrs);
-    POOL_END();    
+    POOL_END();
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_INT timeout) {
@@ -1278,7 +1288,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_openConnection___java_lang_String_int
     NetworkConnectionImpl* impl = [[NetworkConnectionImpl alloc] init];
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG url);
     void* response = [impl openConnection:nsSrc timeout:timeout];
-    POOL_END();    
+    POOL_END();
     return (JAVA_LONG)response;
 }
 
@@ -1286,7 +1296,7 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     [impl connect];
-    POOL_END();    
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT mtd) {
@@ -1294,7 +1304,7 @@ void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(CN1_THRE
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG mtd);
     [impl setMethod:nsSrc];
-    POOL_END();    
+    POOL_END();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getResponseCode___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -1306,7 +1316,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseMessage___long(CN1_THREA
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG [impl getResponseMessage]);
-    POOL_END();    
+    POOL_END();
     return str;
 }
 
@@ -1320,15 +1330,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeader___long_java_lang_
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG [impl getResponseHeader:nsSrc]);
-    POOL_END();    
+    POOL_END();
     return str;
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getResponseHeaderCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
-    JAVA_INT i = [impl getResponseHeaderCount]; 
-    POOL_END();    
+    JAVA_INT i = [impl getResponseHeaderCount];
+    POOL_END();
     return i;
 }
 
@@ -1336,7 +1346,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(CN
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT j = fromNSString(CN1_THREAD_STATE_PASS_ARG [impl getResponseHeaderName:offset]);
-    POOL_END();    
+    POOL_END();
     return j;
 }
 
@@ -1346,7 +1356,7 @@ void com_codename1_impl_ios_IOSNative_addHeader___long_java_lang_String_java_lan
     NSString* nsKey = toNSString(CN1_THREAD_STATE_PASS_ARG key);
     NSString* nsValue = toNSString(CN1_THREAD_STATE_PASS_ARG value);
     [impl addHeader:nsKey value:nsValue];
-    POOL_END();    
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
@@ -1361,7 +1371,7 @@ void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(CN1_THREAD_STAT
     int len = ((JAVA_ARRAY)arr)->length;
 #endif
     [impl setBody:data size:len];
-    POOL_END();    
+    POOL_END();
 }
 
 void connectionComplete(void* peer) {
@@ -1373,11 +1383,15 @@ void connectionReceivedData(void* peer, NSData* data) {
     if (!__TIB_byte.classInitialized) __INIT_byte();
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [data length]);
     [data getBytes:byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_];
-#else 
-    JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG [data length]);
-    [data getBytes:((JAVA_ARRAY)byteArray)->data];
-#endif
     com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, byteArray);
+#else
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    enteringNativeAllocations();
+    JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
+    [data getBytes:((JAVA_ARRAY)byteArray)->data];
+    com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
+    finishedNativeAllocations();
+#endif
 }
 
 void connectionError(void* peer, NSString* message) {
@@ -1385,7 +1399,7 @@ void connectionError(void* peer, NSString* message) {
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG message);
     com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG peer, str);
-    POOL_END();    
+    POOL_END();
 }
 
 
@@ -1516,8 +1530,8 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
         float wpos = w / scale;
         float hpos = h / scale;
         [v setFrame:CGRectMake(xpos, ypos, wpos, hpos)];
-        [v setNeedsDisplay]; 
-        POOL_END();    
+        [v setNeedsDisplay];
+        POOL_END();
     });
 }
 
@@ -1534,7 +1548,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
                 [[CodenameOne_GLViewController instance].view addSubview:v];
             }
         }
-        POOL_END();    
+        POOL_END();
     });
 }
 
@@ -1560,7 +1574,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
             data[0] = (JAVA_INT)v.bounds.size.width;
             data[1] = (JAVA_INT)v.bounds.size.height;
         }
-        POOL_END();    
+        POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)g);
 }
@@ -1579,11 +1593,11 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
             float wpos = w / scale;
             float hpos = h / scale;
             [v setFrame:CGRectMake(xpos, ypos, wpos, hpos)];
-            [v setNeedsDisplay]; 
+            [v setNeedsDisplay];
         } else {
             [v setFrame:CGRectMake(3000, 0, 300, 300)];
         }
-        POOL_END();    
+        POOL_END();
     });
 }
 
@@ -1612,8 +1626,8 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_
         if(v.superview != nil) {
             [v removeFromSuperview];
             repaintUI();
-        } 
-        POOL_END();    
+        }
+        POOL_END();
     });
 }
 
@@ -1712,7 +1726,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
         POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* byteArray = b;
-        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
         void* data = ((JAVA_ARRAY)b)->data;
@@ -1726,11 +1740,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return [AudioPlayer getVolume];    
+    return [AudioPlayer getVolume];
 }
 
 void com_codename1_impl_ios_IOSNative_setVolume___float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_FLOAT vol) {
-    [AudioPlayer setVolume:vol];    
+    [AudioPlayer setVolume:vol];
 }
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9) {
@@ -1760,14 +1774,14 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
     POOL_BEGIN();
     
-    CGFloat components[8] = { 
-        ((float)((n1 & 0xFF0000) >> 16))/255.0, 
+    CGFloat components[8] = {
+        ((float)((n1 & 0xFF0000) >> 16))/255.0,
         ((float)(n1 & 0xff00 >> 8))/255.0,
-        ((float)(n1 & 0xff))/255.0, 
-        1.0, 
-        ((float)((n2 & 0xFF0000) >> 16))/255.0, 
+        ((float)(n1 & 0xff))/255.0,
+        1.0,
+        ((float)((n2 & 0xFF0000) >> 16))/255.0,
         ((float)(n2 & 0xff00 >> 8))/255.0,
-        ((float)(n2 & 0xff))/255.0, 
+        ((float)(n2 & 0xff))/255.0,
         1.0 };
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
@@ -1795,13 +1809,13 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
         ((float)((n2 >> 8) & 0xFF))/255.0,
         ((float)(n2 & 0xff))/255.0,
         1.0 };
-
+    
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
     CGRect rect = CGRectMake(n3, n4, width, height);
-
+    
     CGContextSaveGState(UIGraphicsGetCurrentContext());
     CGContextClipToRect(UIGraphicsGetCurrentContext(), rect);
     if(n7) {
@@ -1873,7 +1887,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
         POOL_BEGIN();
         //UIWebView* w = (UIWebView*)peer;
         NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:_ua, @"UserAgent", nil];
-        [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];        
+        [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];
         POOL_END();
     });
 }
@@ -2048,7 +2062,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
         POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
-        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
         void* data = ((JAVA_ARRAY)dataObject)->data;
@@ -2061,7 +2075,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
         NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
         
         [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];        
+        NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         moviePlayerInstance.useApplicationAudioSession = NO;
@@ -2121,7 +2135,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1
         NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
         
         [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];        
+        NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         moviePlayerInstance.useApplicationAudioSession = NO;
@@ -2163,7 +2177,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 }
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-    JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+                                                                                                                                                                           JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
     retainCN1(CN1_THREAD_STATE_PASS_ARG recipients);
     retainCN1(CN1_THREAD_STATE_PASS_ARG subject);
     retainCN1(CN1_THREAD_STATE_PASS_ARG content);
@@ -2212,7 +2226,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
             org_xmlvm_runtime_XMLVMArray* attachmentArray = attachment;
             JAVA_ARRAY_OBJECT* attachmentData = (JAVA_ARRAY_OBJECT*)attachmentArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
             int attachmentCount = attachmentArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-
+            
             org_xmlvm_runtime_XMLVMArray* mimeArray = attachmentMimeType;
             JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)mimeArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
@@ -2220,11 +2234,11 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
             int attachmentCount = ((JAVA_ARRAY)attachment)->length;
             JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)attachmentMimeType)->data;
 #endif
-
+            
             for(int iter = 0 ; iter < attachmentCount ; iter++) {
                 NSString* file = toNSString(CN1_THREAD_GET_STATE_PASS_ARG attachmentData[iter]);
                 NSString* mime = toNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeData[iter]);
-
+                
                 int pos = [file rangeOfString:@"/" options:NSBackwardsSearch].location + 1;
                 NSString* fileComponent = [file substringFromIndex:pos];
                 if([file hasPrefix:@"file:"]) {
@@ -2357,21 +2371,21 @@ void com_codename1_impl_ios_IOSNative_setMediaBgDuration___long(CN1_THREAD_STATE
 
 void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pos) {
     /*dispatch_async(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        if ([MPNowPlayingInfoCenter class])  {
-            NSArray *keys = [NSArray arrayWithObjects:
-                             MPMediaItemPropertyPlaybackDuration,
-                             MPNowPlayingInfoPropertyPlaybackRate,
-                             nil];
-            NSArray *values = [NSArray arrayWithObjects:
-                               [NSNumber numberWithLongLong:pos/1000],
-                               [NSNumber numberWithInt:1],
-                               nil];
-            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
-            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
-        }
-        POOL_END();
-    });*/
+     POOL_BEGIN();
+     if ([MPNowPlayingInfoCenter class])  {
+     NSArray *keys = [NSArray arrayWithObjects:
+     MPMediaItemPropertyPlaybackDuration,
+     MPNowPlayingInfoPropertyPlaybackRate,
+     nil];
+     NSArray *values = [NSArray arrayWithObjects:
+     [NSNumber numberWithLongLong:pos/1000],
+     [NSNumber numberWithInt:1],
+     nil];
+     NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+     [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+     }
+     POOL_END();
+     });*/
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -2379,7 +2393,7 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
         POOL_BEGIN();
         if ([MPNowPlayingInfoCenter class])  {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
-            UIImage* i = [glll getImage];        
+            UIImage* i = [glll getImage];
             MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithImage:i];
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyArtwork,
@@ -2451,7 +2465,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_M
         com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
         if ([com_codename1_impl_ios_IOSNative_createCLLocation respondsToSelector:@selector     (requestWhenInUseAuthorization)]) {
 #ifdef IOS8_LOCATION_WARNING
-IOS8_LOCATION_WARNING
+            IOS8_LOCATION_WARNING
 #endif
             [com_codename1_impl_ios_IOSNative_createCLLocation requestWhenInUseAuthorization];
         }
@@ -2539,24 +2553,24 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             if(popoverSupported() && sourceType != UIImagePickerControllerSourceTypeCamera)
             {
 #ifndef CN1_USE_ARC
-                popoverController = [[[NSClassFromString(@"UIPopoverController") alloc] 
-                                      initWithContentViewController:pickerController] autorelease]; 
+                popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
+                                      initWithContentViewController:pickerController] autorelease];
 #else
-                popoverController = [[NSClassFromString(@"UIPopoverController") alloc] 
-                                      initWithContentViewController:pickerController]; 
+                popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
+                                     initWithContentViewController:pickerController];
 #endif
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
                                                    inView:[[CodenameOne_GLViewController instance] view]
-                                 permittedArrowDirections:UIPopoverArrowDirectionAny 
-                                                 animated:YES]; 
+                                 permittedArrowDirections:UIPopoverArrowDirectionAny
+                                                 animated:YES];
 #ifndef CN1_USE_ARC
                 [popoverController retain];
 #endif
             }
-            else 
-            { 
-                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES]; 
+            else
+            {
+                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
             }
             POOL_END();
         }
@@ -2590,14 +2604,14 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
         } else if (type==2){
             pickerController.mediaTypes = [[NSArray alloc] initWithObjects:(NSString*)kUTTypeMovie, (NSString*)kUTTypeImage,  nil];
         }
-                
+        
         if(popoverSupported()) {
 #ifndef CN1_USE_ARC
             popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
                                   initWithContentViewController:pickerController] autorelease];
 #else
             popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
-                                  initWithContentViewController:pickerController];
+                                 initWithContentViewController:pickerController];
 #endif
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
@@ -2615,7 +2629,7 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
 }
 int popoverSupported()
 {
-	return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
+    return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -2643,7 +2657,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_S
     
     POOL_END();
     // The newLocation is good to use
-    return 1;    
+    return 1;
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -2654,7 +2668,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long(CN1_THREAD_ST
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
-    [l stopUpdatingLocation];    
+    [l stopUpdatingLocation];
 }
 
 ABAddressBookRef globalAddressBook = nil;
@@ -2673,7 +2687,7 @@ ABAddressBookRef getAddressBook() {
                 wait(10);
             }
         } else {
-            globalAddressBook = ABAddressBookCreate();            
+            globalAddressBook = ABAddressBookCreate();
         }
     }
     return globalAddressBook;
@@ -2695,7 +2709,7 @@ void throwError(CFErrorRef error) {
         CFIndex length = CFStringGetLength(errorDesc);
         char *buffer = (char *)malloc(length + 1);
         if(CFStringGetCString(errorDesc, buffer, length,
-                           kCFStringEncodingUTF8)) {
+                              kCFStringEncodingUTF8)) {
             XMLVM_THROW_WITH_CSTRING(java_lang_RuntimeException, buffer);
         }
 #endif
@@ -2726,7 +2740,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
         ABRecordSetValue(person, kABPersonEmailProperty, emailVal, &error);
         throwError(error);
     }
-
+    
     if(officePhone != nil || homePhone != nil || cellPhone != nil) {
         ABMutableMultiValueRef phoneVal = ABMultiValueCreateMutable(kABPersonPhoneProperty);
         if(officePhone != nil) {
@@ -2797,10 +2811,10 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* iArray = intArray;
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)intArray)->data;    
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)intArray)->data;
     int size = ((JAVA_ARRAY)intArray)->length;
 #endif
     ABAddressBookRef addressBook = getAddressBook();
@@ -2834,7 +2848,7 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);    
+    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
@@ -2843,7 +2857,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(CN1_THREA
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);    
+    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
@@ -2867,7 +2881,7 @@ JAVA_OBJECT copyValueAsString(CN1_THREAD_STATE_MULTI_ARG ABMultiValueRef r) {
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
@@ -2876,7 +2890,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(CN1_THREA
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
     POOL_BEGIN();
     //ABRecordRef i = (ABRecordRef)peer;
-    //ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneMainLabel);    
+    //ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneMainLabel);
     //JAVA_OBJECT ret = copyValueAsString(k);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG @"work");
     POOL_END();
@@ -2886,7 +2900,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(CN1_T
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);    
+    ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
@@ -2895,7 +2909,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(CN1_TH
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);    
+    ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG emails);
     POOL_END();
     return ret;
@@ -2904,7 +2918,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(CN1_THREAD_ST
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
-    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonAddressProperty);    
+    NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonAddressProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
@@ -2917,7 +2931,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(CN1_THR
     if(ABPersonHasImageData(i)){
         UIImage* img = [UIImage imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageData(i)];
         g = [[GLUIImage alloc] initWithImage:img];
-    }    
+    }
     POOL_END();
     return (JAVA_LONG)((BRIDGE_CAST void*)g);
 }
@@ -2945,8 +2959,8 @@ void addToHashtable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT hash, ABMultiValueRef
     }
 }
 
-void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact_boolean_boolean_boolean_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT cnt, 
-            JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
+void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact_boolean_boolean_boolean_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT cnt,
+                                                                                                                                            JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
     if(includesEmail) {
@@ -2963,7 +2977,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
             addToHashtable(CN1_THREAD_STATE_PASS_ARG emailsHash, emails, emailCount);
         }
     }
-
+    
     if(includesNumbers) {
         ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
         int numbersCount = ABMultiValueGetCount(numbers);
@@ -2983,12 +2997,12 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     if(first != nil) {
         com_codename1_contacts_Contact_setFirstName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG first));
     }
-
+    
     NSString* last = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);
     if(last != nil) {
         com_codename1_contacts_Contact_setFamilyName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG last));
     }
-
+    
     if(includesFullName) {
         NSString* full = [NSString stringWithFormat:@"%@ %@", first, last];
         if(first != nil && last != nil) {
@@ -3008,7 +3022,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     if(note != nil) {
         com_codename1_contacts_Contact_setNote___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG note));
     }
-
+    
     NSDate *bDayProperty = (BRIDGE_CAST NSDate*)ABRecordCopyValue(i, kABPersonBirthdayProperty);
     if(bDayProperty != nil) {
         NSTimeInterval nst = [bDayProperty timeIntervalSince1970];
@@ -3026,21 +3040,23 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
             (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.width_ = (int)[g getImage].size.width;
             (*nativeImage).fields.com_codename1_impl_ios_IOSImplementation_NativeImage.height_ = (int)[g getImage].size.height;
             JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object(nativeImage);
+            com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(CN1_THREAD_STATE_PASS_ARG cnt, image);
 #else
+            enteringNativeAllocations();
             struct obj__com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (struct obj__com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage(CN1_THREAD_STATE_PASS_SINGLE_ARG);
             (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_peer = (JAVA_LONG)g;
             (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_width = (int)[g getImage].size.width;
             (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_height = (int)[g getImage].size.height;
             JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object_R_com_codename1_ui_Image(CN1_THREAD_STATE_PASS_ARG nativeImage);
-#endif
-
             com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(CN1_THREAD_STATE_PASS_ARG cnt, image);
+            finishedNativeAllocations();
+#endif
         }
     }
     
     POOL_END();
 }
-    
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
@@ -3058,7 +3074,7 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 }
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-    JAVA_OBJECT  number, JAVA_OBJECT  text) {
+                                                                                  JAVA_OBJECT  number, JAVA_OBJECT  text) {
     NSString *recipient = toNSString(CN1_THREAD_STATE_PASS_ARG number);
     NSString *smsBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -3099,27 +3115,27 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
             if (settings) {
                 // Prepare class selector
                 SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
-
+                
                 // Obtain a method signature of selector on UIUserNotificationSettings class
                 NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
-
+                
                 // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
                 NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
                 invocation.selector = sel;
                 invocation.target = settings;
-
+                
                 // Set arguments
                 [invocation setArgument:&settingsParam atIndex:2];
                 [invocation setArgument:&categoriesParam atIndex:3];
-
+                
                 // Obtain an instance by firing an invocation
                 NSObject *settingsInstance;
                 [invocation invoke];
                 [invocation getReturnValue:&settingsInstance];
-
+                
                 // Retain an instance so it can live after quitting method and prevent crash :-)
                 CFRetain((__bridge CFTypeRef)(settingsInstance));
-
+                
                 // Finally call the desired method with proper settings
                 if (settingsInstance) {
                     [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
@@ -3127,7 +3143,7 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
             }
         } else {
             [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-                    (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+             (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
         }
     });
 #endif
@@ -3232,14 +3248,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
 JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
     NSData* d = (BRIDGE_CAST NSData*)((void *)nsData);
     return d.length;
-} 
+}
 
 void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT dataArray) {
     POOL_BEGIN();
     NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* byteArray = dataArray;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
     void* data = ((JAVA_ARRAY)dataArray)->data;
 #endif
@@ -3249,7 +3265,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-    JAVA_OBJECT  destinationFile) {
+                                                                                  JAVA_OBJECT  destinationFile) {
     __block AVAudioRecorder* recorder = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3290,8 +3306,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                     recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:ns]
                                                            settings: recordSettings
                                                               error: &error];
-                    if(error != nil) {  
-                        NSLog(@"Error in recording: %@", [error localizedDescription]);        
+                    if(error != nil) {
+                        NSLog(@"Error in recording: %@", [error localizedDescription]);
                     }
                     recorder.delegate = [CodenameOne_GLViewController instance];
                 } else {
@@ -3330,7 +3346,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
 }
 
 void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-    JAVA_LONG  peer) {
+                                                              JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3347,8 +3363,8 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_M
     });
 }
 
-void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
-    JAVA_LONG  peer) {
+void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                              JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3357,8 +3373,8 @@ void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(CN1_THREAD_STATE_M
     });
 }
 
-void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
-    JAVA_LONG  peer) {
+void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                                JAVA_LONG  peer) {
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3378,7 +3394,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofByteArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
-{    
+{
     return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_BYTE;
 }
 
@@ -3453,42 +3469,42 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___j
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];    
+    NSString *documentsPath = [writablePaths lastObject];
     
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
     BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:foofile];
-    POOL_END();    
+    POOL_END();
     return fileExists;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];    
+    NSString *documentsPath = [writablePaths lastObject];
     
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
-
+    
     sqlite3 *db;
     int rc = sqlite3_open([foofile UTF8String], &db);
     
-    POOL_END();    
+    POOL_END();
     return (JAVA_LONG)db;
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];    
+    NSString *documentsPath = [writablePaths lastObject];
     
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
     [[NSFileManager defaultManager] removeItemAtPath:foofile error:nil];
-    POOL_END();    
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG db) {
@@ -3503,13 +3519,13 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
         sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* stringArray = args;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_ARRAY_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;
         int count = ((JAVA_ARRAY)args)->length;
 #endif
-
+        
         for(int iter = 0 ; iter < count ; iter++) {
             JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
             const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
@@ -3527,17 +3543,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
     sqlite3_stmt *addStmt = nil;
     sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
-
+    
     if(args != nil) {
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* stringArray = args;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)args)->data;    
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)args)->data;
         int count = ((JAVA_ARRAY)args)->length;
 #endif
-
+        
         for(int iter = 0 ; iter < count ; iter++) {
             JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
             const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
@@ -3551,9 +3567,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(CN1_THREAD_S
     sqlite3_reset((sqlite3_stmt *)statementPeer);
     return YES;
 }
-    
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    return sqlite3_step((sqlite3_stmt *)statementPeer) == SQLITE_ROW;    
+    return sqlite3_step((sqlite3_stmt *)statementPeer) == SQLITE_ROW;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
@@ -3590,6 +3606,7 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
 
 #ifdef NEW_CODENAME_ONE_VM
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    enteringNativeAllocations();
     const char* result = (const char*)sqlite3_column_text((sqlite3_stmt*)statement, col);
     if(result == 0) {
         return JAVA_NULL;
@@ -3612,6 +3629,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
                             dest[length] = (JAVA_CHAR)[ns characterAtIndex:length];
                             length++;
                         }];
+    finishedNativeAllocations();
     
     return str;
 }
@@ -3647,13 +3665,13 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     org_xmlvm_runtime_XMLVMArray* strArray = skus;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int count = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else 
+#else
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)skus)->data;
     int count = ((JAVA_ARRAY)skus)->length;
 #endif
     
     NSMutableSet *productIdentifiers = [[NSMutableSet alloc] init];
-     
+    
     for(int iter = 0 ; iter < count ; iter++) {
         [productIdentifiers addObject:toNSString(CN1_THREAD_STATE_PASS_ARG data[iter])];
     }
@@ -3834,7 +3852,7 @@ void com_codename1_impl_ios_IOSNative_scanBarCode__(CN1_THREAD_STATE_MULTI_ARG J
         reader.supportedOrientationsMask = ZBarOrientationMaskAll;
         
         //ZBAR_CONFIGURATIONS
-
+        
         ZBarImageScanner *scanner = reader.scanner;
         // TODO: (optional) additional reader configuration here
         
@@ -3862,14 +3880,14 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JA
      
      QRCodeReader* qrcodeReader = [[QRCodeReader alloc] init];
      [readers addObject:qrcodeReader];
-#ifndef CN1_USE_ARC
+     #ifndef CN1_USE_ARC
      [qrcodeReader release];
-#endif
+     #endif
      
      widController.readers = readers;
-#ifndef CN1_USE_ARC
+     #ifndef CN1_USE_ARC
      [readers release];
-#endif
+     #endif
      
      [[CodenameOne_GLViewController instance] presentModalViewController:widController animated:YES];
      [widController release];
@@ -3880,7 +3898,7 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JA
 #ifdef NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
-    void* data = (void*)byteArray->data;    
+    void* data = (void*)byteArray->data;
     NSData* d = [NSData dataWithBytes:data length:byteArray->length];
     return d;
 }
@@ -3888,7 +3906,7 @@ NSData* arrayToData(JAVA_OBJECT arr) {
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3896,7 +3914,7 @@ JAVA_OBJECT nsDataToByteArr(NSData *data) {
 JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3904,7 +3922,7 @@ JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
 JAVA_OBJECT nsDataToCharArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3912,7 +3930,7 @@ JAVA_OBJECT nsDataToCharArray(NSData *data) {
 JAVA_OBJECT nsDataToShortArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3920,7 +3938,7 @@ JAVA_OBJECT nsDataToShortArray(NSData *data) {
 JAVA_OBJECT nsDataToIntArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3928,7 +3946,7 @@ JAVA_OBJECT nsDataToIntArray(NSData *data) {
 JAVA_OBJECT nsDataToLongArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3936,7 +3954,7 @@ JAVA_OBJECT nsDataToLongArray(NSData *data) {
 JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
@@ -3944,14 +3962,14 @@ JAVA_OBJECT nsDataToFloatArray(NSData *data) {
 JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;    
+    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
 }
 #else // NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
     org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
-    void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
     return d;
 }
@@ -3960,9 +3978,9 @@ JAVA_OBJECT nsDataToByteArr(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();    
+    POOL_END();
     return byteArray;
 }
 
@@ -3970,9 +3988,9 @@ JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_boolean, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 
@@ -3980,9 +3998,9 @@ JAVA_OBJECT nsDataToCharArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_char, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 
@@ -3990,9 +4008,9 @@ JAVA_OBJECT nsDataToShortArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_short, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 
@@ -4000,9 +4018,9 @@ JAVA_OBJECT nsDataToIntArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_int, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 
@@ -4010,9 +4028,9 @@ JAVA_OBJECT nsDataToLongArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_long, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 
@@ -4020,9 +4038,9 @@ JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_float, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();            
+    POOL_END();
     return byteArray;
 }
 
@@ -4030,9 +4048,9 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     POOL_BEGIN();
     NSData* d = (NSData*)data;
     org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_double, [d length]);
-    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;    
+    void* dtd = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     memcpy(dtd, d.bytes, d.length);
-    POOL_END();        
+    POOL_END();
     return byteArray;
 }
 #endif // NEW_CODENAME_ONE_VM
@@ -4071,7 +4089,7 @@ void com_codename1_impl_ios_IOSNative_log___java_lang_String(CN1_THREAD_STATE_MU
 void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_util_Vector(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT receiver, JAVA_OBJECT urlStr, JAVA_OBJECT outVector) {
     POOL_BEGIN();
     NSHTTPCookieStorage *cstore = [NSHTTPCookieStorage sharedHTTPCookieStorage];
-
+    
     NSString* nsStr = toNSString(CN1_THREAD_STATE_PASS_ARG urlStr);
     
     // workaround for exception where the | character is concidered to be illegal by apple but is required by facebook
@@ -4092,7 +4110,10 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
         JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970];
         JAVA_BOOLEAN secure = [cookie isSecure];
         JAVA_BOOLEAN httpOnly = [cookie isHTTPOnly];
-
+        
+#ifdef NEW_CODENAME_ONE_VM
+        enteringNativeAllocations();
+#endif
         JAVA_OBJECT jcookie = __NEW_INSTANCE_com_codename1_io_Cookie(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         com_codename1_io_Cookie_setName___java_lang_String(CN1_THREAD_STATE_PASS_ARG jcookie, name);
         com_codename1_io_Cookie_setSecure___boolean(CN1_THREAD_STATE_PASS_ARG jcookie, secure);
@@ -4101,29 +4122,30 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
         com_codename1_io_Cookie_setValue___java_lang_String(CN1_THREAD_STATE_PASS_ARG jcookie, value);
         com_codename1_io_Cookie_setDomain___java_lang_String(CN1_THREAD_STATE_PASS_ARG jcookie, domain);
         com_codename1_io_Cookie_setExpires___long(CN1_THREAD_STATE_PASS_ARG jcookie, expires);
-
+        
 #ifndef NEW_CODENAME_ONE_VM
         java_util_Vector_add___java_lang_Object(outVector, jcookie);
 #else
         java_util_Vector_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outVector, jcookie);
+        finishedNativeAllocations();
 #endif
     }
-
+    
     POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_String_java_lang_String_java_lang_String_boolean_boolean_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT receiver, JAVA_OBJECT key, JAVA_OBJECT value,JAVA_OBJECT domain, JAVA_OBJECT path, JAVA_BOOLEAN secure, JAVA_BOOLEAN httpOnly, JAVA_LONG expires) {
     POOL_BEGIN();
     NSDictionary *stringProps = [[NSDictionary alloc] initWithObjectsAndKeys:
-                    toNSString(CN1_THREAD_STATE_PASS_ARG key), NSHTTPCookieName,
-                    toNSString(CN1_THREAD_STATE_PASS_ARG value), NSHTTPCookieValue,
-                    toNSString(CN1_THREAD_STATE_PASS_ARG domain), NSHTTPCookieDomain,
-                    toNSString(CN1_THREAD_STATE_PASS_ARG path), NSHTTPCookiePath,
-                    (secure ? @"1" : @""), NSHTTPCookieSecure,
-                    [NSDate dateWithTimeIntervalSince1970:expires], NSHTTPCookieExpires, Nil];
+                                 toNSString(CN1_THREAD_STATE_PASS_ARG key), NSHTTPCookieName,
+                                 toNSString(CN1_THREAD_STATE_PASS_ARG value), NSHTTPCookieValue,
+                                 toNSString(CN1_THREAD_STATE_PASS_ARG domain), NSHTTPCookieDomain,
+                                 toNSString(CN1_THREAD_STATE_PASS_ARG path), NSHTTPCookiePath,
+                                 (secure ? @"1" : @""), NSHTTPCookieSecure,
+                                 [NSDate dateWithTimeIntervalSince1970:expires], NSHTTPCookieExpires, Nil];
     NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties: stringProps];
     [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
-
+    
     POOL_END();
 }
 
@@ -4138,7 +4160,7 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
         zooz.sandbox = sandbox;//set this if working in Sandbox mode
         ZooZPaymentRequest *req = [zooz createPaymentRequestWithTotal:amount invoiceRefNumber:_invoiceNumber delegate:[CodenameOne_GLViewController instance]];
         req.currencyCode = _currency;
-//        req.payerDetails.email = @"test@test.com";
+        //        req.payerDetails.email = @"test@test.com";
         [zooz openPayment:req forAppKey:_appKey];
         POOL_END();
     });
@@ -4219,7 +4241,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STA
 #endif
         POOL_END();
     });
-
+    
     return c;
 }
 
@@ -4227,7 +4249,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STA
 bool datepickerPopover = NO;
 #ifndef NEW_CODENAME_ONE_VM
 org_xmlvm_runtime_XMLVMArray* pickerStringArray = nil;
-#else 
+#else
 JAVA_OBJECT pickerStringArray = JAVA_NULL;
 #endif
 int stringPickerSelection;
@@ -4639,7 +4661,7 @@ void com_codename1_impl_ios_IOSNative_setAsyncEditMode___boolean(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-     dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
             [editingComponent resignFirstResponder];
             [editingComponent removeFromSuperview];
@@ -4647,8 +4669,8 @@ void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_
             [editingComponent release];
 #endif
             editingComponent = nil;
-         }
-         repaintUI();
+        }
+        repaintUI();
     });
 }
 
@@ -4844,7 +4866,7 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_i
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)bounds;
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)arr->fields.org_xmlvm_runtime_XMLVMArray.array_;
-#else 
+#else
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*) ((JAVA_ARRAY)bounds)->data;
 #endif
     Renderer_getOutputBounds(renderer, iArr);
@@ -4954,7 +4976,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     //jbyte* maskArray = malloc(sizeof(jbyte)*ac.width*ac.height);
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimension(__CLASS_byte, ac.width*ac.height);
-
+    
     //NSLog(@"Mask width %d height %d",
     //      ac.width,
     //      ac.height
@@ -4968,7 +4990,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
 #else
     JAVA_OBJECT data = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
     ac.alphas = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)data)->data;
-
+    
     Renderer_produceAlphas(renderer, &ac);
     JAVA_OBJECT idata = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)((JAVA_ARRAY)idata)->data;
@@ -4982,14 +5004,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     }
     
     return (JAVA_OBJECT)idata;
-
+    
 }
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
 #ifdef USE_ES2
-
+    
     __block JAVA_LONG outTexture = NULL;
     
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5047,7 +5069,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         _glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         GLErrorLog;
         glGenTextures(1, &tex);
-
+        
         GLErrorLog;
         
         if ( tex == 0 ){
@@ -5161,7 +5183,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
         }
         return 1;
     }
-#else 
+#else
     return 0;
 #endif
     
@@ -5245,20 +5267,20 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 // End Shapes
 
 /*JAVA_OBJECT com_codename1_impl_ios_IOSNative_stackTraceToString___java_lang_Throwable(JAVA_OBJECT t) {
-    POOL_BEGIN();
-
-    NSArray* arr = [NSThread callStackSymbols];
-    NSMutableArray* marr = [[NSMutableArray alloc] init];
-    [marr addObjectsFromArray:arr];
-    [marr removeObjectAtIndex:0];
-    [marr removeObjectAtIndex:0];
-    [marr removeObjectAtIndex:0];
-    [marr removeObjectAtIndex:0];
-    NSString* nstr = [marr description];
-    JAVA_OBJECT jstr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG nstr);
-    POOL_END();
-    return jstr;
-}*/
+ POOL_BEGIN();
+ 
+ NSArray* arr = [NSThread callStackSymbols];
+ NSMutableArray* marr = [[NSMutableArray alloc] init];
+ [marr addObjectsFromArray:arr];
+ [marr removeObjectAtIndex:0];
+ [marr removeObjectAtIndex:0];
+ [marr removeObjectAtIndex:0];
+ [marr removeObjectAtIndex:0];
+ NSString* nstr = [marr description];
+ JAVA_OBJECT jstr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG nstr);
+ POOL_END();
+ return jstr;
+ }*/
 
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -5287,7 +5309,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long_
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int_R_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
-    return com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(instanceObject, renderer, color);
+    enteringNativeAllocations();
+    JAVA_OBJECT o = com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(instanceObject, renderer, color);
+    finishedNativeAllocations();
+    return o;
 }
 
 
@@ -5511,7 +5536,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return com_codename1_impl_ios_IOSNative_getVolume__(CN1_THREAD_STATE_PASS_ARG instanceObject);    
+    return com_codename1_impl_ios_IOSNative_getVolume__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
@@ -5627,7 +5652,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion___R_java_lang_String(C
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    return com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_STATE_PASS_ARG instanceObject, peer);    
+    return com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_STATE_PASS_ARG instanceObject, peer);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -5696,7 +5721,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long_R_int(CN1_THREAD_
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-    JAVA_OBJECT  destinationFile) {
+                                                                                         JAVA_OBJECT  destinationFile) {
     return com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, destinationFile);
 }
 
@@ -5716,9 +5741,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
     return com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
-    
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    return com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);    
+    return com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
