@@ -253,15 +253,12 @@ public class Tree extends Container {
         Container parent = c.getParent();
         Object o = c.getClientProperty(KEY_OBJECT);
         Container dest = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        Label dummy = new Label();
-        parent.addComponent(BorderLayout.CENTER, dummy);
+        parent.addComponent(BorderLayout.CENTER, dest);
         buildBranch(o, depth, dest);
         // prevent a race condition on node expansion contraction
-        if(dummy.getParent() == parent) {
-            parent.replaceAndWait(dummy, dest, t);
-            if(multilineMode) {
-                revalidate();
-            }
+        parent.animateHierarchyAndWait(300);
+        if(multilineMode) {
+            revalidate();
         }
         return dest;
     }
