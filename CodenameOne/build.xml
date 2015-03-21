@@ -462,6 +462,15 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
+        <zip basedir="../Demos/PropertyCross" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCross.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
         <zip basedir="../Demos/KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
