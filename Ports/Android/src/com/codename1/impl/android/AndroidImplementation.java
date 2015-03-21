@@ -4060,7 +4060,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public LocationManager getLocationManager() {
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
-        if (includesPlayServices) {
+        if (includesPlayServices && hasAndroidMarket()) {
             try {
                 Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
                 return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
