@@ -572,6 +572,13 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             try {
                 BufferedImage bi = ImageIO.read(selectedFile);
                 aspect = ((float)bi.getWidth()) / ((float)bi.getHeight());
+                
+                veryLowHeight.setValue( (int)(((Integer)veryLowWidth.getValue()).intValue() * aspect) );
+                lowHeight.setValue((int)(((Integer)lowWidth.getValue()).intValue() * aspect));
+                mediumHeight.setValue((int)(((Integer)mediumWidth.getValue()).intValue() * aspect));
+                highHeight.setValue((int)(((Integer)highWidth.getValue()).intValue() * aspect));
+                hdHeight.setValue((int)(((Integer)hdWidth.getValue()).intValue() * aspect));
+                
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
