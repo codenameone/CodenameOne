@@ -3413,7 +3413,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         void nativeDrawAlphaMask(TextureAlphaMask mask) {
-            if ( mask.getTextureName() != 0 ){
+            if ( mask != null && mask.getTextureName() != 0 ){
                 Rectangle r = mask.getBounds();
                 //Log.p("Drawing shape with bounds "+r);
                 nativeInstance.drawTextureAlphaMask(mask.getTextureName(), this.color, this.alpha, r.getX(), r.getY(), r.getWidth(), r.getHeight() );
@@ -3434,6 +3434,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
                 textureCache.add(shape, stroke, mask);
                 
+            }
+            if (mask==null){
+                // A null mask generally means the shape had zero bounds
+                return;
             }
             //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
             nativeDrawAlphaMask(mask);
