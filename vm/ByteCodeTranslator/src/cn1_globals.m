@@ -499,7 +499,7 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
+            if(o->__codenameOneGcMark != -1 && o->__codenameOneGcMark < currentGcMarkValue - 1) {
                 CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
                 allObjectsInHeap[iter] = JAVA_NULL;
                 //if(o->__codenameOneReferenceCount > 0) {
@@ -660,7 +660,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     memset(o, 0, size);
     o->__codenameOneParentClsReference = parent;
-    o->__codenameOneGcMark = currentGcMarkValue;
+    o->__codenameOneGcMark = -1;
     o->__ownerThread = threadStateData;
     o->__heapPosition = -1;
     o->__codenameOneReferenceCount = 1;
