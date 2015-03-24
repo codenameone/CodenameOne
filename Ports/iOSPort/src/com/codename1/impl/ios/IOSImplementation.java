@@ -5760,36 +5760,70 @@ public class IOSImplementation extends CodenameOneImplementation {
         }.start();
     }
     
-    Vector getPurchased() {
-        if(purchasedItems == null) {
-            purchasedItems = (Vector)Storage.getInstance().readObject("CN1PurchasedItemList.dat");
+    private static final String PURCHASES_KEY="CN1PurchasedItemList.dat";
+    
+    List getPurchased() {
+        synchronized(PURCHASES_KEY){
             if(purchasedItems == null) {
                 purchasedItems = new Vector();
+                List items = (List)Storage.getInstance().readObject(PURCHASES_KEY);
+                if (items != null){
+                    purchasedItems.addAll(items);
+                }
+
+            }
+            return purchasedItems;
+        }
+    }
+    
+    void addPurchase(String sku){
+        List purchased = getPurchased();
+        synchronized(PURCHASES_KEY){
+            if (!purchased.contains(sku)){
+                purchased.add(sku);
+                commitPurchased();
             }
         }
-        return purchasedItems;
+    }
+    
+    void removePurchase(String sku){
+        List purchased = getPurchased();
+        synchronized(PURCHASES_KEY){
+            if (purchased.contains(sku)){
+                purchased.remove(sku);
+                commitPurchased();
+            }
+        }
+    }
+    
+    void commitPurchased(){
+        if (purchasedItems != null){
+            Storage.getInstance().writeObject(PURCHASES_KEY, purchasedItems);
+        }
     }
     
     static void itemPurchased(final String sku) {
-        if(purchaseCallback != null) {
-            safeCallSerially(new Runnable() {
-                @Override
-                public void run() {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                instance.addPurchase(sku);
+                if (purchaseCallback != null){
                     purchaseCallback.itemPurchased(sku);
                 }
-            });
-        }
+            }
+        });
     }
     
     static void itemRestored(final String sku) {
-        if(restoreCallback != null) {
-            safeCallSerially(new Runnable() {
-                @Override
-                public void run() {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                instance.addPurchase(sku);
+                if (restoreCallback != null){
                     restoreCallback.itemRestored(sku);
                 }
-            });
-        }
+            }
+        });
     }
     
     static void restoreRequestComplete() {
@@ -5826,14 +5860,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     static void itemRefunded(final String sku) {
-        if(purchaseCallback != null) {
-            safeCallSerially(new Runnable() {
-                @Override
-                public void run() {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                instance.removePurchase(sku);
+                if (purchaseCallback != null){
                     purchaseCallback.itemRefunded(sku);
                 }
-            });
-        }
+            }
+        });
     }
 
 

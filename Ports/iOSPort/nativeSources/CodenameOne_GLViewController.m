@@ -2645,10 +2645,6 @@ extern SKPayment *paymentInstance;
 {
     for (SKPaymentTransaction *transaction in transactions)
     {
-        if(paymentInstance == nil) {
-            [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-            continue;
-        }
         switch (transaction.transactionState)
         {
             case SKPaymentTransactionStatePurchased:
@@ -2665,10 +2661,10 @@ extern SKPayment *paymentInstance;
                 continue;
                 
             case SKPaymentTransactionStateRestored:
-                NSLog(@"Transaction restored SKPaymentTransactionStateRestored");
+                NSLog(@"Transaction restored SKPaymentTransactionStateRestored %@", transaction.originalTransaction.payment.productIdentifier);
                 
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
+                com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.originalTransaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStatePurchasing:
                 NSLog(@"SKPaymentTransactionStatePurchasing");
