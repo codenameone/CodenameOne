@@ -2280,6 +2280,15 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE
     });
 }
 
+void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        [m pause];
+        POOL_END();
+    });
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     if([obj isKindOfClass:[MPMoviePlayerController class]]) {

@@ -219,6 +219,7 @@ public final class IOSNative {
     native void startVideoComponent(long peer); 
     
     native void stopVideoComponent(long peer);
+    native void pauseVideoComponent(long peer);
 
     native int getMediaTimeMS(long peer);
     

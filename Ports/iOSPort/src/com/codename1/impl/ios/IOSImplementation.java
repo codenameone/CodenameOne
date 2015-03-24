@@ -2566,7 +2566,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void pause() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
-                    nativeInstance.stopVideoComponent(moviePlayerPeer);
+                    nativeInstance.pauseVideoComponent(moviePlayerPeer);
                 } else {
                     nativeInstance.pauseAudio(moviePlayerPeer);
                 }
