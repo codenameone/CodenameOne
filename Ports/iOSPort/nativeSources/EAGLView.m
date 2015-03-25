@@ -29,6 +29,8 @@
 #include "xmlvm.h"
 #include "CN1ES2compat.h"
 
+static BOOL firstTime=YES;
+
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 extern UIView *editingComponent;
 extern BOOL vkbAlwaysOpen;
@@ -373,7 +375,14 @@ extern int currentlyEditingMaxLength;
     return success;
 }
 
-
+-(void)layoutSubviews
+{
+    if (firstTime){
+        [self deleteFramebuffer];
+        firstTime=NO;
+    }
+    [super layoutSubviews];
+}
 
 /*-(void)drawRect:(CGRect)rect {
  [[CodenameOne_GLViewController instance] drawFrame:rect];
