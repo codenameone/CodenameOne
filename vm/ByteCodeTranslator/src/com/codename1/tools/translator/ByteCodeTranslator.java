@@ -129,10 +129,7 @@ public class ByteCodeTranslator {
      */
     public static void main(String[] args) throws Exception {        
         if(args.length == 0) {
-            //new File("build/GoogleMaps").mkdirs();
-            new File("build/CatchApplication").mkdirs();
-            //args = new String[] {"ios", "/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/codenameone-google-maps/GoogleMaps/build/classes;/Users/shai/dev/codenameone-google-maps/GoogleMaps/native/ios;/Users/shai/dev/codenameone-google-maps/GoogleMapsTest/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/CodenameOne/ByteCodeTranslator/GoogleMapsStub", 
-            //    "build/GoogleMaps", "GoogleMapsTestApp", "com.codename1.test.googlemaps", "GoogleMapsTestApp", "1.0", "ios", "none"};
+            new File("build/kitchen").mkdirs();
             args = new String[] {"ios", "/Users/shai/dev/CodenameOne/ByteCodeTranslator/tmp;/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/cn1/Demos/KitchenSink/build/classes", 
                 "build/kitchen", "KitchenSink", "com.codename1.demos.kitchen", "Kitchen Sink", "1.0", "ios", "none"};
         }
@@ -173,8 +170,10 @@ public class ByteCodeTranslator {
         if(output == OutputType.OUTPUT_TYPE_IOS) {
             File root = new File(dest, "dist");
             root.mkdirs();
+            System.out.println("Root is: " + root.getAbsolutePath());
             File srcRoot = new File(root, appName + "-src");
             srcRoot.mkdirs();
+            System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
             
             File imagesXcassets = new File(srcRoot, "Images.xcassets");
             imagesXcassets.mkdirs();

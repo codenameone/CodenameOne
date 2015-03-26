@@ -371,6 +371,7 @@ public class Parser extends ClassVisitor {
     }
     
     public static void writeOutput(File outputDirectory) throws Exception {
+        System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
         String file = "Unknown File";
         try {
             for(ByteCodeClass bc : classes) {
