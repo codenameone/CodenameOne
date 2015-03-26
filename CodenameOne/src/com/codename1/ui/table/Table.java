@@ -201,7 +201,8 @@ public class Table extends Container {
 
                         // returns the current row we iterate about
                         int currentRow = ((TableLayout)getLayout()).getNextRow();
-                        if(currentRow > model.getRowCount()) {
+                        
+                        if(r > model.getRowCount()) {
                             return;
                         }
                         addComponent(con, cell);
@@ -300,6 +301,9 @@ public class Table extends Container {
                                     }
 
                                     g.drawLine(x + columnWidth, y, x + columnWidth, y + rowHeight);
+                                }
+                                if(t.getCellHorizontalSpan(cellRow, cellColumn) > 1){
+                                    cellColumn += t.getCellHorizontalSpan(cellRow, cellColumn) - 1;
                                 }
                             }
                         }
