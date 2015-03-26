@@ -594,6 +594,23 @@ public class UIManager {
         }
         themeProps.put("TextField.sel#derive", "TextField");
         themeProps.put("TextField.dis#derive", "TextField");
+        if(installedTheme == null || !installedTheme.containsKey("TextFieldInvalid.derive")) {
+            themeProps.put("TextFieldInvalid.derive", "TextField");
+            themeProps.put("TextFieldInvalid.fgColor", "ff0000");
+            themeProps.put("TextFieldInvalid.sel#fgColor", "ff0000");
+            themeProps.put("TextFieldInvalid.sel#fgColor", "ff0000");
+            themeProps.put("TextFieldInvalid.sel#derive", "TextField");
+            themeProps.put("TextFieldInvalid.dis#derive", "TextField");
+        }
+
+        if(installedTheme == null || !installedTheme.containsKey("TextAreaInvalid.derive")) {
+            themeProps.put("TextAreaInvalid.derive", "TextArea");
+            themeProps.put("TextAreaInvalid.fgColor", "ff0000");
+            themeProps.put("TextAreaInvalid.sel#fgColor", "ff0000");
+            themeProps.put("TextAreaInvalid.sel#fgColor", "ff0000");
+            themeProps.put("TextAreaInvalid.sel#derive", "TextArea");
+            themeProps.put("TextAreaInvalid.dis#derive", "TextArea");
+        }
 
         if(installedTheme == null || !installedTheme.containsKey("TextHint.derive")) {
             themeProps.put("TextHint.transparency", "0");
