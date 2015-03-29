@@ -25,3 +25,4 @@
 **/build/*
 **/dist/*
 *.zip
+CodenameOneDesigner/src/version.properties
