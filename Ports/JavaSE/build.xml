@@ -152,7 +152,7 @@
     
     <target name="-post-compile">
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
-        <unjar src="lib/sqlite-jdbc-3.7.15-M1.jar" dest="build/classes" /> 
+        <unjar src="../../../cn1-binaries/javase/sqlite-jdbc-3.7.15-M1.jar" dest="build/classes" /> 
     </target>    
 
     <target name="desktop" depends="jar">
