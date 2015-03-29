@@ -26,3 +26,4 @@
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
+/Ports/JavaSE/dist/
