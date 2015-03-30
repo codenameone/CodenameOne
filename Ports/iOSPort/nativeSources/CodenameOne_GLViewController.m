@@ -1534,17 +1534,30 @@ extern GLKMatrix4 CN1transformMatrix;
             [(EAGLView *)self.view setFramebuffer];
         } else {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
-            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, he, wi));
+            
+            CGImageRef imageRef;
+            if (isIOS8()){
+                imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, wi, he));
+            } else {
+                imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, he, wi));
+
+            }
             img = [UIImage imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
             gl = [[GLUIImage alloc] initWithImage:img];
             int imgHeight = img.size.height;
             int imgWidth = img.size.width;
-            dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:imgHeight h:imgWidth];
+            if (isIOS8()){
+                dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:imgWidth h:imgHeight];
+            } else {
+                dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:imgHeight h:imgWidth];
+            }
+            
             NSLog(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
             [(EAGLView *)self.view setFramebuffer];
         }
+
         
         GLErrorLog;
         
