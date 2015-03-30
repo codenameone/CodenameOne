@@ -22,10 +22,12 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.io.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.ui.Display;
+import java.io.IOException;
 
 /**
  * Implementation of the purchase API 
@@ -37,6 +39,10 @@ class ZoozPurchase extends Purchase implements Runnable {
     private String purchaseId = null;
     private static final Object LOCK = new Object();
     private static boolean completed = false;
+    private static boolean fetchProductsFailed;
+    private static boolean fetchProductsComplete;
+    private static String fetchProductsFailedMessage;
+    
     private IOSNative nativeInstance;
     private IOSImplementation ioImpl;
     private static String transactionId;
@@ -74,19 +80,30 @@ class ZoozPurchase extends Purchase implements Runnable {
             LOCK.notify();
         }
     }
+    
+    static void fetchProductsCanceledOrFailed(String error){
+        fetchProductsFailedMessage = error;
+        fetchProductsFailed = true;
+    }
+    
+    static void fetchProductsComplete(){
+        fetchProductsComplete=true;
+    }
 
-    public Product[] getProducts(String[] skus) {
+    public synchronized Product[] getProducts(String[] skus) {
         final Product[] p = new Product[skus.length];
         for(int iter = 0 ; iter < p.length ; iter++) {
             p[iter] = new Product();
         }
+        fetchProductsFailed = false;
+        fetchProductsComplete = false;
         nativeInstance.fetchProducts(skus, p);
 
         // wait for request to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                while(p[p.length - 1].getDisplayName() == null) {
+                while(!fetchProductsFailed && !fetchProductsComplete) {
                     try {
                         Thread.currentThread().sleep(10);
                     } catch (InterruptedException ex) {
@@ -94,6 +111,10 @@ class ZoozPurchase extends Purchase implements Runnable {
                 }
             }
         });
+        if (fetchProductsFailed){
+            Log.e(new IOException("Failed to fetch products: "+fetchProductsFailedMessage));
+            return null;
+        }
         return p;
     }
 

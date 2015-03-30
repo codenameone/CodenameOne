@@ -2650,6 +2650,16 @@ extern JAVA_OBJECT productsArrayPending;
         }
     }
     productsArrayPending = nil;
+    com_codename1_impl_ios_ZoozPurchase_fetchProductsComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    POOL_END();
+}
+
+
+-(void)request:(SKRequest *)request didFailWithError:(NSError *)error
+{
+    POOL_BEGIN();
+    com_codename1_impl_ios_ZoozPurchase_fetchProductsCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+    
     POOL_END();
 }
 
