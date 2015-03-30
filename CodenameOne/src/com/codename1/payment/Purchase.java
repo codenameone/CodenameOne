@@ -120,7 +120,8 @@ public abstract class Purchase {
     /**
      * Returns true if the given SKU was purchased in the past, notice this method might not 
      * work as expected for Unmanaged/consumable products which can be purchased multiple
-     * times.
+     * times.  In addition, this will only return true if the product was purchased (or
+     * has been restored) on the current device.
      * 
      * @param sku the id of the product
      * @return true if the product was purchased
