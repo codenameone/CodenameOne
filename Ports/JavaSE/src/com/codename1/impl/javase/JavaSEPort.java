@@ -1838,7 +1838,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("https://codenameone.googlecode.com/svn/trunk/CodenameOne/javadoc/index.html"));
+                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/javadoc/"));
                     } catch (Exception ex) {
                         
                     }
@@ -2170,7 +2170,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     
-                    URL u = new URL("https://codenameone.googlecode.com/svn/trunk/Skins/OTA/Skins.xml");
+                    URL u = new URL("https://codenameone.com/OTA/Skins.xml");
                     URLConnection uc = u.openConnection();
                     InputStream is = uc.getInputStream();
                     doc[0] = db.parse(is);
@@ -2189,7 +2189,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
                             Vector row = new Vector();
                             row.add(new Boolean(false));
-                            row.add(new ImageIcon(new URL("https://codenameone.googlecode.com/svn/trunk/Skins/OTA" + attr.getNamedItem("icon").getNodeValue())));
+                            row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
                             row.add(attr.getNamedItem("name").getNodeValue());
                             if(exists){
                                 row.add("Update");                                                        
@@ -2256,7 +2256,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
                                         String url = attr.getNamedItem("url").getNodeValue();
                                         String [] data = new String[2];
-                                        data[0] = "https://codenameone.googlecode.com/svn/trunk/Skins/OTA" + url;
+                                        data[0] = "http://www.codenameone.com/OTA" + url;
                                         data[1] = attr.getNamedItem("version").getNodeValue();                                        
                                         toDowload.add(data);
                                         break;
