@@ -26,3 +26,5 @@
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
+/Ports/iOSPort/build/
+/Ports/iOSPort/dist/
