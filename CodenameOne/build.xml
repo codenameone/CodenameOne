@@ -107,6 +107,9 @@
     <target name="-pre-compile" depends="stamp">
     </target>
 
+
+    <!-- This target is used to build releases, you will need to comment out this target and to remove
+     the depends from the pre-compile target above-->
     <target name="stamp">
         <tstamp>
             <format property="tstamp" pattern="yyyyMMdd" />

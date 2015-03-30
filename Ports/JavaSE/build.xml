@@ -138,6 +138,7 @@
     </target>    
     
     <target name="-pre-compile">
+        <!-- run manually the build-skins target to generate the skins-->
         <copy file="../../../codenameone-skins/torch.skin" todir="src" />
         <copy file="../../../codenameone-skins/lumia.skin" todir="src" />
         <!-- copy file="../../../codenameone-skins/android.skin" todir="src" / -->
