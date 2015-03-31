@@ -684,27 +684,55 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 }
 
 #define PI 3.14159265358979323846
-CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
+CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle, BOOL fill) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if(width == height) {
         int radius = MIN(width, height) / 2;
-        CGContextAddArc (context, x + radius, y + radius, radius, startAngle * PI / 180, (startAngle + angle) * PI / 180, 1);
+        if (fill){
+            CGContextBeginPath(context);
+            CGContextMoveToPoint(context, x+width/2, y+width/2);
+        }
+        CGContextAddArc (context, x + radius, y + radius, radius, -startAngle * PI / 180, -(startAngle + angle) * PI / 180, 1);
+        if (fill){
+            CGContextClosePath(context);
+        }
     } else {
-        CGRect rect = CGRectMake(x, y, width, height);
-        CGContextAddEllipseInRect(context, rect);
+        CGFloat cx = x+width/2;
+        CGFloat cy = y+height/2;
+        CGMutablePathRef path = CGPathCreateMutable();
+        
+        CGAffineTransform t = CGAffineTransformMakeTranslation(cx, cy);
+        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/width), t);
+        
+        CGFloat radius = width/2;
+        if (fill){
+            CGPathMoveToPoint(path, &t, 0, 0);
+            CGPathAddLineToPoint(path, &t, radius * cos(-startAngle*PI/180), radius * sin(-startAngle*PI/180));
+        }
+        CGPathAddArc(path, &t, 0, 0, radius, -startAngle * PI / 180, -(startAngle + angle) * PI / 180, 1);
+
+        if (fill){
+            CGPathAddLineToPoint(path, &t, 0, 0);
+        }
+        
+        CGContextAddPath(context, path);
+        if (fill){
+            CGContextClosePath(context);
+        }
+        CFRelease(path);
     }
     return context;
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
+    CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle, NO));
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle));
+    CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle, YES));
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
