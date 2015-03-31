@@ -417,19 +417,22 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
-    NSLog(@"There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
+    NSLog(@"\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
-            if(iter > cn1_array_start_offset) {
-                NSLog(@"There are %i instances of %@ taking its %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter], sizeInHeapForTypePreSweep[iter]);
-            } else {
-                JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
-                NSLog(@"There are %i instances of %@ taking its %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter], sizeInHeapForTypePreSweep[iter]);
+            if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
+                if(iter > cn1_array_start_offset) {
+                    NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+                } else {
+                    JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+                    NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+                }
             }
             actualTotalMemory += sizeInHeapForType[iter];
         }
     }
     //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    NSLog(@"**** GC cycle complete ****");
     
     free(arrayOfNames);
     [pool release];

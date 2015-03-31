@@ -814,11 +814,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(CN1_THREAD_STA
 
 void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_deleteNativePeer___long]
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_deleteNativePeerImpl((void *)n1);
-    POOL_END();
-    //XMLVM_END_WRAPPER
+    if(n1 != 0) {
+        // this prevents a race condition where the gc might be invoked too soon
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSObject* n = (NSObject*)n1;
+            [n release];
+        });
+    }
 }
 
 void com_codename1_impl_ios_IOSNative_deleteNativeFontPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
