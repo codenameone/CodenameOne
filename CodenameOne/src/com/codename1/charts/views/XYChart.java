@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.SortedMap;
 import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
@@ -65,13 +64,13 @@ public abstract class XYChart extends AbstractChart {
   /** The visible chart area, in screen coordinates. */
   private Rectangle mScreenR;
   /** The calculated range. */
-  private final Map<Integer, double[]> mCalcRange = new HashMap<Integer, double[]>();
+  private final HashMap<Integer, double[]> mCalcRange = new HashMap<Integer, double[]>();
 
   /**
    * The clickable areas for all points. The array index is the series index,
    * and the RectF list index is the point index in that series.
    */
-  private Map<Integer, List<ClickableArea>> clickableAreas = new HashMap<Integer, List<ClickableArea>>();
+  private HashMap<Integer, List<ClickableArea>> clickableAreas = new HashMap<Integer, List<ClickableArea>>();
 
   protected XYChart() {
   }
@@ -262,9 +261,10 @@ public abstract class XYChart extends AbstractChart {
             seriesRenderer.isDisplayBoundingPoints());
         int startIndex = -1;
 
-        for (Entry<Double, Double> value : range.entrySet()) {
-          double xValue = value.getKey();
-          double yValue = value.getValue();
+        for (Double value : range.keySet()) {
+          double xValue = value;
+          Double rValue = range.get(value);
+          double yValue = rValue.doubleValue();
           if (startIndex < 0 && (!isNullValue(yValue) || isRenderNullValues())) {
             startIndex = series.getIndexForKey(xValue);
           }
@@ -273,8 +273,8 @@ public abstract class XYChart extends AbstractChart {
           // * (value.getKey().floatValue() - minX[scale])));
           // points.add((float) (bottom - yPixelsPerUnit[scale]
           // * (value.getValue().floatValue() - minY[scale])));
-          values.add(value.getKey());
-          values.add(value.getValue());
+          values.add(value);
+          values.add(rValue);
 
           if (!isNullValue(yValue)) {
             points.add((float) (left + xPixelsPerUnit[scale] * (xValue - minX[scale])));
@@ -482,7 +482,7 @@ public abstract class XYChart extends AbstractChart {
   }
 
   protected Map<Integer, List<Double>> getYLabels(double[] minY, double[] maxY, int maxScaleNumber) {
-    Map<Integer, List<Double>> allYLabels = new HashMap<Integer, List<Double>>();
+    HashMap<Integer, List<Double>> allYLabels = new HashMap<Integer, List<Double>>();
     for (int i = 0; i < maxScaleNumber; i++) {
       allYLabels.put(i,
           getValidLabels(MathHelper.getLabels(minY[i], maxY[i], mRenderer.getYLabels())));

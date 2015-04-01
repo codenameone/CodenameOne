@@ -505,11 +505,12 @@ private static class IndexXYMap<K, V> extends TreeMap<K, V> {
     return out;
   }
 }
+}
 
 /**
  * A map entry value encapsulating an XY point.
  */
-private static class XYEntry<K, V> implements Map.Entry<K, V> {
+class XYEntry<K, V> implements Map.Entry<K, V> {
   private final K key;
   
   private V value;
@@ -531,6 +532,4 @@ private static class XYEntry<K, V> implements Map.Entry<K, V> {
     this.value = object;
     return this.value;
   }
-}
-
 }

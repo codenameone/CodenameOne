@@ -470,9 +470,8 @@ public final class ConstraintParser {
     public static Map<ComponentWrapper, CC> parseComponentConstraints(Map<ComponentWrapper, String> constrMap) {
         HashMap<ComponentWrapper, CC> flowConstrMap = new HashMap<ComponentWrapper, CC>();
 
-        for (Iterator<Map.Entry<ComponentWrapper, String>> it = constrMap.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<ComponentWrapper, String> entry = it.next();
-            flowConstrMap.put(entry.getKey(), parseComponentConstraint(entry.getValue()));
+        for (ComponentWrapper c : constrMap.keySet()) {
+            flowConstrMap.put(c, parseComponentConstraint(constrMap.get(c)));
         }
 
         return flowConstrMap;

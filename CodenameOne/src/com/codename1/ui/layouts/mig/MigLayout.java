@@ -311,8 +311,8 @@ public final class MigLayout extends Layout {
     public void setConstraintMap(Map<Component, Object> map) {
         scrConstrMap.clear();
         ccMap.clear();
-        for (Map.Entry<Component, Object> e : map.entrySet()) {
-            setComponentConstraintsImpl(e.getKey(), e.getValue(), true);
+        for (Component e : map.keySet()) {
+            setComponentConstraintsImpl(e, map.get(e), true);
         }
     }
 
