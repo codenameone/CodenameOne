@@ -32,3 +32,5 @@ Ports/iOSPort/nbproject/private/private.xml
 /Ports/JavaSE/dist/
 
 *.nbm
+/vm/ByteCodeTranslator/build/
+/vm/ByteCodeTranslator/dist/
