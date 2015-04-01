@@ -502,48 +502,52 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(o->__codenameOneGcMark != -1 && o->__codenameOneGcMark < currentGcMarkValue - 1) {
-                CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
-                allObjectsInHeap[iter] = JAVA_NULL;
-                //if(o->__codenameOneReferenceCount > 0) {
-                //    NSLog(@"Sweped %X", (int)o);
-                //}
-                
+            if(o->__codenameOneGcMark != -1) {
+                if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
+                    CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
+                    allObjectsInHeap[iter] = JAVA_NULL;
+                    //if(o->__codenameOneReferenceCount > 0) {
+                    //    NSLog(@"Sweped %X", (int)o);
+                    //}
+                    
 #ifdef DEBUG_GC_ALLOCATIONS
-                int classId = o->className;
-                NSString* whereIs;
-                if(classId > 0) {
-                    whereIs = (NSString*)((struct obj__java_lang_String*)STRING_FROM_CONSTANT_POOL_OFFSET(classId))->java_lang_String_nsString;
-                } else {
-                    whereIs = @"unknown";
-                }
-
-                if(o->__codenameOneParentClsReference->isArray) {
-                    JAVA_ARRAY arr = (JAVA_ARRAY)o;
-                    if(arr->__codenameOneParentClsReference == &class_array1__JAVA_CHAR) {
-                        JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)arr->data;
-                        char data[arr->length + 1];
-                        for(int iter = 0 ; iter < arr->length ; iter++) {
-                            data[iter] = ch[iter];
-                        }
-                        data[arr->length] = 0;
-                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], [NSString stringWithUTF8String:data]);
+                    int classId = o->className;
+                    NSString* whereIs;
+                    if(classId > 0) {
+                        whereIs = (NSString*)((struct obj__java_lang_String*)STRING_FROM_CONSTANT_POOL_OFFSET(classId))->java_lang_String_nsString;
                     } else {
-                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName]);
+                        whereIs = @"unknown";
                     }
-                } else {
-                    JAVA_OBJECT str = java_lang_Object_toString___R_java_lang_String(threadStateData, o);
-                    NSString* ns = toNSString(threadStateData, str);
-                    if(ns == nil) {
-                        ns = @"[NULL]";
+                    
+                    if(o->__codenameOneParentClsReference->isArray) {
+                        JAVA_ARRAY arr = (JAVA_ARRAY)o;
+                        if(arr->__codenameOneParentClsReference == &class_array1__JAVA_CHAR) {
+                            JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)arr->data;
+                            char data[arr->length + 1];
+                            for(int iter = 0 ; iter < arr->length ; iter++) {
+                                data[iter] = ch[iter];
+                            }
+                            data[arr->length] = 0;
+                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], [NSString stringWithUTF8String:data]);
+                        } else {
+                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName]);
+                        }
+                    } else {
+                        JAVA_OBJECT str = java_lang_Object_toString___R_java_lang_String(threadStateData, o);
+                        NSString* ns = toNSString(threadStateData, str);
+                        if(ns == nil) {
+                            ns = @"[NULL]";
+                        }
+                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
                     }
-                    NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
-                }
 #endif
-
-                removeObjectFromHeapCollection(threadStateData, o);
-                freeAndFinalize(threadStateData, o);
-                //counter++;
+                    
+                    removeObjectFromHeapCollection(threadStateData, o);
+                    freeAndFinalize(threadStateData, o);
+                    //counter++;
+                }
+            } else {
+                o->__codenameOneGcMark = currentGcMarkValue;
             }
         }
     }
