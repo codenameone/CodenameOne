@@ -611,11 +611,15 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
+    private static final Image[] threeImageCache = new Image[3];
     /**
      * @inheritDoc
      */
     public Dimension getButtonPreferredSize(Button b) {
-        return getPreferredSize(b, new Image[]{b.getMaskedIcon(), b.getRolloverIcon(), b.getPressedIcon()}, null);
+        threeImageCache[0] = b.getMaskedIcon();
+        threeImageCache[1] = b.getRolloverIcon();
+        threeImageCache[2] = b.getPressedIcon();
+        return getPreferredSize(b, threeImageCache, null);
     }
 
     /**
@@ -625,10 +629,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if(cb.isToggle()) {
             return getButtonPreferredSize(cb);
         }
+        threeImageCache[0] = cb.getMaskedIcon();
+        threeImageCache[1] = cb.getRolloverIcon();
+        threeImageCache[2] = cb.getPressedIcon();
         if (chkBoxImages != null) {
-            return getPreferredSize(cb, new Image[]{cb.getMaskedIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, chkBoxImages[0]);
+            return getPreferredSize(cb, threeImageCache, chkBoxImages[0]);
         }
-        Dimension d = getPreferredSize(cb, new Image[]{cb.getMaskedIcon(), cb.getRolloverIcon(), cb.getPressedIcon()}, null);
+        Dimension d = getPreferredSize(cb, threeImageCache, null);
 
         // checkbox square needs to be the height and width of the font height even
         // when no text is in the check box this is a good indication of phone DPI
@@ -641,11 +648,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return d;
     }
 
+    private static final Image[] oneImageCache = new Image[1];
+    
     /**
      * @inheritDoc
      */
     public Dimension getLabelPreferredSize(Label l) {
-        return getPreferredSize(l, new Image[]{l.getMaskedIcon()}, null);
+        oneImageCache[0] = l.getMaskedIcon();
+        return getPreferredSize(l, oneImageCache, null);
     }
 
     /**
@@ -838,10 +848,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if(rb.isToggle()) {
             return getButtonPreferredSize(rb);
         }
+        threeImageCache[0] = rb.getMaskedIcon();
+        threeImageCache[1] = rb.getRolloverIcon();
+        threeImageCache[2] = rb.getPressedIcon();
         if (rButtonImages != null) {
-            return getPreferredSize(rb, new Image[]{rb.getMaskedIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, rButtonImages[0]);
+            return getPreferredSize(rb, threeImageCache, rButtonImages[0]);
         }
-        Dimension d = getPreferredSize(rb, new Image[]{rb.getMaskedIcon(), rb.getRolloverIcon(), rb.getPressedIcon()}, null);
+        Dimension d = getPreferredSize(rb, threeImageCache, null);
 
         // radio button radius needs to be of the size of the font height even
         // when no text is in the radio button this is a good indication of phone DPI
