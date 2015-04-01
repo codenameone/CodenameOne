@@ -288,7 +288,7 @@ public class Component implements Animation, StyleListener {
     private Component[] sameWidth;
     private Component[] sameHeight;
     
-    private EventDispatcher focusListeners = new EventDispatcher();
+    private EventDispatcher focusListeners;
     private EventDispatcher scrollListeners;
     private EventDispatcher dropListener;
     private EventDispatcher dragOverListener;    
@@ -909,6 +909,9 @@ public class Component implements Animation, StyleListener {
      * @param l listener interface implementing the observable pattern
      */
     public void addFocusListener(FocusListener l) {
+        if(focusListeners == null) {
+            focusListeners = new EventDispatcher();
+        }
         focusListeners.addListener(l);
     }
 
@@ -918,6 +921,9 @@ public class Component implements Animation, StyleListener {
      * @param l listener interface implementing the observable pattern
      */
     public void removeFocusListener(FocusListener l) {
+        if(focusListeners == null) {
+            return;
+        }
         focusListeners.removeListener(l);
     }
 
@@ -990,7 +996,9 @@ public class Component implements Animation, StyleListener {
             return;
         }
 
-        focusListeners.fireFocus(cmp);
+        if(focusListeners != null) {
+            focusListeners.fireFocus(cmp);
+        }
         focusGainedInternal();
         focusGained();
         if (isSelectableInteraction()) {
@@ -1035,7 +1043,9 @@ public class Component implements Animation, StyleListener {
             }
         }
 
-        focusListeners.fireFocus(cmp);
+        if(focusListeners != null) {
+            focusListeners.fireFocus(cmp);
+        }
         focusLostInternal();
         focusLost();
     }
