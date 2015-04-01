@@ -72,9 +72,9 @@
     -->
 
     <target name="-pre-jar">
-        <unzip src="asm-5.0/lib/asm-5.0.3.jar" dest="build/classes"  />
-        <unzip src="asm-5.0/lib/asm-commons-5.0.3.jar" dest="build/classes"  />
-        <unzip src="asm-5.0/lib/asm-tree-5.0.3.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-5.0.3.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-commons-5.0.3.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-tree-5.0.3.jar" dest="build/classes"  />
     </target>
             
         <!-- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project TestApp.xcodeproj/ -target TestApp -configuration release -sdk iphoneos7.0 build -->
