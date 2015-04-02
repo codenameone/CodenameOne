@@ -5688,12 +5688,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                         @Override
                         public void cancel() {
+                            super.cancel();
                             dismissed[0] = true;
                             canceled[0] = true;
                         }
 
                         @Override
                         public void dismiss() {
+                            super.dismiss();
                             dismissed[0] = true;
                         }
                     
