@@ -114,6 +114,9 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         veryHighDPI = new javax.swing.JCheckBox();
         veryLowDPI = new javax.swing.JCheckBox();
         hdDPI = new javax.swing.JCheckBox();
+        hd560DPI = new javax.swing.JCheckBox();
+        hd2DPI = new javax.swing.JCheckBox();
+        hd4kDPI = new javax.swing.JCheckBox();
 
         FormListener formListener = new FormListener();
 
@@ -182,8 +185,8 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         cropRight.setName("cropRight"); // NOI18N
         cropRight.addChangeListener(formListener);
 
-        multiImageCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Generate RGB Image", "Generate Medium Resolution MultiImage", "Generate High Resolution MultiImage", "Generate Very High Resolution MultiImage", "Generate HD Resolution MultiImage" }));
-        multiImageCombo.setSelectedIndex(2);
+        multiImageCombo.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Generate RGB Image", "Generate Medium Resolution MultiImage", "Generate High Resolution MultiImage", "Generate Very High Resolution MultiImage", "Generate HD Resolution MultiImage", "Generate 560 Resolution MultiImage", "Generate 2HD Resolution MultiImage", "Generate 4K Resolution MultiImage" }));
+        multiImageCombo.setSelectedIndex(3);
         multiImageCombo.setName("multiImageCombo"); // NOI18N
         multiImageCombo.addActionListener(formListener);
 
@@ -201,6 +204,7 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         mediumDPI.setText("Medium");
         mediumDPI.setName("mediumDPI"); // NOI18N
 
+        highDPI.setSelected(true);
         highDPI.setText("High");
         highDPI.setName("highDPI"); // NOI18N
 
@@ -212,6 +216,15 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
 
         hdDPI.setText("HD");
         hdDPI.setName("hdDPI"); // NOI18N
+
+        hd560DPI.setText("560");
+        hd560DPI.setName("hd560DPI"); // NOI18N
+
+        hd2DPI.setText("2hd");
+        hd2DPI.setName("hd2DPI"); // NOI18N
+
+        hd4kDPI.setText("4k");
+        hd4kDPI.setName("hd4kDPI"); // NOI18N
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
         this.setLayout(layout);
@@ -252,8 +265,6 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                             .add(jLabel11))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(mediumDPI)
-                            .add(highDPI)
                             .add(multiImageCombo, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(layout.createSequentialGroup()
                                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -262,7 +273,18 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                                     .add(hdDPI)
-                                    .add(veryHighDPI)))))
+                                    .add(layout.createSequentialGroup()
+                                        .add(veryHighDPI)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                        .add(hd4kDPI))))
+                            .add(layout.createSequentialGroup()
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(mediumDPI)
+                                    .add(highDPI))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(hd2DPI)
+                                    .add(hd560DPI)))))
                     .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 750, Short.MAX_VALUE))
                 .addContainerGap())
         );
@@ -285,7 +307,8 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                     .add(cropTop, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel11)
                     .add(veryLowDPI)
-                    .add(veryHighDPI))
+                    .add(veryHighDPI)
+                    .add(hd4kDPI))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel3)
@@ -300,14 +323,16 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                     .add(left, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel8)
                     .add(cropLeft, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(mediumDPI))
+                    .add(mediumDPI)
+                    .add(hd560DPI))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel5)
                     .add(right, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel9)
                     .add(cropRight, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(highDPI))
+                    .add(highDPI)
+                    .add(hd2DPI))
                 .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
     }
@@ -396,6 +421,9 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
         veryLowDPI.setEnabled(b);
         hdDPI.setEnabled(b);
         highDPI.setEnabled(b);
+        hd560DPI.setEnabled(b);
+        hd2DPI.setEnabled(b);
+        hd4kDPI.setEnabled(b);
     }
 
     private void multiImageComboActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_multiImageComboActionPerformed
@@ -431,6 +459,27 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                 enableChecks(true);
                 hdDPI.setEnabled(false);
                 hdDPI.setSelected(false);
+                break;
+
+            // Generate 560 Resolution MultiImage
+            case 5:
+                enableChecks(true);
+                hd560DPI.setEnabled(false);
+                hd560DPI.setSelected(false);
+                break;
+
+            // Generate 2HD Resolution MultiImage
+            case 6:
+                enableChecks(true);
+                hd2DPI.setEnabled(false);
+                hd2DPI.setSelected(false);
+                break;
+
+            // Generate 4k Resolution MultiImage
+            case 7:
+                enableChecks(true);
+                hd4kDPI.setEnabled(false);
+                hd4kDPI.setSelected(false);
                 break;
         }
     }//GEN-LAST:event_multiImageComboActionPerformed
@@ -534,6 +583,24 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
                 ratioWidth = 1080;
                 multiVal = com.codename1.ui.Display.DENSITY_HD;
                 break;
+
+            // Generate HD560 Resolution MultiImage
+            case 5:
+                ratioWidth = 1500;
+                multiVal = com.codename1.ui.Display.DENSITY_560;
+                break;
+
+            // Generate HD2 Resolution MultiImage
+            case 6:
+                ratioWidth = 2000;
+                multiVal = com.codename1.ui.Display.DENSITY_2HD;
+                break;
+
+            // Generate 4k Resolution MultiImage
+            case 7:
+                ratioWidth = 2500;
+                multiVal = com.codename1.ui.Display.DENSITY_4K;
+                break;
         }
         EditableResources.MultiImage multi = new EditableResources.MultiImage();
         multi.setDpi(new int[] {multiVal});
@@ -580,6 +647,27 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
             multi = ImageMultiEditor.scaleMultiImage(multiVal, com.codename1.ui.Display.DENSITY_HD, w, h, multi);
         }
 
+        if(hd560DPI.isSelected()) {
+            float ratio = 1500.0f / ratioWidth;
+            int w = Math.max((int)(img.getWidth() * ratio), 1);
+            int h = Math.max((int)(img.getHeight() * ratio), 1);
+            multi = ImageMultiEditor.scaleMultiImage(multiVal, com.codename1.ui.Display.DENSITY_560, w, h, multi);
+        }
+
+        if(hd2DPI.isSelected()) {
+            float ratio = 2000.0f / ratioWidth;
+            int w = Math.max((int)(img.getWidth() * ratio), 1);
+            int h = Math.max((int)(img.getHeight() * ratio), 1);
+            multi = ImageMultiEditor.scaleMultiImage(multiVal, com.codename1.ui.Display.DENSITY_2HD, w, h, multi);
+        }
+
+        if(hd4kDPI.isSelected()) {
+            float ratio = 2500.0f / ratioWidth;
+            int w = Math.max((int)(img.getWidth() * ratio), 1);
+            int h = Math.max((int)(img.getHeight() * ratio), 1);
+            multi = ImageMultiEditor.scaleMultiImage(multiVal, com.codename1.ui.Display.DENSITY_4K, w, h, multi);
+        }
+
         res.setMultiImage(prefix + "_" + i + ".png", multi);
         return multi.getBest();
     }
@@ -603,6 +691,9 @@ public class ImageBorderCuttingWizard extends javax.swing.JPanel {
     private javax.swing.JSpinner cropLeft;
     private javax.swing.JSpinner cropRight;
     private javax.swing.JSpinner cropTop;
+    private javax.swing.JCheckBox hd2DPI;
+    private javax.swing.JCheckBox hd4kDPI;
+    private javax.swing.JCheckBox hd560DPI;
     private javax.swing.JCheckBox hdDPI;
     private javax.swing.JCheckBox highDPI;
     private javax.swing.JLabel imageLabel;

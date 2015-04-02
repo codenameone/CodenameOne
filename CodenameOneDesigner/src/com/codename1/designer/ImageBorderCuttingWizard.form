@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <Properties>
@@ -59,8 +59,6 @@
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="mediumDPI" min="-2" max="-2" attributes="0"/>
-                          <Component id="highDPI" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Component id="multiImageCombo" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
@@ -70,7 +68,22 @@
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="hdDPI" alignment="0" min="-2" max="-2" attributes="0"/>
-                                  <Component id="veryHighDPI" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="veryHighDPI" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                      <Component id="hd4kDPI" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                          </Group>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="mediumDPI" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="highDPI" alignment="0" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="hd2DPI" min="-2" max="-2" attributes="0"/>
+                                  <Component id="hd560DPI" min="-2" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                       </Group>
@@ -102,6 +115,7 @@
                   <Component id="jLabel11" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="veryLowDPI" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="veryHighDPI" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="hd4kDPI" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
@@ -119,6 +133,7 @@
                   <Component id="jLabel8" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="cropLeft" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="mediumDPI" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="hd560DPI" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
@@ -127,6 +142,7 @@
                   <Component id="jLabel9" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="cropRight" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="highDPI" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="hd2DPI" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace max="32767" attributes="0"/>
           </Group>
@@ -289,15 +305,18 @@
     <Component class="javax.swing.JComboBox" name="multiImageCombo">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="5">
+          <StringArray count="8">
             <StringItem index="0" value="Generate RGB Image"/>
             <StringItem index="1" value="Generate Medium Resolution MultiImage"/>
             <StringItem index="2" value="Generate High Resolution MultiImage"/>
             <StringItem index="3" value="Generate Very High Resolution MultiImage"/>
             <StringItem index="4" value="Generate HD Resolution MultiImage"/>
+            <StringItem index="5" value="Generate 560 Resolution MultiImage"/>
+            <StringItem index="6" value="Generate 2HD Resolution MultiImage"/>
+            <StringItem index="7" value="Generate 4K Resolution MultiImage"/>
           </StringArray>
         </Property>
-        <Property name="selectedIndex" type="int" value="2"/>
+        <Property name="selectedIndex" type="int" value="3"/>
         <Property name="name" type="java.lang.String" value="multiImageCombo" noResource="true"/>
       </Properties>
       <Events>
@@ -332,6 +351,7 @@
     </Component>
     <Component class="javax.swing.JCheckBox" name="highDPI">
       <Properties>
+        <Property name="selected" type="boolean" value="true"/>
         <Property name="text" type="java.lang.String" value="High"/>
         <Property name="name" type="java.lang.String" value="highDPI" noResource="true"/>
       </Properties>
@@ -352,6 +372,24 @@
       <Properties>
         <Property name="text" type="java.lang.String" value="HD"/>
         <Property name="name" type="java.lang.String" value="hdDPI" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JCheckBox" name="hd560DPI">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="560"/>
+        <Property name="name" type="java.lang.String" value="hd560DPI" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JCheckBox" name="hd2DPI">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="2hd"/>
+        <Property name="name" type="java.lang.String" value="hd2DPI" noResource="true"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JCheckBox" name="hd4kDPI">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="4k"/>
+        <Property name="name" type="java.lang.String" value="hd4kDPI" noResource="true"/>
       </Properties>
     </Component>
   </SubComponents>

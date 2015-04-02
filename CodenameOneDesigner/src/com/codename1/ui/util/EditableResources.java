@@ -470,6 +470,9 @@ public class EditableResources extends Resources implements TreeModel {
                                         name = normalizeFileName(name);
                                     }
                                     File multiImageDir = new File(resDir, name);
+                                    File hd4k = new File(multiImageDir, "4k.png");
+                                    File hd2 = new File(multiImageDir, "2hd.png");
+                                    File hd560 = new File(multiImageDir, "560.png");
                                     File hd = new File(multiImageDir, "hd.png");
                                     File veryhigh = new File(multiImageDir, "veryhigh.png");
                                     File high = new File(multiImageDir, "high.png");
@@ -478,6 +481,15 @@ public class EditableResources extends Resources implements TreeModel {
                                     File veryLow = new File(multiImageDir, "verylow.png");
                                     
                                     Map<Integer, EncodedImage> images = new HashMap<Integer, EncodedImage>();
+                                    if(hd4k.exists()) {
+                                        images.put(new Integer(Display.DENSITY_4K), EncodedImage.create(readFileNoNormal(hd4k)));
+                                    }
+                                    if(hd2.exists()) {
+                                        images.put(new Integer(Display.DENSITY_2HD), EncodedImage.create(readFileNoNormal(hd2)));
+                                    }
+                                    if(hd560.exists()) {
+                                        images.put(new Integer(Display.DENSITY_560), EncodedImage.create(readFileNoNormal(hd560)));
+                                    }
                                     if(hd.exists()) {
                                         images.put(new Integer(Display.DENSITY_HD), EncodedImage.create(readFileNoNormal(hd)));
                                     }
@@ -909,6 +921,15 @@ public class EditableResources extends Resources implements TreeModel {
                                 for(int imageIter = 0 ; imageIter < mi.getDpi().length ; imageIter++) {
                                     File f = null;
                                     switch(mi.getDpi()[imageIter]) {
+                                        case Display.DENSITY_4K:
+                                            f = new File(multiImageDir, "4k.png");
+                                            break;
+                                        case Display.DENSITY_2HD:
+                                            f = new File(multiImageDir, "2hd.png");
+                                            break;
+                                        case Display.DENSITY_560:
+                                            f = new File(multiImageDir, "560.png");
+                                            break;
                                         case Display.DENSITY_HD:
                                             f = new File(multiImageDir, "hd.png");
                                             break;

@@ -237,6 +237,27 @@ public class ResourceEditorView extends FrameView {
         QuitAction.INSTANCE.setResource(loadedResources);
         initComponents();
         
+        jMenu7.add(new AbstractAction("560") {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeDPI(Display.DENSITY_560);
+            }
+        });
+        
+        jMenu7.add(new AbstractAction("2HD") {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeDPI(Display.DENSITY_2HD);
+            }
+        });
+        
+        jMenu7.add(new AbstractAction("4k") {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeDPI(Display.DENSITY_4K);
+            }
+        });
+        
         livePreviewUI.setSelected(Preferences.userNodeForPackage(getClass()).getBoolean("LivePreview", false));
         boolean isXMLEnabled = Preferences.userNodeForPackage(getClass()).getBoolean("XMLFileMode", true);
         EditableResources.setXMLEnabled(isXMLEnabled);
@@ -4547,6 +4568,15 @@ public static void openInIDE(File f, int lineNumber) {
                                 com.codename1.ui.EncodedImage c = multi.getInternalImages()[iter];
                                 String label = "_veryLow.png";
                                 switch(multi.getDpi()[iter]) {
+                                    case com.codename1.ui.Display.DENSITY_4K:
+                                        label = "_4k.png";
+                                        break;
+                                    case com.codename1.ui.Display.DENSITY_2HD:
+                                        label = "_2hd.png";
+                                        break;
+                                    case com.codename1.ui.Display.DENSITY_560:
+                                        label = "_560.png";
+                                        break;
                                     case com.codename1.ui.Display.DENSITY_HD:
                                         label = "_hd.png";
                                         break;
