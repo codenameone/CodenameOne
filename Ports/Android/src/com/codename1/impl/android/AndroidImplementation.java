@@ -5647,20 +5647,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
         if(type == Display.PICKER_TYPE_TIME) {
+            final boolean [] canceled = new boolean[1];
+            final boolean [] dismissed = new boolean[1];
+            
             class TimePick implements TimePickerDialog.OnTimeSetListener, TimePickerDialog.OnCancelListener, Runnable {
                 int result = ((Integer)currentValue).intValue();
-                boolean dismissed;
-                boolean canceled;
                 public void onTimeSet(TimePicker tp, int hour, int minute) {
                     result = hour * 60 + minute;
-                    dismissed = true;
+                    dismissed[0] = true;
                     synchronized(this) {
                         notify();
                     }
                 }
                 
                 public void run() {
-                    while(!dismissed) {
+                    while(!dismissed[0]) {
                         synchronized(this) {
                             try {
                                 wait(50);
@@ -5671,9 +5672,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public void onCancel(DialogInterface di) {
-                    canceled = true;
-                    dismissed = true;
-                    synchronized(this) {
+                    dismissed[0] = true;
+                    canceled[0] = true;
+                    synchronized (this) {
                         notify();
                     }
                 }
@@ -5683,14 +5684,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     int hour = ((Integer)currentValue).intValue() / 60;
                     int minute = ((Integer)currentValue).intValue() % 60;
-                    TimePickerDialog tp = new TimePickerDialog(activity, pickInstance, hour, minute, true);
+                    TimePickerDialog tp = new TimePickerDialog(activity, pickInstance, hour, minute, true){
+
+                        @Override
+                        public void cancel() {
+                            dismissed[0] = true;
+                            canceled[0] = true;
+                        }
+
+                        @Override
+                        public void dismiss() {
+                            dismissed[0] = true;
+                        }
+                    
+                    };
                     tp.setOnCancelListener(pickInstance);
                         //DateFormat.is24HourFormat(activity));
                     tp.show();
                 }
             });
             Display.getInstance().invokeAndBlock(pickInstance);
-            if(pickInstance.canceled) {
+            if(canceled[0]) {
                 return null;
             }
             return new Integer(pickInstance.result);
