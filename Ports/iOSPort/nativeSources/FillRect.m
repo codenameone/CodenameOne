@@ -105,8 +105,10 @@ static GLuint getOGLProgram(){
     //GlColorFromRGB(color, alpha);
     glUseProgram(getOGLProgram());
     
-    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
-                                       ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
+    float alph = ((float)alpha)/255.0;
+    
+    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0 * alph,
+                                       ((float)((color >> 8) & 0xff))/255.0 * alph, ((float)(color & 0xff))/255.0 * alph, alph);
     GLfloat vertexes[] = {
         x+0.5, y+0.5,
         x + width, y+0.5,
