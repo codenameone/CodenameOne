@@ -24,6 +24,7 @@
 #import <UIKit/UIKit.h>
 #include "xmlvm.h"
 #include "CodenameOne_GLViewController.h"
+#include "com_codename1_impl_ios_IOSImplementation.h"
 
 int connections = 0;
 @implementation NetworkConnectionImpl
@@ -51,6 +52,11 @@ int connections = 0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];
+#ifdef NEW_CODENAME_ONE_VM
+    request.HTTPShouldHandleCookies = com_codename1_impl_ios_IOSImplementation_isUseNativeCookiesNativeCallback___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#else
+    request.HTTPShouldHandleCookies = com_codename1_impl_ios_IOSImplementation_isUseNativeCookiesNativeCallback__();
+#endif
 #ifndef CN1_USE_ARC
     [request retain];
 #endif

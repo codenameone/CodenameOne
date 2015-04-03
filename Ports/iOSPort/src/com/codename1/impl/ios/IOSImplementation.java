@@ -224,6 +224,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Used to enable/disable native cookies from native code.
+     * @param cookiesArray 
+     */
+    static void setUseNativeCookiesNativeCallback(boolean useNative){
+        instance.setUseNativeCookieStore(useNative);
+    }
+    
+    static boolean isUseNativeCookiesNativeCallback(){
+        return instance.isUseNativeCookieStore();
+    }
+    
     @Override
     public void addCookie(Cookie[] cookiesArray) {
         if(isUseNativeCookieStore()) {
