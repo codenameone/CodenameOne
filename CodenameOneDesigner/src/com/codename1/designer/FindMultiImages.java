@@ -86,6 +86,15 @@ public class FindMultiImages extends javax.swing.JDialog {
         jPanel2 = new javax.swing.JPanel();
         ok = new javax.swing.JButton();
         cancel = new javax.swing.JButton();
+        jLabel12 = new javax.swing.JLabel();
+        hd560 = new javax.swing.JLabel();
+        select560Density = new javax.swing.JButton();
+        jLabel13 = new javax.swing.JLabel();
+        hd2 = new javax.swing.JLabel();
+        select2HDDensity = new javax.swing.JButton();
+        jLabel14 = new javax.swing.JLabel();
+        hd4k = new javax.swing.JLabel();
+        select4kDensity = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -169,14 +178,44 @@ public class FindMultiImages extends javax.swing.JDialog {
 
         jPanel1.add(jPanel2);
 
+        jLabel12.setText("560 Density Dir");
+        jLabel12.setName("jLabel12"); // NOI18N
+
+        hd560.setText("[Undefined]");
+        hd560.setName("hd560"); // NOI18N
+
+        select560Density.setText("...");
+        select560Density.setName("select560Density"); // NOI18N
+        select560Density.addActionListener(formListener);
+
+        jLabel13.setText("2HD Density Dir");
+        jLabel13.setName("jLabel13"); // NOI18N
+
+        hd2.setText("[Undefined]");
+        hd2.setName("hd2"); // NOI18N
+
+        select2HDDensity.setText("...");
+        select2HDDensity.setName("select2HDDensity"); // NOI18N
+        select2HDDensity.addActionListener(formListener);
+
+        jLabel14.setText("4K Density Dir");
+        jLabel14.setName("jLabel14"); // NOI18N
+
+        hd4k.setText("[Undefined]");
+        hd4k.setName("hd4k"); // NOI18N
+
+        select4kDensity.setText("...");
+        select4kDensity.setName("select4kDensity"); // NOI18N
+        select4kDensity.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+            .add(layout.createSequentialGroup()
                 .addContainerGap()
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 640, Short.MAX_VALUE)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 712, Short.MAX_VALUE)
                     .add(layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
@@ -184,11 +223,26 @@ public class FindMultiImages extends javax.swing.JDialog {
                             .add(jLabel5)
                             .add(jLabel7)
                             .add(jLabel9)
-                            .add(jLabel11))
+                            .add(jLabel11)
+                            .add(jLabel12)
+                            .add(jLabel13)
+                            .add(jLabel14))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(layout.createSequentialGroup()
-                                .add(veryLow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 484, Short.MAX_VALUE)
+                                .add(hd4k, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 489, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(select4kDensity))
+                            .add(layout.createSequentialGroup()
+                                .add(hd2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 489, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(select2HDDensity))
+                            .add(layout.createSequentialGroup()
+                                .add(hd560, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 489, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(select560Density))
+                            .add(layout.createSequentialGroup()
+                                .add(veryLow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 489, Short.MAX_VALUE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(selectVeryLowDensity))
                             .add(layout.createSequentialGroup()
@@ -247,8 +301,23 @@ public class FindMultiImages extends javax.swing.JDialog {
                     .add(hd)
                     .add(selectHDDensity))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel12)
+                    .add(hd560)
+                    .add(select560Density))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel13)
+                    .add(hd2)
+                    .add(select2HDDensity))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel14)
+                    .add(hd4k)
+                    .add(select4kDensity))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
         );
 
         pack();
@@ -277,11 +346,20 @@ public class FindMultiImages extends javax.swing.JDialog {
             else if (evt.getSource() == selectHDDensity) {
                 FindMultiImages.this.selectHDDensityActionPerformed(evt);
             }
+            else if (evt.getSource() == ok) {
+                FindMultiImages.this.okActionPerformed(evt);
+            }
             else if (evt.getSource() == cancel) {
                 FindMultiImages.this.cancelActionPerformed(evt);
             }
-            else if (evt.getSource() == ok) {
-                FindMultiImages.this.okActionPerformed(evt);
+            else if (evt.getSource() == select560Density) {
+                FindMultiImages.this.select560DensityActionPerformed(evt);
+            }
+            else if (evt.getSource() == select2HDDensity) {
+                FindMultiImages.this.select2HDDensityActionPerformed(evt);
+            }
+            else if (evt.getSource() == select4kDensity) {
+                FindMultiImages.this.select4kDensityActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -321,8 +399,23 @@ public class FindMultiImages extends javax.swing.JDialog {
         updateLabelImages(high, com.codename1.ui.Display.DENSITY_HIGH);
         updateLabelImages(veryHigh, com.codename1.ui.Display.DENSITY_VERY_HIGH);
         updateLabelImages(hd, com.codename1.ui.Display.DENSITY_HD);
+        updateLabelImages(hd560, com.codename1.ui.Display.DENSITY_560);
+        updateLabelImages(hd2, com.codename1.ui.Display.DENSITY_2HD);
+        updateLabelImages(hd4k, com.codename1.ui.Display.DENSITY_4K);
         dispose();
     }//GEN-LAST:event_okActionPerformed
+
+    private void select560DensityActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_select560DensityActionPerformed
+        updateDir(hd560);
+    }//GEN-LAST:event_select560DensityActionPerformed
+
+    private void select2HDDensityActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_select2HDDensityActionPerformed
+        updateDir(hd2);
+    }//GEN-LAST:event_select2HDDensityActionPerformed
+
+    private void select4kDensityActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_select4kDensityActionPerformed
+        updateDir(hd4k);
+    }//GEN-LAST:event_select4kDensityActionPerformed
 
     private void updateLabelImages(JLabel l, int dpi) {
         File dir = new File(l.getText());
@@ -375,9 +468,15 @@ public class FindMultiImages extends javax.swing.JDialog {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton cancel;
     private javax.swing.JLabel hd;
+    private javax.swing.JLabel hd2;
+    private javax.swing.JLabel hd4k;
+    private javax.swing.JLabel hd560;
     private javax.swing.JLabel high;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel11;
+    private javax.swing.JLabel jLabel12;
+    private javax.swing.JLabel jLabel13;
+    private javax.swing.JLabel jLabel14;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel7;
@@ -387,6 +486,9 @@ public class FindMultiImages extends javax.swing.JDialog {
     private javax.swing.JLabel low;
     private javax.swing.JLabel medium;
     private javax.swing.JButton ok;
+    private javax.swing.JButton select2HDDensity;
+    private javax.swing.JButton select4kDensity;
+    private javax.swing.JButton select560Density;
     private javax.swing.JButton selectHDDensity;
     private javax.swing.JButton selectHighDensity;
     private javax.swing.JButton selectLowDensity;

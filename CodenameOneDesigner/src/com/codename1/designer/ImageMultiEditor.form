@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.7" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <AuxValues>
@@ -85,13 +85,16 @@
     <Component class="javax.swing.JComboBox" name="dpi">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="6">
+          <StringArray count="9">
             <StringItem index="0" value="Very Low Density 176x220 And Smaller"/>
             <StringItem index="1" value="Low Density Up To 240x320"/>
             <StringItem index="2" value="Medium Density Up To (360x480/3.5 inch)"/>
-            <StringItem index="3" value="Hi Density Up To (480x854/3.5-4inch)"/>
-            <StringItem index="4" value="Very Hi Density Up To (1440x720/3.5-4.5inch)"/>
+            <StringItem index="3" value="High Density Up To (480x854/3.5-4inch)"/>
+            <StringItem index="4" value="Very High Density Up To (1440x720/3.5-4.5inch)"/>
             <StringItem index="5" value="HD Up To 1920x1080"/>
+            <StringItem index="6" value="560"/>
+            <StringItem index="7" value="2HD"/>
+            <StringItem index="8" value="4K"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="dpi" noResource="true"/>
@@ -112,7 +115,7 @@
       <SubComponents>
         <Component class="javax.swing.JTextPane" name="help">
           <Properties>
-            <Property name="contentType" type="java.lang.String" value="text/html"/>
+            <Property name="contentType" type="java.lang.String" value="text/html" noResource="true"/>
             <Property name="editable" type="boolean" value="false"/>
             <Property name="text" type="java.lang.String" value="&lt;html&gt;&#xd;&#xa;  &lt;head&gt;&#xd;&#xa;&#xd;&#xa;  &lt;/head&gt;&#xd;&#xa;  &lt;body&gt;&#xd;&#xa;    &lt;p style=&quot;margin-top: 0&quot;&gt;&#xd;&#xa;      &#xd;Multi images allow complex elements such as icons to be specified on a per DPI (dots per inch) basis with classifications to several general DPI&#xa; groups. Normally DPI isn&apos;t specified in reolution but since some devices don&apos;t provide the means to query the actual DPI it is &#xa;&quot;faked&quot; on those devices using the resolution.&#xa;    &lt;/p&gt;&#xd;&#xa;    &lt;p&gt;&#xa;      Notice that multi-images aren&apos;t intended for use as a replacement for scaling/tiling, or anything of that kind since that would become prohibitively &#xa;expensive as the resource grows and would also be ineffective since phones tend to change their resolution during runtime e.g. &#xa;by rotation or poping up some types of virtual keyboards.&#xa;    &lt;/p&gt;&#xa;    &lt;p&gt;&#xa;     The multi-image is very similar in spirit to CodenameOne&apos;s SVG support and is mostly targeted at designers who have raster images rather &#xa;than vector resources or those who would normally target devices without SVG. &#xa;    &lt;/p&gt;&#xa;    &lt;p&gt;&#xa;     Working with the multi-image is seamless and CodenameOne will replace the images on loading during runtime (this is 100% seamless to developers). &#xa;Use the combo box at the top to select the proper DPI/resolution and create an icon that would look decent in that resolution. Keep in mind that &#xa;you do not need to support all resolutions and that CodenameOne will pick the &quot;best&quot; image it can if none is defined for a specific DPI. &#xa;E.g. if an image isn&apos;t defined for the very low resolution CodenameOne will look to higher resolution resources until it finds an image. &#xa;    &lt;/p&gt;&#xa;  &lt;/body&gt;&#xd;&#xa;&lt;/html&gt;&#xd;&#xa;" noResource="true"/>
             <Property name="name" type="java.lang.String" value="help" noResource="true"/>

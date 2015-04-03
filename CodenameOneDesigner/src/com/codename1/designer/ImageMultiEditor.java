@@ -66,7 +66,10 @@ public class ImageMultiEditor extends BaseForm {
             com.codename1.ui.Display.DENSITY_MEDIUM,
             com.codename1.ui.Display.DENSITY_HIGH,
             com.codename1.ui.Display.DENSITY_VERY_HIGH,
-            com.codename1.ui.Display.DENSITY_HD
+            com.codename1.ui.Display.DENSITY_HD,
+            com.codename1.ui.Display.DENSITY_560,
+            com.codename1.ui.Display.DENSITY_2HD,
+            com.codename1.ui.Display.DENSITY_4K
     };
     private EditableResources.MultiImage multi;
     private CodenameOneImageRenderer renderer;
@@ -183,13 +186,13 @@ public class ImageMultiEditor extends BaseForm {
 
         FormListener formListener = new FormListener();
 
-        dpi.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low Density 176x220 And Smaller", "Low Density Up To 240x320", "Medium Density Up To (360x480/3.5 inch)", "Hi Density Up To (480x854/3.5-4inch)", "Very Hi Density Up To (1440x720/3.5-4.5inch)", "HD Up To 1920x1080" }));
+        dpi.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Very Low Density 176x220 And Smaller", "Low Density Up To 240x320", "Medium Density Up To (360x480/3.5 inch)", "High Density Up To (480x854/3.5-4inch)", "Very High Density Up To (1440x720/3.5-4.5inch)", "HD Up To 1920x1080", "560", "2HD", "4K" }));
         dpi.setName("dpi"); // NOI18N
         dpi.addActionListener(formListener);
 
         jScrollPane2.setName("jScrollPane2"); // NOI18N
 
-        help.setContentType("text/html");
+        help.setContentType("text/html"); // NOI18N
         help.setEditable(false);
         help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      \rMulti images allow complex elements such as icons to be specified on a per DPI (dots per inch) basis with classifications to several general DPI\n groups. Normally DPI isn't specified in reolution but since some devices don't provide the means to query the actual DPI it is \n\"faked\" on those devices using the resolution.\n    </p>\r\n    <p>\n      Notice that multi-images aren't intended for use as a replacement for scaling/tiling, or anything of that kind since that would become prohibitively \nexpensive as the resource grows and would also be ineffective since phones tend to change their resolution during runtime e.g. \nby rotation or poping up some types of virtual keyboards.\n    </p>\n    <p>\n     The multi-image is very similar in spirit to CodenameOne's SVG support and is mostly targeted at designers who have raster images rather \nthan vector resources or those who would normally target devices without SVG. \n    </p>\n    <p>\n     Working with the multi-image is seamless and CodenameOne will replace the images on loading during runtime (this is 100% seamless to developers). \nUse the combo box at the top to select the proper DPI/resolution and create an icon that would look decent in that resolution. Keep in mind that \nyou do not need to support all resolutions and that CodenameOne will pick the \"best\" image it can if none is defined for a specific DPI. \nE.g. if an image isn't defined for the very low resolution CodenameOne will look to higher resolution resources until it finds an image. \n    </p>\n  </body>\r\n</html>\r\n"); // NOI18N
         help.setName("help"); // NOI18N
