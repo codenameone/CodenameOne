@@ -152,10 +152,10 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
                     value = twoDigits(month) + separatorChar + twoDigits(day) + separatorChar + (year % 100);
                     break;
                 case Spinner.DATE_FORMAT_DOW_MON_DD:
-                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day);
+                    value = getLocalizedDay(c.get(Calendar.DAY_OF_WEEK) - 1) + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day);
                     break;
                 case Spinner.DATE_FORMAT_DOW_MON_DD_YY:
-                    value = DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day) + separatorChar + year;
+                    value = getLocalizedDay(c.get(Calendar.DAY_OF_WEEK) - 1) + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day) + separatorChar + year;
                     break;
             }
         } else {
@@ -197,6 +197,18 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
         return text;
     }
 
+    private String getLocalizedDay(int i) {
+        Map<String, String> t = getUIManager().getBundle();
+        String text = DAYS[i];
+        if (t != null) {
+            Object o = t.get("Calendar." + text);
+            if (o != null) {
+                text = (String) o;
+            }
+        }
+        return text;
+    }
+    
     /**
      * @return the twentyFourHours
      */
