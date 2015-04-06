@@ -2268,14 +2268,25 @@ public class Component implements Animation, StyleListener {
     }
 
     void clearDrag() {
-        //if this is a tesile animation don't interrupt.
-        if(draggedMotionX != null && draggedMotionX.getValue() > 0 && draggedMotionX.getValue() < getScrollDimension().getWidth() - getWidth()){
-            draggedMotionX = null;
+        //if we are in the middle of a tensile animation reset the scrolling location
+        //before killing the scrolling
+        if (draggedMotionX != null) {
+            if (draggedMotionX.getValue() < 0) {
+                setScrollX(0);
+            } else if (draggedMotionX.getValue() > getScrollDimension().getWidth() - getWidth()) {
+                setScrollX(getScrollDimension().getWidth() - getWidth());
+            }
         }
-        //if this is a tesile animation don't interrupt.
-        if(draggedMotionY != null && draggedMotionY.getValue() > 0 && draggedMotionY.getValue() < getScrollDimension().getHeight()- getHeight()){
-            draggedMotionY = null;
+        if (draggedMotionY != null) {
+            if (draggedMotionY.getValue() < 0) {
+                setScrollY(0);
+            } else if (draggedMotionY.getValue() > getScrollDimension().getHeight() - getHeight()) {
+                setScrollY(getScrollDimension().getHeight() - getHeight());
+            }
         }
+        draggedMotionX = null;
+        draggedMotionY = null;        
+        
         Component parent = getParent();
         if(parent != null){
             parent.clearDrag();
