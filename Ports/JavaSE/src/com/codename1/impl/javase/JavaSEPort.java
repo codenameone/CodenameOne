@@ -5382,6 +5382,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setHttpMethod(Object connection, String method) throws IOException {
+        if (netMonitor != null) {
+            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
+            if (nr != null) {
+                nr.setMethod(method.toUpperCase());
+            }
+        }
         ((HttpURLConnection) connection).setRequestMethod(method);
     }
 
