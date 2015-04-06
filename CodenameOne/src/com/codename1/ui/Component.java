@@ -2951,39 +2951,49 @@ public class Component implements Animation, StyleListener {
         }
         pinchDistance = -1;
         if (dragActivated) {
-            int scroll = scrollY;
             dragActivated = false;
-            boolean shouldScrollX = chooseScrollXOrY(x, y);
-            if(shouldScrollX){
-                scroll = scrollX;
-                if (scroll < 0) {
-                    startTensile(scroll, 0, false);
-                    return;
+            boolean startedTensileX = false;
+            boolean startedTensileY = false;
+            if(isScrollableX()){
+                if (scrollX < 0) {
+                    startTensile(scrollX, 0, false);
+                    startedTensileX = true;
                 } else {
-                    if(scroll > getScrollDimension().getWidth() - getWidth()) {
-                        startTensile(scroll, Math.max(getScrollDimension().getWidth() - getWidth(), 0), false);
-                        return;
+                    if(scrollX > getScrollDimension().getWidth() - getWidth()) {
+                        startTensile(scrollX, Math.max(getScrollDimension().getWidth() - getWidth(), 0), false);
+                        startedTensileX = true;
                     }
                 }
-            } else {
-                if (scroll < 0) {
+            }
+            if(isScrollableY()){
+                if (scrollY < 0) {
                     if(refreshTask != null){
                         putClientProperty("$pullToRelease", "normal");
-                        if(scroll < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
+                        if(scrollY < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
                             putClientProperty("$pullToRelease", "update");                  
-                            startTensile(scroll, -getUIManager().getLookAndFeel().getPullToRefreshHeight(), true);
-                            return;
+                            startTensile(scrollY, -getUIManager().getLookAndFeel().getPullToRefreshHeight(), true);
+                            startedTensileY = true;
                         }
+                    }else{
+                        startTensile(scrollY, 0, true);
+                        startedTensileY = true;
                     }
-                    startTensile(scroll, 0, true);
-                    return;
                 } else {
                     int scrh = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
-                    if(scroll > scrh) {
-                        startTensile(scroll, Math.max(scrh, 0), true);
-                        return;
+                    if(scrollY > scrh) {
+                        startTensile(scrollY, Math.max(scrh, 0), true);
+                        startedTensileY = true;
                     }
                 }
+            }
+            boolean shouldScrollX = chooseScrollXOrY(x, y);
+            if(shouldScrollX && startedTensileX || !shouldScrollX && startedTensileY){
+                return;
+            }
+            
+            int scroll = scrollY;
+            if(shouldScrollX){
+                scroll = scrollX;
             }
             float speed = getDragSpeed(!shouldScrollX);
             int tl;
