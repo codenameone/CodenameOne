@@ -90,6 +90,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -6689,8 +6690,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
-        if(url.startsWith("file:")) {
-            url = "file:/" + unfile(url);
+        if(url.startsWith("file:") && url.indexOf("/html/") < 0) {
+            url = "file://" + unfile(url);
         }
         if (url.startsWith("jar:")) {
             url = url.substring(6);
@@ -7450,7 +7451,41 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
         ((SocketImpl)socket).writeToStream(data);
     }
+
+    /**
+     * Overriden to work well in the simulator
+     */
+    @Override
+    public void installTar() throws IOException {
+        File f = new File("codenameone_settings.properties");        
+        if(!f.exists()) {
+            super.installTar();
+        }
+    }    
     
+    /**
+     * Overriden to work well in the simulator
+     */
+    @Override
+    public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
+        File f = new File("codenameone_settings.properties");        
+        if(!f.exists()) {
+            super.setBrowserPageInHierarchy(browserPeer, url);
+            return;
+        }
+
+        File u = new File(f.getParent(), "src" + File.separator + "html");
+        String base = u.toURI().toURL().toExternalForm(); 
+        if(base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if(url.startsWith("/")) {
+            setBrowserURL(browserPeer, base + url);
+        } else {
+            setBrowserURL(browserPeer, base  + "/" + url);
+        }
+    }
+
     private static void copyFile(File sourceFile, File destFile) throws IOException {
         if (!destFile.exists()) {
             destFile.createNewFile();

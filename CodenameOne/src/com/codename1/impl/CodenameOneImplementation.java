@@ -36,6 +36,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.tar.TarEntry;
+import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -3507,6 +3509,27 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Sets a relative URL from the html hierarchy
+     * 
+     * @param browserPeer the peer component
+     * @param url the url relative to the HTML directory
+     */
+    public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
+        installTar();
+
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String tardir = fs.getAppHomePath() + "cn1html";
+        if(tardir.startsWith("/")) {
+            tardir = "file://" + tardir;
+        }
+        if(url.startsWith("/")) {
+            setBrowserURL(browserPeer, tardir + url);
+        } else {
+            setBrowserURL(browserPeer, tardir  + "/" + url);            
+        }
+    }
+    
+    /**
      * Sets the page URL, jar: URL's must be supported by the implementation
      * @param browserPeer browser instance
      * @param url  the URL
@@ -5871,5 +5894,41 @@ public abstract class CodenameOneImplementation {
      * @param data the data written
      */
     public void writeToSocketStream(Object socket, byte[] data) {
+    }
+    
+    /**
+     * Installs a tar file from the build server into the file system storage so it can be used with respect for hierarchy
+     */
+    public void installTar() throws IOException {
+        String p = Preferences.get("cn1$InstallKey", null);
+        String buildKey = Display.getInstance().getProperty("build_key", null);
+        if(p == null || !p.equals(buildKey)) {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String tardir = fs.getAppHomePath() + "cn1html/";
+            fs.mkdir(tardir);
+            TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar"));
+            
+            TarEntry t = is.getNextEntry();
+            byte[] data = new byte[8192];
+            while(t != null) {
+                String name = t.getName();
+                if(t.isDirectory()) {
+                    fs.mkdir(tardir + name);
+                } else {
+                    OutputStream os = fs.openOutputStream(tardir + name);
+                    int count;
+                    while((count = is.read(data)) != -1) {
+                        os.write(data, 0, count);
+                    }
+
+                    os.close();
+                }
+                
+                t = is.getNextEntry();
+            }
+            
+            Util.cleanup(is);
+            Preferences.set("cn1$InstallKey", buildKey);
+        }
     }
 }

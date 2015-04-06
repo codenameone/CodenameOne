@@ -29,6 +29,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.plaf.Style;
+import java.io.IOException;
 import java.util.Hashtable;
 
 /**
@@ -139,6 +140,15 @@ public class BrowserComponent extends Container {
         Display.getInstance().getImplementation().setBrowserURL(internal, url);
     }
 
+
+    /**
+     * Sets the page URL while respecting the hierarchy of the html
+     * @param url  the URL
+     */
+    public void setURLHierarchy(String url) throws IOException {
+        Display.getInstance().getImplementation().setBrowserPageInHierarchy(internal, url);
+    }
+
     /**
      * Reload the current page
      */
@@ -231,7 +241,7 @@ public class BrowserComponent extends Container {
     public void setPage(String html, String baseUrl) {
         Display.getInstance().getImplementation().setBrowserPage(internal, html, baseUrl);
     }
-    
+
     private EventDispatcher getEventDispatcher(String type, boolean autoCreate) {
         if(listeners == null) {
             if(!autoCreate) {
