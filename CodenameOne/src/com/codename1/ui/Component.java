@@ -2497,7 +2497,7 @@ public class Component implements Animation, StyleListener {
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
-    public void pointerDragged(int x, int y) {
+    public void pointerDragged(final int x, final int y) {
         Form p = getComponentForm();
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
@@ -2539,7 +2539,53 @@ public class Component implements Animation, StyleListener {
             oldx = x;
             oldy = y;
             p.repaint(draggedx , draggedy, getWidth(), getHeight());
-            getParent().scrollRectToVisible(draggedx - getParent().getAbsoluteX(), draggedy - getParent().getAbsoluteY(), getWidth() + 40, getHeight() + 40, getParent());
+            Container scrollParent = getParent();
+            while(scrollParent != null && !scrollParent.isScrollable()){
+                scrollParent = scrollParent.getParent();
+            }
+            if(scrollParent != null){                
+                Style s = getStyle();
+                int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
+                int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
+
+                Rectangle view;
+                int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
+                //if the dragging component is out of bounds move the scrollable parent
+                if(!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())){
+                    if((scrollParent.isScrollableY() && scrollParent.getScrollY() >= 0 && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) || 
+                       (scrollParent.isScrollableX() && scrollParent.getScrollX() >= 0 && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth()) ){
+                        int yposition = draggedy - scrollParent.getAbsoluteY() - 40;
+                        if( yposition  < 0){
+                            yposition = 0;
+                        }
+                        int xposition = draggedx - scrollParent.getAbsoluteX() - 40;
+                        if( xposition  < 0){
+                            xposition = 0;
+                        }
+                        int height = getHeight() + 80;
+                        if(scrollParent.getScrollY() + draggedy + height >= scrollParent.getScrollDimension().getHeight()){
+                            yposition = draggedy - scrollParent.getAbsoluteY();
+                            height = scrollParent.getScrollDimension().getHeight() - yposition;
+                        }                        
+                        int width = getWidth()+ 80;
+                        if(scrollParent.getScrollX() + draggedx + width >= scrollParent.getScrollDimension().getWidth()){
+                            xposition = draggedx - scrollParent.getAbsoluteX();
+                            width = scrollParent.getScrollDimension().getWidth() - xposition;
+                        }                        
+                                
+                        scrollParent.scrollRectToVisible(xposition, yposition, width, height, scrollParent);            
+                        //keep move it until edges or until it is fully visible in the scrollable parent container
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            public void run() {
+                                pointerDragged(x,y);
+                            }
+                        });
+                    }
+                }
+            }    
+                
             return;
         }
         if(!dragActivated){
@@ -2703,6 +2749,7 @@ public class Component implements Animation, StyleListener {
      * 
      */
     public void longPointerPress(int x, int y) {
+        System.out.println("hello");
     }
 
     /**
