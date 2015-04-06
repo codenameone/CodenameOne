@@ -2749,7 +2749,6 @@ public class Component implements Animation, StyleListener {
      * 
      */
     public void longPointerPress(int x, int y) {
-        System.out.println("hello");
     }
 
     /**
