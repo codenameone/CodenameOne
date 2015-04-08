@@ -5598,6 +5598,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private String unfile(String file) {
+        
+        if(!exposeFilesystem){
+            if(!file.startsWith("file:/")){
+                throw new IllegalArgumentException( file + " is not a valid path, use "
+                        + "FileSystemStorage.getInstance().getAppHomePath() to get a valid dir path to read/write files");
+            }
+        }
+        
         if(file.startsWith("file://home")) {
             return System.getProperty("user.home").replace('\\', '/') + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
         }
