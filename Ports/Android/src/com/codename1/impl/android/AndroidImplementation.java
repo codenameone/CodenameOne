@@ -5646,9 +5646,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
+        final boolean [] canceled = new boolean[1];
+        final boolean [] dismissed = new boolean[1];
+        
         if(type == Display.PICKER_TYPE_TIME) {
-            final boolean [] canceled = new boolean[1];
-            final boolean [] dismissed = new boolean[1];
             
             class TimePick implements TimePickerDialog.OnTimeSetListener, TimePickerDialog.OnCancelListener, Runnable {
                 int result = ((Integer)currentValue).intValue();
@@ -5716,7 +5717,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             cl.setTime((Date)currentValue);
             class DatePick implements DatePickerDialog.OnDateSetListener,DatePickerDialog.OnCancelListener, Runnable {
                 Date result = (Date)currentValue;
-                boolean dismissed;
                 
                 public void onDateSet(DatePicker dp, int year, int month, int day) {
                     java.util.Calendar c = java.util.Calendar.getInstance();
@@ -5724,14 +5724,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     c.set(java.util.Calendar.MONTH, month);
                     c.set(java.util.Calendar.DAY_OF_MONTH, day);
                     result = c.getTime();
-                    dismissed = true;
+                    dismissed[0] = true;
                     synchronized(this) {
                         notify();
                     }                    
                 }
                 
                 public void run() {
-                    while(!dismissed) {
+                    while(!dismissed[0]) {
                         synchronized(this) {
                             try {
                                 wait(50);
@@ -5742,7 +5742,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 public void onCancel(DialogInterface di) {
                     result = null;
-                    dismissed = true;
+                    dismissed[0] = true;
+                    canceled[0] = true;
                     synchronized(this) {
                         notify();
                     }
@@ -5751,7 +5752,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final DatePick pickInstance = new DatePick();
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH));
+                    DatePickerDialog tp = new DatePickerDialog(activity, pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH)){
+
+                        @Override
+                        public void cancel() {
+                            super.cancel();
+                            dismissed[0] = true;
+                            canceled[0] = true;
+                        }
+
+                        @Override
+                        public void dismiss() {
+                            super.dismiss();
+                            dismissed[0] = true;
+                        }
+                        
+                    };
                     tp.setOnCancelListener(pickInstance);
                     tp.show();
                 }
@@ -5763,14 +5779,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final String[] values = (String[])data;
             class StringPick implements Runnable, NumberPicker.OnValueChangeListener {
                 int result = -1;
-                boolean dismissed;
-                boolean canceled;
                 
                 StringPick() {
                 }
                 
                 public void run() {
-                    while(!dismissed) {
+                    while(!dismissed[0]) {
                         synchronized(this) {
                             try {
                                 wait(50);
@@ -5780,16 +5794,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
 
                 public void cancel() {
-                    canceled = true;
-                    dismissed = true;
+                    dismissed[0] = true;
+                    canceled[0] = true;
                     synchronized(this) {
                         notify();
                     }
                 }
 
                 public void ok() {
-                    canceled = false;
-                    dismissed = true;
+                    canceled[0] = false;
+                    dismissed[0] = true;
                     synchronized(this) {
                         notify();
                     }
@@ -5852,7 +5866,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
             Display.getInstance().invokeAndBlock(pickInstance);
-            if(pickInstance.canceled) {
+            if(canceled[0]) {
                 return null;
             }
             if(pickInstance.result < 0) {
