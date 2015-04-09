@@ -234,7 +234,12 @@ public class Picker extends Button {
      * @param strs string array
      */
     public void setStrings(String[] strs) {
+        for (int i = 0; i < strs.length; i++) {
+            String str = strs[i];
+            strs[i] = getUIManager().localize(str, str);
+        }
         metaData = strs;
+        
         if(!(value instanceof String)) {
             value = null;
         }
@@ -277,6 +282,7 @@ public class Picker extends Button {
         }
         switch(type) {
             case Display.PICKER_TYPE_STRINGS:
+                value = getUIManager().localize(value.toString(), value.toString());
                 setText(value.toString());
                 break;
             case Display.PICKER_TYPE_DATE:
