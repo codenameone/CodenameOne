@@ -1480,6 +1480,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenuItem screenshot = new JMenuItem("Screenshot");
             simulatorMenu.add(screenshot);
+            KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
+            screenshot.setAccelerator(f2);
             screenshot.addActionListener(new ActionListener() {
 
                 private File findScreenshotFile() {

@@ -83,6 +83,38 @@ public class SpanLabel extends Container {
     }
     
     /**
+     * Returns the text elements style object
+     * @return the style object
+     */
+    public Style getTextUnselectedStyle() {
+        return text.getUnselectedStyle();
+    }
+    
+    /**
+     * The text elements style object
+     * @param t the style object
+     */
+    public void setTextUnselectedStyle(Style t) {
+        text.setUnselectedStyle(t);
+    }
+    
+    /**
+     * Returns the text elements style object
+     * @return the style object
+     */
+    public Style getTextSelectedStyle() {
+        return text.getSelectedStyle();
+    }
+    
+    /**
+     * The text elements style object
+     * @param t the style object
+     */
+    public void setTextSelectedStyle(Style t) {
+        text.setSelectedStyle(t);
+    }
+    
+    /**
      * Sets the uiid for the icon if present
      * @param uiid the uiid for the icon
      */
