@@ -106,6 +106,7 @@ public class OnOffSwitch extends Container {
             button = new CheckBox(on);
             button.setToggle(true);
             button.setUIID("Button");
+            button.setEndsWith3Points(false);
             button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());
             button.getSelectedStyle().setFont(getSelectedStyle().getFont());
             button.getPressedStyle().setFont(getSelectedStyle().getFont());
