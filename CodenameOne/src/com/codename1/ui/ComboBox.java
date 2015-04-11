@@ -383,6 +383,7 @@ public class ComboBox<T> extends List<T> {
      */
     protected List<T> createPopupList() {
         List<T> l = new List<T>(getModel());
+        l.setCommandList(isCommandList());
         l.setSmoothScrolling(isSmoothScrolling());
         l.setFixedSelection(getFixedSelection());
         l.setListCellRenderer(getRenderer());
