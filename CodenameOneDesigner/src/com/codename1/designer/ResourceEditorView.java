@@ -3092,7 +3092,7 @@ private void resPasswordActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
 
 private boolean configureOptiPNG() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("optiPng", null);
-    if(node == null) {
+    if(node == null || !new File(node).exists()) {
         JOptionPane.showMessageDialog(mainPanel, "Please select the OptiPng executable in the following dialog\nOptiPng can be downloaded from http://optipng.sourceforge.net/", "Select OptiPNG", JOptionPane.INFORMATION_MESSAGE);
         File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app");
         if(result != null) {
