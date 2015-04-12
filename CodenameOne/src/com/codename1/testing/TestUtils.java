@@ -521,13 +521,22 @@ public class TestUtils {
      */
     public static void pointerPress(float x, float y, String componentName) {
         if(verbose) {
-            log("pointerPress(" + x + ", " + y + ", " + componentName + ")");
+            if(componentName == null) {
+                log("pointerPress(" + x + ", " + y + ", null)");
+            } else {
+                log("pointerPress(" + x + ", " + y + ", " + componentName + ")");
+            }
         }
         waitFor(20);
-        Component c = findByName(componentName);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
-        Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+        if(componentName != null) {
+            Component c = findByName(componentName);
+            int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
+            int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+            Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+        } else {
+            Display.getInstance().getCurrent().pointerPressed((int)(x * Display.getInstance().getDisplayWidth()), 
+                    (int)(y * Display.getInstance().getDisplayHeight()));
+        }
         waitFor(10);
     }
 
