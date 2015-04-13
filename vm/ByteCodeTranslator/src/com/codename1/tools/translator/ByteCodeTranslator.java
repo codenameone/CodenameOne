@@ -416,7 +416,8 @@ public class ByteCodeTranslator {
                         "***FRAMEWORKS2***", frameworks2.toString(), "***RESOURCES***", resources.toString());
             }
 
-            replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion);
+            String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
+            replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
         } else {
             b.execute(sources, dest);
             Parser.writeOutput(dest);
