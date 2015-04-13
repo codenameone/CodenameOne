@@ -4333,6 +4333,9 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     [fakeActionSheet addSubview:pickerView];
     [[CodenameOne_GLViewController instance].view addSubview:fakeActionSheet];
     currentActionSheet = fakeActionSheet;
+    if ([pickerView isKindOfClass: [UIPickerView class]] && stringPickerSelection>-1) {
+        [(UIPickerView*)pickerView selectRow: stringPickerSelection inComponent:0 animated: NO];
+    }
     repaintUI();
 }
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
