@@ -187,7 +187,7 @@ public class TestRecorder extends javax.swing.JFrame {
         while(cmp != contentPane) {
             com.codename1.ui.Container parent = cmp.getParent();
             if(parent == null) {
-                return null;
+                return "(String)null";
             }
             l.add(0, parent.getComponentIndex(cmp));
             cmp = parent;

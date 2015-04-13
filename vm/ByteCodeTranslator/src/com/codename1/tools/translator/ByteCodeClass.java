@@ -377,7 +377,8 @@ public class ByteCodeClass {
 
         // create class objects for 1 - 3 dimension arrays
         for(int iter = 1 ; iter < 4 ; iter++) {
-            if(!arrayTypes.contains(iter + "_" + clsName)) {
+            if(!(arrayTypes.contains(iter + "_" + clsName) || arrayTypes.contains((iter + 1) + "_" + clsName) || 
+                    arrayTypes.contains((iter + 2) + "_" + clsName))) {
                 continue;
             }
             b.append("struct clazz class_array");
@@ -647,7 +648,7 @@ public class ByteCodeClass {
             }
         }
                 
-        if(arrayTypes.contains("1_" + clsName)) {
+        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
             b.append("JAVA_OBJECT __NEW_ARRAY_");
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {\n");
@@ -758,7 +759,7 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(".initialized) return;\n\n    ");
 
-        if(arrayTypes.contains("1_" + clsName)) {
+        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
             b.append("class_array1__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
@@ -974,13 +975,13 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(";\n");
 
-        if(arrayTypes.contains("1_" + clsName)) {
+        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
             b.append("extern struct clazz class_array1__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(arrayTypes.contains("2_" + clsName)) {
+        if(arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
             b.append("extern struct clazz class_array2__");
             b.append(clsName);
             b.append(";\n");

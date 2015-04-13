@@ -2368,15 +2368,36 @@ public class UIBuilder { //implements Externalizable {
      * @return a lazy value that will return the back form
      */
     public LazyValue<Form> createBackLazyValue(final Form f) {
+        Vector formNavigationStack = baseFormNavigationStack;
+        Hashtable p = null;
+        Command cmd = null;
+        if(formNavigationStack.size() > 1) {
+            p = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 2);
+            String backTitle = getBackCommandText((String)p.get(FORM_STATE_KEY_TITLE));
+            String commandAction = (String)p.get(FORM_STATE_KEY_NAME);
+            cmd = createCommandImpl(backTitle, null,
+                    BACK_COMMAND_ID, commandAction, true, "");
+            cmd.putClientProperty(COMMAND_ARGUMENTS, "");
+            cmd.putClientProperty(COMMAND_ACTION, commandAction);
+        }
+        final Hashtable h =  p;
+        final Command backCommand = cmd;
+        
         return new LazyValue<Form>() {
             public Form get(Object... args) {
                 String n = getPreviousFormName(f);
                 final Form f = createForm((Form)createContainer(fetchResourceFile(), n));;
+                if(h != null) {
+                    setFormState(f, h);
+                    setBackCommand(f, backCommand);
+                }
                 f.addShowListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         postShow(f);
                     }
                 });
+                Vector formNavigationStack = baseFormNavigationStack;
+                formNavigationStack.remove(formNavigationStack.size() - 1);
                 beforeShow(f);
                 return f;
             }

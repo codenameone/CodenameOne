@@ -4762,6 +4762,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             synchronized(LOCK) {
                 pendingData.addElement(data);
                 LOCK.notify();
+                try {
+                    if(pendingData.size() > 20) {
+                        LOCK.wait(1000);
+                    }
+                } catch(InterruptedException ie) {
+                }
             }
         }
         

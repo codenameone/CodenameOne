@@ -90,13 +90,13 @@ public class AddThemeResource extends javax.swing.JDialog {
         jLabel2.setText("Template");
         jLabel2.setName("jLabel2"); // NOI18N
 
-        template.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Native_Theme", "Blank", "socialboo", "Leather", "Chrome", "Mapper", "CodenameOne_Touch", "CodenameOne_Feature", "tzone_theme", "tipster_theme", "Blackberry", "Wood", "Accessability_Big_Theme", "Accessability_Black_Theme", "Accessability_White_Theme", "Accessability_Yellow_Theme" }));
+        template.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Native_Theme", "FlatBlueTheme", "FlatRedTheme", "FlatOrangeTheme", "socialboo", "Leather", "Chrome", "Mapper", "Blank" }));
         template.setName("template"); // NOI18N
         template.addActionListener(formListener);
 
         jScrollPane1.setName("jScrollPane1"); // NOI18N
 
-        templateDetails.setContentType("text/html");
+        templateDetails.setContentType("text/html"); // NOI18N
         templateDetails.setEditable(false);
         templateDetails.setName("templateDetails"); // NOI18N
         jScrollPane1.setViewportView(templateDetails);
@@ -169,11 +169,11 @@ public class AddThemeResource extends javax.swing.JDialog {
             if (evt.getSource() == template) {
                 AddThemeResource.this.templateActionPerformed(evt);
             }
-            else if (evt.getSource() == cancel) {
-                AddThemeResource.this.cancelActionPerformed(evt);
-            }
             else if (evt.getSource() == ok) {
                 AddThemeResource.this.okActionPerformed(evt);
+            }
+            else if (evt.getSource() == cancel) {
+                AddThemeResource.this.cancelActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents

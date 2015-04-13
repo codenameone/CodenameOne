@@ -41,7 +41,14 @@ public class InfiniteScrollAdapter {
     private Container infiniteContainer;
     private Runnable fetchMore;
     private Component ip;
-    private Component endMarker = new Component() {
+    private int componentLimit = -1;
+    
+    class EdgeMarker extends Component {
+        private boolean top;
+        public EdgeMarker(boolean top) {
+            this.top = top;
+        }
+        
         public Dimension calcPreferredSize() {
             return new Dimension(1,1);
         }
@@ -49,8 +56,10 @@ public class InfiniteScrollAdapter {
             if(getParent() != null && isInClippingRegion(g)) {
                 reachedEnd();
             }
-        }
-    };
+        }        
+    }
+    
+    private Component endMarker = new EdgeMarker(true);
     
     private InfiniteScrollAdapter() {
         InfiniteProgress progress = new InfiniteProgress();
@@ -131,12 +140,43 @@ public class InfiniteScrollAdapter {
             c.setY(infiniteContainer.getHeight());
             infiniteContainer.addComponent(c);
         }
+        
+        if(componentLimit > 0) {
+            int diff = infiniteContainer.getComponentCount() - componentLimit;
+            while(diff > 0) {
+                infiniteContainer.removeComponent(infiniteContainer.getComponentAt(0));
+                diff--;
+            }
+        }
+        
         infiniteContainer.revalidate();
         if(areThereMore) {
             // if this is animated we get redundant calls to reached end
             infiniteContainer.addComponent(endMarker);
             infiniteContainer.revalidate();
         }
+    }
+
+    /**
+     * The component limit defines the number of components that should be within the infinite scroll adapter,
+     * if more than component limit is added then the appropriate number of components is removed from the top.
+     * This prevents running out of memory or performance overhead with too many components... 
+     * Notice that -1 is a special case value for no component limit.
+     * @return the componentLimit
+     */
+    public int getComponentLimit() {
+        return componentLimit;
+    }
+
+    /**
+     * The component limit defines the number of components that should be within the infinite scroll adapter,
+     * if more than component limit is added then the appropriate number of components is removed from the top.
+     * This prevents running out of memory or performance overhead with too many components... 
+     * Notice that -1 is a special case value for no component limit.
+     * @param componentLimit the componentLimit to set
+     */
+    public void setComponentLimit(int componentLimit) {
+        this.componentLimit = componentLimit;
     }
     
 }

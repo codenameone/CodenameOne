@@ -217,7 +217,19 @@ public class ComboBox<T> extends List<T> {
     protected Dialog createPopupDialog(List<T> l) {
         Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle"){
 
-            protected void autoAdjust(int w, int h) {
+            void sizeChangedInternal(int w, int h) {
+                //if only height changed it's the virtual keyboard, no need to
+                //resize the popup just resize the parent form
+                if(getWidth() == w && getHeight() != h){
+                    Form frm = getPreviousForm();
+                    if(frm != null){
+                        frm.sizeChangedInternal(w, h);
+                    }        
+                    setSize(new Dimension(w, h));
+                    repaint();
+                }else{
+                    dispose();
+                }
             }
             
         };
@@ -371,6 +383,7 @@ public class ComboBox<T> extends List<T> {
      */
     protected List<T> createPopupList() {
         List<T> l = new List<T>(getModel());
+        l.setCommandList(isCommandList());
         l.setSmoothScrolling(isSmoothScrolling());
         l.setFixedSelection(getFixedSelection());
         l.setListCellRenderer(getRenderer());

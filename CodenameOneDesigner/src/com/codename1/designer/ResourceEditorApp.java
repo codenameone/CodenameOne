@@ -221,6 +221,15 @@ public class ResourceEditorApp extends SingleFrameApplication {
         if(themeName.equalsIgnoreCase("mapper")) {
             template = "mapper";
         }
+        if(themeName.equalsIgnoreCase("flatblue")) {
+            template = "FlatBlueTheme";
+        }
+        if(themeName.equalsIgnoreCase("flatred")) {
+            template = "FlatRedTheme";
+        }
+        if(themeName.equalsIgnoreCase("flatorange")) {
+            template = "FlatOrangeTheme";
+        }
         
         res.setTheme("Theme", importRes(res, template));
         

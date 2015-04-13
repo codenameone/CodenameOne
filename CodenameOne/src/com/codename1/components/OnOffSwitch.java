@@ -65,6 +65,7 @@ public class OnOffSwitch extends Container {
     private Image switchMaskImage;
     private int deltaX;
     private EventDispatcher dispatcher = new EventDispatcher();
+    private boolean animationLock;
     
     /**
      * Default constructor
@@ -106,6 +107,7 @@ public class OnOffSwitch extends Container {
             button = new CheckBox(on);
             button.setToggle(true);
             button.setUIID("Button");
+            button.setEndsWith3Points(false);
             button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());
             button.getSelectedStyle().setFont(getSelectedStyle().getFont());
             button.getPressedStyle().setFont(getSelectedStyle().getFont());
@@ -268,10 +270,14 @@ public class OnOffSwitch extends Container {
             button.setText(on);
             getUnselectedStyle().setPadding(LEFT, buttonWidth);
             getUnselectedStyle().setPadding(RIGHT, 0);
+            getSelectedStyle().setPadding(LEFT, buttonWidth);
+            getSelectedStyle().setPadding(RIGHT, 0);
         } else {
             button.setText(off);            
             getUnselectedStyle().setPadding(RIGHT, buttonWidth);
             getUnselectedStyle().setPadding(LEFT, 0);
+            getSelectedStyle().setPadding(RIGHT, buttonWidth);
+            getSelectedStyle().setPadding(LEFT, 0);
         }
     }
     
@@ -297,7 +303,9 @@ public class OnOffSwitch extends Container {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
-        super.pointerPressed(x, y);
+        if(iosMode) {
+            super.pointerPressed(x, y);
+        }
         pressX = x;
     }
     
@@ -317,6 +325,8 @@ public class OnOffSwitch extends Container {
             }
             getUnselectedStyle().setPadding(RIGHT, right);
             getUnselectedStyle().setPadding(LEFT, left);
+            getSelectedStyle().setPadding(RIGHT, right);
+            getSelectedStyle().setPadding(LEFT, left);
             if(right < left) {
                 button.setText(on);
             } else {
@@ -364,6 +374,10 @@ public class OnOffSwitch extends Container {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
+        if(animationLock) {
+            return;
+        }
+        animationLock = true;
         if(iosMode) {
             int switchButtonPadInt = UIManager.getInstance().getThemeConstant("switchButtonPadInt", 16);
             if(dragged) {
@@ -383,6 +397,7 @@ public class OnOffSwitch extends Container {
             } else {
                 animateTo(!value, 0);
             }
+            animationLock = false;
             return;
         } else {
             if(!dragged) {
@@ -403,10 +418,11 @@ public class OnOffSwitch extends Container {
                 }
                 
                 updateButton();
-                animateLayout(150);
+                animateLayoutAndWait(150);
             }
         }        
         dragged = false;
+        animationLock = false;
     }
 
     /**
@@ -456,6 +472,8 @@ public class OnOffSwitch extends Container {
      * @param value the value to set
      */
     public void setValue(boolean value) {
+        boolean orig = animationLock;
+        animationLock = true;
         boolean fireEvent = this.value != value;
         if(fireEvent) {
             this.value = value;
@@ -467,9 +485,10 @@ public class OnOffSwitch extends Container {
                 repaint();
             } else {
                 updateButton();
-                animateLayout(150);
+                animateLayoutAndWait(150);
             }
         }
+        animationLock = orig;
     }
 
     /**
