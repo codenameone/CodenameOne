@@ -57,6 +57,7 @@
 #import "StoreKit/StoreKit.h"
 #import "ScanCodeImpl.h"
 #include "com_codename1_contacts_Contact.h"
+#include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
 #include "com_codename1_ui_Image.h"
 #include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
@@ -2974,6 +2975,58 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                                                                                                                                             JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
+    
+    if(includeAddress) {
+        ABMultiValueRef addresses = (ABMultiValueRef)ABRecordCopyValue(i, kABPersonAddressProperty);
+        int addressCount = ABMultiValueGetCount(addresses);
+        if(addressCount > 0) {
+            
+#ifndef NEW_CODENAME_ONE_VM
+            JAVA_OBJECT addressesHash = com_codename1_contacts_Contact_getAddresses__(cnt);
+#else
+            JAVA_OBJECT addressesHash = com_codename1_contacts_Contact_getAddresses___R_java_util_Hashtable(CN1_THREAD_STATE_PASS_ARG cnt);
+            for (CFIndex j = 0; j<addressCount;j++){
+                JAVA_OBJECT addr = __NEW_com_codename1_contacts_Address(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                com_codename1_contacts_Address___INIT____(CN1_THREAD_STATE_PASS_ARG addr);
+                CFDictionaryRef dict = ABMultiValueCopyValueAtIndex(addresses, j);
+                CFStringRef typeTmp = ABMultiValueCopyLabelAtIndex(addresses, j);
+                CFStringRef labeltype = ABAddressBookCopyLocalizedLabel(typeTmp);
+                NSString *street = [(NSString *)CFDictionaryGetValue(dict, kABPersonAddressStreetKey) copy];
+                NSString *city = [(NSString *)CFDictionaryGetValue(dict, kABPersonAddressCityKey) copy];
+                NSString *state = [(NSString *)CFDictionaryGetValue(dict, kABPersonAddressStateKey) copy];
+                NSString *zip = [(NSString *)CFDictionaryGetValue(dict, kABPersonAddressZIPKey) copy];
+                NSString *country = [(NSString *)CFDictionaryGetValue(dict, kABPersonAddressCountryKey) copy];
+                
+                com_codename1_contacts_Address_setCountry___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG country));
+                com_codename1_contacts_Address_setLocality___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG city));
+                com_codename1_contacts_Address_setRegion___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG state));
+                com_codename1_contacts_Address_setPostalCode___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG zip));
+                com_codename1_contacts_Address_setStreetAddress___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG country));
+                
+                
+                
+                
+                
+                
+                [street release];
+                [city release];
+                [state release];
+                [zip release];
+                [country release];
+                CFRelease(dict);
+                CFRelease(typeTmp);
+                CFRelease(labeltype);
+                java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CN1_THREAD_STATE_PASS_ARG addressesHash, fromNSString(CN1_THREAD_STATE_PASS_ARG (NSString*)labeltype), addr);
+            }
+            CFRelease(addresses);
+            
+            
+#endif
+            
+            //addToHashtable(CN1_THREAD_STATE_PASS_ARG addressesHash, addresses, addressCount);
+        }
+    }
+    
     if(includesEmail) {
         ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
         int emailCount = ABMultiValueGetCount(emails);
@@ -3067,6 +3120,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     
     POOL_END();
 }
+
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
     POOL_BEGIN();

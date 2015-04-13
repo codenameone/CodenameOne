@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
+import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.impl.CodenameOneImplementation;
@@ -4323,6 +4324,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         Contact c = new Contact();
         c.setId(id);
         c.setAddresses(new Hashtable());
+        if (includeAddress) {
+            // This is a hack to make sure that 
+            // Address and its methods aren't stripped out by the BytecodeCompiler
+            Address tmp = new Address();
+        }
+
         c.setEmails(new Hashtable());
         c.setPhoneNumbers(new Hashtable());
         nativeInstance.updatePersonWithRecordID(recId, c, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
@@ -6150,7 +6157,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
-    
+
    
 }
 
