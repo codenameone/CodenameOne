@@ -351,7 +351,49 @@ JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CO
     if ( !b ){
         sprintf(s, "%lf", d);
     } else {
-        sprintf(s, "%lE", d);
+        sprintf(s, "%1.20E", d);
+    }
+    
+    // We need to match the format of Java spec.  That includes:
+    // No "+" for positive exponent.
+    // No leading zeroes in positive exponents.
+    // No trailing zeroes in decimal portion.
+    int j=0;
+    int i=32;
+    char s2[32];
+    BOOL inside=NO;
+    while (i-->0){
+        if (inside){
+            if (s[i]=='.'){
+                s2[j++]='0';
+            }
+            if (s[i]!='0'){
+                inside=NO;
+                s2[j++]=s[i];
+            }
+            
+        } else {
+            if (s[i]=='E'){
+                inside=YES;
+            }
+            if (s[i]=='+'){
+                // If a positive exponent, we don't need leading zeroes in
+                // the exponent
+                while (s2[--j]=='0'){
+                    
+                }
+                j++;
+                continue;
+            }
+            s2[j++]=s[i];
+        }
+    }
+    i=0;
+    while (j-->0){
+        s[i++]=s2[j];
+        if (s[i]=='\0'){
+            break;
+        }
     }
     return newStringFromCString(threadStateData, s);
 }
@@ -361,10 +403,53 @@ JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODE
     if ( !b ){
         sprintf(s, "%f", d);
     } else {
-        sprintf(s, "%E", d);
+        sprintf(s, "%1.20E", d);
     }
+    // We need to match the format of Java spec.  That includes:
+    // No "+" for positive exponent.
+    // No leading zeroes in positive exponents.
+    // No trailing zeroes in decimal portion.
+    int j=0;
+    int i=32;
+    char s2[32];
+    BOOL inside=NO;
+    while (i-->0){
+        if (inside){
+            if (s[i]=='.'){
+                s2[j++]='0';
+            }
+            if (s[i]!='0'){
+                inside=NO;
+                s2[j++]=s[i];
+            }
+            
+        } else {
+            if (s[i]=='E'){
+                inside=YES;
+            }
+            if (s[i]=='+'){
+                // If a positive exponent, we don't need leading zeroes in
+                // the exponent
+                while (s2[--j]=='0'){
+                    
+                }
+                j++;
+                continue;
+            }
+            s2[j++]=s[i];
+        }
+    }
+    i=0;
+    while (j-->0){
+        s[i++]=s2[j];
+        if (s[i]=='\0'){
+            break;
+        }
+    }
+    
     return newStringFromCString(threadStateData, s);
 }
+
 
 JAVA_OBJECT java_lang_Integer_toString___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT d) {
     char s[12];
