@@ -4766,15 +4766,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         public void appendData(byte[] data) {
+            boolean w = false;
             synchronized(LOCK) {
                 pendingData.addElement(data);
                 LOCK.notify();
                 try {
                     if(pendingData.size() > 20) {
+                        w = true;
                         LOCK.wait(1000);
                     }
                 } catch(InterruptedException ie) {
                 }
+            }
+            if(w) {
+                System.gc();
             }
         }
         

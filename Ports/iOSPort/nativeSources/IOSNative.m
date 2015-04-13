@@ -1390,9 +1390,20 @@ void connectionReceivedData(void* peer, NSData* data) {
 #else
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     enteringNativeAllocations();
-    JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-    [data getBytes:((JAVA_ARRAY)byteArray)->data];
-    com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
+    if([data length] > 65536) {
+        int offset = 0;
+        while(offset < [data length]) {
+            int currentLength = MIN(65536, [data length] - offset);
+            JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, currentLength);
+            [data getBytes:((JAVA_ARRAY)byteArray)->data range:NSMakeRange(offset, currentLength)];
+            com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
+            offset += 65536;
+        }
+    } else {
+        JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
+        [data getBytes:((JAVA_ARRAY)byteArray)->data];
+        com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
+    }
     finishedNativeAllocations();
 #endif
 }
