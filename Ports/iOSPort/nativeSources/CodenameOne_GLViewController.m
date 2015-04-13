@@ -1191,9 +1191,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
                                                  coloSpaceRgb,
                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-    CGRect r = CGRectMake(-x, -(img.size.height - y - height), img.size.width, img.size.height);
+    CGRect r = CGRectMake(0, 0, width, height);
     CGImageRef cgImg = [img CGImage];
     CGContextDrawImage(context, r, cgImg);
+    
     CGColorSpaceRelease(coloSpaceRgb);
     CGContextRelease(context);
 }
