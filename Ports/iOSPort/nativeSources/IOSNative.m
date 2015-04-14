@@ -4108,6 +4108,14 @@ void com_codename1_impl_ios_IOSNative_log___java_lang_String(CN1_THREAD_STATE_MU
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_clearNativeCookies__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT receiver){
+    NSHTTPCookieStorage *storage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    for (NSHTTPCookie *cookie in [storage cookies]) {
+        [storage deleteCookie:cookie];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
 void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_util_Vector(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT receiver, JAVA_OBJECT urlStr, JAVA_OBJECT outVector) {
     POOL_BEGIN();
     NSHTTPCookieStorage *cstore = [NSHTTPCookieStorage sharedHTTPCookieStorage];

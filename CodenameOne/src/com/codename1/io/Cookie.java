@@ -210,5 +210,8 @@ public class Cookie implements Externalizable {
         if (Storage.getInstance().exists(Cookie.STORAGE_NAME)) {
             Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
         }
+        // This is necessary to clear cookies on iOS
+        // https://github.com/codenameone/CodenameOne/issues/1422
+        Util.getImplementation().clearNativeCookies();
     }
 }

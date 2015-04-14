@@ -496,5 +496,6 @@ public final class IOSNative {
     native void setNativeClippingPolygonGlobal(float[] points);
 
     
+    native void clearNativeCookies();
 
 }

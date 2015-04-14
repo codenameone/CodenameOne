@@ -235,6 +235,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     static boolean isUseNativeCookiesNativeCallback(){
         return instance.isUseNativeCookieStore();
     }
+
+    @Override
+    public void clearNativeCookies() {
+        nativeInstance.clearNativeCookies();
+    }
+    
+    
     
     @Override
     public void addCookie(Cookie[] cookiesArray) {

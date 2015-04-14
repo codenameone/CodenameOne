@@ -3902,6 +3902,10 @@ public abstract class CodenameOneImplementation {
         return response;
     }
 
+    public void clearNativeCookies(){
+        
+    }
+    
     /**
      * Connects to a given URL, returns a connection object to be used with the implementation
      * later
