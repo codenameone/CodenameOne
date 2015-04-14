@@ -5692,7 +5692,11 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean exists(String file) {
-        return new File(unfile(file)).exists();
+        try {
+            return new File(unfile(file)).exists();            
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
