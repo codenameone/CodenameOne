@@ -219,7 +219,7 @@ extern int getResourceSize(const char* name, int nameLen, const char* type, int 
 extern int isPainted();
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
-(void* peer, int* arr, int x, int y, int width, int height);
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
 
 extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* arr, int width, int height);
@@ -383,7 +383,7 @@ void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THR
 }
 
 
-void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_OBJECT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
+void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_OBJECT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
 {
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
@@ -392,7 +392,7 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
 #else
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
 #endif
-    Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl((void *)n1, data, n3, n4, n5, n6);
+    Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl((void *)n1, data, n3, n4, n5, n6, n7, n8);
     POOL_END();
 }
 

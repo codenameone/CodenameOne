@@ -668,12 +668,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             arr = newArr;
             offset = 0;
         }
-        
-        imageRgbToIntArray(((NativeImage)nativeImage).peer, arr, x, y, width, height);
+        NativeImage nimg = (NativeImage)nativeImage;
+        imageRgbToIntArray(nimg.peer, arr, x, y, width, height, nimg.width, nimg.height);
     }
 
-    private void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height) {
-        nativeInstance.imageRgbToIntArray(imagePeer, arr, x, y, width, height);
+    private void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+        nativeInstance.imageRgbToIntArray(imagePeer, arr, x, y, width, height, imgWidth, imgHeight);
     }
 
     private long createImageFromARGB(int[] argb, int width, int height) {

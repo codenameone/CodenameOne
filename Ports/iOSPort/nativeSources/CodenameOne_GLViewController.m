@@ -1178,7 +1178,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
-(void* peer, int* arr, int x, int y, int width, int height) {
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
@@ -1191,7 +1191,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
                                                  coloSpaceRgb,
                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-    CGRect r = CGRectMake(0, 0, width, height);
+    
+    float scaleX = ((float)imgWidth)/((float)img.size.width);
+    float scaleY = ((float)imgHeight)/((float)img.size.height);
+    CGRect r = CGRectMake(-x / scaleX, -(imgHeight - y - height) / scaleY, img.size.width * scaleX, img.size.height * scaleY);
     CGImageRef cgImg = [img CGImage];
     CGContextDrawImage(context, r, cgImg);
     

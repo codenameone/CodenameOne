@@ -46,7 +46,7 @@ public final class IOSNative {
     native int getDisplayHeight();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar);
     native void flushBuffer(long peer, int x, int y, int width, int height);
-    native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height);
+    native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
     native long createImage(byte[] data, int[] widthHeight);
     native long createImageNSData(long nsData, int[] widthHeight);
