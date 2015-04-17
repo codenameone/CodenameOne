@@ -1107,8 +1107,6 @@ public final class Display {
         c.onEditComplete(text);
         c.fireActionEvent();
     }
-
-    private Runnable[] serialCallsArrayCache = new Runnable[100];
     
     /**
      * Used by the EDT to process all the calls submitted via call serially
@@ -1120,11 +1118,7 @@ public final class Display {
             Runnable[] array = null;
             synchronized(lock) {
                 size = pendingSerialCalls.size();
-                if(size < 101) {
-                    array = serialCallsArrayCache;
-                } else {
-                    array = new Runnable[size];
-                }
+                array = new Runnable[size];
 
                 // copy all elements to an array and remove them otherwise invokeAndBlock from
                 // within a callSerially() can cause an infinite loop...
