@@ -115,7 +115,9 @@ public class TypeInstruction extends Instruction {
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
-                    b.append(", sizeof(JAVA_OBJECT), 1 ));\n    stack[stackPointer - 1].data.o->__codenameOneParentClsReference = &class_array");
+                    b.append(", sizeof(JAVA_OBJECT), ");
+                    b.append(dim);
+                    b.append("));\n    stack[stackPointer - 1].data.o->__codenameOneParentClsReference = &class_array");
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
