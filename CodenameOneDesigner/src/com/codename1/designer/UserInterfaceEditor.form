@@ -180,13 +180,13 @@
                               <Group type="102" attributes="0">
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Component id="bindOnCreate" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="bindActionEvent" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="bindBeforeShow" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="bindPostShow" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="bindExitForm" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="bindListModel" alignment="0" pref="558" max="32767" attributes="0"/>
-                                      <Component id="whyAreEventsDisabled" alignment="0" pref="407" max="32767" attributes="0"/>
+                                      <Component id="bindOnCreate" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="bindActionEvent" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="bindBeforeShow" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="bindPostShow" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="bindExitForm" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="bindListModel" alignment="0" pref="420" max="32767" attributes="0"/>
+                                      <Component id="whyAreEventsDisabled" alignment="0" pref="420" max="32767" attributes="0"/>
                                   </Group>
                                   <EmptySpace max="-2" attributes="0"/>
                               </Group>
@@ -373,7 +373,7 @@
                                       <Component id="jLabel5" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="initialForm" alignment="3" min="-2" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace pref="175" max="32767" attributes="0"/>
+                                  <EmptySpace pref="145" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -602,8 +602,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneCheckBox">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/CheckBox32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Check Box"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;CheckBox&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Is derived from Button and thus has all its capabilities, besides those a checkbox also has a&lt;br&gt;&#xa;checkmark next to it by default and has a state indicating whether it is selected or not.&lt;br&gt;&#xa;A checkbox can be marked as a toggle button at which point it will not draw the checkbox&lt;br&gt;&#xa;mark.&lt;br&gt;&#xa;The graphics for the checkbox drawing can be replaced in the theme using the constants tab.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -619,8 +619,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneRadioButton">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/RadioButton32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Radio Button"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;RadioButton&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Identical to checkbox (derived from Button) with a somewhat different type of marking drawn next&lt;br&gt;&#xa;to it. The major difference is that a radio button belongs to a group (specified by name in the&lt;br&gt;&#xa;properties) this group indicates exclusivity. Only one member of the radio group may be selected&lt;br&gt;&#xa;at once and when another member gets selected an old member loses selection.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -687,8 +687,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneTextArea">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/Text32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Text Area"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;TextArea&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Allows viewing text that potentially spans multiple lines and can potentially resize automatically&lt;br&gt;&#xa;based on the amount of text. TextArea optionally allows editing the text but only by going&lt;br&gt;&#xa;to a separate native editor to complete the editing. This can have some advantages on most&lt;br&gt;&#xa;devices since text input is unique and complex.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -704,8 +704,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneTextField">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/Text32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Text Field"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;TextField&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Based on the text area but designed for &quot;in place&quot; editing with a cursor and everything involved&lt;br&gt;&#xa;in that. The text field is far more customizable than the text area but also far more complex.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -721,8 +721,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneAutoCompleteTextField">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTaskPane32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Auto Complete"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Auto Complete TextField&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A TextField that shows a completion popup as you type into it and allows you to pick from a&lt;br&gt;&#xa;set of entries&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -772,8 +772,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneTabs">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/Tabs32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Tabs"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Tabs&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Tabs is a type of container that arranges the components/containers within it in named tabs&lt;br&gt;&#xa;allowing the user to page or swipe between them. &#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -806,8 +806,8 @@
                                 </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneCalendar">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXDatePicker32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Calendar"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Calendar&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;The calendar component contains a month view and ability to select a specific day within&lt;br&gt;&#xa;said view. It is very good for feature phones but on touch devices you might be better off&lt;br&gt;&#xa;using a date spinner.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -857,7 +857,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneTable">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTreeTable32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Table"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Table&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A table component allowing the display and editing of tabular data&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -874,7 +874,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneTree">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTreeTable32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Tree"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Tree&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;An expandable tree component&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -891,7 +891,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneHTMLComponent">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/Web32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Web View"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;WebBrowser&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Browser component that allows viewing HTML and optionally uses the platform native browser component if available&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -908,7 +908,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneContainerList">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="ContainerList"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ContainerList&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A container that acts like a List, providing a model and renderer approach but doesn&apos;t&lt;br&gt;&#xa;enable component addition. This allows mapping list functionality and model to a Container&lt;br&gt;&#xa;and using standard Codename One layout managers to arrange the content of the container.&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -925,7 +925,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneComponentGroup">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Component Group"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ComponentGroup&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A component group is a container that applies the given UIID to a set of components within it&lt;br&gt;&#xa;while appending First/Last/Only to the UIID appropriately. This is useful to create some user interfaces&lt;br&gt;&#xa;where the first/last element should have different UIID&apos;s (e.g. rounded edges).&lt;br&gt;&#xa;&lt;b&gt;This feature is disabled by default!!!&lt;/b&gt; It will have no effect on your code unless you explicitly&lt;br&gt;&#xa;define the theme constant ComponentGroupBool, this allows themes that aren&apos;t interested in this&lt;br&gt;&#xa;effect to remain much simpler.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -942,7 +942,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneMediaPlayer">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/Play32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Media Player"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;MediaPlayer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A video playback component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -959,7 +959,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOnePicker">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/PickerShadow32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Picker"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Picker&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Important: a picker is rendered natively and will look differently on the device!&lt;/b&gt;&lt;br&gt;&#xa;A spinner dialog component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -976,7 +976,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneNumericSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/number32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Numeric Spinner"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Numeric Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -993,7 +993,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneDateSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXDatePicker32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Date Spinner"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1010,7 +1010,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneTimeSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/time32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Time Spinner"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1027,7 +1027,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneDateTimeSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXDatePicker32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Date &amp; Time Spinner"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Date &amp;amp; Time Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;An iOS like spinner component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1044,7 +1044,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneGenericSpinner">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/SpinnerG32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Generic Spinner"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Generic Spinner&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;&lt;b&gt;Deprecated: it is recommended you use the new Picker component&lt;/b&gt;&lt;br&gt;&#xa;A spinner component that shows arbitrary data&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1058,27 +1058,10 @@
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneGenericSpinnerActionPerformed"/>
                                   </Events>
                                 </Component>
-                                <Component class="javax.swing.JButton" name="codenameOneLikeButton">
-                                  <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXButton32.png"/>
-                                    </Property>
-                                    <Property name="text" type="java.lang.String" value="Facebook Like Button"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;LikeButton&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Simple Facebook like button&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
-                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
-                                      <Border info="null"/>
-                                    </Property>
-                                    <Property name="horizontalAlignment" type="int" value="2"/>
-                                    <Property name="name" type="java.lang.String" value="codenameOneLikeButton" noResource="true"/>
-                                  </Properties>
-                                  <Events>
-                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneLikeButtonActionPerformed"/>
-                                  </Events>
-                                </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneInfiniteProgress">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXBusyLabel32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Infinite Progress"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Infinite Progress&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;A constantly spinning wheel component indicating progress&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1092,27 +1075,10 @@
                                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneInfiniteProgressActionPerformed"/>
                                   </Events>
                                 </Component>
-                                <Component class="javax.swing.JButton" name="codenameOneAds">
-                                  <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
-                                    </Property>
-                                    <Property name="text" type="java.lang.String" value="Ads"/>
-                                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Ads&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Generic pluggable ad component.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
-                                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
-                                      <Border info="null"/>
-                                    </Property>
-                                    <Property name="horizontalAlignment" type="int" value="2"/>
-                                    <Property name="name" type="java.lang.String" value="codenameOneAds" noResource="true"/>
-                                  </Properties>
-                                  <Events>
-                                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="codenameOneAdsActionPerformed"/>
-                                  </Events>
-                                </Component>
                                 <Component class="javax.swing.JButton" name="codenameOneMap">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/gui/map32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Map"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;Map&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Displays a user navigatable Map on the screen.&lt;br&gt;&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1163,7 +1129,7 @@
                                 <Component class="javax.swing.JButton" name="codenameOneImageViewer">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXImagePanel32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="Image Viewer"/>
                                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;&lt;body&gt;&lt;b&gt;ImageViewer&lt;/b&gt;&lt;br&gt; &#xa;&lt;p&gt;&#xa;Control allowing the user to view/pinch and optionally swipe between images&#xa;&lt;/p&gt; &lt;/body&gt; &lt;/html&gt;" noResource="true"/>
@@ -1212,8 +1178,8 @@
                               <SubComponents>
                                 <Component class="javax.swing.JButton" name="rssReader">
                                   <Properties>
-                                    <Property name="icon" type="javax.swing.Icon" noResource="true" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                    <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                      <Image iconType="3" name="/gui/rss.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="RSS Reader"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
@@ -1229,7 +1195,7 @@
                                 <Component class="javax.swing.JButton" name="fileTree">
                                   <Properties>
                                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/placeholder32.png"/>
+                                      <Image iconType="3" name="/org/jdesktop/swingx/resources/JXTreeTable32.png"/>
                                     </Property>
                                     <Property name="text" type="java.lang.String" value="File Tree"/>
                                     <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">

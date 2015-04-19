@@ -1881,12 +1881,12 @@ public class UserInterfaceEditor extends BaseForm {
         makeDraggable(codenameOneTimeSpinner, com.codename1.ui.spinner.TimeSpinner.class, "TimeSpinner", null);
         makeDraggable(codenameOneDateTimeSpinner, com.codename1.ui.spinner.DateTimeSpinner.class, "DateTimeSpinner", null);
         makeDraggable(codenameOneGenericSpinner, com.codename1.ui.spinner.GenericSpinner.class, "GenericSpinner", null);
-        makeDraggable(codenameOneLikeButton, com.codename1.facebook.ui.LikeButton.class, "LikeButton", null);
+        //makeDraggable(codenameOneLikeButton, com.codename1.facebook.ui.LikeButton.class, "LikeButton", null);
         makeDraggable(codenameOneInfiniteProgress, com.codename1.components.InfiniteProgress.class, "InfiniteProgress", null);
         makeDraggable(codenameOneMultiButton, com.codename1.components.MultiButton.class, "MultiButton", null);
         makeDraggable(codenameOneSpanButton, com.codename1.components.SpanButton.class, "SpanButton", null);
         makeDraggable(codenameOneSpanLabel, com.codename1.components.SpanLabel.class, "SpanLabel", null);
-        makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
+        //makeDraggable(codenameOneAds, com.codename1.components.Ads.class, "Ads", null);
         makeDraggable(codenameOneMap, com.codename1.maps.MapComponent.class, "MapComponent", null);
         makeDraggable(codenameOneMultiList, com.codename1.ui.list.MultiList.class, "MultiList", null);
         makeDraggable(codenameOneShare, com.codename1.components.ShareButton.class, "ShareButton", null);
@@ -5417,9 +5417,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTimeSpinner = new javax.swing.JButton();
         codenameOneDateTimeSpinner = new javax.swing.JButton();
         codenameOneGenericSpinner = new javax.swing.JButton();
-        codenameOneLikeButton = new javax.swing.JButton();
         codenameOneInfiniteProgress = new javax.swing.JButton();
-        codenameOneAds = new javax.swing.JButton();
         codenameOneMap = new javax.swing.JButton();
         codenameOneShare = new javax.swing.JButton();
         codenameOneOnOffSwitch = new javax.swing.JButton();
@@ -5519,13 +5517,13 @@ public class UserInterfaceEditor extends BaseForm {
             .add(jPanel4Layout.createSequentialGroup()
                 .addContainerGap()
                 .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 558, Short.MAX_VALUE)
-                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 407, Short.MAX_VALUE))
+                    .add(bindOnCreate, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(bindActionEvent, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(bindBeforeShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(bindPostShow, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(bindExitForm, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(bindListModel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE)
+                    .add(whyAreEventsDisabled, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 420, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel4Layout.setVerticalGroup(
@@ -5608,7 +5606,7 @@ public class UserInterfaceEditor extends BaseForm {
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel5)
                     .add(initialForm))
-                .addContainerGap(175, Short.MAX_VALUE))
+                .addContainerGap(145, Short.MAX_VALUE))
         );
 
         propertyAndEventTabs.addTab("Preview & Misc", jPanel9);
@@ -5688,7 +5686,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneSpanButton.addActionListener(formListener);
         coreComponents.add(codenameOneSpanButton);
 
-        codenameOneCheckBox.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneCheckBox.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/CheckBox32.png"))); // NOI18N
         codenameOneCheckBox.setText("Check Box");
         codenameOneCheckBox.setToolTipText("<html><body><b>CheckBox</b><br> \n<p>\nIs derived from Button and thus has all its capabilities, besides those a checkbox also has a<br>\ncheckmark next to it by default and has a state indicating whether it is selected or not.<br>\nA checkbox can be marked as a toggle button at which point it will not draw the checkbox<br>\nmark.<br>\nThe graphics for the checkbox drawing can be replaced in the theme using the constants tab.\n</p> </body> </html>"); // NOI18N
         codenameOneCheckBox.setBorder(null);
@@ -5697,7 +5695,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneCheckBox.addActionListener(formListener);
         coreComponents.add(codenameOneCheckBox);
 
-        codenameOneRadioButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneRadioButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/RadioButton32.png"))); // NOI18N
         codenameOneRadioButton.setText("Radio Button");
         codenameOneRadioButton.setToolTipText("<html><body><b>RadioButton</b><br> \n<p>\nIdentical to checkbox (derived from Button) with a somewhat different type of marking drawn next<br>\nto it. The major difference is that a radio button belongs to a group (specified by name in the<br>\nproperties) this group indicates exclusivity. Only one member of the radio group may be selected<br>\nat once and when another member gets selected an old member loses selection.\n</p> </body> </html>"); // NOI18N
         codenameOneRadioButton.setBorder(null);
@@ -5733,7 +5731,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMultiList.addActionListener(formListener);
         coreComponents.add(codenameOneMultiList);
 
-        codenameOneTextArea.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTextArea.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/Text32.png"))); // NOI18N
         codenameOneTextArea.setText("Text Area");
         codenameOneTextArea.setToolTipText("<html><body><b>TextArea</b><br> \n<p>\nAllows viewing text that potentially spans multiple lines and can potentially resize automatically<br>\nbased on the amount of text. TextArea optionally allows editing the text but only by going<br>\nto a separate native editor to complete the editing. This can have some advantages on most<br>\ndevices since text input is unique and complex.\n</p> </body> </html>"); // NOI18N
         codenameOneTextArea.setBorder(null);
@@ -5742,7 +5740,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTextArea.addActionListener(formListener);
         coreComponents.add(codenameOneTextArea);
 
-        codenameOneTextField.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTextField.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/Text32.png"))); // NOI18N
         codenameOneTextField.setText("Text Field");
         codenameOneTextField.setToolTipText("<html><body><b>TextField</b><br> \n<p>\nBased on the text area but designed for \"in place\" editing with a cursor and everything involved<br>\nin that. The text field is far more customizable than the text area but also far more complex.\n</p> </body> </html>"); // NOI18N
         codenameOneTextField.setBorder(null);
@@ -5751,7 +5749,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTextField.addActionListener(formListener);
         coreComponents.add(codenameOneTextField);
 
-        codenameOneAutoCompleteTextField.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneAutoCompleteTextField.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTaskPane32.png"))); // NOI18N
         codenameOneAutoCompleteTextField.setText("Auto Complete");
         codenameOneAutoCompleteTextField.setToolTipText("<html><body><b>Auto Complete TextField</b><br> \n<p>\nA TextField that shows a completion popup as you type into it and allows you to pick from a<br>\nset of entries\n</p> </body> </html>"); // NOI18N
         codenameOneAutoCompleteTextField.setBorder(null);
@@ -5778,7 +5776,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneContainer.addActionListener(formListener);
         coreComponents.add(codenameOneContainer);
 
-        codenameOneTabs.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTabs.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/Tabs32.png"))); // NOI18N
         codenameOneTabs.setText("Tabs");
         codenameOneTabs.setToolTipText("<html><body><b>Tabs</b><br> \n<p>\nTabs is a type of container that arranges the components/containers within it in named tabs<br>\nallowing the user to page or swipe between them. \n</p> </body> </html>"); // NOI18N
         codenameOneTabs.setBorder(null);
@@ -5796,7 +5794,7 @@ public class UserInterfaceEditor extends BaseForm {
         embedContainer.addActionListener(formListener);
         coreComponents.add(embedContainer);
 
-        codenameOneCalendar.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneCalendar.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXDatePicker32.png"))); // NOI18N
         codenameOneCalendar.setText("Calendar");
         codenameOneCalendar.setToolTipText("<html><body><b>Calendar</b><br> \n<p>\nThe calendar component contains a month view and ability to select a specific day within<br>\nsaid view. It is very good for feature phones but on touch devices you might be better off<br>\nusing a date spinner.\n</p> </body> </html>"); // NOI18N
         codenameOneCalendar.setBorder(null);
@@ -5815,7 +5813,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneExtraComponents.setName("codenameOneExtraComponents"); // NOI18N
         codenameOneExtraComponents.setLayout(new java.awt.GridLayout(0, 2));
 
-        codenameOneTable.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTable.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTreeTable32.png"))); // NOI18N
         codenameOneTable.setText("Table");
         codenameOneTable.setToolTipText("<html><body><b>Table</b><br> \n<p>\nA table component allowing the display and editing of tabular data\n</p> </body> </html>"); // NOI18N
         codenameOneTable.setBorder(null);
@@ -5824,7 +5822,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTable.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneTable);
 
-        codenameOneTree.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTree.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTreeTable32.png"))); // NOI18N
         codenameOneTree.setText("Tree");
         codenameOneTree.setToolTipText("<html><body><b>Tree</b><br> \n<p>\nAn expandable tree component\n</p> </body> </html>"); // NOI18N
         codenameOneTree.setBorder(null);
@@ -5833,7 +5831,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTree.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneTree);
 
-        codenameOneHTMLComponent.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneHTMLComponent.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/Web32.png"))); // NOI18N
         codenameOneHTMLComponent.setText("Web View");
         codenameOneHTMLComponent.setToolTipText("<html><body><b>WebBrowser</b><br> \n<p>\nBrowser component that allows viewing HTML and optionally uses the platform native browser component if available\n</p> </body> </html>"); // NOI18N
         codenameOneHTMLComponent.setBorder(null);
@@ -5842,7 +5840,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneHTMLComponent.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneHTMLComponent);
 
-        codenameOneContainerList.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneContainerList.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"))); // NOI18N
         codenameOneContainerList.setText("ContainerList");
         codenameOneContainerList.setToolTipText("<html><body><b>ContainerList</b><br> \n<p>\nA container that acts like a List, providing a model and renderer approach but doesn't<br>\nenable component addition. This allows mapping list functionality and model to a Container<br>\nand using standard Codename One layout managers to arrange the content of the container.\n</p> </body> </html>"); // NOI18N
         codenameOneContainerList.setBorder(null);
@@ -5851,7 +5849,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneContainerList.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneContainerList);
 
-        codenameOneComponentGroup.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneComponentGroup.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTaskPaneContainer32.png"))); // NOI18N
         codenameOneComponentGroup.setText("Component Group");
         codenameOneComponentGroup.setToolTipText("<html><body><b>ComponentGroup</b><br> \n<p>\nA component group is a container that applies the given UIID to a set of components within it<br>\nwhile appending First/Last/Only to the UIID appropriately. This is useful to create some user interfaces<br>\nwhere the first/last element should have different UIID's (e.g. rounded edges).<br>\n<b>This feature is disabled by default!!!</b> It will have no effect on your code unless you explicitly<br>\ndefine the theme constant ComponentGroupBool, this allows themes that aren't interested in this<br>\neffect to remain much simpler.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneComponentGroup.setBorder(null);
@@ -5860,7 +5858,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneComponentGroup.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneComponentGroup);
 
-        codenameOneMediaPlayer.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneMediaPlayer.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/Play32.png"))); // NOI18N
         codenameOneMediaPlayer.setText("Media Player");
         codenameOneMediaPlayer.setToolTipText("<html><body><b>MediaPlayer</b><br> \n<p>\nA video playback component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneMediaPlayer.setBorder(null);
@@ -5869,7 +5867,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneMediaPlayer.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneMediaPlayer);
 
-        codenameOnePicker.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOnePicker.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/PickerShadow32.png"))); // NOI18N
         codenameOnePicker.setText("Picker");
         codenameOnePicker.setToolTipText("<html><body><b>Picker</b><br> \n<p>\n<b>Important: a picker is rendered natively and will look differently on the device!</b><br>\nA spinner dialog component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
         codenameOnePicker.setBorder(null);
@@ -5878,7 +5876,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOnePicker.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOnePicker);
 
-        codenameOneNumericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneNumericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/number32.png"))); // NOI18N
         codenameOneNumericSpinner.setText("Numeric Spinner");
         codenameOneNumericSpinner.setToolTipText("<html><body><b>Numeric Spinner</b><br> \n<p>\n\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneNumericSpinner.setBorder(null);
@@ -5887,7 +5885,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneNumericSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneNumericSpinner);
 
-        codenameOneDateSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneDateSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXDatePicker32.png"))); // NOI18N
         codenameOneDateSpinner.setText("Date Spinner");
         codenameOneDateSpinner.setToolTipText("<html><body><b>Date Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateSpinner.setBorder(null);
@@ -5896,7 +5894,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneDateSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneDateSpinner);
 
-        codenameOneTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/time32.png"))); // NOI18N
         codenameOneTimeSpinner.setText("Time Spinner");
         codenameOneTimeSpinner.setToolTipText("<html><body><b>Time Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneTimeSpinner.setBorder(null);
@@ -5905,7 +5903,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneTimeSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneTimeSpinner);
 
-        codenameOneDateTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneDateTimeSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXDatePicker32.png"))); // NOI18N
         codenameOneDateTimeSpinner.setText("Date & Time Spinner");
         codenameOneDateTimeSpinner.setToolTipText("<html><body><b>Date &amp; Time Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nAn iOS like spinner component.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneDateTimeSpinner.setBorder(null);
@@ -5914,7 +5912,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneDateTimeSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneDateTimeSpinner);
 
-        codenameOneGenericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneGenericSpinner.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/SpinnerG32.png"))); // NOI18N
         codenameOneGenericSpinner.setText("Generic Spinner");
         codenameOneGenericSpinner.setToolTipText("<html><body><b>Generic Spinner</b><br> \n<p>\n<b>Deprecated: it is recommended you use the new Picker component</b><br>\nA spinner component that shows arbitrary data<br>\n</p> </body> </html>"); // NOI18N
         codenameOneGenericSpinner.setBorder(null);
@@ -5923,16 +5921,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneGenericSpinner.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneGenericSpinner);
 
-        codenameOneLikeButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXButton32.png"))); // NOI18N
-        codenameOneLikeButton.setText("Facebook Like Button");
-        codenameOneLikeButton.setToolTipText("<html><body><b>LikeButton</b><br> \n<p>\nSimple Facebook like button</p> </body> </html>"); // NOI18N
-        codenameOneLikeButton.setBorder(null);
-        codenameOneLikeButton.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
-        codenameOneLikeButton.setName("codenameOneLikeButton"); // NOI18N
-        codenameOneLikeButton.addActionListener(formListener);
-        codenameOneExtraComponents.add(codenameOneLikeButton);
-
-        codenameOneInfiniteProgress.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneInfiniteProgress.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXBusyLabel32.png"))); // NOI18N
         codenameOneInfiniteProgress.setText("Infinite Progress");
         codenameOneInfiniteProgress.setToolTipText("<html><body><b>Infinite Progress</b><br> \n<p>\nA constantly spinning wheel component indicating progress<br>\n</p> </body> </html>"); // NOI18N
         codenameOneInfiniteProgress.setBorder(null);
@@ -5941,16 +5930,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneInfiniteProgress.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneInfiniteProgress);
 
-        codenameOneAds.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
-        codenameOneAds.setText("Ads");
-        codenameOneAds.setToolTipText("<html><body><b>Ads</b><br> \n<p>\nGeneric pluggable ad component.<br>\n</p> </body> </html>"); // NOI18N
-        codenameOneAds.setBorder(null);
-        codenameOneAds.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
-        codenameOneAds.setName("codenameOneAds"); // NOI18N
-        codenameOneAds.addActionListener(formListener);
-        codenameOneExtraComponents.add(codenameOneAds);
-
-        codenameOneMap.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneMap.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/map32.png"))); // NOI18N
         codenameOneMap.setText("Map");
         codenameOneMap.setToolTipText("<html><body><b>Map</b><br> \n<p>\nDisplays a user navigatable Map on the screen.<br>\n</p> </body> </html>"); // NOI18N
         codenameOneMap.setBorder(null);
@@ -5977,7 +5957,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneOnOffSwitch.addActionListener(formListener);
         codenameOneExtraComponents.add(codenameOneOnOffSwitch);
 
-        codenameOneImageViewer.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        codenameOneImageViewer.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXImagePanel32.png"))); // NOI18N
         codenameOneImageViewer.setText("Image Viewer");
         codenameOneImageViewer.setToolTipText("<html><body><b>ImageViewer</b><br> \n<p>\nControl allowing the user to view/pinch and optionally swipe between images\n</p> </body> </html>"); // NOI18N
         codenameOneImageViewer.setBorder(null);
@@ -5996,7 +5976,7 @@ public class UserInterfaceEditor extends BaseForm {
         codenameOneIOComponents.setName("codenameOneIOComponents"); // NOI18N
         codenameOneIOComponents.setLayout(new java.awt.GridLayout(0, 2));
 
-        rssReader.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        rssReader.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/rss.png"))); // NOI18N
         rssReader.setText("RSS Reader");
         rssReader.setBorder(null);
         rssReader.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
@@ -6004,7 +5984,7 @@ public class UserInterfaceEditor extends BaseForm {
         rssReader.addActionListener(formListener);
         codenameOneIOComponents.add(rssReader);
 
-        fileTree.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/placeholder32.png"))); // NOI18N
+        fileTree.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/jdesktop/swingx/resources/JXTreeTable32.png"))); // NOI18N
         fileTree.setText("File Tree");
         fileTree.setBorder(null);
         fileTree.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
@@ -6150,6 +6130,9 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneMediaPlayer) {
                 UserInterfaceEditor.this.codenameOneMediaPlayerActionPerformed(evt);
             }
+            else if (evt.getSource() == codenameOnePicker) {
+                UserInterfaceEditor.this.codenameOnePickerActionPerformed(evt);
+            }
             else if (evt.getSource() == codenameOneNumericSpinner) {
                 UserInterfaceEditor.this.codenameOneNumericSpinnerActionPerformed(evt);
             }
@@ -6165,14 +6148,8 @@ public class UserInterfaceEditor extends BaseForm {
             else if (evt.getSource() == codenameOneGenericSpinner) {
                 UserInterfaceEditor.this.codenameOneGenericSpinnerActionPerformed(evt);
             }
-            else if (evt.getSource() == codenameOneLikeButton) {
-                UserInterfaceEditor.this.codenameOneLikeButtonActionPerformed(evt);
-            }
             else if (evt.getSource() == codenameOneInfiniteProgress) {
                 UserInterfaceEditor.this.codenameOneInfiniteProgressActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOneAds) {
-                UserInterfaceEditor.this.codenameOneAdsActionPerformed(evt);
             }
             else if (evt.getSource() == codenameOneMap) {
                 UserInterfaceEditor.this.codenameOneMapActionPerformed(evt);
@@ -6191,9 +6168,6 @@ public class UserInterfaceEditor extends BaseForm {
             }
             else if (evt.getSource() == fileTree) {
                 UserInterfaceEditor.this.fileTreeActionPerformed(evt);
-            }
-            else if (evt.getSource() == codenameOnePicker) {
-                UserInterfaceEditor.this.codenameOnePickerActionPerformed(evt);
             }
         }
 
@@ -6805,14 +6779,6 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         addComponentToContainer(new com.codename1.components.MultiButton(), "MultiButton");
     }//GEN-LAST:event_codenameOneMultiButtonActionPerformed
 
-    private void codenameOneLikeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneLikeButtonActionPerformed
-        if(lockForDragging) {
-            lockForDragging = false;
-            return; 
-        }
-        addComponentToContainer(new com.codename1.facebook.ui.LikeButton(), "LikeButton");
-    }//GEN-LAST:event_codenameOneLikeButtonActionPerformed
-
     private void codenameOneInfiniteProgressActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneInfiniteProgressActionPerformed
         if(lockForDragging) {
             lockForDragging = false;
@@ -6820,14 +6786,6 @@ private void codenameOneGenericSpinnerActionPerformed(java.awt.event.ActionEvent
         }
         addComponentToContainer(new com.codename1.components.InfiniteProgress(), "InfiniteProgress");
     }//GEN-LAST:event_codenameOneInfiniteProgressActionPerformed
-
-    private void codenameOneAdsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneAdsActionPerformed
-        if(lockForDragging) {
-            lockForDragging = false;
-            return; 
-        }
-        addComponentToContainer(new com.codename1.components.Ads(), "Ads");
-    }//GEN-LAST:event_codenameOneAdsActionPerformed
 
     private void codenameOneMapActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_codenameOneMapActionPerformed
         if(lockForDragging) {
@@ -7005,7 +6963,6 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton bindListModel;
     private javax.swing.JButton bindOnCreate;
     private javax.swing.JButton bindPostShow;
-    private javax.swing.JButton codenameOneAds;
     private javax.swing.JButton codenameOneAutoCompleteTextField;
     private javax.swing.JButton codenameOneButton;
     private javax.swing.JButton codenameOneCalendar;
@@ -7023,7 +6980,6 @@ private void codenameOneSpanButtonActionPerformed(java.awt.event.ActionEvent evt
     private javax.swing.JButton codenameOneImageViewer;
     private javax.swing.JButton codenameOneInfiniteProgress;
     private javax.swing.JButton codenameOneLabel;
-    private javax.swing.JButton codenameOneLikeButton;
     private javax.swing.JButton codenameOneList;
     private javax.swing.JButton codenameOneMap;
     private javax.swing.JButton codenameOneMediaPlayer;
