@@ -26,9 +26,10 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 
 /**
- * This is the Factory class to get a Location Manager instance.
- * The LocationManager is the main entry to retrieveLocation or to bind 
- * a LocationListener 
+ * The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
+ * order to use location on iOS you will need to define the build argument ios.locationUsageDescription.
+ * This build argument should be used to describe to Apple &amp; the users why you need to use the location 
+ * functionality.
  */
 public abstract class LocationManager {
     
