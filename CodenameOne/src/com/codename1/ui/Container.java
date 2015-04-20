@@ -2287,6 +2287,9 @@ public class Container extends Component {
             switch(animationType) {
                 case 2:
                     int componentCount = thisContainer.getComponentCount();
+                        componentCount = motions[0].length;
+                    }
+                    
                     if(animatedComponents != null) {
                         componentCount = animatedComponents.size();
                         for(int iter = 0 ; iter < componentCount ; iter++) {
