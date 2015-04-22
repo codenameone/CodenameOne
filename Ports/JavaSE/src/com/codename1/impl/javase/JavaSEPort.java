@@ -5995,7 +5995,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 File selected = pickFile(imageTypes, desc);
 
                 com.codename1.ui.events.ActionEvent result = null;
-                if(exposeFilesystem) { 
+                if(!exposeFilesystem) { 
                     if (selected != null) {
                         try {
                             File tmp = File.createTempFile("temp", "." + imageTypes[0]);
