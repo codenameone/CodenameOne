@@ -453,13 +453,12 @@ public final class GeneralPath implements Shape {
      * @param endY The end Y coordinate.
      */
     public void arcTo(float cX, float cY, float endX, float endY){
-        if ( pointSize < 3 ){
+        if ( pointSize < 2 ){
             throw new RuntimeException("Cannot add arc to path if it doesn't already have a starting point.");
             
         }
         float startX = points[pointSize-2];
         float startY = points[pointSize-1];
-        Log.p("Arc start "+startX+","+startY+" Arc end: "+endX+","+endY+", Center: "+cX+", "+cY);
         addBezierArcToPath(this, cX, cY, startX, startY, endX, endY);
     }
     
