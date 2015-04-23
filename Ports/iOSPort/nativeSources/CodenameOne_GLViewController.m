@@ -1936,8 +1936,6 @@ int keyboardHeight;
 #endif
 }
 
-UIInterfaceOrientation lastLandscapeOrientation;
-UIInterfaceOrientation lastPortraitOrientation;
 
 - (BOOL)shouldAutorotate {
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
