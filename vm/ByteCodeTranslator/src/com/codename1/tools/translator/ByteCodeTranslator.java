@@ -360,7 +360,7 @@ public class ByteCodeTranslator {
                         fileThreeEntry.append(" */,\n");
                     }
                 } else {
-                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib")) {
+                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith("Info.plist") || file.endsWith(".pch")) {
                         frameworks.append("				0");
                         frameworks.append(referenceValue);
                         frameworks.append("18E9ABBC002F3D1D /* ");
