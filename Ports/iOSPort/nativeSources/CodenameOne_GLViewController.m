@@ -1665,34 +1665,24 @@ int keyboardHeight;
     
     keyboardSlideOffset = 0;
     if(patch) {
-        if(displayHeight > displayWidth) {
+        if (isIOS8()) {
             viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
         } else {
-            /*if(isIOS8()) {
-                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
-                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
-                    viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
-                } else {
-                    viewFrame.origin.y -= keyboardHeight / patchSize * upsideDownMultiplier;
-                }
-            } else {*/
+            if(displayHeight > displayWidth) {
+                 viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
+            } else {
                 viewFrame.origin.x -= keyboardHeight / patchSize * upsideDownMultiplier;
-            //}
+            }
         }
     } else {
-        if(displayHeight > displayWidth) {
+        if (isIOS8()) {
             viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
         } else {
-            /*if(isIOS8()) {
-                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
-                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
-                    viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
-                } else {
-                    viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
-                }
-            } else {*/
+            if(displayHeight > displayWidth) {
+                viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
+            } else {
                 viewFrame.origin.x -= keyboardHeight * upsideDownMultiplier;
-            //}
+            }
         }
     }
     /*float y = editingComponent.frame.origin.y;
@@ -1758,42 +1748,30 @@ int keyboardHeight;
     }
     
     if(patch) {
-        if(displayHeight > displayWidth) {
+        if (isIOS8()){
             viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
             keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
         } else {
-            /*if(isIOS8()) {
-                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
-                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
-                    viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
-                    keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier * -1;
-                } else {
-                    viewFrame.origin.y += (keyboardHeight / patchSize) * upsideDownMultiplier;
-                    keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
-                }
-            } else {*/
+            if(displayHeight > displayWidth) {
+                viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
+                keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
+            } else {
                 viewFrame.origin.x += (keyboardHeight / patchSize) * upsideDownMultiplier;
                 keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
-            //}
+            }
         }
     } else {
-        if(displayHeight > displayWidth) {
+        if (isIOS8()){
             viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
             keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
         } else {
-            /*if(isIOS8()) {
-                UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
-                if(interfaceOrientation != UIInterfaceOrientationLandscapeLeft) {
-                    viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
-                    keyboardSlideOffset = keyboardHeight * upsideDownMultiplier * -1;
-                } else {
-                    viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
-                    keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
-                }
-            } else {*/
+            if(displayHeight > displayWidth) {
+                viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+                keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
+            } else {
                 viewFrame.origin.x += keyboardHeight * upsideDownMultiplier;
                 keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
-            //}
+            }
         }
     }
     
@@ -1958,30 +1936,33 @@ int keyboardHeight;
 #endif
 }
 
+UIInterfaceOrientation lastLandscapeOrientation;
+UIInterfaceOrientation lastPortraitOrientation;
+
 - (BOOL)shouldAutorotate {
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
     upsideDownMultiplier = 1;
+    //NSLog(@"%d %d x %d %d", interfaceOrientation, displayWidth, displayHeight, self.interfaceOrientation);
+    if (!isIOS8()) {
+        
+        if (self.interfaceOrientation == UIInterfaceOrientationLandscapeLeft) {
+            upsideDownMultiplier = -1;
+        }
+        //NSLog(@"multiplier %d", upsideDownMultiplier);
+    }
+    //return YES;
     switch (orientationLock) {
         case 0:
-            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
-                upsideDownMultiplier = -1;
-            }
             return YES;
             
         case 1:
-            if(interfaceOrientation == UIInterfaceOrientationPortrait) {
-                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
-                    upsideDownMultiplier = -1;
-                }
+            if(interfaceOrientation == UIInterfaceOrientationPortrait || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
                 return YES;
             }
             return NO;
             
         default:
             if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
-                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
-                    upsideDownMultiplier = -1;
-                }
                 return YES;
             }
     }
@@ -2019,13 +2000,17 @@ int keyboardHeight;
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
+    
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
     [(EAGLView *)self.view deleteFramebuffer];
-    
+
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
+    
     lockDrawing = NO;
+    
     screenSizeChanged(displayWidth, displayHeight);
+    repaintUI();
     
     if ( currentActionSheet != nil ){
         [UIView beginAnimations:nil context:nil];
