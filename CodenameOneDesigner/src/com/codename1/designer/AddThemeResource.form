@@ -89,16 +89,17 @@
     <Component class="javax.swing.JComboBox" name="template">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="9">
+          <StringArray count="10">
             <StringItem index="0" value="Native_Theme"/>
             <StringItem index="1" value="FlatBlueTheme"/>
             <StringItem index="2" value="FlatRedTheme"/>
             <StringItem index="3" value="FlatOrangeTheme"/>
-            <StringItem index="4" value="socialboo"/>
-            <StringItem index="5" value="Leather"/>
-            <StringItem index="6" value="Chrome"/>
-            <StringItem index="7" value="Mapper"/>
-            <StringItem index="8" value="Blank"/>
+            <StringItem index="4" value="BusinessTheme"/>
+            <StringItem index="5" value="socialboo"/>
+            <StringItem index="6" value="Leather"/>
+            <StringItem index="7" value="Chrome"/>
+            <StringItem index="8" value="Mapper"/>
+            <StringItem index="9" value="Blank"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="template" noResource="true"/>

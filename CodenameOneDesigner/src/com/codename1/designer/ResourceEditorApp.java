@@ -230,6 +230,9 @@ public class ResourceEditorApp extends SingleFrameApplication {
         if(themeName.equalsIgnoreCase("flatorange")) {
             template = "FlatOrangeTheme";
         }
+        if(themeName.equalsIgnoreCase("business")) {
+            template = "BusinessTheme";
+        }
         
         res.setTheme("Theme", importRes(res, template));
         
