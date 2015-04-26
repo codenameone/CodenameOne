@@ -3263,7 +3263,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         protected void initComponent() {
             super.initComponent();
-			blockNativeFocus(false);
+            blockNativeFocus(false);
             setPeerImage(null);
         }
         
