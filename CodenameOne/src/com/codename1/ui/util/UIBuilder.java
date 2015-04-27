@@ -2380,13 +2380,14 @@ public class UIBuilder { //implements Externalizable {
             cmd.putClientProperty(COMMAND_ARGUMENTS, "");
             cmd.putClientProperty(COMMAND_ACTION, commandAction);
         }
-        final Hashtable h =  p;
+        final Object ho =  p;
         final Command backCommand = cmd;
         
         return new LazyValue<Form>() {
             public Form get(Object... args) {
                 String n = getPreviousFormName(f);
                 final Form f = createForm((Form)createContainer(fetchResourceFile(), n));;
+                Hashtable h =  (Hashtable)ho;
                 if(h != null) {
                     setFormState(f, h);
                     setBackCommand(f, backCommand);
