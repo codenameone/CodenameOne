@@ -102,16 +102,22 @@ public class CodenameOneActivity extends Activity {
         }
     };
     IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
-        public void onIabPurchaseFinished(IabResult result, String sku, Purchase purchase) {
+        public void onIabPurchaseFinished(final IabResult result, final String sku, Purchase purchase) {
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) {
                 return;
             }
-            PurchaseCallback pc = getPurchaseCallback();
+            final PurchaseCallback pc = getPurchaseCallback();
             
             if(result.isFailure()){
                 if (pc != null) {
-                    pc.itemPurchaseError(sku, result.getMessage());
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            pc.itemPurchaseError(sku, result.getMessage());
+                        }
+                    });
                     return;
                 }                        
             }
@@ -122,7 +128,13 @@ public class CodenameOneActivity extends Activity {
 
             if(result.isSuccess()){
                 if (pc != null) {
-                    pc.itemPurchased(sku);     
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            pc.itemPurchased(sku);     
+                        }
+                    });
                     inventory.addPurchase(purchase);
                     //This is a temp hack to get the last purchase raw data
                     //The IAP API needs to be modified to support this on all platforms
@@ -143,7 +155,7 @@ public class CodenameOneActivity extends Activity {
 
     // Called when consumption is complete
     IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
-        public void onConsumeFinished(Purchase purchase, IabResult result) {
+        public void onConsumeFinished(final Purchase purchase, final IabResult result) {
 
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) {
@@ -151,13 +163,19 @@ public class CodenameOneActivity extends Activity {
             }
 
             if (result.isFailure()) {
-                PurchaseCallback pc = getPurchaseCallback();
+                final PurchaseCallback pc = getPurchaseCallback();
                 if (pc != null) {
-                    String sku = null;
-                    if(purchase != null){
-                        sku = purchase.getSku();
-                    }
-                    pc.itemPurchaseError(sku, result.getMessage());
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            String sku = null;
+                            if(purchase != null){
+                                sku = purchase.getSku();
+                            }
+                            pc.itemPurchaseError(sku, result.getMessage());
+                        }
+                    });
                 }
             }
             if(purchase != null){
