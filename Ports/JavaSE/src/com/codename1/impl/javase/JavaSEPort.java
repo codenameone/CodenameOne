@@ -2975,16 +2975,29 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         checkEDT();
         javax.swing.text.JTextComponent swingT;
-        if (cmp instanceof com.codename1.ui.TextField && ((com.codename1.ui.TextField)cmp).isSingleLineTextArea()) {
-            JTextField t = new JTextField() {
-                public void repaint(long tm, int x, int y, int width, int height) {
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            cmp.repaint();
-                        }
-                    });
-                }
-            };
+        if (((com.codename1.ui.TextField)cmp).isSingleLineTextArea()) {
+            JTextComponent t;
+            if(isDesktop() && (constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
+                t = new JPasswordField() {
+                    public void repaint(long tm, int x, int y, int width, int height) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                cmp.repaint();
+                            }
+                        });
+                    }
+                };
+            } else {
+                t = new JTextField() {
+                    public void repaint(long tm, int x, int y, int width, int height) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                cmp.repaint();
+                            }
+                        });
+                    }
+                };
+            }
             swingT = t;
         } else {
             com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
