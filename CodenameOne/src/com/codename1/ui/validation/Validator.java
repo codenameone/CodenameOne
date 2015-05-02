@@ -387,6 +387,9 @@ public class Validator {
     void setValid(Component cmp, boolean v) {
         Boolean b = (Boolean)cmp.getClientProperty(VALID_MARKER);
         if(b != null && b.booleanValue() == v) {
+            for(Component c : submitButtons) {
+                c.setEnabled(b.booleanValue());
+            }
             return;
         }
         if(!v) {
