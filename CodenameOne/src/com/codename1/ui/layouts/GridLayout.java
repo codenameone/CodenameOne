@@ -49,7 +49,7 @@ public class GridLayout extends Layout{
      * 
      * @param rows - number of rows.
      * @param columns - number of columns.
-     * @throws IllegalArgumentException if rows < 1 or columns < 1
+     * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
      */
     public GridLayout(int rows, int columns) {
         this.rows = rows;
