@@ -227,8 +227,8 @@ public class InPlaceEditView extends FrameLayout {
         }
         final Style taStyle = textArea.getStyle();
         Font font = taStyle.getFont();
-        int txty = textArea.getAbsoluteY();
-        int txtx = textArea.getAbsoluteX();
+        int txty = textArea.getAbsoluteY() + textArea.getScrollY();
+        int txtx = textArea.getAbsoluteX() + textArea.getScrollX();
         int paddingTop = 0;
         int paddingLeft = taStyle.getPadding(textArea.isRTL(), Component.LEFT);
         int paddingRight = taStyle.getPadding(textArea.isRTL(), Component.RIGHT);
@@ -467,8 +467,8 @@ public class InPlaceEditView extends FrameLayout {
 
             TextArea txt = sInstance.mEditText.mTextArea;
             if (txt != null) {
-                int txty = txt.getAbsoluteY();
-                int txtx = txt.getAbsoluteX();
+                int txty = txt.getAbsoluteY() + txt.getScrollY();
+                int txtx = txt.getAbsoluteX() + txt.getScrollX();
                 int w = txt.getWidth();
                 int h = txt.getHeight();
 
