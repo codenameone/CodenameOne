@@ -5082,18 +5082,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         return resultArr;
     }
 
+    private String storageDirectory;
+    public String getStorageDirectory() {
+        if(storageDirectory == null) {
+            if(Display.getInstance().getProperty("iosNewStorage", "false").equals("true")) {
+                storageDirectory = nativeInstance.getDocumentsDir();
+            } else {
+                storageDirectory = nativeInstance.getCachesDir();
+            }
+        }
+        return storageDirectory;
+    }
+    
     /**
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
-        nativeInstance.deleteFile(nativeInstance.getCachesDir() + "/" + name);
+        nativeInstance.deleteFile(getStorageDirectory() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        name = nativeInstance.getCachesDir() + "/" + name;
+        name = getStorageDirectory() + "/" + name;
         return new BufferedOutputStream(new NSDataOutputStream(name) , name);
     }
 
@@ -5101,7 +5113,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public InputStream createStorageInputStream(String name) throws IOException {
-        name = nativeInstance.getCachesDir() + "/" + name;
+        name = getStorageDirectory() + "/" + name;
         return new BufferedInputStream(new NSDataInputStream(name), name);
     }
 
@@ -5109,14 +5121,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
-        return nativeInstance.fileExists(nativeInstance.getCachesDir() + "/" + name);
+        return nativeInstance.fileExists(getStorageDirectory() + "/" + name);
     }
 
     /**
      * @inheritDoc
      */
     public String[] listStorageEntries() {
-        String c = nativeInstance.getCachesDir();
+        String c = getStorageDirectory();
         String[] a = new String[nativeInstance.fileCountInDir(c)];
         nativeInstance.listFilesInDir(c, a);
         return a;
@@ -5126,7 +5138,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getStorageEntrySize(String name) {
-        return nativeInstance.getFileSize(nativeInstance.getCachesDir() + "/" + name);
+        return nativeInstance.getFileSize(getStorageDirectory() + "/" + name);
     }
 
     /**
