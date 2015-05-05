@@ -495,8 +495,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                int x = cmp.getAbsoluteX();
-                int y = cmp.getAbsoluteY();
+                int x = cmp.getAbsoluteX() + cmp.getScrollX();
+                int y = cmp.getAbsoluteY() + cmp.getScrollY();
                 int w = cmp.getWidth();
                 int h = cmp.getHeight();
                 int pt = stl.getPadding(false, Component.TOP);
