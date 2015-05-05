@@ -102,7 +102,7 @@ public class ByteCodeTranslator {
         }
         if(directoryList != null) {
             for(File f : directoryList) {
-                if(f.getName().endsWith(".bundle")) {
+                if(f.getName().endsWith(".bundle") || f.getName().endsWith(".xcdatamodeld")) {
                     copyDir(f, outputDir);
                     continue;
                 }
@@ -224,7 +224,7 @@ public class ByteCodeTranslator {
             String[] sourceFiles = srcRoot.list(new FilenameFilter() {
                 @Override
                 public boolean accept(File pathname, String string) {
-                    return string.endsWith(".bundle") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
+                    return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
                 }
             });
             
@@ -309,7 +309,7 @@ public class ByteCodeTranslator {
                 } else {
                     fileListEntry.append("; path = \"");
                     if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
-                            file.endsWith(".bundle") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
+                            file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
                         fileListEntry.append(file);
                     } else {
                         fileListEntry.append(appName);
@@ -335,10 +335,10 @@ public class ByteCodeTranslator {
                 }
                 
                 if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
-                        file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xib")) {
+                        file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib")) {
                     
                     // bundle also needs to be a runtime resource
-                    if(file.endsWith(".bundle")) {
+                    if(file.endsWith(".bundle") || file.endsWith(".xcdatamodeld")) {
                         resources.append("\n				0");
                         resources.append(referenceValue);
                         resources.append("18E9ABBC002F3D1D /* ");
@@ -380,7 +380,7 @@ public class ByteCodeTranslator {
                             fileTwoEntry.append(file);
                             fileTwoEntry.append(" */,\n");
 
-                            if(!file.endsWith(".h") && !file.endsWith(".bundle")) {
+                            if(!file.endsWith(".h") && !file.endsWith(".bundle") && !file.endsWith(".xcdatamodeld")) {
                                 fileThreeEntry.append("				0");
                                 fileThreeEntry.append(referenceValue);
                                 fileThreeEntry.append("18E9ABBC002F3D1D /* ");
@@ -445,8 +445,8 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".plist")) {
             return "text.plist.xml";
-        }
-        if(s.endsWith(".bundle")) {
+        } 
+        if(s.endsWith(".bundle") || s.endsWith("xcdatamodeld")) {
             return "wrapper.plug-in";
         }
         if(s.endsWith(".m") || s.endsWith(".c")) {
