@@ -2975,7 +2975,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         checkEDT();
         javax.swing.text.JTextComponent swingT;
-        if (((com.codename1.ui.TextField)cmp).isSingleLineTextArea()) {
+        if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
             JTextComponent t;
             if(isDesktop() && (constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
