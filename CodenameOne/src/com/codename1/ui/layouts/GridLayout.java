@@ -55,8 +55,7 @@ public class GridLayout extends Layout{
         this.rows = rows;
         this.columns = columns;
         if(rows < 1 || columns < 1){
-            throw new IllegalArgumentException("rows and columns must be greater " +
-                    "then zero");
+            throw new IllegalArgumentException("Rows and columns must be greater than zero");
         }
     }
 
