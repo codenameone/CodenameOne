@@ -5084,7 +5084,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private String storageDirectory;
-    public String getStorageDirectory() throws IOException {
+    public String getStorageDirectory() {
         if(storageDirectory == null) {
             storageDirectory = nativeInstance.getDocumentsDir();
             if(!storageDirectory.endsWith("/")) {
@@ -5104,10 +5104,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     for(String current : a) {
                         if(!isDirectory(cachesDir + current)) {
-                            InputStream i = FileSystemStorage.getInstance().openInputStream(cachesDir + current);
-                            OutputStream o = FileSystemStorage.getInstance().openOutputStream(storageDirectory + current);
-                            Util.copy(i, o);
-                            FileSystemStorage.getInstance().delete(cachesDir + current);
+                            InputStream i = null;
+                            try {
+                                i = FileSystemStorage.getInstance().openInputStream(cachesDir + current);
+                                OutputStream o = FileSystemStorage.getInstance().openOutputStream(storageDirectory + current);
+                                Util.copy(i, o);
+                                FileSystemStorage.getInstance().delete(cachesDir + current);
+                            } catch (IOException ex) {
+                                throw new RuntimeException(ex.getMessage());
+                            } finally {
+                                try {
+                                    i.close();
+                                } catch (IOException ex) {
+                                    //throw new RuntimeException(ex.getMessage());
+                                }
+                            }
                         }
                     }
                 } 
