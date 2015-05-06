@@ -425,7 +425,7 @@ public class EventDispatcher {
         if(isEdt) {
             fireScrollSync(array, scrollX, scrollY, oldscrollX, oldscrollY);
         } else {
-            selectionListenerArray = true;
+            scrollListenerArray = true;
             Runnable cl = new CallbackClass(array, new int[] {scrollX, scrollY, oldscrollX, oldscrollY});
             if(blocking) {
                 Display.getInstance().callSeriallyAndWait(cl);
