@@ -75,6 +75,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
+import com.codename1.io.Preferences;
 import com.codename1.media.MediaManager;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
@@ -5083,12 +5084,35 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private String storageDirectory;
-    public String getStorageDirectory() {
+    public String getStorageDirectory() throws IOException {
         if(storageDirectory == null) {
-            if(Display.getInstance().getProperty("iosNewStorage", "false").equals("true")) {
-                storageDirectory = nativeInstance.getDocumentsDir();
+            storageDirectory = nativeInstance.getDocumentsDir();
+            if(!storageDirectory.endsWith("/")) {
+                storageDirectory = storageDirectory + "/";
+            }
+            storageDirectory += "cn1storage/";
+            if(!Display.getInstance().getProperty("iosNewStorage", "false").equals("true")) {
+                if(!exists(storageDirectory)) {
+                    // migrate existing storage
+                    mkdir(storageDirectory);
+
+                    String cachesDir = nativeInstance.getCachesDir();
+                    String[] a = new String[nativeInstance.fileCountInDir(cachesDir)];
+                    nativeInstance.listFilesInDir(cachesDir, a);
+                    if(!cachesDir.endsWith("/")) {
+                        cachesDir = cachesDir + "/";
+                    }
+                    for(String current : a) {
+                        if(!isDirectory(cachesDir + current)) {
+                            InputStream i = FileSystemStorage.getInstance().openInputStream(cachesDir + current);
+                            OutputStream o = FileSystemStorage.getInstance().openOutputStream(storageDirectory + current);
+                            Util.copy(i, o);
+                            FileSystemStorage.getInstance().delete(cachesDir + current);
+                        }
+                    }
+                } 
             } else {
-                storageDirectory = nativeInstance.getCachesDir();
+                mkdir(storageDirectory);
             }
         }
         return storageDirectory;
@@ -5145,11 +5169,20 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
-        String[] roots = new String[] {
-            nativeInstance.getCachesDir(),
-            nativeInstance.getDocumentsDir(),
-            nativeInstance.getResourcesDir()
-        };
+        String[] roots;
+        if(Display.getInstance().getProperty("iosNewStorage", "false").equals("true")) {
+            roots = new String[] {
+                    nativeInstance.getDocumentsDir(),
+                    nativeInstance.getCachesDir(),
+                    nativeInstance.getResourcesDir()
+                };
+        } else {
+            roots = new String[] {
+                    nativeInstance.getCachesDir(),
+                    nativeInstance.getDocumentsDir(),
+                    nativeInstance.getResourcesDir()
+                };
+        }
         for(int iter = 0 ; iter < roots.length ; iter++) {
             if(roots[iter].startsWith("/")) {
                 roots[iter] = "file:/" + roots[iter];
