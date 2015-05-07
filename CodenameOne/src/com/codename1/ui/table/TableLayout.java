@@ -605,10 +605,11 @@ public class TableLayout extends Layout {
      * @inheritDoc
      */
     public void addLayoutComponent(Object value, Component comp, Container c) {
-        Constraint con = (Constraint)value;
-        if(con == null) {
+        Constraint con = null;
+        if(!(value instanceof Constraint)) {
             con = createConstraint();
         } else {
+            con = (Constraint)value;
             if(con.parent != null) {
                 Constraint con2 = createConstraint();
                 con2.align = con.align;
