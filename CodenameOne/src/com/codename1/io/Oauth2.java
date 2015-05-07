@@ -324,7 +324,11 @@ public class Oauth2 {
                         boolean success = url.indexOf("#") > -1;
                         if (success) {
                             String accessToken = url.substring(url.indexOf("#") + 1);
-                            token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
+                            if(accessToken.indexOf("&") > 0){
+                                token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
+                            }else{
+                                token = accessToken.substring(accessToken.indexOf("=") + 1);                            
+                            }
                             if(login != null) {
                                 login.dispose();
                             }
