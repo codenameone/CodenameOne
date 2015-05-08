@@ -22,6 +22,7 @@
  */
 package com.codename1.util;
 
+import com.codename1.impl.CodenameOneImplementation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -32,6 +33,11 @@ import java.util.Vector;
  */
 public class StringUtil {
 
+    
+    private static CodenameOneImplementation impl;
+    public static void setImplementation(CodenameOneImplementation i) {
+        impl = i;
+    }
 
     /**
      * This method replaces all occurrences of the pattern with the 
@@ -143,30 +149,32 @@ public class StringUtil {
      */
     public static List<String> tokenize(String source, char separator) {
         ArrayList<String> tokenized = new ArrayList<String>();
-        int len = source.length();
-        boolean lastSeparator = false;
-        StringBuilder buf = new StringBuilder();
-        for(int iter = 0 ; iter < len ; iter++) {
-            char current = source.charAt(iter);
-            if(current == separator) {
-                if(lastSeparator) {
-                    buf.append(separator);
-                    lastSeparator = false;
-                    continue;
-                }
-                lastSeparator = true;
-                if(buf.length() > 0) {
-                    tokenized.add(buf.toString());
-                    buf = new StringBuilder();
-                }
-            } else {
-                lastSeparator = false;
-                buf.append(current);
-            }
-        }
-        if(buf.length() > 0) {
-            tokenized.add(buf.toString());
-        }
+//        int len = source.length();
+//        boolean lastSeparator = false;
+//        StringBuilder buf = new StringBuilder();
+//        for(int iter = 0 ; iter < len ; iter++) {
+//            char current = source.charAt(iter);
+//            if(current == separator) {
+//                if(lastSeparator) {
+//                    buf.append(separator);
+//                    lastSeparator = false;
+//                    continue;
+//                }
+//                lastSeparator = true;
+//                if(buf.length() > 0) {
+//                    tokenized.add(buf.toString());
+//                    buf = new StringBuilder();
+//                }
+//            } else {
+//                lastSeparator = false;
+//                buf.append(current);
+//            }
+//        }
+//        if(buf.length() > 0) {
+//            tokenized.add(buf.toString());
+//        }
+        
+        impl.splitString(source, separator, tokenized);
         return tokenized;
     }
     
@@ -181,7 +189,7 @@ public class StringUtil {
     public static List<String> tokenize(String source, String separator) {
         if(separator.length() == 1) {
             // slightly faster
-            return tokenizeString(source, separator.charAt(0));
+            return tokenize(source, separator.charAt(0));
         }
         ArrayList<String> tokenized = new ArrayList<String>();
         int len = source.length();

@@ -6006,3 +6006,62 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String_R_bo
 JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
 }
 #endif
+
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
+    int offset = ((java_lang_String*) string)->fields.java_lang_String.offset_;
+    int strlen = ((java_lang_String*) string)->fields.java_lang_String.count_;
+    org_xmlvm_runtime_XMLVMArray* srcArr = ((java_lang_String*) string)->fields.java_lang_String.value_;
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+    JAVA_INT startPos = offset;
+    JAVA_INT endOffset = offset + strlen;
+    JAVA_INT i = startPos;
+    for (; i < endOffset; i++) {
+        if (src[i] == separator) {
+            JAVA_OBJECT str = __NEW_java_lang_String();
+            java_lang_String___INIT____char_1ARRAY_int_int(str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            startPos = i + 1;
+            java_util_ArrayList_add___java_lang_Object(outArr, str);
+        }
+    }
+    if (i >= startPos) {
+        JAVA_OBJECT str = __NEW_java_lang_String();
+        java_lang_String___INIT____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+        java_util_ArrayList_add___java_lang_Object(CN1_THREAD_STATE_PASS_ARG outArr, str);
+    }
+    
+    
+}
+
+
+
+#else
+JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
+    enteringNativeAllocations();
+    struct obj__java_lang_String* encString = (struct obj__java_lang_String*)string;
+    JAVA_INT strlen = encString->java_lang_String_count;
+    JAVA_INT offset = get_field_java_lang_String_offset(string);
+    JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(string);
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
+    JAVA_INT startPos = offset;
+    JAVA_INT endOffset = offset + strlen;
+    JAVA_INT i = startPos;
+    for (; i < endOffset; i++) {
+        if (src[i] == separator) {
+            JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            startPos = i + 1;
+            java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+        }
+    }
+    if (i >= startPos) {
+        JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+        java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+    }
+    finishedNativeAllocations();
+    
+}
+#endif

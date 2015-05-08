@@ -1174,3 +1174,58 @@ JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_
 
     return str;
 }
+
+
+JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT __cn1Arg1) {
+    //DEFINE_INSTANCE_METHOD_STACK(3, 2, 0, 752, 755);
+    struct obj__java_lang_String* encString = (struct obj__java_lang_String*)__cn1ThisObject;
+    JAVA_ARRAY arr =(JAVA_ARRAY)(encString->java_lang_String_value);
+    if(__cn1Arg1 < 0 || __cn1Arg1 >= arr->length) { THROW_ARRAY_INDEX_EXCEPTION(__cn1Arg1); }
+    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)arr->data;
+    JAVA_INT index = get_field_java_lang_String_offset(__cn1ThisObject)+__cn1Arg1;
+    //releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, 2, stack, locals);
+    return encArr[index];
+    
+}
+
+JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT ch, JAVA_INT fromIndex) {
+    struct obj__java_lang_String* encString = (struct obj__java_lang_String*)__cn1ThisObject;
+    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)(encString->java_lang_String_value))->data;
+    //releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, 2, stack, locals);
+    int off = get_field_java_lang_String_offset(__cn1ThisObject);
+    int endOff = off+encString->java_lang_String_count;
+    for (int i=off+fromIndex; i<endOff; i++) {
+        if (encArr[i] == ch) {
+            return i-off;
+        }
+    }
+    return -1;
+}
+
+
+JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
+    JAVA_INT len = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    JAVA_INT valueLen = ((JAVA_ARRAY)value)->length;
+    if (len==valueLen) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, len+1);
+        value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    }
+    JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
+    d[len] = __cn1Arg1;
+    set_field_java_lang_StringBuilder_count(threadStateData, len+1, __cn1ThisObject);
+    return __cn1ThisObject;
+}
+
+JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_OBJECT __cn1Arg3, JAVA_INT __cn1Arg4) {
+    
+    JAVA_INT offset = get_field_java_lang_String_offset(__cn1ThisObject);
+    JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(__cn1ThisObject);
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
+    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)__cn1Arg3)->data;
+    int start = offset + __cn1Arg1;
+    int end = offset + __cn1Arg2;
+    for (JAVA_INT i=start; i<end; i++) {
+        dst[__cn1Arg4++] = src[i];
+    }
+}

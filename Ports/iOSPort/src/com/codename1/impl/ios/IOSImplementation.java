@@ -6223,6 +6223,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
         nativeInstance.writeToSocketStream(((Long)socket).longValue(), data);
     }
+
+    @Override
+    public void splitString(String source, char separator, ArrayList<String> out) {
+        nativeInstance.splitString(source, separator, out);
+    }
     
     
 
