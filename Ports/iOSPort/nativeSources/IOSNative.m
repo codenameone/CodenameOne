@@ -1466,7 +1466,7 @@ void com_codename1_impl_ios_IOSNative_flashBacklight___int(CN1_THREAD_STATE_MULT
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isMinimized__]
-    return false;
+    return !([[UIApplication sharedApplication] applicationState] == UIApplicationStateActive);
     //XMLVM_END_WRAPPER
 }
 
