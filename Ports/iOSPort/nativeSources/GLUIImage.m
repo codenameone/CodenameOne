@@ -114,8 +114,19 @@ extern int nextPowerOf2(int val);
     [img retain];
 #endif
     if(textureName != 0) {
-        glDeleteTextures(1, &textureName);
+        int tname = textureName;
         textureName = 0;
+        if([NSThread isMainThread]) {
+            glDeleteTextures(1, &tname);
+            GLErrorLog;
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                //int fm = [ExecutableOp get_free_memory];
+                glDeleteTextures(1, &tname);
+                GLErrorLog;
+                //NSLog(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
+            });
+        }
     }
 }
 
@@ -140,7 +151,7 @@ extern int nextPowerOf2(int val);
             glDeleteTextures(1, &tname);
             GLErrorLog;
         } else {
-            dispatch_sync(dispatch_get_main_queue(), ^{
+            dispatch_async(dispatch_get_main_queue(), ^{
                 //int fm = [ExecutableOp get_free_memory];
                 glDeleteTextures(1, &tname);
                 GLErrorLog;
