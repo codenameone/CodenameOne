@@ -863,7 +863,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         // allow for radio buttons without a string within them
         d.setHeight(Math.max(height, d.getHeight()));
 
-        d.setWidth(d.getWidth() + height + rb.getGap());
+        if(rButtonImages != null && rButtonImages.length > 0) {
+            d.setWidth(rButtonImages[0].getWidth() + d.getWidth() + rb.getGap());
+        } else {
+            d.setWidth(d.getWidth() + height + rb.getGap());
+        }
         return d;
     }
 
