@@ -225,6 +225,14 @@ public class InteractionDialog extends Container {
     }
 
     /**
+     * Will return true if the dialog is currently showing
+     * @return true if showing
+     */
+    public boolean isShowing() {
+        return getParent() != null;
+    }
+    
+    /**
      * Indicates whether show/dispose should be animated or not
      * @return the animateShow 
      */
