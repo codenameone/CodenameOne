@@ -1102,9 +1102,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
     if(error != nil) {
         NSLog(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);
     }
-    NSDate* modDate = [attrs objectForKey:NSFileModificationDate];
-    NSTimeZone *tzone = [NSTimeZone timeZoneWithName:@"GMT"];
-    JAVA_LONG result = [tzone secondsFromGMTForDate:modDate] * 1000;
+    NSDate* modDate = [attrs fileModificationDate];
+    //[modDate timeIntervalSince1970];
+    //NSTimeZone *tzone = [NSTimeZone timeZoneWithName:@"GMT"];
+    JAVA_LONG result = [modDate timeIntervalSince1970] * 1000;
 #ifndef CN1_USE_ARC
     [man release];
 #endif
