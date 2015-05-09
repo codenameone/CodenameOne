@@ -161,9 +161,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * Returns the character at the specified index. An index ranges from 0 to length() - 1. The first character of the sequence is at index 0, the next at index 1, and so on, as for array indexing.
      */
-    public final char charAt(int index){
-        return value[offset + index];
-    }
+    public final native char charAt(int index);//{
+//        return value[offset + index];
+//    }
 
     /**
      * Compares two strings lexicographically. The comparison is based on the Unicode value of each character in the strings. The character sequence represented by this String object is compared lexicographically to the character sequence represented by the argument string. The result is a negative integer if this String object lexicographically precedes the argument string. The result is a positive integer if this String object lexicographically follows the argument string. The result is zero if the strings are equal; compareTo returns 0 exactly when the
@@ -289,12 +289,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * The first character to be copied is at index srcBegin; the last character to be copied is at index srcEnd-1 (thus the total number of characters to be copied is srcEnd-srcBegin). The characters are copied into the subarray of dst starting at index dstBegin and ending at index:
      * dstbegin + (srcEnd-srcBegin) - 1
      */
-    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin){
-        for(int iter = srcBegin ; iter < srcEnd ; iter++) {
-            dst[dstBegin] = value[offset + iter];
-            dstBegin++;
-        }
-    }
+    public native void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin);//{
+//        for(int iter = srcBegin ; iter < srcEnd ; iter++) {
+//            dst[dstBegin] = value[offset + iter];
+//            dstBegin++;
+//        }
+//    }
 
     /**
      * Returns a hashcode for this string. The hashcode for a String object is computed as s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1] using int arithmetic, where s[i] is the
@@ -322,12 +322,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * ) == ch is true. If no such character occurs in this string, then -1 is returned.
      */
     public int indexOf(int ch){
-        for(int iter = offset ; iter < count + offset ; iter++) {
-            if(value[iter] == ch) {
-                return iter - offset;
-            }
-        }
-        return -1; 
+        return indexOf(ch, 0); 
     }
 
     /**
@@ -338,14 +333,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * >= fromIndex) is true. If no such character occurs in this string at or after position fromIndex, then -1 is returned.
      * There is no restriction on the value of fromIndex. If it is negative, it has the same effect as if it were zero: this entire string may be searched. If it is greater than the length of this string, it has the same effect as if it were equal to the length of this string: -1 is returned.
      */
-    public int indexOf(int ch, int fromIndex){
-        for(int iter = offset + fromIndex ; iter < count + offset ; iter++) {
-            if(value[iter] == ch) {
-                return iter - offset;
-            }
-        }
-        return -1; 
-    }
+    public native int indexOf(int ch, int fromIndex);//{
+//        for(int iter = offset + fromIndex ; iter < count + offset ; iter++) {
+//            if(value[iter] == ch) {
+//                return iter - offset;
+//            }
+//        }
+//        return -1; 
+//    }
 
     /**
      * Returns the index within this string of the first occurrence of the specified substring. The integer returned is the smallest value

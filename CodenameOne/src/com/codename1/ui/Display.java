@@ -585,6 +585,7 @@ public final class Display {
             INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
+            com.codename1.util.StringUtil.setImplementation(INSTANCE.impl);
             com.codename1.io.Util.setImplementation(INSTANCE.impl);
             
             // this can happen on some cases where an application was restarted etc...

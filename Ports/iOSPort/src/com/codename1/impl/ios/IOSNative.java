@@ -498,4 +498,6 @@ public final class IOSNative {
     
     native void clearNativeCookies();
 
+    native void splitString(String source, char separator, ArrayList<String> out) ;
+
 }

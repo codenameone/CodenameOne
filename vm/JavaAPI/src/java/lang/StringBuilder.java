@@ -110,13 +110,13 @@ public final class StringBuilder implements CharSequence {
      * The argument is appended to the contents of this string buffer. The length of this string buffer increases by 1.
      * The overall effect is exactly as if the argument were converted to a string by the method String.valueOf(char) and the character in that string were then appended to this StringBuffer object.
      */
-    public java.lang.StringBuilder append(char c){
-        if (count == value.length) {
-            enlargeBuffer(count + 1);
-        }
-        value[count++] = c;
-        return this; 
-    }
+    public native java.lang.StringBuilder append(char c);//{
+//        if (count == value.length) {
+//            enlargeBuffer(count + 1);
+//        }
+//        value[count++] = c;
+//        return this; 
+//    }
 
     java.lang.StringBuilder append(char[] chars){
         int newCount = count + chars.length;
@@ -518,9 +518,9 @@ public final class StringBuilder implements CharSequence {
             enlargeBuffer(newLength);
         } else {
             //if (shared) {
-                char[] newData = new char[value.length];
-                System.arraycopy(value, 0, newData, 0, count);
-                value = newData;
+//                char[] newData = new char[value.length];
+//                System.arraycopy(value, 0, newData, 0, count);
+//                value = newData;
                 /*shared = false;
             } else {
                 if (count < newLength) {

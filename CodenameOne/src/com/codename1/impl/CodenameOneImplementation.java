@@ -63,6 +63,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -5933,6 +5934,33 @@ public abstract class CodenameOneImplementation {
             
             Util.cleanup(is);
             Preferences.set("cn1$InstallKey", buildKey);
+        }
+    }
+    
+    public void splitString(String source, char separator, ArrayList<String> out) {
+        int len = source.length();
+        boolean lastSeparator = false;
+        StringBuilder buf = new StringBuilder();
+        for(int iter = 0 ; iter < len ; iter++) {
+            char current = source.charAt(iter);
+            if(current == separator) {
+                if(lastSeparator) {
+                    buf.append(separator);
+                    lastSeparator = false;
+                    continue;
+                }
+                lastSeparator = true;
+                if(buf.length() > 0) {
+                    out.add(buf.toString());
+                    buf.setLength(0);
+                }
+            } else {
+                lastSeparator = false;
+                buf.append(current);
+            }
+        }
+        if(buf.length() > 0) {
+            out.add(buf.toString());
         }
     }
 }
