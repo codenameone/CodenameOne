@@ -3013,7 +3013,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                 com_codename1_contacts_Address_setLocality___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG city));
                 com_codename1_contacts_Address_setRegion___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG state));
                 com_codename1_contacts_Address_setPostalCode___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG zip));
-                com_codename1_contacts_Address_setStreetAddress___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG country));
+                com_codename1_contacts_Address_setStreetAddress___java_lang_String(CN1_THREAD_STATE_PASS_ARG addr, fromNSString(CN1_THREAD_STATE_PASS_ARG street));
                 
                 
                 
