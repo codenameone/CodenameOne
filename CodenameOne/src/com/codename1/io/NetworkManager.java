@@ -148,6 +148,7 @@ public class NetworkManager {
     class NetworkThread implements Runnable {
         private ConnectionRequest currentRequest;
         private Thread threadInstance;
+        private boolean stopped = false;
 
         public NetworkThread() {
         }
@@ -180,7 +181,7 @@ public class NetworkManager {
 
         public void run() {
             threadInstance = Thread.currentThread();
-            while(running) {
+            while(running && !stopped) {
                 if(pending.size() > 0) {
                     // the synchronization here isn't essential, only for good measure
                     synchronized(LOCK) {
@@ -630,6 +631,23 @@ public class NetworkManager {
         Display.getInstance().invokeAndBlock(new KillWaitingClass());
     }
 
+    void kill9(final ConnectionRequest request) {
+        if (request.isKilled()) {
+            for(int iter = 0 ; iter < threadCount ; iter++) {
+                if(networkThreads[iter].currentRequest == request) {
+                    synchronized(LOCK) {
+                        if(networkThreads[iter].currentRequest == request) {
+                            networkThreads[iter].interrupt();
+                            networkThreads[iter].stopped = true;
+                            networkThreads[iter] = createNetworkThread();
+                            networkThreads[iter].start();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     /**
      * Adds the given network connection to the queue of execution
      *

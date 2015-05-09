@@ -910,6 +910,7 @@ public class ConnectionRequest implements IOProgressListener {
         if(input != null && input instanceof BufferedInputStream) {
             ((BufferedInputStream)input).stop();
         }
+        NetworkManager.getInstance().kill9(this);
     }
 
     /**
