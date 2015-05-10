@@ -1189,6 +1189,7 @@ JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_O
 }
 
 JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT ch, JAVA_INT fromIndex) {
+    fromIndex = MAX(0, fromIndex);
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)__cn1ThisObject;
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)(encString->java_lang_String_value))->data;
     //releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, 2, stack, locals);
