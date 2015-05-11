@@ -185,7 +185,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS
-            = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+            = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
     private static String appHomeDir = ".cn1";
     
     /**
@@ -2156,169 +2156,188 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-
-                final JDialog d = new JDialog(frm, true);
-                d.setTitle("Skins");
-                d.setLayout(new BorderLayout());
-                String userDir = System.getProperty("user.home");
-                final File skinDir = new File(userDir + "/.codenameone/");
-                if (!skinDir.exists()) {
-                    skinDir.mkdir();
-                }
-
-                Vector data = new Vector();
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                final Document[] doc = new Document[1];
-                try {
-                    DocumentBuilder db = dbf.newDocumentBuilder();
-
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    
-                    URL u = new URL("https://codenameone.com/OTA/Skins.xml");
-                    URLConnection uc = u.openConnection();
-                    InputStream is = uc.getInputStream();
-                    doc[0] = db.parse(is);
-                    NodeList skins = doc[0].getElementsByTagName("Skin");
-                    
-                    for (int i = 0; i < skins.getLength(); i++) {
-                        Node skin = skins.item(i);
-                        NamedNodeMap attr = skin.getAttributes();
-                        String url = attr.getNamedItem("url").getNodeValue();
-                        int ver = 0;
-                        Node n = attr.getNamedItem("version");
-                        if(n != null){
-                            ver = Integer.parseInt(n.getNodeValue());
-                        }
-                        boolean exists = new File(skinDir.getAbsolutePath() + url).exists();
-                        if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
-                            Vector row = new Vector();
-                            row.add(new Boolean(false));
-                            row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
-                            row.add(attr.getNamedItem("name").getNodeValue());
-                            if(exists){
-                                row.add("Update");                                                        
-                            }else{
-                                row.add("New");                            
-                            }
-                            data.add(row);
-                        }
-                    }
-
-                } catch (Exception ex) {
-                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
-                }
-
-                if (data.size() == 0) {
-                    JOptionPane.showMessageDialog(frm, "No New Skins to Install");
-                    return;
-                }
-
-                Vector cols = new Vector();
-                cols.add("Install");
-                cols.add("Icon");
-                cols.add("Name");
-                cols.add("");
-
-                final DefaultTableModel tableModel = new DefaultTableModel(data, cols) {
+                
+                final JDialog pleaseWait = new JDialog(frm, false);
+                pleaseWait.setLocationRelativeTo(frm);
+                pleaseWait.setTitle("Message");
+                pleaseWait.setLayout(new BorderLayout());
+                pleaseWait.add(new JLabel("  Please Wait...  "), BorderLayout.CENTER);
+                pleaseWait.pack();
+                pleaseWait.setVisible(true);
+                
+                SwingUtilities.invokeLater(new Runnable() {
 
                     @Override
-                    public boolean isCellEditable(int row, int column) {
-                        return column == 0;
-                    }
-                };
-                JTable skinsTable = new JTable(tableModel) {
-
-                    @Override
-                    public Class<?> getColumnClass(int column) {
-                        if (column == 0) {
-                            return Boolean.class;
+                    public void run() {
+                        
+                        final JDialog d = new JDialog(frm, true);
+                        d.setLocationRelativeTo(frm);
+                        d.setTitle("Skins");
+                        d.setLayout(new BorderLayout());
+                        String userDir = System.getProperty("user.home");
+                        final File skinDir = new File(userDir + "/.codenameone/");
+                        if (!skinDir.exists()) {
+                            skinDir.mkdir();
                         }
-                        if (column == 1) {
-                            return Icon.class;
-                        }
-                        return super.getColumnClass(column);
-                    }
-                };
-                skinsTable.setRowHeight(112);
-                skinsTable.getTableHeader().setReorderingAllowed(false);
-                d.add(new JScrollPane(skinsTable), BorderLayout.CENTER);
-                JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
-                JButton download = new JButton("Download");
-                download.addActionListener(new ActionListener() {
 
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        final Vector toDowload = new Vector();
+                        Vector data = new Vector();
+                        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                        final Document[] doc = new Document[1];
+                        try {
+                            DocumentBuilder db = dbf.newDocumentBuilder();
 
-                        NodeList skins = doc[0].getElementsByTagName("Skin");
-                        for (int i = 0; i < tableModel.getRowCount(); i++) {
-                            if (((Boolean) tableModel.getValueAt(i, 0)).booleanValue()) {
-                                Node skin;
-                                for (int j = 0; j < skins.getLength(); j++) {
-                                    skin = skins.item(j);
-                                    NamedNodeMap attr = skin.getAttributes();
-                                    if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
-                                        String url = attr.getNamedItem("url").getNodeValue();
-                                        String [] data = new String[2];
-                                        data[0] = "http://www.codenameone.com/OTA" + url;
-                                        data[1] = attr.getNamedItem("version").getNodeValue();                                        
-                                        toDowload.add(data);
-                                        break;
-                                    }                                    
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+
+                            URL u = new URL("https://codenameone.com/OTA/Skins.xml");
+                            URLConnection uc = u.openConnection();
+                            InputStream is = uc.getInputStream();
+                            doc[0] = db.parse(is);
+                            NodeList skins = doc[0].getElementsByTagName("Skin");
+
+                            for (int i = 0; i < skins.getLength(); i++) {
+                                Node skin = skins.item(i);
+                                NamedNodeMap attr = skin.getAttributes();
+                                String url = attr.getNamedItem("url").getNodeValue();
+                                int ver = 0;
+                                Node n = attr.getNamedItem("version");
+                                if(n != null){
+                                    ver = Integer.parseInt(n.getNodeValue());
+                                }
+                                boolean exists = new File(skinDir.getAbsolutePath() + url).exists();
+                                if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
+                                    Vector row = new Vector();
+                                    row.add(new Boolean(false));
+                                    row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
+                                    row.add(attr.getNamedItem("name").getNodeValue());
+                                    if(exists){
+                                        row.add("Update");                                                        
+                                    }else{
+                                        row.add("New");                            
+                                    }
+                                    data.add(row);
                                 }
                             }
+
+                        } catch (Exception ex) {
+                            Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
                         }
 
-                        if (toDowload.size() > 0) {
-                            final JDialog downloadMessage = new JDialog(d, true);
-                            downloadMessage.setTitle("Downloading");
-                            downloadMessage.setLayout(new FlowLayout());
-                            downloadMessage.setLocationRelativeTo(d);
-                            final JLabel details = new JLabel("<br><br>Details");
-                            downloadMessage.add(details);
-                            final JLabel progress = new JLabel("Progress<br><br>");
-                            downloadMessage.add(progress);
-                            new Thread() {
+                        if (data.size() == 0) {
+                            JOptionPane.showMessageDialog(frm, "No New Skins to Install");
+                            return;
+                        }
 
-                                @Override
-                                public void run() {
-                                    for (Iterator it = toDowload.iterator(); it.hasNext();) {
-                                        String [] data = (String []) it.next();
-                                        String url = data[0];
-                                        details.setText(url.substring(url.lastIndexOf("/")));
-                                        details.repaint();
-                                        progress.setText("");
-                                        progress.repaint();
+                        Vector cols = new Vector();
+                        cols.add("Install");
+                        cols.add("Icon");
+                        cols.add("Name");
+                        cols.add("");
 
-                                        try {
-                                            File skin = downloadSkin(skinDir, url, data[1], progress);
-                                            if (skin.exists()) {
-                                                addSkinName(skin.toURI().toString());
-                                            }
-                                        } catch (Exception e) {
+                        final DefaultTableModel tableModel = new DefaultTableModel(data, cols) {
+
+                            @Override
+                            public boolean isCellEditable(int row, int column) {
+                                return column == 0;
+                            }
+                        };
+                        JTable skinsTable = new JTable(tableModel) {
+
+                            @Override
+                            public Class<?> getColumnClass(int column) {
+                                if (column == 0) {
+                                    return Boolean.class;
+                                }
+                                if (column == 1) {
+                                    return Icon.class;
+                                }
+                                return super.getColumnClass(column);
+                            }
+                        };
+                        skinsTable.setRowHeight(112);
+                        skinsTable.getTableHeader().setReorderingAllowed(false);
+                        d.add(new JScrollPane(skinsTable), BorderLayout.CENTER);
+                        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                        JButton download = new JButton("Download");
+                        download.addActionListener(new ActionListener() {
+
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                final Vector toDowload = new Vector();
+
+                                NodeList skins = doc[0].getElementsByTagName("Skin");
+                                for (int i = 0; i < tableModel.getRowCount(); i++) {
+                                    if (((Boolean) tableModel.getValueAt(i, 0)).booleanValue()) {
+                                        Node skin;
+                                        for (int j = 0; j < skins.getLength(); j++) {
+                                            skin = skins.item(j);
+                                            NamedNodeMap attr = skin.getAttributes();
+                                            if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
+                                                String url = attr.getNamedItem("url").getNodeValue();
+                                                String [] data = new String[2];
+                                                data[0] = "http://www.codenameone.com/OTA" + url;
+                                                data[1] = attr.getNamedItem("version").getNodeValue();                                        
+                                                toDowload.add(data);
+                                                break;
+                                            }                                    
                                         }
                                     }
-                                    downloadMessage.setVisible(false);
-                                    d.setVisible(false);
-                                    try {
-                                        createSkinsMenu(frm, skinMenu);
-                                    } catch (MalformedURLException ex) {
-                                        Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
-                                    }
                                 }
-                            }.start();
-                            downloadMessage.pack();
-                            downloadMessage.setSize(200, 70);
-                            downloadMessage.setVisible(true);
-                        }else{
-                            JOptionPane.showMessageDialog(d, "Choose a Skin to Download");
-                        }
+
+                                if (toDowload.size() > 0) {
+                                    final JDialog downloadMessage = new JDialog(d, true);
+                                    downloadMessage.setTitle("Downloading");
+                                    downloadMessage.setLayout(new FlowLayout());
+                                    downloadMessage.setLocationRelativeTo(d);
+                                    final JLabel details = new JLabel("<br><br>Details");
+                                    downloadMessage.add(details);
+                                    final JLabel progress = new JLabel("Progress<br><br>");
+                                    downloadMessage.add(progress);
+                                    new Thread() {
+
+                                        @Override
+                                        public void run() {
+                                            for (Iterator it = toDowload.iterator(); it.hasNext();) {
+                                                String [] data = (String []) it.next();
+                                                String url = data[0];
+                                                details.setText(url.substring(url.lastIndexOf("/")));
+                                                details.repaint();
+                                                progress.setText("");
+                                                progress.repaint();
+
+                                                try {
+                                                    File skin = downloadSkin(skinDir, url, data[1], progress);
+                                                    if (skin.exists()) {
+                                                        addSkinName(skin.toURI().toString());
+                                                    }
+                                                } catch (Exception e) {
+                                                }
+                                            }
+                                            downloadMessage.setVisible(false);
+                                            d.setVisible(false);
+                                            try {
+                                                createSkinsMenu(frm, skinMenu);
+                                            } catch (MalformedURLException ex) {
+                                                Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                                            }
+                                        }
+                                    }.start();
+                                    downloadMessage.pack();
+                                    downloadMessage.setSize(200, 70);
+                                    downloadMessage.setVisible(true);
+                                }else{
+                                    JOptionPane.showMessageDialog(d, "Choose a Skin to Download");
+                                }
+                            }
+                        });
+                        p.add(download);
+                        d.add(p, BorderLayout.SOUTH);
+                        d.pack();
+                        pleaseWait.dispose();
+                        d.setVisible(true);
+                        
                     }
                 });
-                p.add(download);
-                d.add(p, BorderLayout.SOUTH);
-                d.pack();
-                d.setVisible(true);
+
 
             }
         });
@@ -2377,6 +2396,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                         pref.put("skins", DEFAULT_SKINS);
                         
+                        String userDir = System.getProperty("user.home");
+                        final File skinDir = new File(userDir + "/.codenameone/");
+                        if(skinDir.exists()){
+                            File [] childs = skinDir.listFiles();
+                            for (int i = 0; i < childs.length; i++) {
+                                File child = childs[i];
+                                if(child.getName().endsWith(".skin")){
+                                    child.delete();
+                                }                                
+                            }
+                        }
                         if (netMonitor != null) {
                             netMonitor.dispose();
                             netMonitor = null;

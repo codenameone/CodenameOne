@@ -141,7 +141,7 @@
         <!-- run manually the build-skins target to generate the skins-->
         <copy file="../../../codenameone-skins/torch.skin" todir="src" />
         <copy file="../../../codenameone-skins/lumia.skin" todir="src" />
-        <!-- copy file="../../../codenameone-skins/android.skin" todir="src" / -->
+        <copy file="../../../codenameone-skins/android.skin" todir="src" />
         <copy file="../../../codenameone-skins/feature_phone.skin" todir="src" />
         <copy file="../../../codenameone-skins/ipad_os7.skin" tofile="src/ipad.skin" />
         <copy file="../../../codenameone-skins/nexus.skin" todir="src" />
