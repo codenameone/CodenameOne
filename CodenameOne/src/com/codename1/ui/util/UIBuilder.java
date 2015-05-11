@@ -235,7 +235,7 @@ public class UIBuilder { //implements Externalizable {
     // used by the resource editor
     static boolean ignorBaseForm;
 
-    private Vector baseFormNavigationStack = new Vector();
+    Vector baseFormNavigationStack = new Vector();
     private Vector backCommands;
 
     /**
@@ -2362,33 +2362,6 @@ public class UIBuilder { //implements Externalizable {
         return cnt;
     }
     
-    class LazyValueC implements LazyValue<Form> {
-        private Hashtable h;
-        private Form f;
-        private Command backCommand;
-        public LazyValueC(Form f, Hashtable h, Command backCommand) {
-            this.h = h;
-            this.f = f;
-            this.backCommand = backCommand;
-        }
-        public Form get(Object... args) {
-            String n = getPreviousFormName(f);
-            final Form f = createForm((Form)createContainer(fetchResourceFile(), n));;
-            if(h != null) {
-                setFormState(f, h);
-                setBackCommand(f, backCommand);
-            }
-            f.addShowListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    postShow(f);
-                }
-            });
-            Vector formNavigationStack = baseFormNavigationStack;
-            formNavigationStack.remove(formNavigationStack.size() - 1);
-            beforeShow(f);
-            return f;
-        }
-    }
 
     /**
      * This is useful for swipe back navigation behavior
@@ -2409,7 +2382,7 @@ public class UIBuilder { //implements Externalizable {
             cmd.putClientProperty(COMMAND_ACTION, commandAction);
         }
 
-        return new LazyValueC(f, p, cmd);
+        return new LazyValueC(f, p, cmd, this);
     }
 
     Form createForm(Form f) {
@@ -2927,5 +2900,35 @@ public class UIBuilder { //implements Externalizable {
                 showContainer(action, cmd, evt.getComponent());
             }
         }
+    }
+}
+
+class LazyValueC implements LazyValue<Form> {
+    private Hashtable h;
+    private Form f;
+    private Command backCommand;
+    private UIBuilder parent;
+    public LazyValueC(Form f, Hashtable h, Command backCommand, UIBuilder parent) {
+        this.h = h;
+        this.f = f;
+        this.backCommand = backCommand;
+        this.parent = parent;
+    }
+    public Form get(Object... args) {
+        String n = parent.getPreviousFormName(f);
+        final Form f = parent.createForm((Form)parent.createContainer(parent.fetchResourceFile(), n));;
+        if(h != null) {
+            parent.setFormState(f, h);
+            parent.setBackCommand(f, backCommand);
+        }
+        f.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                parent.postShow(f);
+            }
+        });
+        Vector formNavigationStack = parent.baseFormNavigationStack;
+        formNavigationStack.remove(formNavigationStack.size() - 1);
+        parent.beforeShow(f);
+        return f;
     }
 }
