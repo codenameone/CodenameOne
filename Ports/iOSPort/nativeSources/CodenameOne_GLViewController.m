@@ -1664,6 +1664,16 @@ int keyboardHeight;
     }
     
     keyboardSlideOffset = 0;
+
+    
+    // https://github.com/codenameone/CodenameOne/issues/1074
+#ifdef __IPHONE_7_0
+    if (isIOS7()) {
+        prefersStatusBarHidden = NO;
+        [self setNeedsStatusBarAppearanceUpdate];
+    }
+#endif
+    
     if(patch) {
         if (isIOS8()) {
             viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
@@ -1695,6 +1705,13 @@ int keyboardHeight;
     [self.view setFrame:viewFrame];
     [UIView commitAnimations];
 }
+
+BOOL prefersStatusBarHidden = NO;
+
+- (BOOL) prefersStatusBarHidden {
+    return prefersStatusBarHidden;
+}
+
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
@@ -1747,6 +1764,13 @@ int keyboardHeight;
         patchSize = 2;
     }
     
+    //https://github.com/codenameone/CodenameOne/issues/1074
+#ifdef __IPHONE_7_0
+    if (isIOS7()) {
+        prefersStatusBarHidden = YES;
+        [self setNeedsStatusBarAppearanceUpdate];
+    }
+#endif
     if(patch) {
         if (isIOS8()){
             viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
