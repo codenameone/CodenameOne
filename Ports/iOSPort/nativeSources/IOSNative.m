@@ -3591,9 +3591,21 @@ void com_codename1_impl_ios_IOSNative_sqlDbClose___long(CN1_THREAD_STATE_MULTI_A
 void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
+    
     if(args != nil) {
         sqlite3_stmt *addStmt = nil;
-        sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
+        char* errInfo;
+        int result = sqlite3_prepare_v2(db, chrs, -1, &addStmt, 0);
+#ifdef NEW_CODENAME_ONE_VM
+        if (result != SQLITE_OK) {
+            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+            //NSLog(@"Error : %@", errStr);
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
+            throwException(threadStateData, ex);
+            return;
+        }
+#endif
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* stringArray = args;
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -3608,10 +3620,42 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
             const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
             sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
         }
-        sqlite3_step(addStmt);
-        sqlite3_finalize(addStmt);
+        result = sqlite3_step(addStmt);
+#ifdef NEW_CODENAME_ONE_VM
+        if (result != SQLITE_ROW && result != SQLITE_DONE && result != SQLITE_OK) {
+            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+            //NSLog(@"Error : %@", errStr);
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
+            throwException(threadStateData, ex);
+            return;
+        }
+#endif
+        result = sqlite3_finalize(addStmt);
+#ifdef NEW_CODENAME_ONE_VM
+        if (result != SQLITE_OK) {
+            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+            //NSLog(@"Error : %@", errStr);
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
+            throwException(threadStateData, ex);
+            return;
+        }
+#endif
     } else {
-        sqlite3_exec(db, chrs, 0, 0, 0);
+        char * errInfo;
+        int result = sqlite3_exec(db, chrs, 0, 0, &errInfo);
+        
+#ifdef NEW_CODENAME_ONE_VM
+        if (result != SQLITE_OK) {
+            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+            //NSLog(@"Error : %@", errStr);
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG errInfo));
+            throwException(threadStateData, ex);
+            return;
+        }
+#endif
     }
 }
 
@@ -3619,7 +3663,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
     sqlite3_stmt *addStmt = nil;
-    sqlite3_prepare_v2(db, chrs, -1, &addStmt, nil);
+    int result = sqlite3_prepare_v2(db, chrs, -1, &addStmt, 0);
+    
+#ifdef NEW_CODENAME_ONE_VM
+    if (result != SQLITE_OK) {
+        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+        //NSLog(@"Error : %@", errStr);
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
+        throwException(threadStateData, ex);
+        return 0;
+    }
+#endif
     
     if(args != nil) {
 #ifndef NEW_CODENAME_ONE_VM
@@ -3634,19 +3689,53 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
         for(int iter = 0 ; iter < count ; iter++) {
             JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
             const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
-            sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
+            result = sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
+#ifdef NEW_CODENAME_ONE_VM
+            if (result != SQLITE_OK) {
+                //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+                //NSLog(@"Error : %@", errStr);
+                JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
+                throwException(threadStateData, ex);
+                return 0;
+            }
+#endif
         }
     }
     return (JAVA_LONG)addStmt;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    sqlite3_reset((sqlite3_stmt *)statementPeer);
+    int result = sqlite3_reset((sqlite3_stmt *)statementPeer);
+#ifdef NEW_CODENAME_ONE_VM
+    if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
+        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+        //NSLog(@"Error : %@", errStr);
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
+        throwException(threadStateData, ex);
+        return 0;
+    }
+#endif
     return YES;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    return sqlite3_step((sqlite3_stmt *)statementPeer) == SQLITE_ROW;
+    int result = sqlite3_step((sqlite3_stmt *)statementPeer);
+    if (result == SQLITE_ROW) {
+        return YES;
+    }
+#ifdef NEW_CODENAME_ONE_VM
+    if (result != SQLITE_DONE && result != SQLITE_OK) {
+        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
+        //NSLog(@"Error : %@", errStr);
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
+        throwException(threadStateData, ex);
+        return 0;
+    }
+#endif
+    return NO;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
@@ -3733,6 +3822,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THR
     sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
     return sqlite3_column_count(stmt);
 }
+
 
 JAVA_OBJECT productsArrayPending = nil;
 
