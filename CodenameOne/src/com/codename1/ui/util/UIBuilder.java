@@ -2361,6 +2361,34 @@ public class UIBuilder { //implements Externalizable {
         }
         return cnt;
     }
+    
+    class LazyValueC implements LazyValue<Form> {
+        private Hashtable h;
+        private Form f;
+        private Command backCommand;
+        public LazyValueC(Form f, Hashtable h, Command backCommand) {
+            this.h = h;
+            this.f = f;
+            this.backCommand = backCommand;
+        }
+        public Form get(Object... args) {
+            String n = getPreviousFormName(f);
+            final Form f = createForm((Form)createContainer(fetchResourceFile(), n));;
+            if(h != null) {
+                setFormState(f, h);
+                setBackCommand(f, backCommand);
+            }
+            f.addShowListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    postShow(f);
+                }
+            });
+            Vector formNavigationStack = baseFormNavigationStack;
+            formNavigationStack.remove(formNavigationStack.size() - 1);
+            beforeShow(f);
+            return f;
+        }
+    }
 
     /**
      * This is useful for swipe back navigation behavior
@@ -2380,29 +2408,8 @@ public class UIBuilder { //implements Externalizable {
             cmd.putClientProperty(COMMAND_ARGUMENTS, "");
             cmd.putClientProperty(COMMAND_ACTION, commandAction);
         }
-        final Object ho =  p;
-        final Command backCommand = cmd;
-        
-        return new LazyValue<Form>() {
-            public Form get(Object... args) {
-                String n = getPreviousFormName(f);
-                final Form f = createForm((Form)createContainer(fetchResourceFile(), n));;
-                Hashtable h =  (Hashtable)ho;
-                if(h != null) {
-                    setFormState(f, h);
-                    setBackCommand(f, backCommand);
-                }
-                f.addShowListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        postShow(f);
-                    }
-                });
-                Vector formNavigationStack = baseFormNavigationStack;
-                formNavigationStack.remove(formNavigationStack.size() - 1);
-                beforeShow(f);
-                return f;
-            }
-        };
+
+        return new LazyValueC(f, p, cmd);
     }
 
     Form createForm(Form f) {
