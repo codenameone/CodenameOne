@@ -1101,7 +1101,7 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("(threadStateArgument, valueArgument) ");
+                    b.append("(threadStateArgument, valueArgument) set_static_");
                     b.append(bf.getClsName());
                     b.append("_");
                     b.append(bf.getFieldName());
