@@ -425,23 +425,214 @@ public final class GeneralPath implements Shape {
         dirty = true;
     }
     
-    private static void addBezierArcToPath(GeneralPath path, float cx, float cy,
-                                          float startX, float startY, float endX, float endY)
-    {
+    
+    /**
+     * Draws an elliptical arc on the path given the provided bounds.
+     * @param x Left x coord of bounding rect.
+     * @param y Top y coordof bounding rect.
+     * @param w Width of bounding rect.
+     * @param h Height of bounding rect.
+     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     */
+    public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
+        float cx = x+w/2;
+        float cy = y+h/2;
+        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this);
+    }
+    
+    /**
+     * Draws an elliptical arc on the path given the provided bounds.
+     * @param x Left x coord of bounding rect.
+     * @param y Top y coordof bounding rect.
+     * @param w Width of bounding rect.
+     * @param h Height of bounding rect.
+     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     */
+    public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
+        double cx = x+w/2;
+        double cy = y+h/2;
+        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 4, false, this);
+    }
+    
+    
+    
+    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+                                          double startX, double startY, double endX, double endY) {
         if ( startX != endX || startY != endY ){
-            final double ax = startX - cx;
-            final double ay = startY - cy;
-            final double bx = endX - cx;
-            final double by = endY- cy;
+            double ax = startX - cx;
+            double ay = startY - cy;
+            double bx = endX - cx;
+            double by = endY- cy;
+            
+            final double r1s = ax * ax + ay * ay;
+            final double r2s = bx * bx + by * by;
+            double ellipseScaleY = 0;
+            if (Math.abs(r1s - r2s) > 1) {
+                // This is not a circle
+                // Let's get the arc for the circle
+                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
+                startY = cy + ellipseScaleY * (startY-cy);
+                endY = cy + ellipseScaleY * (endY-cy);
+                
+                ay = startY - cy;
+                by = endY - cy;
+            }
+            
             final double q1 = ax * ax + ay * ay;
             final double q2 = q1 + ax * bx + ay * by;
             final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
             final float x2 = (float)(cx + ax - k2 * ay);
-            final float y2 = (float)(cy + ay + k2 * ax);
+            float y2 = (float)(cy + ay + k2 * ax);
             final float x3 = (float)(cx + bx + k2 * by);
-            final float y3 = (float)(cy + by - k2 * bx);
+             float y3 = (float)(cy + by - k2 * bx);
+            if (ellipseScaleY != 0) {
+                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
+                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
+                endY = (float)(cy + (endY-cy)/ellipseScaleY);
+            }
             path.curveTo(x2, y2, x3, y3, endX, endY);
+            
         } 
+    }
+    
+    /**
+     * Adds a circular arc to the given path by approximating it through a cubic BÈzier curve, splitting it if
+     * necessary. The precision of the approximation can be adjusted through {@code pointsOnCircle} and
+     * {@code overlapPoints} parameters.
+     * <p>
+     * <strong>Example:</strong> imagine an arc starting from 0∞ and sweeping 100∞ with a value of
+     * {@code pointsOnCircle} equal to 12 (threshold -> 360∞ / 12 = 30∞):
+     * <ul>
+     * <li>if {@code overlapPoints} is {@code true}, it will be split as following:
+     * <ul>
+     * <li>from 0∞ to 30∞ (sweep 30∞)</li>
+     * <li>from 30∞ to 60∞ (sweep 30∞)</li>
+     * <li>from 60∞ to 90∞ (sweep 30∞)</li>
+     * <li>from 90∞ to 100∞ (sweep 10∞)</li>
+     * </ul>
+     * </li>
+     * <li>if {@code overlapPoints} is {@code false}, it will be split into 4 equal arcs:
+     * <ul>
+     * <li>from 0∞ to 25∞ (sweep 25∞)</li>
+     * <li>from 25∞ to 50∞ (sweep 25∞)</li>
+     * <li>from 50∞ to 75∞ (sweep 25∞)</li>
+     * <li>from 75∞ to 100∞ (sweep 25∞)</li>
+     * </ul>
+     * </li>
+     * </ul>
+     * </p>
+     * <p/>
+     * For a technical explanation:
+     * <a href="http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html">
+     * http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html
+     * </a>
+     *
+     * @param center            The center of the circle.
+     * @param radius            The radius of the circle.
+     * @param startAngleRadians The starting angle on the circle (in radians).
+     * @param sweepAngleRadians How long to make the total arc (in radians).
+     * @param pointsOnCircle    Defines a <i>threshold</i> (360∞ /{@code pointsOnCircle}) to split the BÈzier arc to
+     *                          better approximate a circular arc, depending also on the value of {@code overlapPoints}.
+     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90∞).
+     *                          Less than 1 will be ignored (the arc will not be split).
+     * @param overlapPoints     Given the <i>threshold</i> defined through {@code pointsOnCircle}:
+     *                          <ul>
+     *                          <li>if {@code true}, split the arc on every angle which is a multiple of the
+     *                          <i>threshold</i> (yields better results if drawing precision is required,
+     *                          especially when stacking multiple arcs, but can potentially use more points)</li>
+     *                          <li>if {@code false}, split the arc equally so that each part is shorter than
+     *                          the <i>threshold</i></li>
+     *                          </ul>
+     * @param addToPath         An existing path where to add the arc to, or {@code null} to create a new path.
+     *
+     *
+     * @see #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
+     */
+    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
+                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
+                                              GeneralPath addToPath)
+    {
+        final GeneralPath path = addToPath;
+        if (sweepAngleRadians == 0d) { return; }
+ 
+        float radius = radiusX;
+        float yScale = radiusY / radius;
+        
+        if (pointsOnCircle >= 1)
+        {
+            final double threshold = Math.PI * 2d / pointsOnCircle;
+            if (Math.abs(sweepAngleRadians) > threshold)
+            {
+                double angle = normalizeRadians(startAngleRadians);
+                //PointF end, start = pointFromAngleRadians(center, radius, angle);
+                double endX, endY;
+                double startX = cx + radius * Math.cos(angle);
+                double startY = cy + radius * Math.sin(angle) * yScale;
+                path.moveTo(startX, startY);
+                if (overlapPoints)
+                {
+                    final boolean cw = sweepAngleRadians > 0; // clockwise?
+                    final double angleEnd = angle + sweepAngleRadians;
+                    while (true)
+                    {
+                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
+                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
+                        final boolean isEnd = cw ? angleEnd <= next : angleEnd >= next;
+                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
+                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
+                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
+                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+                        if (isEnd) { break; }
+                        angle = next;
+                        startX = endX;
+                        startY = endY;
+                    }
+                }
+                else
+                {
+                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
+                    final double sweep = sweepAngleRadians / n;
+                    for (int i = 0;
+                         i < n;
+                         i++, startX = endX, startY = endY)
+                    {
+                        angle += sweep;
+                        //end = pointFromAngleRadians(center, radius, angle);
+                        endX = cx + radius * Math.cos(angle);
+                        endY = cy + radius * Math.sin(angle) * yScale;
+                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+                    }
+                }
+                return;
+            }
+        }
+ 
+        double startX = cx + radius * Math.cos(startAngleRadians);
+        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
+        
+        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
+        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
+        path.moveTo(startX, startY);
+        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+        
+    }
+    
+     /**
+     * Normalize the input radians in the range 360∞ > x >= 0∞.
+     *
+     * @param radians The angle to normalize (in radians).
+     *
+     * @return The angle normalized in the range 360∞ > x >= 0∞.
+     */
+    private static double normalizeRadians(double radians)
+    {
+        double PI2 = Math.PI*2d;
+        radians %= PI2;
+        if (radians < 0d) { radians += PI2; }
+        if (radians == PI2) { radians = 0d; }
+        return radians;
     }
     
     /**
