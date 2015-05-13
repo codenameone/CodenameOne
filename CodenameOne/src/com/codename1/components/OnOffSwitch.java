@@ -485,7 +485,9 @@ public class OnOffSwitch extends Container {
                 repaint();
             } else {
                 updateButton();
-                animateLayoutAndWait(150);
+                if(isInitialized()){
+                    animateLayoutAndWait(150);
+                }
             }
         }
         animationLock = orig;
