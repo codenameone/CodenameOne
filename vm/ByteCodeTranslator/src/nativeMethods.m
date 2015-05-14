@@ -1205,6 +1205,7 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
 
 
 JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
+    enteringNativeAllocations();
     JAVA_INT len = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
     JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
     JAVA_INT valueLen = ((JAVA_ARRAY)value)->length;
@@ -1215,6 +1216,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODE
     JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
     d[len] = __cn1Arg1;
     set_field_java_lang_StringBuilder_count(threadStateData, len+1, __cn1ThisObject);
+    finishedNativeAllocations();
     return __cn1ThisObject;
 }
 
