@@ -277,6 +277,7 @@ public class Component implements Animation, StyleListener {
     private boolean dropTarget;
     private Image dragImage;
     private Component dropTargetComponent;
+    private int dragCallbacks = 0;
 
     private String cloudBoundProperty;
     private String cloudDestinationProperty;
@@ -2505,6 +2506,19 @@ public class Component implements Animation, StyleListener {
         }
         
         if(dragAndDropInitialized) {
+            //keep call to pointerDragged to move the parent scroll if needed
+            if (dragCallbacks < 2) {
+                dragCallbacks++;
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (dragActivated) {
+                            pointerDragged(x, y);
+                        }
+                        dragCallbacks--;
+                    }
+                });
+            }
+            
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -2575,13 +2589,6 @@ public class Component implements Animation, StyleListener {
                         }                        
                                 
                         scrollParent.scrollRectToVisible(xposition, yposition, width, height, scrollParent);            
-                        //keep move it until edges or until it is fully visible in the scrollable parent container
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            public void run() {
-                                pointerDragged(x,y);
-                            }
-                        });
                     }
                 }
             }    
