@@ -1242,3 +1242,13 @@ JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 }
+
+JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+    enteringNativeAllocations();
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString *nsString = [toNSString(CN1_THREAD_STATE_PASS_ARG __cn1ThisObject) lowercaseString];
+    JAVA_OBJECT jString = fromNSString(CN1_THREAD_STATE_PASS_ARG nsString);
+    [pool release];
+    finishedNativeAllocations();
+    return jString;
+}

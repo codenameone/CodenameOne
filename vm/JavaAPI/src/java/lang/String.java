@@ -735,13 +735,15 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * Converts all of the characters in this String to lower case.
      */
-    public java.lang.String toLowerCase(){
-        char[] c = new char[length()];
-        for(int iter = 0 ; iter < count ; iter++) {
-            c[iter] = Character.toLowerCase(value[offset + iter]);
-        }
-        return new String(c);
-    }
+//    public java.lang.String toLowerCase(){
+//        char[] c = new char[length()];
+//        for(int iter = 0 ; iter < count ; iter++) {
+//            c[iter] = Character.toLowerCase(value[offset + iter]);
+//        }
+//        return new String(c);
+//    }
+    
+    public native java.lang.String toLowerCase();
 
     /**
      * This object (which is already a string!) is itself returned.
