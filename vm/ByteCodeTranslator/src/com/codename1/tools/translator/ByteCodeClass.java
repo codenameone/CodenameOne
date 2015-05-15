@@ -523,7 +523,7 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     b.append("_");
                     b.append(bf.getFieldName());
-                    if(bf.isObjectType() && bf.isFinal()) {
+                    if(bf.shouldRemoveFromHeapCollection()) {
                         b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
                     } else {
                         b.append(" = __cn1StaticVal;\n}\n\n");
@@ -1463,7 +1463,7 @@ public class ByteCodeClass {
     
     public void appendStaticFieldsExtern(StringBuilder b) {
         for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && bf.isObjectType() && !isTrulyFinal(bf)) {
+            if(bf.isStaticField() && bf.isObjectType() && !bf.shouldRemoveFromHeapCollection()) {
                 b.append("extern ");
                 b.append(bf.getCDefinition());
                 b.append(" STATIC_FIELD_");
@@ -1490,7 +1490,7 @@ public class ByteCodeClass {
     
     public void appendStaticFieldsMark(StringBuilder b) {
         for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && bf.isObjectType() && !isTrulyFinal(bf)) {
+            if(bf.isStaticField() && bf.isObjectType() && !bf.shouldRemoveFromHeapCollection()) {
                 b.append("    gcMarkObject(threadStateData, STATIC_FIELD_");
                 b.append(clsName);
                 b.append("_");

@@ -145,6 +145,17 @@ public class ByteCodeField {
         return finalField;
     }
     
+    public boolean shouldRemoveFromHeapCollection() {
+        if(finalField && isObjectType()) {
+            // 2d arrays can be modified in runtime resulting in broken arrays
+            if(arrayDimensions < 2) {
+                // this should probably be more elaborate to detect various mutable object types...
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public Object getValue() {
         return value;
     }
