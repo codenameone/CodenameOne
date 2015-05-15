@@ -753,14 +753,16 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * Converts all of the characters in this String to upper case.
      */
-    public java.lang.String toUpperCase(){
-        char[] c = new char[length()];
-        for(int iter = 0 ; iter < count ; iter++) {
-            c[iter] = Character.toUpperCase(value[offset + iter]);
-        }
-        return new String(c);
-    }
+//    public java.lang.String toUpperCase(){
+//        char[] c = new char[length()];
+//        for(int iter = 0 ; iter < count ; iter++) {
+//            c[iter] = Character.toUpperCase(value[offset + iter]);
+//        }
+//        return new String(c);
+//    }
 
+    public native java.lang.String toUpperCase();
+    
     /**
      * Removes white space from both ends of this string.
      * If this String object represents an empty character sequence, or the first and last characters of character sequence represented by this String object both have codes greater than 'u0020' (the space character), then a reference to this String object is returned.

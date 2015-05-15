@@ -1232,3 +1232,13 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
         dst[__cn1Arg4++] = src[i];
     }
 }
+
+JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+    enteringNativeAllocations();
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString *nsString = [toNSString(CN1_THREAD_STATE_PASS_ARG __cn1ThisObject) uppercaseString];
+    JAVA_OBJECT jString = fromNSString(CN1_THREAD_STATE_PASS_ARG nsString);
+    [pool release];
+    finishedNativeAllocations();
+    return jString;
+}
