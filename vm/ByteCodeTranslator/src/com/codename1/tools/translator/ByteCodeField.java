@@ -149,8 +149,9 @@ public class ByteCodeField {
         if(finalField && isObjectType()) {
             // 2d arrays can be modified in runtime resulting in broken arrays
             if(arrayDimensions < 2) {
-                // this should probably be more elaborate to detect various mutable object types...
-                return true;
+                if(type == null || type.startsWith("java_lang_")) {
+                    return true;
+                }
             }
         }
         return false;
