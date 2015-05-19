@@ -6611,7 +6611,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public String getDatabasePath(String databaseName) {
-        return getStorageDir() + "/database/" + databaseName;
+        if(exposeFilesystem){
+            return getStorageDir() + "/database/" + databaseName;
+        }else{
+            return getAppHomePath() + "database/" + databaseName;        
+        }
     }
 
     @Override
