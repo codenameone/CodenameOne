@@ -2025,6 +2025,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     @Override
+    public boolean isNativeVideoPlayerControlsIncluded() {
+        return true;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    @Override
     public Media createMedia(final String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
 
         if (uri.startsWith("file://")) {

@@ -93,6 +93,7 @@ public class MediaPlayer extends Container {
             setDataSource(pendingDataURI);
             pendingDataURI = null;
         }
+        initUI();
     }
     
     /**
@@ -209,14 +210,16 @@ public class MediaPlayer extends Container {
         removeAll();
         setLayout(new BorderLayout());        
         
-        addComponent(BorderLayout.CENTER, video.getVideoComponent());        
+        if(video != null){
+            addComponent(BorderLayout.CENTER, video.getVideoComponent());        
+        }
         
         Container buttonsBar = new Container(new FlowLayout(Container.CENTER));
         if(!Display.getInstance().isNativeVideoPlayerControlsIncluded()) {
             addComponent(BorderLayout.SOUTH, buttonsBar);
         }
         
-        if(!video.isNativePlayerMode()){
+        if(video == null || !video.isNativePlayerMode()){
             Button back = new Button();
             back.setUIID("MediaPlayerBack");
             if(backIcon != null){
@@ -228,13 +231,16 @@ public class MediaPlayer extends Container {
             back.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
+                    if(video == null){
+                        return;
+                    }
                     int t = video.getTime();
                     video.setTime(t - 2);
                 }
             });        
         }
         
-        final Button play = new Button("play");
+        final Button play = new Button();
         play.setUIID("MediaPlayerPlay");
         if(playIcon != null){
             play.setIcon(playIcon);
@@ -247,13 +253,17 @@ public class MediaPlayer extends Container {
             } else {
                 play.setText("pause");
             }
-            if(!video.isPlaying()){
+            if(video != null && !video.isPlaying()){
                 video.play();
             }
         }
         play.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
+                if(video == null){
+                    return;
+                }
+                
                 if(!video.isPlaying()){
                     video.play();
                     play.setUIID("MediaPlayerPause");
@@ -277,11 +287,14 @@ public class MediaPlayer extends Container {
         });
         buttonsBar.addComponent(play);
 
-        if(!video.isNativePlayerMode()){        
+        if(video == null || !video.isNativePlayerMode()){        
             Button fwd = new Button();
             fwd.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
+                    if(video == null){
+                        return;
+                    }
                     int t = video.getTime();
                     video.setTime(t + 1);
                 }
@@ -346,19 +359,19 @@ public class MediaPlayer extends Container {
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("backIcon")) {
-            setBackIcon((Image)value);
+            this.backIcon = (Image)value;
             return null;
         }
         if(name.equals("forwardIcon")) {
-            setFwdIcon((Image)value);
+            this.fwdIcon = (Image)value;
             return null;
         }
         if(name.equals("playIcon")) {
-            setPlayIcon((Image)value);
+            this.playIcon = (Image)value;
             return null;
         }
         if(name.equals("pauseIcon")) {
-            setPauseIcon((Image)value);
+            this.pauseIcon = (Image)value;
             return null;
         }
         if(name.equals("dataSource")) {
