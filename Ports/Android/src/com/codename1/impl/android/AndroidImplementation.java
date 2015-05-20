@@ -624,6 +624,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void confirmControlView() {
+        if(myView == null){
+            initSurface();
+        }
         myView.getAndroidView().setVisibility(View.VISIBLE);
         //ugly workaround for a bug where on some android versions the async view
         //came back black from the background.
@@ -1240,7 +1243,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void repaint(Animation cmp) {
-        if(myView.alwaysRepaintAll()) {
+        if(myView != null && myView.alwaysRepaintAll()) {
             if(cmp instanceof Component) {
                 Component c = (Component)cmp;
                 c.setDirtyRegion(null);
@@ -1259,6 +1262,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if(f != null) {
                     super.repaint(f);
                 }
+                return;
             }
         }
         super.repaint(cmp);
