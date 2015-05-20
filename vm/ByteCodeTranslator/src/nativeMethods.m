@@ -56,6 +56,7 @@ JAVA_VOID java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAV
 }
 
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
+    enteringNativeAllocations();
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
     sourceData += off;
     NSStringEncoding enc;
@@ -71,7 +72,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
             for(int iter = 0 ; iter < len ; iter++) {
                 dest[iter] = sourceData[iter];
             }
-            
+            finishedNativeAllocations();
             return destArr;
         } else {
             if(compareStringToCharArray("UTF-16", encArr, arrLength)) {
@@ -106,7 +107,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
             for(int iter = 0 ; iter < len ; iter++) {
                 dest[iter] = sourceData[iter];
             }
-            
+            finishedNativeAllocations();
             return destArr;
         }
     }
@@ -114,6 +115,17 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     // this allows emojii to work with the Strings properly
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString* nsStr = [[NSString alloc] initWithBytes:sourceData length:len encoding:enc];
+    if (nsStr == nil) {
+        nsStr = [[NSString alloc] initWithBytes:sourceData length:len encoding:NSISOLatin1StringEncoding];
+        if (nsStr == nil) {
+            JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG "Encoding Error"));
+            finishedNativeAllocations();
+            throwException(threadStateData, ex);
+            
+            return NULL;
+        }
+    }
 
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [nsStr length]);
     __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
@@ -134,6 +146,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
 
     [nsStr release];
     [pool release];
+    finishedNativeAllocations();
     return destArr;
 }
 
