@@ -637,9 +637,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     try {
                         Thread.sleep(1000);                        
+                        ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
                     } catch (Exception e) {
                     }
-                    ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
                 }
             }).start();
         }
