@@ -149,7 +149,7 @@ public class ByteCodeField {
         if(finalField && isObjectType()) {
             // 2d arrays can be modified in runtime resulting in broken arrays
             if(arrayDimensions < 2) {
-                if(type == null || type.startsWith("java_lang_")) {
+                if(type == null || type.startsWith("java_lang_") && !type.endsWith("Builder") && !type.endsWith("Buffer")) {
                     return true;
                 }
             }
