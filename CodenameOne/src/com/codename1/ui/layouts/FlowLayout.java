@@ -108,7 +108,9 @@ public class FlowLayout extends Layout{
                 }
             } else {
                 moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, i, rowBaseline);
-                fillRow(parent, width, start, i);
+                if(fillRows) {
+                    fillRow(parent, width, start, i);
+                }
                 x = initX+cmp.getStyle().getMargin(false, Component.LEFT);
                 y += rowH;
                 rowBaseline = 0;
@@ -134,48 +136,56 @@ public class FlowLayout extends Layout{
             }
         }
         moveComponents(parent, parent.getStyle().getPadding(rtl, Component.LEFT), y, width - parent.getStyle().getPadding(rtl, Component.LEFT) - x, rowH, start, numOfcomponents, rowBaseline);
-        fillRow(parent, width, start, numOfcomponents);
+        if(fillRows) {
+            fillRow(parent, width, start, numOfcomponents);
+        }
     }
 
+    /**
+     * 
+     * @param target the parent container
+     * @param width the width of the row to fill
+     * @param start the index of the first component in this row
+     * @param end the index of the last component in this row
+     */ 
     protected void fillRow(Container target, int width, int start, int end) {
-        if(fillRows) {
-            int available = width;
-            for(int iter = start ; iter < end ; iter++) {
-                Component c = target.getComponentAt(iter);
-                available -= (c.getWidth() + c.getStyle().getMargin(false, Component.RIGHT) + 
-                        c.getStyle().getMargin(false, Component.LEFT));
-            }
-            if(available > 0 && end - start > 0) {
-                int perComponent = available / (end - start);
-                int lastComponent = perComponent + available % (end - start);
-                if(perComponent > 0) {
-                    int addOffset = 0;
-                    boolean rtl = target.isRTL();
-                    for(int iter = start ; iter < end - 1 ; iter++) {
-                        Component c = target.getComponentAt(iter);
-                        c.setWidth(c.getWidth() + perComponent);
-                        if(rtl) {
-                            addOffset += perComponent;
-                            c.setX(c.getX() - addOffset);
-                        } else {
-                            c.setX(c.getX() + addOffset);
-                            addOffset += perComponent;
-                        }
-                    }
-                    Component c = target.getComponentAt(end - 1);
+        int available = width;
+        for(int iter = start ; iter < end ; iter++) {
+            Component c = target.getComponentAt(iter);
+            available -= (c.getWidth() + c.getStyle().getMargin(false, Component.RIGHT) + 
+                    c.getStyle().getMargin(false, Component.LEFT));
+        }
+        if(available > 0 && end - start > 0) {
+            int perComponent = available / (end - start);
+            int lastComponent = perComponent + available % (end - start);
+            if(perComponent > 0) {
+                int addOffset = 0;
+                boolean rtl = target.isRTL();
+                for(int iter = start ; iter < end - 1 ; iter++) {
+                    Component c = target.getComponentAt(iter);
+                    c.setWidth(c.getWidth() + perComponent);
                     if(rtl) {
-                        addOffset += lastComponent;
+                        addOffset += perComponent;
                         c.setX(c.getX() - addOffset);
                     } else {
                         c.setX(c.getX() + addOffset);
+                        addOffset += perComponent;
                     }
-                    c.setWidth(c.getWidth() + lastComponent);
-                } else {
-                    Component c = target.getComponentAt(end - 1);
-                    c.setWidth(c.getWidth() + lastComponent);
                 }
+                Component c = target.getComponentAt(end - 1);
+                if(rtl) {
+                    addOffset += lastComponent;
+                    c.setX(c.getX() - addOffset);
+                } else {
+                    c.setX(c.getX() + addOffset);
+                }
+                c.setWidth(c.getWidth() + lastComponent);
+            } else {
+                Component c = target.getComponentAt(end - 1);
+                c.setWidth(c.getWidth() + lastComponent);
             }
         }
+        
     }
 
     private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd){
