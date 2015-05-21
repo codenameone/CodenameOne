@@ -149,6 +149,10 @@ public class ByteCodeField {
         if(finalField && isObjectType()) {
             // 2d arrays can be modified in runtime resulting in broken arrays
             if(arrayDimensions < 2) {
+                // arrays of non-primitive types are mutable despite being marked as final
+                if(type != null && arrayDimensions > 0) {
+                    return false;
+                }
                 if(type == null || type.startsWith("java_lang_") && !type.endsWith("Builder") && !type.endsWith("Buffer")) {
                     return true;
                 }
