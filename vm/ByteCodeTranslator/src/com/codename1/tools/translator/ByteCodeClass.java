@@ -524,7 +524,11 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     if(bf.shouldRemoveFromHeapCollection()) {
-                        b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
+                        if(bf.getType() != null && bf.getType().endsWith("String")) {
+                            b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n    removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)__cn1StaticVal)->java_lang_String_value);\n}\n\n");
+                        } else {
+                            b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
+                        }
                     } else {
                         b.append(" = __cn1StaticVal;\n}\n\n");
                     }
