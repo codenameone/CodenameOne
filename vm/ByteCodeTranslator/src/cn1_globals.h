@@ -747,6 +747,8 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #define CN1_THREAD_STATE_PASS_SINGLE_ARG threadStateData
 #define CN1_THREAD_GET_STATE_PASS_ARG getThreadLocalData(),
 #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG getThreadLocalData()
+#define CN1_YIELD_THREAD getThreadLocalData()->threadActive = JAVA_FALSE;
+#define CN1_RESUME_THREAD while (getThreadLocalData()->threadBlockedByGC){ usleep((JAVA_INT)1000);} getThreadLocalData()->threadActive = JAVA_TRUE;
 
 extern struct ThreadLocalData* getThreadLocalData();
 

@@ -1041,7 +1041,7 @@ public class BytecodeMethod {
                             }
                         } 
                     } else {
-                        if(iter + 2 < instructionCount && !astoreCalls) {
+                        if(iter + 2 < instructionCount && !astoreCalls && ((VarOp)current).getIndex() == 0) {
                             // optimize a setter
                             Instruction isThisPutField = instructions.get(iter + 2);
                             boolean isReturn = false;
