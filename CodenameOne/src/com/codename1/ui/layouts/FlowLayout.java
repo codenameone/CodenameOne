@@ -142,6 +142,8 @@ public class FlowLayout extends Layout{
     }
 
     /**
+     * This method tries to fill up the available space in a row.
+     * This method is called if isFillRows() returns true.
      * 
      * @param target the parent container
      * @param width the width of the row to fill
