@@ -137,12 +137,13 @@ public class FlowLayout extends Layout{
         fillRow(parent, width, start, numOfcomponents);
     }
 
-    private void fillRow(Container target, int width, int start, int end) {
+    protected void fillRow(Container target, int width, int start, int end) {
         if(fillRows) {
             int available = width;
             for(int iter = start ; iter < end ; iter++) {
                 Component c = target.getComponentAt(iter);
-                available -= c.getWidth();
+                available -= (c.getWidth() + c.getStyle().getMargin(false, Component.RIGHT) + 
+                        c.getStyle().getMargin(false, Component.LEFT));
             }
             if(available > 0 && end - start > 0) {
                 int perComponent = available / (end - start);
