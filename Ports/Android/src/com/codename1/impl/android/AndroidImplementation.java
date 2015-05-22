@@ -1262,7 +1262,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if(f != null) {
                     super.repaint(f);
                 }
-                return;
             }
         }
         super.repaint(cmp);
