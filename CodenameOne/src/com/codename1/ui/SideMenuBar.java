@@ -584,7 +584,9 @@ public class SideMenuBar extends MenuBar {
             }
             if(c instanceof Button && ((Button)c).getCommand() == cmd) {
                 Container cc = getParent();
-                cc.removeComponent(c);
+                if(cc != null) {
+                    cc.removeComponent(c);
+                }
                 return;
             }
         }
