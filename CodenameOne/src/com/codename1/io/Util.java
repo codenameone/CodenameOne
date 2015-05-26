@@ -1079,6 +1079,68 @@ public class Util {
     }
     
     /**
+     * Removes the object at the source array offset and copies all other objects to the destination array
+     * @param sourceArray the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
+     * @param o the object to remove from the array
+     */
+    public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, Object o) {
+        int off = indexOf(sourceArray, o);
+        removeObjectAtOffset(sourceArray, destinationArray, off);
+    }
+    
+    /**
+     * Removes the object at the source array offset and copies all other objects to the destination array
+     * @param sourceArray the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
+     * @param offset the offset of the array
+     */
+    public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset) {
+        System.arraycopy(sourceArray, 0, destinationArray, 0, offset);
+        System.arraycopy(sourceArray, offset + 1, destinationArray, offset, sourceArray.length - offset - 1);
+    }
+    
+    /**
+     * Inserts the object at the destination array offset 
+     * @param sourceArray the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length + 1
+     * @param offset the offset of the array
+     * @param o the object
+     */
+    public static void insertObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset, Object o) {
+        if(offset == 0) {
+            destinationArray[0] = o;
+            System.arraycopy(sourceArray, 0, destinationArray, 1, sourceArray.length);
+        } else {
+            if(offset == sourceArray.length) {
+                System.arraycopy(sourceArray, 0, destinationArray, 0, sourceArray.length);
+                destinationArray[sourceArray.length] = o;
+            } else {
+                System.arraycopy(sourceArray, 0, destinationArray, 0, offset);
+                destinationArray[offset] = o;
+                System.arraycopy(sourceArray, offset, destinationArray, offset + 1, sourceArray.length);
+            }
+        }
+    }
+
+    /**
+     * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
+     * rely on the ordering of the elements like the Arrays method.
+     * @param arr the array
+     * @param value the value to search
+     * @return the offset or -1
+     */
+    public static int indexOf(Object[] arr, Object value) {
+        int l = arr.length;
+        for(int iter = 0 ; iter < l ; iter++) {
+            if(arr[iter] == value) {
+                return iter;
+            }
+        }
+        return -1;
+    }
+    
+    /**
      * Blocking method that will download the given URL to storage and return when the 
      * operation completes
      * @param url the URL

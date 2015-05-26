@@ -51,6 +51,7 @@ import java.util.Vector;
  * sensitive way! In order to work around this create a property with an identical 
  * name that contains the field as lower or upper case in order to query/sort 
  * against.
+ * @deprecated this API is targeted for removal due to changes in Google App Engine API support
  *
  * @author Shai Almog
  */
@@ -747,7 +748,7 @@ public class CloudStorage {
      * @param limit number of responses to fetch
      * @param visibilityScope indicates the scope in which to look as one of the 
      * CloudObject constants ACCESS_*
-     * @return array of objects matching the query
+     * @param response array of objects matching the query
      */
     public void queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
         try {
@@ -766,6 +767,7 @@ public class CloudStorage {
      * @return an ID for the given file that can be used to delete the file or construct a URL of the file
      * @throws CloudException in case of a server side error 
      * @throws IOException when a problem occurs with the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String uploadCloudFile(String mimeType, String file) throws CloudException, IOException {
         return uploadCloudFileImpl(mimeType, file, null, -1);
@@ -781,6 +783,7 @@ public class CloudStorage {
      * @return an ID for the given file that can be used to delete the file or construct a URL of the file
      * @throws CloudException in case of a server side error 
      * @throws IOException when a problem occurs with the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String uploadCloudFile(String mimeType, String filename, InputStream data, int dataSize) throws CloudException, IOException {
         return uploadCloudFileImpl(mimeType, filename, data, dataSize);
@@ -841,6 +844,7 @@ public class CloudStorage {
      * 
      * @param fileId the file id to delete
      * @return true if the operation was successful
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public boolean deleteCloudFile(String fileId) {
         if(CloudPersona.getCurrentPersona().getToken() == null) {
@@ -862,6 +866,7 @@ public class CloudStorage {
     /**
      * Deletes all the cloud files under this user, notice that this method
      * is asynchronous and a background server process performs the actual deletion
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public void deleteAllCloudFilesForUser() {
         if(CloudPersona.getCurrentPersona().getToken() == null) {
@@ -884,6 +889,7 @@ public class CloudStorage {
      * @param timestamp the timestamp since epoch (as in System.currentTimemillis).
      * @param developerAccount your developer email
      * @param developerPassword your developer password
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public void deleteAllCloudFilesBefore(long timestamp, String developerAccount, String developerPassword) {
         if(CloudPersona.getCurrentPersona().getToken() == null) {
@@ -905,6 +911,7 @@ public class CloudStorage {
      * 
      * @param fileId the file ID
      * @return a URL that allows downloading the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String getUrlForCloudFileId(String fileId) {
         return SERVER_URL + "/fileStoreDownload?i=" + fileId;
