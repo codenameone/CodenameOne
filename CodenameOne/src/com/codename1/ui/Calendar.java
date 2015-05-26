@@ -140,6 +140,7 @@ public class Calendar extends Container {
                         newMv.setMonth(year, month);
                         replaceAndWait(mv, newMv, cm);
                         mv = newMv;
+                        newMv.fireActionEvent();                        
                     } else {
                         mv.setMonth(year, month);
                         componentChanged();
