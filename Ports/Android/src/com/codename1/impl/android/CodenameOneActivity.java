@@ -243,6 +243,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        AndroidImplementation.activity = this;
         AndroidNativeUtil.onResume();
         waitingForResult = false;
         background = false;

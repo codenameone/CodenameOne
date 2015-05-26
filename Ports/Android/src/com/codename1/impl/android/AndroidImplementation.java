@@ -625,7 +625,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void confirmControlView() {
         if(myView == null){
-            initSurface();
+            init(activity);
         }
         myView.getAndroidView().setVisibility(View.VISIBLE);
         //ugly workaround for a bug where on some android versions the async view
