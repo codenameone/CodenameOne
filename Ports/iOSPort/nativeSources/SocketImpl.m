@@ -23,7 +23,8 @@
 }
 
 -(int)getAvailableInput{
-    return availableValue;
+    //return availableValue;
+    return [inputStream hasBytesAvailable] ? 1 : 0;
 }
 
 -(NSString*)getErrorMessage{
