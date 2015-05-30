@@ -1118,7 +1118,7 @@ public class Util {
             } else {
                 System.arraycopy(sourceArray, 0, destinationArray, 0, offset);
                 destinationArray[offset] = o;
-                System.arraycopy(sourceArray, offset, destinationArray, offset + 1, sourceArray.length);
+                System.arraycopy(sourceArray, offset, destinationArray, offset + 1, sourceArray.length - offset);
             }
         }
     }
