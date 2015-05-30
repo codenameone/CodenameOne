@@ -147,7 +147,18 @@ public abstract class Database {
      * @throws IOException 
      */
     public void execute(String sql, Object [] params) throws IOException{
-        throw new RuntimeException("not implemented");
+        if ( params == null) {
+            execute(sql);
+        } else {
+            //throw new RuntimeException("not implemented");
+            int len = params.length;
+            String[] strParams = new String[len];
+            for ( int i=0; i<len; i++) {
+                strParams[i] = params[i].toString();
+            }
+            execute(sql, strParams);
+        }
+        
     }
     
     
