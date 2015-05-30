@@ -154,7 +154,14 @@ public abstract class Database {
             int len = params.length;
             String[] strParams = new String[len];
             for ( int i=0; i<len; i++) {
-                strParams[i] = params[i].toString();
+                if (params[i] instanceof byte[]) {
+                    throw new RuntimeException("Blobs aren't supported on this platform");
+                }
+                if (params[i] == null) {
+                    strParams[i] = null;
+                } else {
+                    strParams[i] = params[i].toString();
+                }
             }
             execute(sql, strParams);
         }
