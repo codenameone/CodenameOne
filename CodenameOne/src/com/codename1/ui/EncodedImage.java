@@ -73,6 +73,7 @@ public class EncodedImage extends Image {
      */
     protected void resetCache() {
         cache = null;
+        hardCache = null;
     }
 
     /**
