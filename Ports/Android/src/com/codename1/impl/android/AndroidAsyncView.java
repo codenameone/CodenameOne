@@ -648,4 +648,18 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     public boolean alwaysRepaintAll() {
         return true;
     }
+    
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        //do not let other views steal the focus from the main view
+        if(!gainFocus){
+            requestFocus();
+            if(this.implementation.getCurrentForm() != null){
+                this.implementation.getCurrentForm().repaint();
+                
+            }
+        }
+    }
+    
 }
