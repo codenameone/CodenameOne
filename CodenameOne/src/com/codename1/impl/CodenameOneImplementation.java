@@ -5920,6 +5920,12 @@ public abstract class CodenameOneImplementation {
                 if(t.isDirectory()) {
                     fs.mkdir(tardir + name);
                 } else {
+                    String path = tardir + name;
+                    String dir = path.substring(0,path.lastIndexOf('/'));
+                    if (!fs.exists(dir)) {
+                        fs.mkdir(dir);
+                    }
+
                     OutputStream os = fs.openOutputStream(tardir + name);
                     int count;
                     while((count = is.read(data)) != -1) {
