@@ -243,7 +243,8 @@ public class TableLayout extends Layout {
      * @return the component instance
      */
     public Component getComponentAt(int row, int column) {
-        return tablePositions[row * columns + column].parent;
+        Constraint  c =tablePositions[row * columns + column];
+        return c != null ? c.parent : null;
     }
 
     /**

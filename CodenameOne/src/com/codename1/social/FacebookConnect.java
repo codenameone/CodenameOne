@@ -41,9 +41,13 @@ public class FacebookConnect {
     
     public static FacebookConnect getInstance() {
         if(instance == null) {
-            try {
-                instance = (FacebookConnect)implClass.newInstance();
-            } catch(Throwable t) {
+            if (implClass != null) {
+                try {
+                    instance = (FacebookConnect)implClass.newInstance();
+                } catch(Throwable t) {
+                    instance = new FacebookConnect();
+                }
+            } else {
                 instance = new FacebookConnect();
             }
         }
