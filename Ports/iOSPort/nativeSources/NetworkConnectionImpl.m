@@ -60,7 +60,7 @@ int connections = 0;
 
 - (void)connect {
     dispatch_sync(dispatch_get_main_queue(), ^{
-        connection = [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
+         connection = [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
     });
 }
 
@@ -94,6 +94,21 @@ int connections = 0;
 
 - (void)setBody:(void*)body size:(int)size {
     [request setHTTPBody:[NSData dataWithBytes:body length:size]];
+}
+
+-(void)setBody:(NSString*)file {
+#ifdef __IPHONE_8_0
+    if (isIOS8()) {
+        NSInputStream * input = [NSInputStream inputStreamWithFileAtPath:fixFilePath(file)];
+        [request setHTTPBodyStream: input];
+     } else {
+         NSData* d = [[NSFileManager defaultManager] contentsAtPath:fixFilePath(file)];
+         [request setHTTPBody: d];
+     }
+#else
+    NSData* d = [[NSFileManager defaultManager] contentsAtPath:fixFilePath(file)];
+    [request setHTTPBody: d];
+#endif
 }
 
 

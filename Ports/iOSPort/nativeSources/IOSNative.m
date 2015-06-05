@@ -1378,6 +1378,13 @@ void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(CN1_THREAD_STAT
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_setBody___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT file) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    [impl setBody: toNSString(CN1_THREAD_STATE_PASS_ARG file)];
+    POOL_END();
+}
+
 void connectionComplete(void* peer) {
     com_codename1_impl_ios_IOSImplementation_streamComplete___long(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer);
 }
@@ -6154,5 +6161,162 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
     }
     finishedNativeAllocations();
     
+}
+#endif
+
+
+/*
+native void readFile(long nsFileHandle, byte[] b, int off, int len);
+*/
+JAVA_VOID com_codename1_impl_ios_IOSNative_readFile___long_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG fileHandle, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len) {
+    POOL_BEGIN();
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* byteArray = b;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    void* data = ((JAVA_ARRAY)b)->data;
+#endif
+    void* actual = &(data[off]);
+    
+    NSData* n = [fh readDataOfLength:len];
+    
+    [n getBytes:actual length:len];
+    
+    POOL_END();
+    
+}
+
+/*
+native int getNSFileOffset(long nsFileHandle);
+ */
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileOffset___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG fileHandle) {
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    return (JAVA_INT)[fh offsetInFile];
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileOffset___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG fileHandle) {
+    return com_codename1_impl_ios_IOSNative_getNSFileOffset___long_R_int(CN1_THREAD_STATE_PASS_ARG instanceObject, fileHandle);
+}
+#endif
+
+/*
+native int getNSFileAvailable(long nsFileHandle);
+ */
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileAvailable___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG fileHandle) {
+
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    unsigned long long offset = [fh offsetInFile];
+    unsigned long long end = [fh seekToEndOfFile];
+    long long available = end - offset;
+    [fh seekToFileOffset:offset];
+    return available > 0 ? 1 : 0;
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileAvailable___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, long fileHandle) {
+    return com_codename1_impl_ios_IOSNative_getNSFileAvailable___long_R_int(CN1_THREAD_STATE_PASS_ARG instanceObject, fileHandle);
+}
+#endif
+
+/*
+native int getNSFileSize(long nsFileHandle);
+*/
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileSize___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG fileHandle) {
+    
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    unsigned long long offset = [fh offsetInFile];
+    unsigned long long end = [fh seekToEndOfFile];
+    [fh seekToFileOffset:offset];
+    return (JAVA_INT)end;
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_getNSFileSize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, long fileHandle) {
+    return com_codename1_impl_ios_IOSNative_getNSFileSize___long_R_int(CN1_THREAD_STATE_PASS_ARG instanceObject, fileHandle);
+}
+#endif
+
+/*
+native long createNSFileHandle(String name, String type);
+ */
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_OBJECT name, JAVA_OBJECT type) {
+    POOL_BEGIN();
+    NSString* nameNS = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    NSString* typeNS = nameNS == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG type);
+    NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
+    NSFileHandle* file = [NSFileHandle fileHandleForReadingAtPath:path];
+#ifndef CN1_USE_ARC
+    [file retain];
+#endif
+    POOL_END();
+    return (JAVA_LONG)((BRIDGE_CAST void*)file);
+
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_OBJECT name, JAVA_OBJECT type) {
+    return com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String_java_lang_String_R_long(CN1_THREAD_STATE_PASS_ARG instance, name, type);
+}
+#endif
+
+/*native long createNSFileHandle(String file);*/
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_OBJECT file) {
+    POOL_BEGIN();
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
+    if([ns hasPrefix:@"file:"]) {
+        ns = [ns substringFromIndex:5];
+    } else {
+        if([ns hasPrefix:@"//localhost"]) {
+            ns = [@"file:" stringByAppendingString:ns];
+            //NSData* d = [NSData dataWithContentsOfURL:[NSURL URLWithString:ns]];
+            NSFileHandle* fh = [NSFileHandle fileHandleForReadingFromURL:[NSURL URLWithString:ns] error:nil];
+#ifndef CN1_USE_ARC
+            [fh retain];
+#endif
+            POOL_END();
+            return (JAVA_LONG)((BRIDGE_CAST void*)fh);
+        }
+    }
+    //NSData* d = [NSData dataWithContentsOfFile:ns];
+    NSFileHandle* fh = [NSFileHandle fileHandleForReadingAtPath:ns];
+#ifndef CN1_USE_ARC
+    [fh retain];
+#endif
+    POOL_END();
+    return (JAVA_LONG)((BRIDGE_CAST void*)fh);
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_OBJECT name) {
+    return com_codename1_impl_ios_IOSNative_createNSFileHandle___java_lang_String_R_long(CN1_THREAD_STATE_PASS_ARG instance, name);
+}
+#endif
+
+/*native void setNSFileOffset(long nsFileHandle, int off);*/
+JAVA_VOID com_codename1_impl_ios_IOSNative_setNSFileOffset___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_LONG fileHandle, JAVA_INT offset) {
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    [fh seekToFileOffset:offset];
+}
+
+
+
+/*native int readNSFile(long nsFileHandle);*/
+JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_LONG fileHandle) {
+    POOL_BEGIN();
+    NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
+    NSData* d =[fh readDataOfLength:1];
+    unsigned char *n = [d bytes];
+    JAVA_INT out = n[0];
+    POOL_END();
+    return out;
+}
+
+#ifndef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_LONG fileHandle) {
+    return com_codename1_impl_ios_IOSNative_readNSFile___long_R_int(CN1_THREAD_STATE_PASS_ARG instance, fileHandle);
 }
 #endif

@@ -75,6 +75,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.media.MediaManager;
 import com.codename1.payment.RestoreCallback;
@@ -87,6 +88,7 @@ import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.StringUtil;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
 /**
@@ -2146,7 +2148,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(val <= 0) {
             return null;
         }
-        return new BufferedInputStream(new NSDataInputStream(resource, null), resource);
+        return new BufferedInputStream(new NSFileInputStream(resource, null), resource);
     }
 
     // this might be accessed on multiple threads
@@ -4707,9 +4709,140 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * An output stream that will start writing to a file once it reaches 
+     * a certain size.  
+     */
+    static class FileBackedOutputStream extends OutputStream {
+
+        private ByteArrayOutputStream buf;
+        private NSDataOutputStream fos;
+        private static int maxBufferSize=102400;
+        boolean usingBuffer = true;
+        private String file;
+        
+        public FileBackedOutputStream() {
+            buf = new ByteArrayOutputStream();
+        }
+        
+        @Override
+        public void write(int b) throws IOException {
+            if (usingBuffer && buf.size() < maxBufferSize) {
+                buf.write(b);
+            } else if (usingBuffer) {
+                usingBuffer = false;
+                file = createTempFile();
+                fos = new NSDataOutputStream(file);
+                fos.write(buf.toByteArray());
+                fos.write(b);
+                buf = null;
+            } else {
+                fos.write(b);
+            }
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+            write(b, 0, b.length);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            if (usingBuffer && buf.size() + len < maxBufferSize) {
+                buf.write(b, off, len);
+            } else if (usingBuffer) {
+                usingBuffer = false;
+                file = createTempFile();
+                fos = new NSDataOutputStream(file);
+                fos.write(buf.toByteArray());
+                fos.write(b, off, len);
+                buf = null;
+            } else {
+                fos.write(b, off, len);
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (buf != null) {
+                buf.close();
+            }
+            if (fos != null) {
+                fos.flush();
+                fos.close();
+            }
+        }
+
+        @Override
+        public void flush() throws IOException {
+            if (buf != null) {
+                buf.flush();
+            }
+            if (fos != null) {
+                fos.flush();
+            }
+        }
+        
+        
+        
+        public String getFilePath() {
+            if (fos != null) {
+                return file;
+            } else {
+                return null;
+            }
+        }
+        
+        public boolean isBackedByFile() {
+            return !usingBuffer;
+        }
+        
+        
+        public byte[] toByteArray() throws IOException {
+            if (isBackedByFile()) {
+                NSFileInputStream fis = null;
+                
+                fis = new NSFileInputStream(getFilePath());
+                byte[] out = Util.readInputStream(fis);
+                
+                Util.cleanup(fis);
+                return out;
+                
+                
+                
+            } else {
+                return buf.toByteArray();
+            }
+        }
+        
+        public InputStream getInputStream() throws IOException {
+            if (isBackedByFile()) {
+                return new NSFileInputStream(getFilePath());
+            } else {
+                return new ByteArrayInputStream(toByteArray());
+            }
+        }
+        
+        
+        
+        private String createTempFile() {
+            String p = FileSystemStorage.getInstance().getAppHomePath();
+            if (p.lastIndexOf("/") != p.length()-1) {
+                p += "/";
+            }
+            long t = System.currentTimeMillis();
+            while (FileSystemStorage.getInstance().exists(p + "networkTmp_"+t)) {
+                t++;
+            }
+            return p + "networkTmp_"+t;
+        }
+        
+    }
+    
+    
     static class NetworkConnection extends InputStream {
         private long peer;
-        private ByteArrayOutputStream body;
+        private FileBackedOutputStream body;
         private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
@@ -4739,8 +4872,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
-                    nativeInstance.setBody(peer, body.toByteArray());
-                    body = null;
+                    if (body.isBackedByFile()) {
+                        nativeInstance.setBody(peer, body.getFilePath());
+                    } else {
+                        nativeInstance.setBody(peer, body.toByteArray());
+                        body = null;
+                    }
+                    
                 }
                 nativeInstance.connect(peer);
                 while(!connected) {
@@ -4750,6 +4888,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
                 if(error != null) {
+                    Log.p(error);
                     throw new IOException(error);
                 }
             }
@@ -4857,6 +4996,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             synchronized(CONNECTIONS_LOCK) {
                 instance.connections.remove(peer);
+                if (body != null && body.isBackedByFile() && FileSystemStorage.getInstance().exists(body.getFilePath())) {
+                    FileSystemStorage.getInstance().delete(body.getFilePath());
+                }
             }
         }
 
@@ -4943,7 +5085,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
-        n.body = new ByteArrayOutputStream();
+        n.body = new FileBackedOutputStream();
         return n.body;
     }
 
@@ -4960,7 +5102,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openInputStream(Object connection) throws IOException {
         if(connection instanceof String) {
-            BufferedInputStream o = new BufferedInputStream(new NSDataInputStream((String)connection), (String)connection);
+            BufferedInputStream o = new BufferedInputStream(new NSFileInputStream((String)connection), (String)connection);
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
@@ -5149,7 +5291,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream createStorageInputStream(String name) throws IOException {
         name = getStorageDirectory() + "/" + name;
-        return new BufferedInputStream(new NSDataInputStream(name), name);
+        return new BufferedInputStream(new NSFileInputStream(name), name);
     }
 
     /**
@@ -5311,7 +5453,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openFileInputStream(String file) throws IOException {
         file = unfile(file);
-        return new BufferedInputStream(new NSDataInputStream(file), file);
+        return new BufferedInputStream(new NSFileInputStream(file), file);
     }
 
     /**

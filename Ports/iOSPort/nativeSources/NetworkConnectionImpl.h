@@ -40,6 +40,7 @@
 - (NSString*)getResponseHeader:(NSString*)name;
 - (void)addHeader:(NSString*)key value:(NSString*)value;
 - (void)setBody:(void*)body size:(int)size;
+- (void)setBody:(NSString*)file;
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response;
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error;
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data;

@@ -279,7 +279,9 @@ public final class IOSNative {
 
     native void addHeader(long peer, String key, String value);
 
-    native void setBody(long peer, byte[] arr);    
+    native void setBody(long peer, byte[] arr);  
+    
+    native void setBody(long peer, String file);
     
     native void closeConnection(long peer);
     
@@ -500,4 +502,24 @@ public final class IOSNative {
 
     native void splitString(String source, char separator, ArrayList<String> out) ;
 
+    native void readFile(long nsFileHandle, byte[] b, int off, int len);
+
+    native int getNSFileOffset(long nsFileHandle);
+
+    native int getNSFileAvailable(long nsFileHandle);
+
+    native int getNSFileSize(long nsFileHandle);
+
+    native long createNSFileHandle(String name, String type);
+
+    native long createNSFileHandle(String file);
+
+    native void setNSFileOffset(long nsFileHandle, int off);
+
+    /**
+     * Reads a single byte from filehandle.
+     * @param nsFileHandle
+     * @return 
+     */
+    native int readNSFile(long nsFileHandle);
 }
