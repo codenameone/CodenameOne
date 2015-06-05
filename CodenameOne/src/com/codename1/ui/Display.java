@@ -614,6 +614,7 @@ public final class Display {
      * Notice that minimize (being a Codename One method) MUST be invoked before invoking this method!
      */
     public static void deinitialize() {
+        
         INSTANCE.codenameOneRunning = false;
         synchronized(lock) {
             lock.notifyAll();
@@ -625,7 +626,7 @@ public final class Display {
      * @return true if the EDT is running
      */
     public static boolean isInitialized(){
-        return INSTANCE.codenameOneRunning;
+        return INSTANCE.codenameOneRunning && (INSTANCE.impl == null ? false : INSTANCE.impl.isInitialized());
     }
 
     /**

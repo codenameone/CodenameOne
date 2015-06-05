@@ -135,9 +135,10 @@ public abstract class CodenameOneImplementation {
     private static PurchaseCallback purchaseCallback;
     private int commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
     private static Runnable onCurrentFormChange;
-    private static Runnable onExit;
-    
+    private static Runnable onExit;    
     private boolean useNativeCookieStore = true;
+    private boolean initiailized = false;
+    
         
     static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
@@ -161,6 +162,14 @@ public abstract class CodenameOneImplementation {
             String clsName = m.getClass().getName();
             packageName = clsName.substring(0, clsName.lastIndexOf('.'));
         }
+        initiailized = true;
+    }
+    
+    /**
+     * Returns true if the implementation is initialized.
+     */ 
+    public boolean isInitialized(){
+        return initiailized;
     }
     
     /**
@@ -217,7 +226,9 @@ public abstract class CodenameOneImplementation {
     /**
      * Allows subclasses to cleanup if necessary
      */
-    public void deinitialize() {}
+    public void deinitialize() {
+        initiailized = false;
+    }
 
     /**
      * Invoked when a dialog is shown, this method allows a dialog to play a sound

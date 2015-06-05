@@ -478,6 +478,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CookieHandler.setDefault(null);
     }
     
+    @Override
+    public boolean isInitialized(){
+        if(myView == null){
+            //if the view is null deinitialize the Display
+            if(Display.isInitialized()){
+                syncDeinitialize();
+            }    
+            return false;
+        }
+        return super.isInitialized();
+    }
+    
+    
     private static class InvalidateOptionsMenuImpl implements Runnable {
         private Activity activity;
 
@@ -625,23 +638,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void confirmControlView() {
         if(myView == null){
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    init(activity);
-                }
-            });            
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                @Override
-                public void run() {
-                    while(myView == null){
-                        try {
-                            Thread.sleep(50);
-                        } catch(InterruptedException er) {}                    
-                    }
-                }
-            });
+            return;
         }
         myView.getAndroidView().setVisibility(View.VISIBLE);
         //ugly workaround for a bug where on some android versions the async view
