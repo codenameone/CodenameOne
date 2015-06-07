@@ -5244,6 +5244,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
+            if(write){
+                c.setChunkedStreamingMode(0);
+            }
         }
 
         con.setDoInput(read);

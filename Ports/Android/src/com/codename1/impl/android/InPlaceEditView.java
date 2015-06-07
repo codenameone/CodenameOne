@@ -163,7 +163,8 @@ public class InPlaceEditView extends FrameLayout {
 
         if (mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.getComponentForm() != null) {
             Component c = mEditText.mTextArea.getComponentForm().getComponentAt((int) event.getX(), (int) event.getY());
-            if (c != null && c instanceof TextArea && ((TextArea) c).isEditable() && ((TextArea) c).isEnabled()) {
+            if ( mEditText.mTextArea.getClientProperty("leaveVKBOpen") != null 
+                    || (c != null && c instanceof TextArea && ((TextArea) c).isEditable() && ((TextArea) c).isEnabled())) {
                 leaveVKBOpen = true;
             }
         }
@@ -182,7 +183,7 @@ public class InPlaceEditView extends FrameLayout {
     private void showVirtualKeyboard(boolean show) {
         Log.i(TAG, "showVirtualKeyboard show=" + show);
 
-        boolean result;
+        boolean result = false;
         if (show) {
             // If we're in landscape, Android will not show the soft
             // keyboard unless SHOW_FORCED is requested
@@ -194,7 +195,11 @@ public class InPlaceEditView extends FrameLayout {
             mInputManager.restartInput(mEditText);
             result = mInputManager.showSoftInput(mEditText, showFlags, mResultReceiver);
         } else {
-            result = mInputManager.hideSoftInputFromWindow(mEditText.getWindowToken(), 0, mResultReceiver);
+            if(mEditText == null){
+                mInputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+            }else{
+                result = mInputManager.hideSoftInputFromWindow(mEditText.getWindowToken(), 0, mResultReceiver);
+            }
             closedTime = System.currentTimeMillis();
         }
         showVKB = show;
@@ -377,6 +382,9 @@ public class InPlaceEditView extends FrameLayout {
     private synchronized void endEditing(int reason, boolean forceVKBOpen) {
 
         if (mEditText == null) {
+            if(isKeyboardShowing()){
+                showVirtualKeyboard(false);
+            }
             return;
         }
         setVisibility(GONE);

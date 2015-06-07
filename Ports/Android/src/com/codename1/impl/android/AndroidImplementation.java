@@ -3567,6 +3567,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
             c.setInstanceFollowRedirects(false);
+            if(write){
+                c.setChunkedStreamingMode(0);
+            }
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
@@ -5209,6 +5212,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(getCurrentForm() == null){
             flushGraphics();
         }
+        stopEditing();
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
