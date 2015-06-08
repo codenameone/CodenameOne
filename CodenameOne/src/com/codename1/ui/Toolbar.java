@@ -184,6 +184,40 @@ public class Toolbar extends Container {
     }
 
     /**
+     * Find the command component instance if such an instance exists
+     * @param c the command instance
+     * @return the button instance
+     */
+    public Button findCommandComponent(Command c) {
+        Button b = sideMenu.findCommandComponent(c);
+        if(b != null) {
+            return b;
+        }
+        return findCommandComponent(c, this);
+    }
+    
+    private Button findCommandComponent(Command c, Container cnt) {
+        int count = cnt.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component current = cnt.getComponentAt(iter);
+            if (current instanceof Button) {
+                Button b = (Button) current;
+                if (b.getCommand() == c) {
+                    return b;
+                }
+            } else {
+                if (current instanceof Container) {
+                    Button b = findCommandComponent(c, (Container) current);
+                    if(b != null) {
+                        return b;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
      * Adds a Command to the TitleArea on the right side.
      *
      * @param cmd a Command
