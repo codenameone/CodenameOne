@@ -575,6 +575,10 @@ public class Container extends Component {
             throw new IllegalArgumentException("Component " + current + " is not contained in this Container");
         }
         if (t == null || !isVisible() || getComponentForm() == null) {
+            next.setX(current.getX());
+            next.setY(current.getY());
+            next.setWidth(current.getWidth());
+            next.setHeight(current.getHeight());
             replace(current, next, false);
             return;
         }
