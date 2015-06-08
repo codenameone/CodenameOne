@@ -26,6 +26,9 @@
 #include "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
+extern int isIOS8();
+extern NSString* fixFilePath(NSString* ns);
+
 int connections = 0;
 @implementation NetworkConnectionImpl
 
