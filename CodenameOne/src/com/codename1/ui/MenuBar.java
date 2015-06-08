@@ -316,7 +316,12 @@ public class MenuBar extends Container implements ActionListener {
         return clearCommand;
     }
 
-    private Button findCommandComponent(Command c) {
+    /**
+     * Find the command component instance if such an instance exists
+     * @param c the command instance
+     * @return the button instance
+     */
+    public Button findCommandComponent(Command c) {
         Button b = findCommandComponent(c, this);
         if (b == null) {
             return findCommandComponent(c, getTitleAreaContainer());
