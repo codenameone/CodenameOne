@@ -196,7 +196,9 @@ public class InPlaceEditView extends FrameLayout {
             result = mInputManager.showSoftInput(mEditText, showFlags, mResultReceiver);
         } else {
             if(mEditText == null){
-                mInputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                if(showVKB){
+                    mInputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                }
             }else{
                 result = mInputManager.hideSoftInputFromWindow(mEditText.getWindowToken(), 0, mResultReceiver);
             }

@@ -5212,7 +5212,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(getCurrentForm() == null){
             flushGraphics();
         }
-        stopEditing();
+        if(InPlaceEditView.isKeyboardShowing()){
+            stopEditing();
+        }
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
             activity.runOnUiThread(new SetCurrentFormImpl(activity, f));
