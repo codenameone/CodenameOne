@@ -568,9 +568,11 @@ public class SideMenuBar extends MenuBar {
         addOpenButton(cmd, false);
         if (getBackCommand() != null
                 && getCommandCount() > 0
-                && !UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)
-                && !getCommands().contains(getBackCommand())) {
-            getCommands().insertElementAt(getBackCommand(), 0);
+                && !UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
+            if(getCommands().contains(getBackCommand())){
+                getCommands().remove(getBackCommand());
+            }
+            getCommands().insertElementAt(getBackCommand(), getCommandCount());
         }
     }
 
