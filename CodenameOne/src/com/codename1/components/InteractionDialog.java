@@ -23,14 +23,21 @@
 
 package com.codename1.components;
 
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * Unlike a regular dialog the interaction dialog only looks like a dialog,
@@ -246,5 +253,203 @@ public class InteractionDialog extends Container {
      */
     public void setAnimateShow(boolean animateShow) {
         this.animateShow = animateShow;
+    }
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
+     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the PopupDialog style by default.
+     *
+     * @param c the context component which is used to position the dialog and can also be pointed at
+     */
+    public void showPopupDialog(Component c) {
+        Rectangle componentPos = c.getSelectedRect();
+        componentPos.setX(componentPos.getX() - c.getScrollX());
+        componentPos.setY(componentPos.getY() - c.getScrollY());
+        
+        showPopupDialog(componentPos);
+    }
+    
+    /**
+     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
+     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the PopupDialog style by default.
+     *
+     * @param rect the screen rectangle to which the popup should point
+     */
+    public void showPopupDialog(Rectangle rect) {
+        if(getDialogUIID().equals("Dialog")) {
+            setDialogUIID("PopupDialog");
+            if(getTitleComponent().getUIID().equals("DialogTitle")) {
+                getTitleComponent().setUIID("PopupDialogTitle");
+            }
+            getContentPane().setUIID("PopupContentPane");
+        }
+
+        Component contentPane = getContentPane();
+        Label title = getTitleComponent();
+
+        UIManager manager = getUIManager();
+        
+        String dialogTitle = title.getText();
+
+        // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
+        // preferred size logic of the dialog won't work with large title borders
+        if((dialogTitle != null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", false)) {
+            boolean b = getTitle().length() > 0;
+            titleArea.setVisible(b);
+            getTitleComponent().setVisible(b);
+            if(!b && manager.isThemeConstant("shrinkPopupTitleBool", true)) {
+                getTitleComponent().setPreferredSize(new Dimension(0,0));
+                getTitleComponent().getStyle().setBorder(null);
+                titleArea.setPreferredSize(new Dimension(0,0));
+                if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
+                    getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
+                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
+                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    byte[] pu = getContentPane().getStyle().getPaddingUnit();
+                    if(pu == null){
+                        pu = new byte[4]; 
+                   }
+                    pu[0] = Style.UNIT_TYPE_PIXELS;
+                    getContentPane().getStyle().setPaddingUnit(pu);
+                    int pop = Display.getInstance().convertToPixels(manager.getThemeConstant("popupNoTitleAddPaddingInt", 1), false);
+                    getContentPane().getStyle().setPadding(TOP, pop + cpPaddingTop + titlePT);
+                }
+            }
+        }
+
+        // allows a text area to recalculate its preferred size if embedded within a dialog
+        revalidate();
+
+        Style contentPaneStyle = getDialogStyle();
+
+        boolean restoreArrow = false;
+        if(manager.isThemeConstant(getDialogUIID()+ "ArrowBool", false)) {
+            Image t = manager.getThemeImageConstant(getDialogUIID() + "ArrowTopImage");
+            Image b = manager.getThemeImageConstant(getDialogUIID() + "ArrowBottomImage");
+            Image l = manager.getThemeImageConstant(getDialogUIID() + "ArrowLeftImage");
+            Image r = manager.getThemeImageConstant(getDialogUIID() + "ArrowRightImage");
+            Border border = contentPaneStyle.getBorder();
+            if(border != null) {
+                border.setImageBorderSpecialTile(t, b, l, r, rect);
+                restoreArrow = true;
+            }
+        }
+        int prefHeight = contentPane.getPreferredH();
+        int prefWidth = contentPane.getPreferredW();
+        if(contentPaneStyle.getBorder() != null) {
+            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
+            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
+        }
+        
+        int availableHeight = Display.getInstance().getDisplayHeight()  - title.getPreferredH();
+        int availableWidth = Display.getInstance().getDisplayWidth();
+        int width = Math.min(availableWidth, prefWidth);
+        int x = 0;
+        int y = 0;
+        Command result;
+
+        boolean showPortrait = Display.getInstance().isPortrait();
+
+        // if we don't have enough space then disregard device orientation
+        if(showPortrait) {
+            if(availableHeight < (availableWidth - rect.getWidth()) / 2) {
+                showPortrait = false;
+            }
+        } else {
+            if(availableHeight / 2 > availableWidth - rect.getWidth()) {
+                showPortrait = true;
+            }
+        }
+        if(showPortrait) {
+            if(width < availableWidth) {
+                int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
+
+                // if the ideal position is less than 0 just use 0
+                if(idealX > 0) {
+                    // if the idealX is too far to the right just align to the right
+                    if(idealX + width > availableWidth) {
+                        x = availableWidth - width;
+                    } else {
+                        x = idealX;
+                    }
+                }
+            }
+            if(rect.getY() < availableHeight / 2) {
+                // popup downwards
+                y = rect.getY() + rect.getSize().getHeight();
+                int height = Math.min(prefHeight, availableHeight - y);
+                show(y, availableHeight - height - y, x, availableWidth - width - x);
+            } else {
+                // popup upwards
+                int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
+                y = rect.getY() - height;
+                show(y, availableHeight - height - y, x, availableWidth - width - x);
+            }
+        } else {
+            int height = Math.min(prefHeight, availableHeight);
+            if(height < availableHeight) {
+                int idealY = rect.getY() - height / 2 + rect.getSize().getHeight() / 2;
+
+                // if the ideal position is less than 0 just use 0
+                if(idealY > 0) {
+                    // if the idealY is too far up just align to the top
+                    if(idealY + height > availableHeight) {
+                        y = availableHeight - height;
+                    } else {
+                        y = idealY;
+                    }
+                }
+            }
+            
+            
+            if(prefWidth > rect.getX()) {
+                // popup right
+                x = rect.getX() + rect.getSize().getWidth();
+                if(x + prefWidth > availableWidth){
+                    x = availableWidth - prefWidth;
+                }
+                
+                width = Math.min(prefWidth, availableWidth - x);
+                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
+            } else {
+                // popup left
+                width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
+                x = rect.getX() - width;
+                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
+            }
+        }
+
+        if(restoreArrow) {
+            contentPaneStyle.getBorder().clearImageBorderSpecialTile();
+        }
+    }
+
+    /**
+     * Simple setter to set the Dialog uiid
+     *
+     * @param uiid the id for the dialog
+     */
+    public void setDialogUIID(String uiid){
+        getContentPane().setUIID(uiid);
+    }
+
+    /**
+     * Returns the uiid of the dialog
+     *
+     * @return the uiid of the dialog
+     */
+    public String getDialogUIID(){
+        return getContentPane().getUIID();
+    }
+
+    /**
+     * Simple getter to get the Dialog Style
+     * 
+     * @return the style of the dialog
+     */
+    public Style getDialogStyle(){
+        return getContentPane().getStyle();
     }
 }
