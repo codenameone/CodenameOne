@@ -216,9 +216,7 @@ public final class Character{
      * The given character is mapped to its lowercase equivalent; if the character has no lowercase equivalent, the character itself is returned.
      * Note that by default CLDC only supports the ISO Latin-1 range of characters.
      */
-    public static char toLowerCase(char ch){
-        return (char) toLowerCase((int) ch);
-    }
+    public static native char toLowerCase(char ch);
 
     /**
      * Returns the lower case equivalent for the specified code point if it is
@@ -230,18 +228,8 @@ public final class Character{
      * @return if {@code codePoint} is an upper case character then its lower
      *         case counterpart, otherwise just {@code codePoint}.
      */
-    public static int toLowerCase(int codePoint) {
-        // Optimized case for ASCII
-        if ('A' <= codePoint && codePoint <= 'Z') {
-            return (char) (codePoint + ('a' - 'A'));
-        }
-        /*if (codePoint < 192) {
-            return codePoint;
-        }
-        return toLowerCaseImpl(codePoint);*/
-        return codePoint;
-    }
-
+    public static native int toLowerCase(int codePoint);
+    
     /**
      * Returns a String object representing this character's value. Converts this Character object to a string. The result is a string whose length is 1. The string's sole component is the primitive char value represented by this object.
      */

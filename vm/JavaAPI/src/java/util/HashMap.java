@@ -232,7 +232,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return (entry != null) &&
                                    ((entry.value == null) ?
                                     (oEntry.getValue() == null) :
-                                    (areEqualValues(entry.value, oEntry.getValue())));
+                                    (areEqualKeys(entry.value, oEntry.getValue())));
         }
 
         @Override
@@ -381,7 +381,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             for (int i = 0; i < elementData.length; i++) {
                 Entry<K, V> entry = elementData[i];
                 while (entry != null) {
-                    if (areEqualValues(value, entry.value)) {
+                    if (areEqualKeys(value, entry.value)) {
                         return true;
                     }
                     entry = entry.next;
@@ -754,13 +754,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         return key.hashCode();
 }
 
-    static boolean areEqualKeys(Object key1, Object key2) {
-        return (key1 == key2) || key1.equals(key2);
-    }
-    
-    static boolean areEqualValues(Object value1, Object value2) {
-        return (value1 == value2) || value1.equals(value2);
-    }
-    
+    native static boolean areEqualKeys(Object key1, Object key2);
+        
     
 }
