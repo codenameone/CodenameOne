@@ -55,6 +55,103 @@ JAVA_VOID java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAV
     }
 }
 
+JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {
+    if(__cn1ThisObject == __cn1Arg1) {
+        return JAVA_TRUE;
+    }
+    if(__cn1ThisObject == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+    }
+    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+        return JAVA_FALSE;
+    }
+    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)__cn1Arg1;
+    if(t->java_lang_String_count != o->java_lang_String_count) {
+        return JAVA_FALSE;
+    }
+    
+    JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data;
+    JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
+    JAVA_INT oo = o->java_lang_String_offset;
+    JAVA_INT to = t->java_lang_String_offset;
+    
+    for(int iter = 0 ; iter < t->java_lang_String_count ; iter++) {
+        if(oa[iter+oo] != ta[iter+to]) {
+            return JAVA_FALSE;
+        }
+    }
+    return JAVA_TRUE;
+}
+
+JAVA_INT java_lang_Character_toLowerCase___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    if ('A' <= __cn1Arg1 && __cn1Arg1 <= 'Z') {
+        return (JAVA_CHAR) (__cn1Arg1 + ('a' - 'A'));
+    }
+    return __cn1Arg1;
+}
+
+JAVA_CHAR java_lang_Character_toLowerCase___char_R_char(CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    if ('A' <= __cn1Arg1 && __cn1Arg1 <= 'Z') {
+        return (JAVA_CHAR) (__cn1Arg1 + ('a' - 'A'));
+    }
+    return __cn1Arg1;
+}
+
+JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {
+    if(__cn1ThisObject == __cn1Arg1) {
+        return JAVA_TRUE;
+    }
+    if(__cn1ThisObject == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+    }
+    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+        return JAVA_FALSE;
+    }
+    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)__cn1Arg1;
+    if(t->java_lang_String_count != o->java_lang_String_count) {
+        return JAVA_FALSE;
+    }
+    
+    JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data;
+    JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
+    JAVA_INT oo = o->java_lang_String_offset;
+    JAVA_INT to = t->java_lang_String_offset;
+    
+    for(int iter = 0 ; iter < t->java_lang_String_count ; iter++) {
+        JAVA_ARRAY_CHAR jo = oa[iter+oo];
+        JAVA_ARRAY_CHAR jt = ta[iter+oo];
+        if ('A' <= jo && jo <= 'Z') {
+            jo = (JAVA_ARRAY_CHAR) (jo + ('a' - 'A'));
+        }
+        if ('A' <= jt && jt <= 'Z') {
+            jt = (JAVA_ARRAY_CHAR) (jt + ('a' - 'A'));
+        }
+        if(jo != jt) {
+            return JAVA_FALSE;
+        }
+    }
+    return JAVA_TRUE;
+}
+
+JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
+    JAVA_INT hash = t->java_lang_String_hashCode;
+    if (hash == 0) {
+        if (t->java_lang_String_count == 0) {
+            return 0;
+        }
+        JAVA_INT end = t->java_lang_String_count + t->java_lang_String_offset;
+        JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
+        for (JAVA_INT i = t->java_lang_String_offset; i < end; ++i) {
+            hash = 31*hash + chars[i];
+        }
+        t->java_lang_String_hashCode = hash;
+    }
+    return hash;
+}
+
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     enteringNativeAllocations();
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
@@ -1109,6 +1206,14 @@ JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) 
 
 JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
     return 0;
+}
+
+
+JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    if(__cn1Arg1 == __cn1Arg2) {
+        return JAVA_TRUE;
+    }
+    return virtual_java_lang_Object_equals___java_lang_Object_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
 }
 
 JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {

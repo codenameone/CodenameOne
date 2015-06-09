@@ -219,7 +219,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * Compares this string to the specified object. The result is true if and only if the argument is not null and is a String object that represents the same sequence of characters as this object.
      */
-    public boolean equals(java.lang.Object anObject){
+    public native boolean equals(java.lang.Object anObject);
+    /*public boolean equals(java.lang.Object anObject){
         if(anObject == this) {
             return true;
         }
@@ -236,23 +237,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             }
         }
         return true;
-    }
+    }*/
 
     /**
      * Compares this String to another String, ignoring case considerations. Two strings are considered equal ignoring case if they are of the same length, and corresponding characters in the two strings are equal ignoring case.
      * Two characters c1 and c2 are considered the same, ignoring case if at least one of the following is true: The two characters are the same (as compared by the == operator). Applying the method Character.toUpperCase(char) to each character produces the same result. Applying the method Character.toLowerCase(char) to each character produces the same result.
      */
-    public boolean equalsIgnoreCase(java.lang.String s){
-        if(s == null || s.length() != length()) {
-            return false;
-        }
-        for(int iter = 0 ; iter < count ; iter++) {
-            if(Character.toLowerCase(value[offset + iter]) != Character.toLowerCase(s.value[s.offset + iter])) {
-                return false;
-            }
-        }
-        return true;
-    }
+    public native boolean equalsIgnoreCase(java.lang.String s);
 
     /**
      * Convert this String into bytes according to the platform's default character encoding, storing the result into a new byte array.
@@ -300,21 +291,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Returns a hashcode for this string. The hashcode for a String object is computed as s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1] using int arithmetic, where s[i] is the
      * th character of the string, n is the length of the string, and ^ indicates exponentiation. (The hash value of the empty string is zero.)
      */
-    public int hashCode(){
-        int hash = hashCode;
-        if (hash == 0) {
-            if (count == 0) {
-                return 0;
-            }
-            final int end = count + offset;
-            final char[] chars = value;
-            for (int i = offset; i < end; ++i) {
-                hash = 31*hash + chars[i];
-            }
-            hashCode = hash;
-        }
-        return hash;
-    }
+    public native int hashCode();
 
     /**
      * Returns the index within this string of the first occurrence of the specified character. If a character with value ch occurs in the character sequence represented by this String object, then the index of the first such occurrence is returned -- that is, the smallest value
