@@ -5244,9 +5244,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
-            if(write){
-                c.setChunkedStreamingMode(0);
-            }
         }
 
         con.setDoInput(read);
@@ -5274,6 +5271,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setHeader(Object connection, String key, String val) {
         HttpURLConnection con = ((HttpURLConnection) connection);
         String url = con.getURL().toString();
+        if(key.equals("Content-Length") && con.getDoOutput()){
+            con.setChunkedStreamingMode(0);
+        }
+        
         //a patch go get a readable login page for facebook
         if (key.equals("User-Agent") && url.contains("facebook.com")) {
             //blackberry user-agent gets an html without javascript.

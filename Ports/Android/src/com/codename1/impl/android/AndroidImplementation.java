@@ -3557,7 +3557,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Context getContext() {
         return activity;
     }
-
+    
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
         CookieHandler.setDefault(null);
@@ -3567,9 +3567,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
             c.setInstanceFollowRedirects(false);
-            if(write){
-                c.setChunkedStreamingMode(0);
-            }
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
@@ -3601,6 +3598,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void setHeader(Object connection, String key, String val) {
         ((URLConnection) connection).setRequestProperty(key, val);
+        if(key.equals("Content-Length") && ((URLConnection) connection).getDoOutput() && connection instanceof HttpURLConnection){
+            ((HttpURLConnection) connection).setChunkedStreamingMode(0);
+        }
     }
 
     /**
