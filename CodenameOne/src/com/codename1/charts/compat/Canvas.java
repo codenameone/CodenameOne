@@ -214,59 +214,29 @@ public class Canvas  {
 
     
     public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
+        GeneralPath p = new GeneralPath();
         float cx = 0;
         float cy = 0;
         cx = (float)(oval.getX()+oval.getWidth()/2f);
         cy = (float)(oval.getY()+oval.getHeight()/2f);
-        float r = (float)oval.getWidth()/2f;
-        float inc = 45f;
-        float prevX=0; float prevY=0;
-        GeneralPath circle = new GeneralPath();
-        if ( useCenter ){
-            circle.moveTo(cx, cy);
-        }
-        float theta = currentAngle;
-        float endAngle = currentAngle+sweepAngle;
-        for(; theta <= endAngle; theta+=inc)
-        {
-            float x = (float)(cx + r * Math.cos(Math.toRadians(theta)));
-            float y = (float)(cy + r * Math.sin(Math.toRadians(theta)));
+        double rx = oval.getWidth()/2.0;
+        double ry = oval.getHeight()/2.0;
+        double currentAngleRad = Math.toRadians(currentAngle);
+        double sweepAngleRad = Math.toRadians(sweepAngle);
+        if (useCenter) {
+            p.moveTo(cx, cy);
             
-            if(theta == currentAngle && !useCenter){
-                circle.moveTo(x,y);
-            } else if ( theta == currentAngle ){
-                circle.lineTo(x, y);
-            }else{
-                
-                //circle.lineTo(x,y);
-                addBezierArcToPath(circle, cx, cy, prevX, prevY, x, y);
-                
-            }
-            prevX = x;
-            prevY = y;
+            
+        } else {
+            p.moveTo(cx + rx * Math.cos(currentAngleRad), cy + ry * Math.sin(currentAngleRad));
         }
-        
-        
-        float x = (float)(cx + r * Math.cos(Math.toRadians(endAngle)));
-        float y = (float)(cy + r * Math.sin(Math.toRadians(endAngle)));
-        addBezierArcToPath(circle, cx, cy, prevX, prevY, x, y);
-        //circle.lineTo(x, y);
-       
-        if ( useCenter ){
-            circle.closePath();
+        p.arc(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight(), -currentAngleRad, -sweepAngleRad, true);
+        if (useCenter) {
+            p.lineTo(cx, cy);
         }
-        /*
-        cx = (float)(oval.getX()+oval.getWidth()/2f);
-        cy = (float)(oval.getY()+oval.getHeight()/2f);
+        p.closePath();
+        drawPath(p, paint);
         
-        //Matrix at = Matrix.getTranslateInstance(cx, cy);
-        Transform at = Transform.makeIdentity();//Transform.makeScale((float)1.0,(float)((oval.getHeight())/ (2.0*r)) );
-        //at.scale(1.0, (oval.bottom-oval.top)/ (2.0*r));
-        at.translate(cx, cy);
-        
-        Shape tCircle = circle.createTransformedShape(at);
-        */
-        drawPath(circle, paint);
     }
 
     

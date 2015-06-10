@@ -426,19 +426,8 @@ public final class GeneralPath implements Shape {
     }
     
     
-    /**
-     * Draws an elliptical arc on the path given the provided bounds.
-     * @param x Left x coord of bounding rect.
-     * @param y Top y coordof bounding rect.
-     * @param w Width of bounding rect.
-     * @param h Height of bounding rect.
-     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
-     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
-     */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
-        float cx = x+w/2;
-        float cy = y+h/2;
-        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this);
+        arc(x, y, w, h, startAngle, sweepAngle, false);
     }
     
     /**
@@ -449,11 +438,31 @@ public final class GeneralPath implements Shape {
      * @param h Height of bounding rect.
      * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
      * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     * @param joinPath If true, then this will join the arc to the existing path with a line.
      */
+    public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
+        float cx = x+w/2;
+        float cy = y+h/2;
+        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
+    }
+    
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
+        arc(x, y, w, h, startAngle, sweepAngle, false);
+    }
+    /**
+     * Draws an elliptical arc on the path given the provided bounds.
+     * @param x Left x coord of bounding rect.
+     * @param y Top y coordof bounding rect.
+     * @param w Width of bounding rect.
+     * @param h Height of bounding rect.
+     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     * @param joinPath If true then this will join the arc to the existing path with a line.
+     */
+    public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
         double cx = x+w/2;
         double cy = y+h/2;
-        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 4, false, this);
+        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
     }
     
     
@@ -552,7 +561,7 @@ public final class GeneralPath implements Shape {
      */
     private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
                                               double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
-                                              GeneralPath addToPath)
+                                              GeneralPath addToPath, boolean joinPath)
     {
         final GeneralPath path = addToPath;
         if (sweepAngleRadians == 0d) { return; }
@@ -570,7 +579,11 @@ public final class GeneralPath implements Shape {
                 double endX, endY;
                 double startX = cx + radius * Math.cos(angle);
                 double startY = cy + radius * Math.sin(angle) * yScale;
-                path.moveTo(startX, startY);
+                if (joinPath) {
+                    path.lineTo(startX, startY);
+                } else {
+                    path.moveTo(startX, startY);
+                }
                 if (overlapPoints)
                 {
                     final boolean cw = sweepAngleRadians > 0; // clockwise?
@@ -593,7 +606,7 @@ public final class GeneralPath implements Shape {
                 else
                 {
                     final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
-                    final double sweep = sweepAngleRadians / n;
+                    final double sweep = sweepAngleRadians / (double)n;
                     for (int i = 0;
                          i < n;
                          i++, startX = endX, startY = endY)
@@ -604,17 +617,23 @@ public final class GeneralPath implements Shape {
                         endY = cy + radius * Math.sin(angle) * yScale;
                         addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
                     }
+                    
                 }
                 return;
             }
         }
  
+        startAngleRadians = normalizeRadians(startAngleRadians);
         double startX = cx + radius * Math.cos(startAngleRadians);
         double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
         
         double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
         double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
-        path.moveTo(startX, startY);
+        if (joinPath) {
+            path.lineTo(startX, startY);
+        } else {
+            path.moveTo(startX, startY);
+        }
         addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
         
     }
