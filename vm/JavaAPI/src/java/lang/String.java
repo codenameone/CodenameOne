@@ -725,9 +725,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /**
      * This object (which is already a string!) is itself returned.
      */
-    public java.lang.String toString(){
-        return this; 
-    }
+    public native java.lang.String toString();
 
     /**
      * Converts all of the characters in this String to upper case.

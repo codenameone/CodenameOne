@@ -167,17 +167,7 @@ void flushReleaseQueue() {
 void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
     if(ptr != 0) {
-        DEFINE_METHOD_STACK(1, 1, 0, cn1_class_id_java_lang_Object, 1);
-        // exceptions might be thrown by the finalizer methods
-        DEFINE_EXCEPTION_HANDLING_CONSTANTS();
-        
-        DEFINE_CATCH_BLOCK(grabAllExceptions, label_continueToDeletion, 0);
-        BEGIN_TRY(-1, grabAllExceptions);
         ptr(threadStateData, obj);
-        END_TRY();
-    label_continueToDeletion:
-        codenameOneGcFree(threadStateData, obj);
-        RETURN_FROM_VOID(1);
     }
     codenameOneGcFree(threadStateData, obj);
 }

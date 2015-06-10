@@ -972,6 +972,29 @@ public class BytecodeMethod {
     
     boolean optimize() {
         int instructionCount = instructions.size();
+        
+        // optimize away a method that only contains the void return instruction e.g. blank constructors etc.
+        if(instructionCount < 6) {
+            int realCount = instructionCount;
+            Instruction actual = null;
+            for(int iter = 0 ; iter < instructionCount ; iter++) {
+                Instruction current = instructions.get(iter);
+                if(current instanceof LabelInstruction) {
+                    realCount--;
+                    continue;
+                }
+                if(current instanceof LineNumber) {
+                    realCount--;
+                    continue;
+                }
+                actual = current;
+            }
+            
+            if(realCount == 1 && actual != null && actual.getOpcode() == Opcodes.RETURN) {
+                return false;
+            }
+        }
+        
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
         for(int iter = 0 ; iter < instructionCount - 1 ; iter++) {

@@ -14,6 +14,8 @@
 #include "java_lang_Runnable.h"
 #include "java_lang_Throwable.h"
 #include "java_lang_StringBuilder.h"
+#include "java_util_HashMap.h"
+#include "java_util_HashMap_Entry.h"
 #import <Foundation/Foundation.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -1332,6 +1334,49 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
     return -1;
 }
 
+JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+    return __cn1ThisObject;
+}
+
+JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT index) {
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    if(index < 0 || index >= ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) { THROW_ARRAY_INDEX_EXCEPTION(index); }
+    JAVA_ARRAY_CHAR* dat = ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
+    return dat[index];
+}
+
+JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT str) {
+    enteringNativeAllocations();
+    if (str == JAVA_NULL) {
+        java_lang_StringBuilder_appendNull__(threadStateData, __cn1ThisObject);
+        finishedNativeAllocations();
+        return __cn1ThisObject;
+    }
+    int length = java_lang_String_length___R_int(threadStateData, str);
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    int newCount = t->java_lang_StringBuilder_count + length;
+    if (newCount > ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, newCount);
+    }
+    java_lang_String_getChars___int_int_char_1ARRAY_int(threadStateData, str, 0, length, t->java_lang_StringBuilder_value, t->java_lang_StringBuilder_count);
+    t->java_lang_StringBuilder_count = newCount;
+    finishedNativeAllocations();
+    return __cn1ThisObject;
+    
+}
+
+JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT start, JAVA_INT end, JAVA_OBJECT dst, JAVA_INT dstStart) {
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(threadStateData, t->java_lang_StringBuilder_value, start, dst, dstStart, end - start);
+}
+
+JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT obj) {
+    if(obj == JAVA_NULL) {
+        java_lang_StringBuilder_appendNull__(threadStateData, __cn1ThisObject);
+        return __cn1ThisObject;
+    }
+    return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, __cn1ThisObject, virtual_java_lang_Object_toString___R_java_lang_String(threadStateData, obj));
+}
 
 JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
     enteringNativeAllocations();

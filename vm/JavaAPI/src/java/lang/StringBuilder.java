@@ -180,20 +180,20 @@ public final class StringBuilder implements CharSequence {
      * Appends the string representation of the Object argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuilder append(java.lang.Object obj){
+    public native java.lang.StringBuilder append(java.lang.Object obj);/*{
         if(obj == null) {
             appendNull();
             return this;
         }
         return append(obj.toString()); 
-    }
+    }*/
 
     /**
      * Appends the string to this string buffer.
      * The characters of the String argument are appended, in order, to the contents of this string buffer, increasing the length of this string buffer by the length of the argument. If str is null, then the four characters "null" are appended to this string buffer.
      * Let n be the length of the old character sequence, the one contained in the string buffer just prior to execution of the append method. Then the character at index k in the new character sequence is equal to the character at index k in the old character sequence, if k is less than n; otherwise, it is equal to the character at index k-n in the argument str.
      */
-    public java.lang.StringBuilder append(java.lang.String str){
+    public native java.lang.StringBuilder append(java.lang.String str); /*{
         if (str == null) {
             appendNull();
             return this;
@@ -206,7 +206,7 @@ public final class StringBuilder implements CharSequence {
         str.getChars(0, length, value, count);
         count = newCount;
         return this;
-    }
+    }*/
 
     /**
      * Returns the current capacity of the String buffer. The capacity is the amount of storage available for newly inserted characters; beyond which an allocation will occur.
@@ -219,9 +219,9 @@ public final class StringBuilder implements CharSequence {
      * The specified character of the sequence currently represented by the string buffer, as indicated by the index argument, is returned. The first character of a string buffer is at index 0, the next at index 1, and so on, for array indexing.
      * The index argument must be greater than or equal to 0, and less than the length of this string buffer.
      */
-    public char charAt(int index){
+    public native char charAt(int index);/*{
         return value[index];
-    }
+    }*/
 
     /**
      * Removes the characters in a substring of this StringBuffer. The substring begins at the specified start and extends to the character at index end - 1 or to the end of the StringBuffer if no such character exists. If start is equal to end, no changes are made.
@@ -286,9 +286,9 @@ public final class StringBuilder implements CharSequence {
      * Characters are copied from this string buffer into the destination character array dst. The first character to be copied is at index srcBegin; the last character to be copied is at index srcEnd-1. The total number of characters to be copied is srcEnd-srcBegin. The characters are copied into the subarray of dst starting at index dstBegin and ending at index:
      * dstbegin + (srcEnd-srcBegin) - 1
      */
-    public void getChars(int start, int end, char[] dst, int dstStart) {
+    public native void getChars(int start, int end, char[] dst, int dstStart);/* {
         System.arraycopy(value, start, dst, dstStart, end - start);
-    }
+    }*/
 
     /**
      * Inserts the string representation of the boolean argument into this string buffer.
