@@ -1216,6 +1216,17 @@ JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_
     return virtual_java_lang_Object_equals___java_lang_Object_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
 }
 
+JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT key, JAVA_INT index, JAVA_INT keyHash) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_ARRAY_OBJECT* obj = ((JAVA_ARRAY)t->java_util_HashMap_elementData)->data;
+    struct obj__java_util_HashMap_Entry* m = (struct obj__java_util_HashMap_Entry*)obj[index];
+    while (m != 0
+           && (m->java_util_HashMap_Entry_origKeyHash != keyHash || !java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, m->java_util_MapEntry_key))) {
+        m = (struct obj__java_util_HashMap_Entry*)m->java_util_HashMap_Entry_next;
+    }
+    return (JAVA_OBJECT)m;
+}
+
 JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
