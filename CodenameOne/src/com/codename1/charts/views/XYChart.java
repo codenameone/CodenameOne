@@ -746,6 +746,7 @@ public abstract class XYChart extends AbstractChart {
     boolean showGridX = mRenderer.isShowGridX();
     boolean showLabels = mRenderer.isShowLabels();
     boolean showTickMarks = mRenderer.isShowTickMarks();
+    paint.setTextSize(mRenderer.getLabelsTextSize());
     for (int i = 0; i < maxScaleNumber; i++) {
       paint.setTextAlign(mRenderer.getYLabelsAlign(i));
       List<Double> yLabels = allYLabels.get(i);

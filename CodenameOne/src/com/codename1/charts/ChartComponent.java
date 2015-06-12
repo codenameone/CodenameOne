@@ -264,6 +264,7 @@ public class ChartComponent extends Component {
         Point chartCoord = screenToChartCoord(x, y);
         SeriesSelection sel = chart.getSeriesAndPointForScreenCoordinate(chartCoord);
         if ( sel == null ){
+            super.pointerPressed(x, y);
             return;
         }
         
@@ -293,6 +294,7 @@ public class ChartComponent extends Component {
         Point chartCoord = screenToChartCoord(x, y);
         SeriesSelection sel = chart.getSeriesAndPointForScreenCoordinate(chartCoord);
         if ( sel == null ){
+            super.pointerReleased(x, y);
             return;
         }
         
@@ -334,6 +336,7 @@ public class ChartComponent extends Component {
     public void pointerDragged(int[] x, int[] y) {
         if ( x.length > 1 ){
             if ( !zoomEnabled ){
+                super.pointerDragged(x, y);
                 return;
             }
             // Pinch zoom
@@ -366,6 +369,7 @@ public class ChartComponent extends Component {
             
         } else {
             if ( !panEnabled ){
+                super.pointerDragged(x, y);
                 return;
             }
             if ( dragStart == null ){
