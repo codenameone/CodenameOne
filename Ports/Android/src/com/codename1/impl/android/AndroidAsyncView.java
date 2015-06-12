@@ -653,11 +653,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
         //do not let other views steal the focus from the main view
-        if(!gainFocus && !InPlaceEditView.isEditing()){
-            requestFocus();
-            if(this.implementation.getCurrentForm() != null){
-                this.implementation.getCurrentForm().repaint();
-                
+        if(!gainFocus && implementation.hasViewAboveBelow()){
+            requestFocus(); 
+            if(implementation.getCurrentForm() != null){
+                implementation.getCurrentForm().repaint();                
             }
         }
     }

@@ -217,6 +217,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         belowSpacing = spacingBelow;
     }
     
+    static boolean hasViewAboveBelow(){
+        return viewBelow != null || viewAbove != null;
+    }
+    
     /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
