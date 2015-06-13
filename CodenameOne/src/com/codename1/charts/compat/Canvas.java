@@ -30,7 +30,6 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
-import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.geom.Shape;
@@ -214,52 +213,24 @@ public class Canvas  {
 
     
     public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
-        GeneralPath p = new GeneralPath();
-        float cx = 0;
-        float cy = 0;
-        cx = (float)(oval.getX()+oval.getWidth()/2f);
-        cy = (float)(oval.getY()+oval.getHeight()/2f);
-        double rx = oval.getWidth()/2.0;
-        double ry = oval.getHeight()/2.0;
-        double currentAngleRad = Math.toRadians(currentAngle);
-        double sweepAngleRad = Math.toRadians(sweepAngle);
-        if (useCenter) {
-            p.moveTo(cx, cy);
+        
+        applyPaint(paint);
+        Paint.Style style = paint.getStyle();
+        if ( Paint.Style.FILL.equals(style)){
+            g.fillArc((int)Math.round(oval.getX()), (int)Math.round(oval.getY()), (int)Math.round(oval.getWidth()), (int)Math.round(oval.getHeight()), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
             
+        } else if ( Paint.Style.STROKE.equals(style)){
+            g.drawArc((int)Math.round(oval.getX()), (int)Math.round(oval.getY()), (int)Math.round(oval.getWidth()), (int)Math.round(oval.getHeight()), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
             
-        } else {
-            p.moveTo(cx + rx * Math.cos(currentAngleRad), cy + ry * Math.sin(currentAngleRad));
+        } else if ( Paint.Style.FILL_AND_STROKE.equals(style)){
+            g.fillArc((int)Math.round(oval.getX()), (int)Math.round(oval.getY()), (int)Math.round(oval.getWidth()), (int)Math.round(oval.getHeight()), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
+            g.drawArc((int)Math.round(oval.getX()), (int)Math.round(oval.getY()), (int)Math.round(oval.getWidth()), (int)Math.round(oval.getHeight()), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
+            
         }
-        p.arc(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight(), -currentAngleRad, -sweepAngleRad, true);
-        if (useCenter) {
-            p.lineTo(cx, cy);
-        }
-        p.closePath();
-        drawPath(p, paint);
         
     }
 
     
-    private static void addBezierArcToPath(GeneralPath path, float cx, float cy,
-                                          float startX, float startY, float endX, float endY)
-    {
-        if ( startX != endX || startY != endY ){
-            final double ax = startX - cx;
-            final double ay = startY - cy;
-            final double bx = endX - cx;
-            final double by = endY- cy;
-            final double q1 = ax * ax + ay * ay;
-            final double q2 = q1 + ax * bx + ay * by;
-            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
-            final float x2 = (float)(cx + ax - k2 * ay);
-            final float y2 = (float)(cy + ay + k2 * ax);
-            final float x3 = (float)(cx + bx + k2 * by);
-            final float y3 = (float)(cy + by - k2 * bx);
-            //Log.p("Curve: "+startX+","+startY+" -> "+x2+","+y2+" -> "+x3+","+y3+" -> "+endX+","+endY);
-
-            path.curveTo(x2, y2, x3, y3, endX, endY);
-        }
-    }
     public void drawPoint(Float get, Float get0, Paint paint) {
         throw new RuntimeException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
