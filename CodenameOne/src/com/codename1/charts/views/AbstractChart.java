@@ -493,7 +493,7 @@ public abstract class AbstractChart  {
           Rectangle2D prevLabelBounds = prevLabelsBounds.get(j);
           if (prevLabelBounds.intersects(xLabel, yLabel, widthLabel, size)) {
             intersects = true;
-            yLabel = (float)Math.max(yLabel, prevLabelBounds.getX()+prevLabelBounds.getHeight());
+            yLabel = (float)Math.max(yLabel, prevLabelBounds.getY()+prevLabelBounds.getHeight());
           }
         }
         
