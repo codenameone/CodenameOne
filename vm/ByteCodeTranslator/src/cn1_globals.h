@@ -792,7 +792,6 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 { \
     int currentOffset = threadStateData->tryBlockOffset; \
     if(setjmp(destinationJump)) { \
-        threadStateData->tryBlockOffset = currentOffset; \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
         stackPointer = 1; \
