@@ -1062,10 +1062,10 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     threadStateData->exception = exceptionArg; 
     threadStateData->tryBlockOffset--; 
     while(threadStateData->tryBlockOffset >= 0) { 
-        if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass == -1 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) { 
+        if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
             int off = threadStateData->tryBlockOffset; 
-            threadStateData->tryBlockOffset--; 
-            longjmp(threadStateData->blocks[off].destination, 1); 
+            longjmp(threadStateData->blocks[off].destination, 1);
+            return;
         } 
         threadStateData->tryBlockOffset--; 
     } 
