@@ -79,7 +79,7 @@ public class TryCatch extends Instruction {
             firstException = false;
         }
         
-        String cid = "-1";
+        String cid = "0";
         if(type != null) {
             cid = "cn1_class_id_" + type.replace('/', '_').replace('$', '_');
         } 
