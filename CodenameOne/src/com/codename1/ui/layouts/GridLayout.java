@@ -78,7 +78,7 @@ public class GridLayout extends Layout{
                 columns = Math.max(width / maxWidth, 1);
             }
             rows = Math.max(1, numOfcomponents / columns);
-            if(numOfcomponents % columns > 0) {
+            if(numOfcomponents % columns > 0 && numOfcomponents > columns) {
                 rows++;
             } 
         }
