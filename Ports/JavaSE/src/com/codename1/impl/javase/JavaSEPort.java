@@ -6333,6 +6333,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     cnt.remove(vid);
                     frm.remove(cnt);
                     frm.repaint();
+                    mediaContainer = null;
                 }
             });
         }
