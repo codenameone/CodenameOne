@@ -164,6 +164,7 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean redirecting;
     private static boolean cookiesEnabledDefault = true;
     private boolean cookiesEnabled = cookiesEnabledDefault;
+    private int chunkedStreamingLen = -1;
 
     private String destinationFile;
     private String destinationStorage;
@@ -258,6 +259,10 @@ public class ConnectionRequest implements IOProgressListener {
 
         if(getContentType() != null) {
             impl.setHeader(connection, "Content-Type", getContentType());
+        }
+        
+        if(chunkedStreamingLen > -1){
+            impl.setChunkedStreamingMode(connection, chunkedStreamingLen);
         }
 
         if(userHeaders != null) {
@@ -1630,4 +1635,20 @@ public class ConnectionRequest implements IOProgressListener {
             setUseNativeCookieStore(false);
         }
     }
+    
+     /**
+     * This method is used to enable streaming of a HTTP request body without 
+     * internal buffering, when the content length is not known in advance. 
+     * In this mode, chunked transfer encoding is used to send the request body. 
+     * Note, not all HTTP servers support this mode.
+     * This mode is supported on Android and the Desktop ports.
+     * 
+     * @param chunklen The number of bytes to write in each chunk. If chunklen 
+     * is zero a default value will be used.
+     */ 
+    public void setChunkedStreamingMode(int chunklen){    
+        this.chunkedStreamingLen = chunklen;
+    }
+   
+    
 }

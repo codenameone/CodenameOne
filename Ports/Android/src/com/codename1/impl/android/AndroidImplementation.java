@@ -3602,10 +3602,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void setHeader(Object connection, String key, String val) {
         ((URLConnection) connection).setRequestProperty(key, val);
-        if(key.equals("Content-Length") && ((URLConnection) connection).getDoOutput() && connection instanceof HttpURLConnection){
-            ((HttpURLConnection) connection).setChunkedStreamingMode(0);
-        }
     }
+
+    @Override
+    public void setChunkedStreamingMode(Object connection, int bufferLen){    
+        HttpURLConnection con = ((HttpURLConnection) connection);
+        con.setChunkedStreamingMode(bufferLen);
+    }
+    
+    
 
     /**
      * @inheritDoc

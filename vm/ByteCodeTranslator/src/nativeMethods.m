@@ -951,9 +951,16 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
             return;
         }
+        threadStateData->threadActive = JAVA_FALSE;
         err = pthread_mutex_lock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = own;
+        while (threadStateData->threadBlockedByGC) {
+            usleep(1000);
+        }
+        threadStateData->threadActive = JAVA_TRUE;
+        
+
     }
     //NSLog(@"Locking mutex %i started from %@", (int)obj->__codenameOneMutex, [NSThread callStackSymbols]);
     //NSLog(@"Locking mutex %i completed", (int)obj->__codenameOneMutex);

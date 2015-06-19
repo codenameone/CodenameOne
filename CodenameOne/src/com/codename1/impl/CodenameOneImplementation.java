@@ -3961,6 +3961,20 @@ public abstract class CodenameOneImplementation {
     public abstract void setHeader(Object connection, String key, String val);
 
     /**
+     * This method is used to enable streaming of a HTTP request body without 
+     * internal buffering, when the content length is not known in advance. 
+     * In this mode, chunked transfer encoding is used to send the request body. 
+     * Note, not all HTTP servers support this mode.
+     * This mode is supported on Android and the Desktop ports.
+     * 
+     * @param connection the connection object
+     * @param bufferLen The number of bytes to write in each chunk. If chunklen 
+     * is less than or equal to zero, a default value will be used.
+     */ 
+    public void setChunkedStreamingMode(Object connection, int bufferLen){    
+    }
+    
+    /**
      * Closes the object (connection, stream etc.) without throwing any exception, even if the
      * object is null
      *
