@@ -112,7 +112,7 @@ public class Canvas  {
             //Log.p("Filling it");
             g.fillRect((int)left, (int)top, (int)right-(int)left, (int)bottom-(int)top);
         } else if ( Paint.Style.STROKE.equals(style)){
-            g.drawRect((int)left, (int)top, (int)right, (int)bottom-(int)top);
+            g.drawRect((int)left, (int)top, (int)right-(int)left, (int)bottom-(int)top);
         } else if ( Paint.Style.FILL_AND_STROKE.equals(style)){
             g.fillRect((int)left, (int)top, (int)right-(int)left, (int)bottom-(int)top);
             //g.drawRect((int)left+bounds.getX(), (int)top+bounds.getY(), (int)right-(int)left, (int)bottom-(int)top);
