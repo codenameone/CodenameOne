@@ -41,9 +41,8 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 
 /**
- * This is a utility class that allows Oauth2 authentication
- * This utility uses the Codename One XHTML Component to display the authentication
- * pages.
+ * This is a utility class that allows Oauth2 authentication This utility uses
+ * the Codename One XHTML Component to display the authentication pages.
  * http://tools.ietf.org/pdf/draft-ietf-oauth-v2-12.pdf
  *
  * @author Chen Fishbein
@@ -54,6 +53,7 @@ public class Oauth2 {
 
     /**
      * Enables going back to the parent form after login is completed
+     *
      * @return the backToParent
      */
     public static boolean isBackToParent() {
@@ -62,6 +62,7 @@ public class Oauth2 {
 
     /**
      * Enables going back to the parent form after login is completed
+     *
      * @param aBackToParent the backToParent to set
      */
     public static void setBackToParent(boolean aBackToParent) {
@@ -78,7 +79,7 @@ public class Oauth2 {
     private Hashtable additionalParams;
     private Dialog login;
     private static boolean backToParent = true;
-    
+
     /**
      * Simple constructor
      *
@@ -89,7 +90,7 @@ public class Oauth2 {
     public Oauth2(String oauth2URL, String clientId, String redirectURI) {
         this(oauth2URL, clientId, redirectURI, null, null, null);
     }
-    
+
     /**
      * Simple constructor
      *
@@ -115,10 +116,10 @@ public class Oauth2 {
             String tokenRequestURL, String clientSecret) {
         this(oauth2URL, clientId, redirectURI, scope, tokenRequestURL, clientSecret, null);
     }
-    
+
     /**
      * Returns the expiry for the token received via oauth
-     * 
+     *
      * @return the expires argument for the token
      */
     public static String getExpires() {
@@ -153,10 +154,10 @@ public class Oauth2 {
      * @return the method if passes authentication will return the access token
      * or null if authentication failed.
      *
-     * @throws IOException the method will throw an IOException if something went
-     * wrong in the communication.
-     * @deprecated use createAuthComponent or showAuthentication which work asynchronously and adapt better
-     * to different platforms
+     * @throws IOException the method will throw an IOException if something
+     * went wrong in the communication.
+     * @deprecated use createAuthComponent or showAuthentication which work
+     * asynchronously and adapt better to different platforms
      */
     public String authenticate() {
 
@@ -179,23 +180,28 @@ public class Oauth2 {
 
         return token;
     }
-    
+
     /**
-     * This method creates a component which can authenticate. You will receive either the
-     * authentication key or an Exception object within the ActionListener callback method.
-     * 
-     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to perform the authentication
+     * This method creates a component which can authenticate. You will receive
+     * either the authentication key or an Exception object within the
+     * ActionListener callback method.
+     *
+     * @param al a listener that will receive at its source either a token for
+     * the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to
+     * perform the authentication
      */
     public Component createAuthComponent(ActionListener al) {
         return createLoginComponent(al, null, null, null);
     }
-    
+
     /**
      * This method shows an authentication for login form
-     * 
-     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to perform the authentication
+     *
+     * @param al a listener that will receive at its source either a token for
+     * the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to
+     * perform the authentication
      */
     public void showAuthentication(ActionListener al) {
         final Form old = Display.getInstance().getCurrent();
@@ -203,10 +209,10 @@ public class Oauth2 {
         final Dialog progress = inf.showInifiniteBlocking();
         Form authenticationForm = new Form("Login");
         authenticationForm.setScrollable(false);
-        if(old != null) {
+        if (old != null) {
             Command cancel = new Command("Cancel") {
                 public void actionPerformed(ActionEvent ev) {
-                    if(Display.getInstance().getCurrent() == progress) {
+                    if (Display.getInstance().getCurrent() == progress) {
                         progress.dispose();
                     }
                     old.showBack();
@@ -223,15 +229,14 @@ public class Oauth2 {
 
         String URL = oauth2URL + "?client_id=" + clientId
                 + "&redirect_uri=" + Util.encodeUrl(redirectURI);
-        if(scope != null){
+        if (scope != null) {
             URL += "&scope=" + scope;
         }
-        if(clientSecret != null){
-            URL += "&response_type=code";        
-        }else{
+        if (clientSecret != null) {
+            URL += "&response_type=code";
+        } else {
             URL += "&response_type=token";
         }
-
 
         if (additionalParams != null) {
             Enumeration e = additionalParams.keys();
@@ -241,116 +246,126 @@ public class Oauth2 {
                 URL += "&" + key + "=" + val;
             }
         }
-        
+
         DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);
-        WebBrowser web = new WebBrowser(){
+        final WebBrowser[] web = new WebBrowser[1];
+        web[0] = new WebBrowser() {
+
+            @Override
+            public void onLoad(String url) {
+                handleURL(url, this, al, frm, backToForm, progress);
+            }
 
             public void onStart(String url) {
-                if ((url.startsWith(redirectURI))) {
-                    if(Display.getInstance().getCurrent() == progress) {
-                        progress.dispose();
-                    }
-
-                    stop();
-                    
-                    //remove the browser component.
-                    if(login != null) {
-                        login.removeAll();
-                        login.revalidate();
-                    }
-                    
-                    if (url.indexOf("code=") > -1) {
-                        Hashtable params = getParamsFromURL(url);
-                        ConnectionRequest req = new ConnectionRequest() {
-
-                            protected void readResponse(InputStream input) throws IOException {
-                                byte[] tok = Util.readInputStream(input);
-                                String t = new String(tok);
-                                token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
-                                int off = t.indexOf("expires=");
-                                if(off > -1) {
-                                    int end = t.indexOf('&', off);
-                                    if(end < 0 || end < off) {
-                                        end = t.length();
-                                    }
-                                    expires = t.substring(off + 8, end);
-                                }
-                                if(login != null) {
-                                    login.dispose();
-                                }
-                            }
-                            
-                            protected void handleException(Exception err) {
-                                if(backToForm != null) {
-                                    backToForm.showBack();
-                                }
-                                if(al != null) {
-                                    al.actionPerformed(new ActionEvent(err));
-                                }                                
-                            }
-                            
-                            protected void postResponse() {
-                                if(backToParent && backToForm != null) {
-                                    backToForm.showBack();
-                                }
-                                if(al != null) {
-                                    al.actionPerformed(new ActionEvent(token));
-                                }
-                            }
-                        };
-
-                        String URL = tokenRequestURL
-                                + "?client_id=" + clientId
-                                + "&redirect_uri=" + Util.encodeUrl(redirectURI)
-                                + "&client_secret=" + clientSecret
-                                + "&code=" + Util.encodeUrl((String)params.get("code"));
-                        
-                        req.setPost(false);
-                        req.setUrl(URL);
-                        NetworkManager.getInstance().addToQueue(req);
-                    } else if (url.indexOf("error_reason=") > -1) {
-                        Hashtable table = getParamsFromURL(url);                        
-                        String error = (String) table.get("error_reason");                        
-                        if(login != null) {
-                            login.dispose();
-                        }
-                        if(backToForm != null) {
-                            backToForm.showBack();
-                        }
-                        if(al != null) {
-                            al.actionPerformed(new ActionEvent(new IOException(error)));
-                        }
-                    } else {
-                        boolean success = url.indexOf("#") > -1;
-                        if (success) {
-                            String accessToken = url.substring(url.indexOf("#") + 1);
-                            if(accessToken.indexOf("&") > 0){
-                                token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
-                            }else{
-                                token = accessToken.substring(accessToken.indexOf("=") + 1);                            
-                            }
-                            if(login != null) {
-                                login.dispose();
-                            }
-                            if(backToParent && backToForm != null) {
-                                backToForm.showBack();
-                            }
-                            if(al != null) {
-                                al.actionPerformed(new ActionEvent(token));
-                            }
-                        }
-                    }
-                } else {
-                    if(frm != null && Display.getInstance().getCurrent() != frm) {
-                        progress.dispose();
-                        frm.show();
-                    } 
-                }
             }
         };
-        web.setURL(URL);
-        
-        return web;
+        web[0].setURL(URL);
+
+        return web[0];
+    }
+
+    private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+        if ((url.startsWith(redirectURI))) {
+            if (Display.getInstance().getCurrent() == progress) {
+                progress.dispose();
+            }
+
+            web.stop();
+
+            //remove the browser component.
+            if (login != null) {
+                login.removeAll();
+                login.revalidate();
+            }
+
+            if (url.indexOf("code=") > -1) {
+                Hashtable params = getParamsFromURL(url);
+                ConnectionRequest req = new ConnectionRequest() {
+
+                    protected void readResponse(InputStream input) throws IOException {
+                        byte[] tok = Util.readInputStream(input);
+                        String t = new String(tok);
+                        token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
+                        int off = t.indexOf("expires=");
+                        if (off > -1) {
+                            int end = t.indexOf('&', off);
+                            if (end < 0 || end < off) {
+                                end = t.length();
+                            }
+                            expires = t.substring(off + 8, end);
+                        }
+                        if (login != null) {
+                            login.dispose();
+                        }
+                    }
+
+                    protected void handleException(Exception err) {
+                        if (backToForm != null) {
+                            backToForm.showBack();
+                        }
+                        if (al != null) {
+                            al.actionPerformed(new ActionEvent(err));
+                        }
+                    }
+
+                    protected void postResponse() {
+                        if (backToParent && backToForm != null) {
+                            backToForm.showBack();
+                        }
+                        if (al != null) {
+                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
+                        }
+                    }
+                };
+                req.setUrl(tokenRequestURL);
+                req.setPost(true);
+                req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                req.addArgument("client_id", clientId);
+                req.addArgument("redirect_uri", redirectURI);
+                req.addArgument("client_secret", clientSecret);
+                req.addArgument("code", (String) params.get("code"));
+                req.addArgument("grant_type", "authorization_code");
+
+                NetworkManager.getInstance().addToQueue(req);
+            } else if (url.indexOf("error_reason=") > -1) {
+                Hashtable table = getParamsFromURL(url);
+                String error = (String) table.get("error_reason");
+                if (login != null) {
+                    login.dispose();
+                }
+                if (backToForm != null) {
+                    backToForm.showBack();
+                }
+                if (al != null) {
+                    al.actionPerformed(new ActionEvent(new IOException(error)));
+                }
+            } else {
+                boolean success = url.indexOf("#") > -1;
+                if (success) {
+                    String accessToken = url.substring(url.indexOf("#") + 1);
+                    if (accessToken.indexOf("&") > 0) {
+                        token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
+                    } else {
+                        token = accessToken.substring(accessToken.indexOf("=") + 1);
+                    }
+                    if (login != null) {
+                        login.dispose();
+                    }
+                    if (backToParent && backToForm != null) {
+                        backToForm.showBack();
+                    }
+                    if (al != null) {
+                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
+                    }
+                }
+            }
+        } else {
+            if (frm != null && Display.getInstance().getCurrent() != frm) {
+                progress.dispose();
+                frm.show();
+            }
+        }
+
     }
 
     private Hashtable getParamsFromURL(String url) {
