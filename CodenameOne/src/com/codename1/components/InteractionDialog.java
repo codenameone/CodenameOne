@@ -336,8 +336,8 @@ public class InteractionDialog extends Container {
                 restoreArrow = true;
             }
         }
-        int prefHeight = contentPane.getPreferredH();
-        int prefWidth = contentPane.getPreferredW();
+        int prefHeight = getPreferredH();
+        int prefWidth = getPreferredW();
         if(contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
