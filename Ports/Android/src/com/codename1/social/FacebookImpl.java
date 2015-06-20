@@ -34,6 +34,7 @@ import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
+import com.facebook.AccessToken;
 import com.facebook.FacebookRequestError;
 import com.facebook.HttpMethod;
 import com.facebook.Request;
@@ -46,6 +47,7 @@ import com.facebook.SessionState;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.StringTokenizer;
 import org.json.JSONException;
@@ -196,6 +198,25 @@ public class FacebookImpl extends FacebookConnect {
         return arr[0];
     }
 
+    @Override
+    public com.codename1.io.AccessToken getAccessToken() {
+        final com.codename1.io.AccessToken[] t = new com.codename1.io.AccessToken[1];
+        AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                Session s = Session.getActiveSession();
+                if (s != null && s.isOpened()) {
+                    String token = s.getAccessToken();
+                    Date expires = s.getExpirationDate();
+                    long diff = expires.getTime() - System.currentTimeMillis();
+                    diff = diff/1000;
+                    t[0] = new com.codename1.io.AccessToken(token, "" + diff);
+                }
+            }
+        });
+        return t[0];
+    }
+    
     @Override
     public void logout() {
         AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {

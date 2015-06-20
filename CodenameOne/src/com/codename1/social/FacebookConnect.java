@@ -20,31 +20,45 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package com.codename1.social;
 
+import com.codename1.facebook.FaceBookAccess;
+import com.codename1.io.AccessToken;
+import com.codename1.io.Oauth2;
+
 /**
- * Invokes the native bundled facebook SDK to login/logout of facebook, notice that
- * in order for this to work server build arguments must indicate that you are using
- * the facebook sdk! To accomplish this just define: facebook.appId=YourAppId in your build
- * arguments. In order to obtain the app ID you need to create a native Android/iOS application
- * and generate the right app id.
+ * Invokes the native bundled facebook SDK to login/logout of facebook, notice
+ * that in order for this to work server build arguments must indicate that you
+ * are using the facebook sdk! To accomplish this just define:
+ * facebook.appId=YourAppId in your build arguments. In order to obtain the app
+ * ID you need to create a native Android/iOS application and generate the right
+ * app id.
  *
  * @author Shai Almog
  */
-public class FacebookConnect {
-    LoginCallback callback;
+public class FacebookConnect extends Login{
+
     private static FacebookConnect instance;
     static Class implClass;
-    
-    FacebookConnect() {}
-    
+
+    private String[] permissions = new String[]{"public_profile", "email", "user_friends"};
+
+    FacebookConnect() {
+        setOauth2URL("https://www.facebook.com/dialog/oauth");
+    }
+
+
+    /**
+     * Gets the FacebookConnect singleton instance
+     * .
+     * @return the FacebookConnect instance
+     */ 
     public static FacebookConnect getInstance() {
-        if(instance == null) {
+        if (instance == null) {
             if (implClass != null) {
                 try {
-                    instance = (FacebookConnect)implClass.newInstance();
-                } catch(Throwable t) {
+                    instance = (FacebookConnect) implClass.newInstance();
+                } catch (Throwable t) {
                     instance = new FacebookConnect();
                 }
             } else {
@@ -53,71 +67,129 @@ public class FacebookConnect {
         }
         return instance;
     }
-    
-    /**
-     * Sets the login callback that will receive event callback notification from
-     * the API
-     * @param lc the login callback or null to remove the existing login callback
-     */
-    public void setCallback(LoginCallback lc) {
-        callback = lc;
-    }
-    
+
     /**
      * Indicates whether the native platform supports native facebook login
+     *
      * @return true if supported
      */
     public boolean isFacebookSDKSupported() {
         return false;
     }
-    
+
     /**
-     * Logs into facebook, notice that this call might suspend the application which might 
-     * trigger repeated invocations of stop()/start() etc. This is due to the facebook SDK
-     * spawning a separate process to perform the login then returning to the application. 
-     * Once logged in the facebook credentials will be available.
+     * Logs into facebook, notice that this call might suspend the application
+     * which might trigger repeated invocations of stop()/start() etc. This is
+     * due to the facebook SDK spawning a separate process to perform the login
+     * then returning to the application. Once logged in the facebook
+     * credentials will be available.
+     *
+     * @deprecated use doLogin
      */
     public void login() {
         throw new RuntimeException("Native facebook unsupported");
     }
+
     
     /**
-     * Indicates if the user is currently logged in
-     * @return true if logged in
+     * Logs out the current user from facebook
+     *
      */
-    public boolean isLoggedIn() {
-        throw new RuntimeException("Native facebook unsupported");
+    public void doLogout() {
+        super.doLogout();
+        if(!isNativeLoginSupported()){
+            FaceBookAccess.logOut();
+        }
     }
     
     /**
      * The facebook token that can be used to access facebook functionality
+     *
      * @return the token
      */
-    public String getToken() {
-        throw new RuntimeException("Native facebook unsupported");
+    public AccessToken getAccessToken() {
+        AccessToken t = super.getAccessToken();
+        if(t != null){
+            return t;
+        }
+        return new AccessToken(getToken(), null);
     }
-    
+
+    /**
+     * Indicates if the user is currently logged in
+     *
+     * @return true if logged in
+     * @deprecated use isUserLoggedIn() instead
+     */
+    public boolean isLoggedIn() {
+        throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use isUserLoggedIn");
+    }
+
+    /**
+     * The facebook token that can be used to access facebook functionality
+     *
+     * @return the token
+     * @deprecated use getAccessToken instead
+     */
+    public String getToken() {
+        throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use getAccessToken");
+    }
+
     /**
      * Logs out the current user from facebook
+     * 
+     * @deprecated use doLogout instead
      */
     public void logout() {
-        throw new RuntimeException("Native facebook unsupported");
+        throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use doLogout");
     }
-    
+
     /**
-     * Asks for publish permissions, this call might suspend the application which might 
-     * trigger repeated invocations of stop()/start().
-     */ 
-    public void askPublishPermissions(LoginCallback lc){
+     * Asks for publish permissions, this call might suspend the application
+     * which might trigger repeated invocations of stop()/start().
+     */
+    public void askPublishPermissions(LoginCallback lc) {
         throw new RuntimeException("Native facebook unsupported");
     }
-    
+
     /**
      * Returns true if the current session already has publish permissions
-     * @return 
+     *
+     * @return
      */
-    public boolean hasPublishPermissions(){
-        throw new RuntimeException("Native facebook unsupported");    
+    public boolean hasPublishPermissions() {
+        throw new RuntimeException("Native facebook unsupported");
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+        return isFacebookSDKSupported();
+                
+    }
+
+    @Override
+    protected Oauth2 createOauth2() {
+        FaceBookAccess.setClientId(clientId);
+        FaceBookAccess.setClientSecret(clientSecret);
+        FaceBookAccess.setRedirectURI(redirectURI);
+        FaceBookAccess.setPermissions(permissions);
+        return FaceBookAccess.getInstance().createOAuth();        
     }
     
+    @Override
+    public void nativelogin(){
+        login();
+    }
+    
+    @Override
+    public void nativeLogout(){
+        logout();
+    }
+    
+    @Override
+    public boolean nativeIsLoggedIn(){
+        return isLoggedIn();
+    }
+    
+
 }

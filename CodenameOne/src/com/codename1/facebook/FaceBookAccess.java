@@ -24,6 +24,7 @@
 package com.codename1.facebook;
 
 import com.codename1.components.SliderBridge;
+import com.codename1.io.AccessToken;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
@@ -81,7 +82,7 @@ public class FaceBookAccess {
         return instance;
     }
 
-    private Oauth2 createOAuth() {
+    public Oauth2 createOAuth() {
         String scope = "";
         if (permissions != null && permissions.length > 0) {
             for (int i = 0; i < permissions.length; i++) {
@@ -135,6 +136,11 @@ public class FaceBookAccess {
             public void actionPerformed(ActionEvent evt) {
                 if(evt.getSource() instanceof String){
                     token = (String) evt.getSource();
+                }
+                if(evt.getSource() instanceof AccessToken){
+                    AccessToken t = (AccessToken) evt.getSource();
+                    token = t.getToken();
+                    
                 }
                 al.actionPerformed(evt);
             }
