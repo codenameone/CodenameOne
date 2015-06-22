@@ -1964,6 +1964,11 @@ BOOL prefersStatusBarHidden = NO;
 - (BOOL)shouldAutorotate {
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
     upsideDownMultiplier = 1;
+    
+    if (interfaceOrientation==UIInterfaceOrientationUnknown) {
+        return YES;
+    }
+    
     //NSLog(@"%d %d x %d %d", interfaceOrientation, displayWidth, displayHeight, self.interfaceOrientation);
     if (!isIOS8()) {
         
@@ -1971,6 +1976,9 @@ BOOL prefersStatusBarHidden = NO;
             upsideDownMultiplier = -1;
         }
         //NSLog(@"multiplier %d", upsideDownMultiplier);
+        if (isIPad() && self.interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
+            upsideDownMultiplier = -1;
+        }
     }
     //return YES;
     switch (orientationLock) {
@@ -1990,6 +1998,7 @@ BOOL prefersStatusBarHidden = NO;
     }
     return NO;
 }
+
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
