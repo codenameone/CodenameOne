@@ -162,6 +162,8 @@ public class FontImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+        int oldColor = g.getColor();
+        Font oldFont = g.getFont();
         g.setColor(color);
         g.setFont(fnt);
         int w = fnt.stringWidth(text);
@@ -177,6 +179,8 @@ public class FontImage extends Image {
         } else {
             g.drawString(text, x + width / 2 - w / 2, y + paddingPixels);
         }
+        g.setFont(oldFont);
+        g.setColor(oldColor);
     }
 
     /**
@@ -187,6 +191,8 @@ public class FontImage extends Image {
             drawImage(g, nativeGraphics, x, y);
             return;
         }
+        int oldColor = g.getColor();
+        Font oldFont = g.getFont();
         Font t = sizeFont(fnt, Math.min(h, w), padding);
         g.setColor(color);
         g.setFont(t);
@@ -203,6 +209,8 @@ public class FontImage extends Image {
         } else {
             g.drawString(text, x + w / 2 - ww / 2, y + paddingPixels);
         }
+        g.setFont(oldFont);
+        g.setColor(oldColor);
     }
 
     /**
@@ -218,7 +226,10 @@ public class FontImage extends Image {
      * @param padding the padding to set
      */
     public void setPadding(int padding) {
-        this.padding = padding;
+        if(this.padding != padding) {
+            this.padding = padding;
+            fnt = sizeFont(fnt, Math.min(width, height), padding);
+        }
     }
     
     /**
