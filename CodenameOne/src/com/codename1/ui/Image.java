@@ -905,7 +905,7 @@ public class Image {
      * @param height height of the scaled image
      * @return new image instance scaled to the given height and width
      */
-    private Image scaledImpl(int width, int height) {        
+    Image scaledImpl(int width, int height) {        
         if(width == -1) {
             return scaledHeight(height);
         } 
