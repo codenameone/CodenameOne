@@ -98,6 +98,7 @@ public abstract class Login {
                     if (evt.getSource() instanceof Exception) {
                         if(callback != null){
                             Exception e = (Exception) evt.getSource();
+                            e.printStackTrace();
                             callback.loginFailed(e.getMessage());
                         }
                         

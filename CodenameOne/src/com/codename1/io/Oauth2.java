@@ -35,10 +35,12 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.regex.StringReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Map;
 
 /**
  * This is a utility class that allows Oauth2 authentication This utility uses
@@ -285,14 +287,33 @@ public class Oauth2 {
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
                         String t = new String(tok);
-                        token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
-                        int off = t.indexOf("expires=");
-                        if (off > -1) {
-                            int end = t.indexOf('&', off);
-                            if (end < 0 || end < off) {
-                                end = t.length();
+                        
+                        if(t.startsWith("{")){
+                            JSONParser p = new JSONParser();
+                            Map map = p.parseJSON(new StringReader(t));
+                            token = (String) map.get("access_token");
+                            Object ex = map.get("expires_in");
+                            if(ex == null){
+                                ex = map.get("expires");                            
                             }
-                            expires = t.substring(off + 8, end);
+                            if(ex != null){
+                                expires = ex.toString();
+                            }
+                        }else{
+                            token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
+                            int off = t.indexOf("expires=");
+                            int start = 8;
+                            if(off == -1){
+                                off = t.indexOf("expires_in=");
+                                start = 11;
+                            }
+                            if (off > -1) {
+                                int end = t.indexOf('&', off);
+                                if (end < 0 || end < off) {
+                                    end = t.length();
+                                }
+                                expires = t.substring(off + start, end);
+                            }
                         }
                         if (login != null) {
                             login.dispose();
