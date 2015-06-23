@@ -28,7 +28,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
 /**
- * The Login absrtact base class is used to simplify Oauth2 authentications 
+ * The Login abstract base class is used to simplify Oauth2 authentications 
  * services.
  * Services can override the default Oauth2 web login and offers the native login
  * experience.
@@ -98,6 +98,7 @@ public abstract class Login {
                     if (evt.getSource() instanceof Exception) {
                         if(callback != null){
                             Exception e = (Exception) evt.getSource();
+                            e.printStackTrace();
                             callback.loginFailed(e.getMessage());
                         }
                         

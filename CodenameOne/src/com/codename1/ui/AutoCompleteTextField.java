@@ -308,7 +308,7 @@ public class AutoCompleteTextField extends TextField {
         int y = getAbsoluteY();
         int topMargin;
         int popupHeight;
-        int listHeight = filter.getUnderlying().getSize() * l.getElementSize(false, true).getHeight();
+        int listHeight = l.getModel().getSize() * l.getElementSize(false, true).getHeight();
         if(y < f.getContentPane().getHeight()/2){
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  

@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Properties;
+import javax.swing.SwingUtilities;
 
 /**
  *
@@ -42,67 +43,77 @@ public class Executor {
     private static Object app;
     
     public static void main(final String[] argv) throws Exception {
-        c = Class.forName(argv[0]);
-        try {
-            Method m = c.getDeclaredMethod("main", String[].class);
-            m.invoke(null, new Object[]{null});
-        } catch (NoSuchMethodException noMain) {
-            try {
-                Method m = c.getDeclaredMethod("startApp");
-                m.invoke(c.newInstance());
-            } catch (NoSuchMethodException noStartApp) {
-                if (Display.isInitialized()) {
-                    Display.deinitialize();
-                }
-                final Method m = c.getDeclaredMethod("init", Object.class);
-                app = c.newInstance();
-                if(app instanceof PushCallback) {
-                    CodenameOneImplementation.setPushCallback((PushCallback)app);
-                }
-                if(app instanceof PurchaseCallback) {
-                    CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
-                }
-                Display.init(null);
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    c = Class.forName(argv[0]);
+                    try {
+                        Method m = c.getDeclaredMethod("main", String[].class);
+                        m.invoke(null, new Object[]{null});
+                    } catch (NoSuchMethodException noMain) {
                         try {
-                            m.invoke(app, new Object[]{null});
-                            String currentDir = System.getProperty("user.dir");
-                            File props = new File(currentDir, "codenameone_settings.properties");
-                            if(props.exists()) {
-                                FileInputStream f = null;
-                                try {
-                                    Properties p = new Properties();
-                                    f = new FileInputStream(props);
-                                    p.load(f);
-                                    f.close();
-                                    String zone = p.getProperty("codename1.arg.vserv.zone", null);
-                                    if(zone != null && zone.length() > 0) {
-                                        com.codename1.impl.VServAds v = new com.codename1.impl.VServAds();
-                                        v.showWelcomeAd(); 
-                                        v.bindTransitionAd(Integer.parseInt(p.getProperty("codename1.arg.vserv.transition", "300000")));
-                                    }
-                                } catch (Exception ex) {
-                                } finally {
+                            Method m = c.getDeclaredMethod("startApp");
+                            m.invoke(c.newInstance());
+                        } catch (NoSuchMethodException noStartApp) {
+                            if (Display.isInitialized()) {
+                                Display.deinitialize();
+                            }
+                            final Method m = c.getDeclaredMethod("init", Object.class);
+                            app = c.newInstance();
+                            if(app instanceof PushCallback) {
+                                CodenameOneImplementation.setPushCallback((PushCallback)app);
+                            }
+                            if(app instanceof PurchaseCallback) {
+                                CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
+                            }
+                            Display.init(null);
+                            Display.getInstance().callSerially(new Runnable() {
+                                @Override
+                                public void run() {
                                     try {
-                                        f.close();
-                                    } catch (IOException ex) {
+                                        m.invoke(app, new Object[]{null});
+                                        String currentDir = System.getProperty("user.dir");
+                                        File props = new File(currentDir, "codenameone_settings.properties");
+                                        if(props.exists()) {
+                                            FileInputStream f = null;
+                                            try {
+                                                Properties p = new Properties();
+                                                f = new FileInputStream(props);
+                                                p.load(f);
+                                                f.close();
+                                                String zone = p.getProperty("codename1.arg.vserv.zone", null);
+                                                if(zone != null && zone.length() > 0) {
+                                                    com.codename1.impl.VServAds v = new com.codename1.impl.VServAds();
+                                                    v.showWelcomeAd(); 
+                                                    v.bindTransitionAd(Integer.parseInt(p.getProperty("codename1.arg.vserv.transition", "300000")));
+                                                }
+                                            } catch (Exception ex) {
+                                            } finally {
+                                                try {
+                                                    f.close();
+                                                } catch (IOException ex) {
+                                                }
+                                            }
+                                        }
+                                        Method start = c.getDeclaredMethod("start", new Class[0]);
+                                        start.invoke(app, new Object[0]);
+                                    } catch (NoSuchMethodException err) {
+                                        System.out.println("Couldn't find a main or a startup in " + argv[0]);
+                                    } catch (Exception err) {
+                                        err.printStackTrace();
+                                        System.exit(1);
                                     }
                                 }
-                            }
-                            Method start = c.getDeclaredMethod("start", new Class[0]);
-                            start.invoke(app, new Object[0]);
-                        } catch (NoSuchMethodException err) {
-                            System.out.println("Couldn't find a main or a startup in " + argv[0]);
-                        } catch (Exception err) {
-                            err.printStackTrace();
-                            System.exit(1);
+                            });
                         }
                     }
-                });
+                } catch(Exception err) {
+                    err.printStackTrace();
+                    System.exit(1);
+                }
             }
-        }
+        });
     }
 
     public static void stopApp(){
