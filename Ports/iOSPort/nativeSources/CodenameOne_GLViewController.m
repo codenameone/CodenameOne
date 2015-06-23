@@ -687,13 +687,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle, BOOL fill) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
-    if(width == height) {
+    if(NO && width == height) {
         int radius = MIN(width, height) / 2;
         if (fill){
             CGContextBeginPath(context);
             CGContextMoveToPoint(context, x+width/2, y+width/2);
         }
-        CGContextAddArc (context, x + radius, y + radius, radius, -startAngle * PI / 180, -(startAngle + angle) * PI / 180, 1);
+        CGContextAddArc (context, x + radius, y + radius, radius, -(startAngle + angle) * PI / 180, -startAngle * PI / 180, 1);
         if (fill){
             CGContextClosePath(context);
         }
@@ -708,9 +708,9 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
         CGFloat radius = width/2;
         if (fill){
             CGPathMoveToPoint(path, &t, 0, 0);
-            CGPathAddLineToPoint(path, &t, radius * cos(-startAngle*PI/180), radius * sin(-startAngle*PI/180));
+            CGPathAddLineToPoint(path, &t, radius * cos(-(startAngle+angle)*PI/180), radius * sin(-(startAngle+angle)*PI/180));
         }
-        CGPathAddArc(path, &t, 0, 0, radius, -startAngle * PI / 180, -(startAngle + angle) * PI / 180, 1);
+        CGPathAddArc(path, &t, 0, 0, radius, -(startAngle + angle) * PI / 180, -startAngle * PI / 180, 1);
 
         if (fill){
             CGPathAddLineToPoint(path, &t, 0, 0);
