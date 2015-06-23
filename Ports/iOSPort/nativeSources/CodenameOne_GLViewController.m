@@ -687,7 +687,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle, BOOL fill) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
-    if(NO && width == height) {
+    if(width == height) {
         int radius = MIN(width, height) / 2;
         if (fill){
             CGContextBeginPath(context);
