@@ -4050,7 +4050,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-    public int stringWidth(Object nativeFont, String str) {
+    public int stringWidth(final Object nativeFont, final String str) {
         if (perfMonitor != null) {
             perfMonitor.stringWidth(nativeFont, str);
         }
@@ -4058,7 +4058,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(str == null) {
             return 0;
         }
-        return (int) Math.ceil(font(nativeFont).getStringBounds(str, canvas.getFRC()).getWidth());
+        java.awt.Font fnt = font(nativeFont);
+        java.awt.geom.Rectangle2D r2d = fnt.getStringBounds(str, canvas.getFRC());
+        int w = (int) Math.ceil(r2d.getWidth());
+        return w;
     }
 
     /**
@@ -4069,7 +4072,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.charWidth(nativeFont, ch);
         }
         checkEDT();
-        return (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        int w = (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        return w;
     }
 
     @Override
