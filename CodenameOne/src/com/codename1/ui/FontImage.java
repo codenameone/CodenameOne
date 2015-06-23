@@ -23,6 +23,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.ImageIO;
 
 /**
  * An image based on icon fonts that adapts its environment
@@ -298,5 +299,34 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
         return f;
+    }
+    
+    /**
+     * Converts the icon image to an encoded image if possible
+     * @return the encoded image or null if the operation failed
+     */
+    public EncodedImage toEncodedImage() {
+        ImageIO io = ImageIO.getImageIO();
+        if(io != null && io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+            Image img = toImage();
+            if(img != null) {
+                return EncodedImage.createFromImage(img, false);
+            }
+        }
+        return null;
+    } 
+    
+    /**
+     * Converts the icon image to an image if possible
+     * @return the encoded image or null if the operation failed
+     */
+    public Image toImage() {
+        if(Image.isAlphaMutableImageSupported()) {
+            Image img = Image.createImage(width, height);
+            Graphics g = img.getGraphics();
+            g.drawImage(this, 0, 0);
+            return img;
+        }
+        return null;
     }
 }
