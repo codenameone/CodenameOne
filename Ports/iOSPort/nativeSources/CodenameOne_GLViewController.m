@@ -1965,9 +1965,11 @@ BOOL prefersStatusBarHidden = NO;
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
     upsideDownMultiplier = 1;
     
+#ifdef NEW_CODENAME_ONE_VM
     if (interfaceOrientation==UIInterfaceOrientationUnknown) {
         return YES;
     }
+#endif
     
     //NSLog(@"%d %d x %d %d", interfaceOrientation, displayWidth, displayHeight, self.interfaceOrientation);
     if (!isIOS8()) {
