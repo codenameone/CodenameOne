@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.Animation;
@@ -564,6 +565,12 @@ public class ImageViewer extends Component {
             this.image = image;
             updatePositions();
             repaint();
+            if(image.isAnimation()) {
+                Form f = getComponentForm();
+                if(f != null) {
+                    f.registerAnimated(this);
+                }
+            }
         }
     }
     
