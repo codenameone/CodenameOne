@@ -61,6 +61,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -3985,9 +3986,18 @@ public abstract class CodenameOneImplementation {
             if(o != null) {
                 if(o instanceof InputStream) {
                     ((InputStream) o).close();
+                    return;
                 }
                 if(o instanceof OutputStream) {
                     ((OutputStream) o).close();
+                    return;
+                }
+                if(o instanceof Reader) {
+                    ((Reader) o).close();
+                    return;
+                }
+                if(o instanceof Writer) {
+                    ((Writer) o).close();
                 }
             }
         } catch (Throwable ex) {

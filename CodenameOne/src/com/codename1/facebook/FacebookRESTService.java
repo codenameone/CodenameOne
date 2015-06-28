@@ -28,6 +28,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParseCallback;
 import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkEvent;
+import com.codename1.io.Util;
 import com.codename1.io.services.ImageDownloadService;
 import com.codename1.ui.list.DefaultListModel;
 import java.io.IOException;
@@ -122,6 +123,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         i.setYield(-1);
         InputStreamReader reader = new InputStreamReader(i, "UTF-8");
         JSONParser.parse(reader, this);
+        Util.cleanup(reader);
         if(stack.size() > 0){
             fireResponseListener(new NetworkEvent(this, stack.elementAt(0)));
         }
