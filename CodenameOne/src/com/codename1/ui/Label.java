@@ -271,6 +271,8 @@ public class Label extends Component {
     
     /**
      * Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM
+     * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
+     * only work when there is an icon</strong>
      * 
      * @param valign alignment value
      * @see #CENTER
@@ -287,6 +289,8 @@ public class Label extends Component {
     /**
      * Returns the vertical alignment of the Label, this will only work when the icon
      * is in the side of the text and not above or bellow it.
+     * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
+     * only work when there is an icon</strong>
      * 
      * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM
      * @see #CENTER

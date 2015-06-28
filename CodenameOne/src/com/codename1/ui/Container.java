@@ -866,6 +866,8 @@ public class Container extends Component {
             Component cmp = getComponentAt(iter);
             if(cmp instanceof Container) {
                 ((Container)cmp).forceRevalidateImpl();
+            } else {
+                cmp.setShouldCalcPreferredSize(true);
             }
         }
     }
