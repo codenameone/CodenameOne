@@ -72,7 +72,10 @@ public class GoogleImpl extends GoogleConnect implements
 
     @Override
     public boolean nativeIsLoggedIn() {
-        return mGoogleApiClient != null;
+        if(mGoogleApiClient != null && mGoogleApiClient.isConnected()){
+            return getAccessToken() != null;
+        }
+        return false;
     }
 
     @Override
