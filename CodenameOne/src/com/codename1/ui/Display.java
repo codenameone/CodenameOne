@@ -1059,7 +1059,10 @@ public final class Display {
             }
             offset = handleEvent(offset);
         }
-
+        
+        if(!impl.isInitialized()){
+            return;
+        }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
         impl.paintDirty();
 
