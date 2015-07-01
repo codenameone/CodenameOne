@@ -256,6 +256,9 @@ public class Component implements Animation, StyleListener {
      */
     public static final int RIGHT = 3;
     
+    /**
+     * Alignment to the baseline constraint
+     */
     public static final int BASELINE = 5;
     
     private HashMap<String, Object> clientProperties;

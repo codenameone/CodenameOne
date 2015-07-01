@@ -761,6 +761,7 @@ extern struct ThreadLocalData* getThreadLocalData();
     }
 
 #define JUMP_TO(labelToJumpTo, blockOffsetLevel) {\
+        threadStateData->tryBlockOffset = methodBlockOffset + blockOffsetLevel; \
         goto labelToJumpTo; \
     }
 
