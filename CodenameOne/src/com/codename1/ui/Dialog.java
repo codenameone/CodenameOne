@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
@@ -1036,6 +1037,10 @@ public class Dialog extends Form {
      * of the screen.
      */
     private void showImpl(boolean reverse) {
+        if(modal && Display.isInitialized() && Display.getInstance().isMinimized()){
+            Log.p("Modal dialogs cannot be displayed on a minimized app");
+            return;
+        }
         // this behavior allows a use case where dialogs of various sizes are layered
         // one on top of the other
         setDisposed(false);
@@ -1075,6 +1080,10 @@ public class Dialog extends Form {
     }
 
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
+        if(Display.isInitialized() && Display.getInstance().isMinimized()){
+            Log.p("Modal dialogs cannot be displayed on a minimized app");
+            return;
+        }
         this.top = top;
         this.bottom = bottom;
         this.left = left;

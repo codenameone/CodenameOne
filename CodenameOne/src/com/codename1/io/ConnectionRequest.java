@@ -705,7 +705,7 @@ public class ConnectionRequest implements IOProgressListener {
             retry();
             return;
         }
-        if(Display.isInitialized() &&
+        if(Display.isInitialized() && !Display.getInstance().isMinimized() &&
                 Dialog.show("Exception", err.toString() + ": for URL " + url + "\n" + err.getMessage(), "Retry", "Cancel")) {
             retry();
         } else {
@@ -731,7 +731,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
             return;
         }
-        if(Display.isInitialized() &&
+        if(Display.isInitialized() && !Display.getInstance().isMinimized() &&
                 Dialog.show("Error", code + ": " + message, "Retry", "Cancel")) {
             retry();
         } else {
