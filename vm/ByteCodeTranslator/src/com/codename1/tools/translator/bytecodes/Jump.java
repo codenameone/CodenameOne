@@ -108,17 +108,17 @@ public class Jump extends Instruction {
                 b.append("if(POP_OBJ() != JAVA_NULL) /* IFNONNULL */ ");
                 break;
         }
-        if(TryCatch.isTryCatchInMethod()) {
+        /*if(TryCatch.isTryCatchInMethod()) {
             b.append("JUMP_TO(label_");
             b.append(label.toString());
             b.append(", ");
             b.append(LabelInstruction.getLabelCatchDepth(label, instructions));
             b.append(");\n");
-        } else {
+        } else {*/
             b.append("goto label_");
             b.append(label.toString());
             b.append(";\n");
-        }
+        //}
     }
 
 }
