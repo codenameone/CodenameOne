@@ -2472,7 +2472,7 @@ public final class Display {
      * @param index the "logical" location of the cursor
      * @return the "visual" location of the cursor
      */
-	public int getCharLocation(String source, int index) {
+    public int getCharLocation(String source, int index) {
         return impl.getCharLocation(source, index);
     }
 
