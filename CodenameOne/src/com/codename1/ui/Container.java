@@ -35,6 +35,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
+import java.util.Iterator;
 import java.util.Vector;
 
 /**
@@ -46,7 +47,7 @@ import java.util.Vector;
  * @see Component
  * @author Chen Fishbein
  */
-public class Container extends Component {
+public class Container extends Component implements Iterable<Component>{
     private static boolean enableLayoutOnPaint = true;
     private Component leadComponent;
     private Layout layout;
@@ -2250,6 +2251,14 @@ public class Container extends Component {
                 a.opacity[iter] = createAndStartAnimateMotion(source, dest, duration);
             }
         }        
+    }
+
+    /**
+     * Part of the Iterable interface allowing us to do a for-each loop on Container
+     * @return the iterator of the components
+     */
+    public Iterator<Component> iterator() {
+        return components.iterator();
     }
     
     static class Anim implements Animation, Runnable {
