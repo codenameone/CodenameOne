@@ -7135,6 +7135,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public String getAppHomePath() {
+        if(exposeFilesystem) {
+            File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
+            home.mkdirs();
+            try {
+                return home.toURI().toURL().toExternalForm();
+            } catch(MalformedURLException err) {
+                // this is just moronic
+                throw new RuntimeException(err);
+            }
+        }
         new File(System.getProperty("user.home") + File.separator + appHomeDir).mkdirs();
         return "file://home/";
     }
