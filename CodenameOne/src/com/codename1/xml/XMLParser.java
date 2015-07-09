@@ -305,7 +305,9 @@ public class XMLParser {
      * @return a new instance of the element
      */
     protected Element createNewElement(String name) {
-        return new Element(name);
+        Element e = new Element(name);
+        e.caseSensitive = caseSensitive;
+        return e;
     }
 
     /**
@@ -315,7 +317,9 @@ public class XMLParser {
      * @return a new instance of the element
      */
     protected Element createNewTextElement(String text) {
-        return new Element(text,true);
+        Element e = new Element(text,true);
+        e.caseSensitive = caseSensitive;
+        return e;
     }
 
     public void setIncludeWhitespacesBetweenTags(boolean include) {

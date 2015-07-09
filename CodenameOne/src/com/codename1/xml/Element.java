@@ -67,6 +67,8 @@ public class Element {
 
     boolean isComment;
 
+    boolean caseSensitive;
+    
     /**
      * Constructs and Element without specifying a name
      * This can be used by subclasses that do not require name assigments.
@@ -537,6 +539,24 @@ public class Element {
         }
     }
 
+    /**
+     * Helper method to return the attribute as an integer
+     * @param name the name of the attribute
+     * @param def default value
+     * @return return value
+     */
+    public int getAttributeAsInt(String name, int def) {
+        String s = getAttribute(name);
+        if(s == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(s);
+        } catch(NumberFormatException e) {
+            return def;
+        }
+    }
+    
 
     /**
      * Returns the attribute value by its name (or null if it wasn't defined for this element)
@@ -547,6 +567,9 @@ public class Element {
     public String getAttribute(String  name) {
         if (attributes==null) {
             return null;
+        }
+        if(!caseSensitive) {
+            name = name.toLowerCase();
         }
         return (String)attributes.get(name);
     }
