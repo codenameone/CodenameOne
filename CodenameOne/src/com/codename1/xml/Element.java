@@ -569,7 +569,10 @@ public class Element {
             return null;
         }
         if(!caseSensitive) {
-            name = name.toLowerCase();
+            String val = (String)attributes.get(name.toLowerCase());
+            if(val != null) {
+                return val;
+            }
         }
         return (String)attributes.get(name);
     }
