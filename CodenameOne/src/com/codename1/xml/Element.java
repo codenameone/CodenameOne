@@ -25,6 +25,7 @@ package com.codename1.xml;
 
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Vector;
 
 /**
@@ -33,7 +34,7 @@ import java.util.Vector;
  *
  * @author Ofir Leitner
  */
-public class Element {
+public class Element implements Iterable<Element> {
 
     /**
      * A constant that can be used for the get descendants methods to denote infinite recursion
@@ -53,7 +54,7 @@ public class Element {
    /**
      * A vector containing this element's children
      */
-    private Vector children;
+    private Vector<Element> children;
 
     /**
      * This element's parent
@@ -190,6 +191,7 @@ public class Element {
      * Returns the internal children vector
      *
      * @return the children vector
+     * @deprecated this uses the old vector API instead of the more modern Collection/List
      */
     protected Vector getChildren() {
         return children;
@@ -199,6 +201,7 @@ public class Element {
      * Sets the children vector of this Element
      *
      * @param children The vector to set as this Element's children
+     * @deprecated this uses the old vector API instead of the more modern Collection/List
      */
     protected void setChildren(Vector children) {
         this.children=children;
@@ -746,5 +749,13 @@ public class Element {
      */
     public boolean isEmpty() {
         return children == null || children.isEmpty();
+    }
+
+    /**
+     * Iterable for children of this entry making tree walking easier, this makes for(Element child : base) {} possible
+     * @return the children iterator
+     */
+    public Iterator<Element> iterator() {
+        return children.iterator();
     }
 }
