@@ -1556,7 +1556,7 @@ static int getColor(String colorStr,int defaultColor) {
         if (depth<1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
         }
-        if (getChildren()==null) {
+        if (isEmpty()) {
             return null;
         }
         Vector v=new Vector();
@@ -1587,8 +1587,8 @@ static int getColor(String colorStr,int defaultColor) {
         HTMLElement parent = (HTMLElement)getParent();
         if (parent!=null) {
             Vector v=parent.getChildren();
-            for(int i=0;i<v.size();i++) {
-                HTMLElement elem = (HTMLElement)v.elementAt(i);
+            for(Element e : parent) {
+                HTMLElement elem = (HTMLElement)e;
                 if (elem==this) {
                     return true;
                 }

@@ -94,7 +94,7 @@ public class XMLWriter {
                 if (!isInline && !element.hasTextChild()) {
                     writer.write('\n');
                     indentation.append('\t');
-                    for (Object child : element.getChildren()) {
+                    for (Object child : element) {
                         if (child instanceof Element) {
                             writeXML(writer, (Element) child, indentation, isInline);
                         } else {
@@ -104,7 +104,7 @@ public class XMLWriter {
                     }
                 } else {
                     isInline = true;
-                    for (Object child : element.getChildren()) {
+                    for (Object child : element) {
                         if (child instanceof Element) {
                             writeXML(writer, (Element) child, null, isInline);
                         } else {

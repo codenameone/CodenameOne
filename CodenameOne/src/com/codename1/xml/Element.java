@@ -23,6 +23,7 @@
  */
 package com.codename1.xml;
 
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -54,7 +55,7 @@ public class Element implements Iterable<Element> {
    /**
      * A vector containing this element's children
      */
-    private Vector<Element> children;
+    private ArrayList<Element> children;
 
     /**
      * This element's parent
@@ -152,7 +153,7 @@ public class Element implements Iterable<Element> {
      */
     public void addChild(Element childElement) {
         setChildParent(childElement);
-        children.addElement(childElement);
+        children.add(childElement);
         //childElement.setParent(this);
     }
 
@@ -194,7 +195,10 @@ public class Element implements Iterable<Element> {
      * @deprecated this uses the old vector API instead of the more modern Collection/List
      */
     protected Vector getChildren() {
-        return children;
+        if(children == null) {
+            return null;
+        }
+        return new Vector(children);
     }
 
     /**
@@ -204,7 +208,11 @@ public class Element implements Iterable<Element> {
      * @deprecated this uses the old vector API instead of the more modern Collection/List
      */
     protected void setChildren(Vector children) {
-        this.children=children;
+        if(children == null) {
+            this.children = null;
+        } else {
+            this.children = new ArrayList<Element>(children);
+        }
     }
 
     /**
@@ -240,7 +248,7 @@ public class Element implements Iterable<Element> {
         if ((index<0) || (children==null) || (index>=children.size())) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        return (Element)children.elementAt(index);
+        return (Element)children.get(index);
 
     }
 
@@ -257,7 +265,7 @@ public class Element implements Iterable<Element> {
         int i=0;
         Element found=null;
         while ((found==null) && (i<children.size())) {
-            Element child=(Element)children.elementAt(i);
+            Element child=(Element)children.get(i);
             if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {
                 found=child;
             } else {
@@ -281,7 +289,7 @@ public class Element implements Iterable<Element> {
         if (children!=null) {
             int i=0;
             while (i<children.size()) {
-                Element child=(Element)children.elementAt(i);
+                Element child=(Element)children.get(i);
                 Element match=child.getElementById(id);
                 if (match!=null) {
                     return match;
@@ -301,7 +309,7 @@ public class Element implements Iterable<Element> {
         if (children!=null) {
             int i=0;
             while (i<children.size()) {
-                Element child=(Element)children.elementAt(i);
+                Element child=(Element)children.get(i);
                 if (depth>1) {
                     child.getDescendantsByTagNameInternal(v, name,depth-1);
                 }
@@ -318,7 +326,7 @@ public class Element implements Iterable<Element> {
         if (children!=null) {
             int i=0;
             while (i<children.size()) {
-                Element child=(Element)children.elementAt(i);
+                Element child=(Element)children.get(i);
                 if (depth>1) {
                     child.getDescendantsByTagNameAndAttributeInternal(v, name, attribute, depth-1);
                 }
@@ -402,7 +410,7 @@ public class Element implements Iterable<Element> {
         }
         int i=0;
         while (i<children.size()) {
-            Element child=(Element)children.elementAt(i);
+            Element child=(Element)children.get(i);
             if (depth>0) {
                 child.getTextDescendantsInternal(v, text, caseSensitive, depth-1);
             }
@@ -483,7 +491,7 @@ public class Element implements Iterable<Element> {
         if (children!=null) {
             int i=0;
             while (i<children.size()) {
-                Element child=(Element)children.elementAt(i);
+                Element child=(Element)children.get(i);
                 if (child.contains(element)) {
                     return true;
                 }
@@ -589,7 +597,7 @@ public class Element implements Iterable<Element> {
             throw new IllegalStateException("An Element can't have two parents.");
         }
         if (children==null) {
-            children=new Vector();
+            children=new ArrayList<Element>();
         }
         child.setParent(this);
     }
@@ -603,9 +611,9 @@ public class Element implements Iterable<Element> {
         if ((index<0) || (children==null) || (index>=children.size())) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        Element child=(Element)children.elementAt(index);
+        Element child=(Element)children.get(index);
         child.setParent(null);
-        children.removeElementAt(index);
+        children.remove(index);
     }
 
     /**
@@ -618,7 +626,7 @@ public class Element implements Iterable<Element> {
         int result=-1;
         if (children!=null) {
             for(int i=0;i<children.size();i++) {
-                if (child==children.elementAt(i)) {
+                if (child==children.get(i)) {
                     result=i;
                     break;
                 }
@@ -635,7 +643,7 @@ public class Element implements Iterable<Element> {
      */
     public void insertChildAt(Element child,int index) {
         setChildParent(child);
-        children.insertElementAt(child, index);
+        children.add(index, child);
     }
 
     /**
@@ -649,7 +657,7 @@ public class Element implements Iterable<Element> {
             setChildParent(newChild);
             int index=children.indexOf(oldChild);
             if (index!=-1) {
-                children.insertElementAt(newChild, index);
+                children.add(index, newChild);
                 removeChildAt(index+1);
 //                children.removeElement(oldChild);
 //                oldChild.setParent(null);
@@ -717,7 +725,7 @@ public class Element implements Iterable<Element> {
             str+=">\n";
             if (children!=null) {
                 for(int i=0;i<children.size();i++) {
-                    str+=((Element)children.elementAt(i)).toString(spacing+' ');
+                    str+=((Element)children.get(i)).toString(spacing+' ');
                 }
             }
             str+=spacing+"</"+getTagName()+">\n";
@@ -734,7 +742,7 @@ public class Element implements Iterable<Element> {
     public boolean hasTextChild() {
         if(children != null) {
             for (int iter = 0 ; iter < children.size() ; iter++) {
-                Object child = children.elementAt(iter);
+                Object child = children.get(iter);
                 if (child instanceof Element && ((Element)child).isTextElement()) {
                     return true;
                 }
