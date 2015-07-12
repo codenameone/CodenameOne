@@ -425,7 +425,15 @@ public final class GeneralPath implements Shape {
         dirty = true;
     }
     
-    
+    /**
+     * Draws an elliptical arc on the path given the provided bounds.
+     * @param x Left x coord of bounding rect.
+     * @param y Top y coordof bounding rect.
+     * @param w Width of bounding rect.
+     * @param h Height of bounding rect.
+     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
@@ -446,6 +454,15 @@ public final class GeneralPath implements Shape {
         createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
     }
     
+    /**
+     * Draws an elliptical arc on the path given the provided bounds.
+     * @param x Left x coord of bounding rect.
+     * @param y Top y coordof bounding rect.
+     * @param w Width of bounding rect.
+     * @param h Height of bounding rect.
+     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
+     */
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
@@ -672,6 +689,14 @@ public final class GeneralPath implements Shape {
         addBezierArcToPath(this, cX, cY, startX, startY, endX, endY);
     }
     
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
     public void arcTo(double cX, double cY, double endX, double endY){
         arcTo((float)cX, (float)cY, (float)endX, (float)endY);
     }
