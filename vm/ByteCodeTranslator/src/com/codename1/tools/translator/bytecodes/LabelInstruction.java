@@ -131,7 +131,8 @@ public class LabelInstruction extends Instruction {
             List<Pair> strs = tryBeginLabels.get(parent);
             if(strs != null) {
                 b.append(":");
-                for(Pair s : strs) {
+                for(int iter = strs.size() - 1;  iter >= 0 ; iter--) {
+                    Pair s = strs.get(iter);
                     b.append(" tryBlockOffset");
                     b.append(parent);
                     b.append(s.cls);
