@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.contacts.Contact;
 import com.codename1.payment.Product;
+import com.codename1.social.GoogleImpl;
 import com.codename1.social.LoginCallback;
 import com.codename1.ui.geom.Rectangle;
 import java.io.Writer;
@@ -522,4 +523,12 @@ public final class IOSNative {
      * @return 
      */
     native int readNSFile(long nsFileHandle);
+
+    public native boolean isGoogleLoggedIn();
+
+    public native void googleLogin(Object callback);
+
+    public native String getGoogleToken();
+
+    public native void googleLogout();
 }

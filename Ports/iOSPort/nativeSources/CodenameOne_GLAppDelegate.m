@@ -30,6 +30,8 @@
 int mallocWhileSuspended = 0;
 #endif
 
+
+
 BOOL isAppSuspended = NO;
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
@@ -37,6 +39,12 @@ BOOL isAppSuspended = NO;
 extern UIView *editingComponent;
 
 #define INCLUDE_CN1_PUSH
+
+
+#ifdef INCLUDE_GOOGLE_CONNECT
+#import "GooglePlus.h"
+#endif
+
 
 @implementation CodenameOne_GLAppDelegate
 
@@ -130,6 +138,19 @@ extern UIView *editingComponent;
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
     JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
+    
+    #ifdef INCLUDE_GOOGLE_CONNECT
+    
+    // Handle Google Plus Login
+    BOOL res = [GPPURLHandler handleURL:url
+           sourceApplication:sourceApplication
+                  annotation:annotation];
+    if (res) {
+        return res;
+    }
+    
+    #endif
+    
 #ifdef NEW_CODENAME_ONE_VM
     JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else
