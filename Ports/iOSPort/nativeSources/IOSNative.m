@@ -6320,3 +6320,4 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
     return com_codename1_impl_ios_IOSNative_readNSFile___long_R_int(CN1_THREAD_STATE_PASS_ARG instance, fileHandle);
 }
 #endif
+

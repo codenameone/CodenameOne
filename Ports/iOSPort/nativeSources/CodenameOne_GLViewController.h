@@ -37,6 +37,11 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define INCLUDE_GOOGLE_CONNECT
+#ifdef INCLUDE_GOOGLE_CONNECT
+#import "GooglePlus.h"
+#endif
+
 #define NOT_INCLUDE_ZOOZ
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
@@ -83,6 +88,9 @@
 #endif
 #ifdef INCLUDE_MOPUB
         ,MPAdViewDelegate
+#endif
+#ifdef INCLUDE_GOOGLE_CONNECT
+        ,GPPSignInDelegate
 #endif
 > {
 @private
