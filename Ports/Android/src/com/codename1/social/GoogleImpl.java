@@ -107,8 +107,7 @@ public class GoogleImpl extends GoogleConnect implements
                             ctx,
                             Plus.AccountApi.getAccountName(mGoogleApiClient),
                             "oauth2:"
-                            + Scopes.PLUS_LOGIN + " "
-                            + Scopes.PLUS_ME);
+                            + scope);
                     setAccessToken(new AccessToken(token, null));
 
                 } catch (IOException transientEx) {

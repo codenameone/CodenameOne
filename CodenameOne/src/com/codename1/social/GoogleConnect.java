@@ -43,8 +43,6 @@ import java.util.Hashtable;
  */
 public class GoogleConnect extends Login{
 
-    private static String scope = "https://www.googleapis.com/auth/userinfo.profile";
-
     private static String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     
     private static GoogleConnect instance;
@@ -52,6 +50,7 @@ public class GoogleConnect extends Login{
     
     GoogleConnect() {
         setOauth2URL("https://accounts.google.com/o/oauth2/auth");
+        setScope("profile email");
     }
 
     /**
