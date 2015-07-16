@@ -530,14 +530,23 @@ if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type
 }
 
 #define BC_DUP2_X2() { \
-    stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
-    stack[stackPointer - 2].data.l = stack[stackPointer - 3].data.l; \
-    stack[stackPointer - 3].data.l = stack[stackPointer].data.l; \
-    stack[stackPointer].type = stack[stackPointer - 1].type; \
-    stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
-    stack[stackPointer - 2].type = stack[stackPointer - 3].type; \
-    stack[stackPointer - 3].type = stack[stackPointer].type; \
+    if (stack[stackPointer-2].type == CN1_TYPE_LONG || stack[stackPointer-2].type == CN1_TYPE_DOUBLE) {\
+        stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
+        stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
+        stack[stackPointer - 2].data.l = stack[stackPointer].data.l; \
+        stack[stackPointer].type = stack[stackPointer - 1].type; \
+        stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
+        stack[stackPointer - 2].type = stack[stackPointer].type; \
+    } else {\
+        stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
+        stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
+        stack[stackPointer - 2].data.l = stack[stackPointer - 3].data.l; \
+        stack[stackPointer - 3].data.l = stack[stackPointer].data.l; \
+        stack[stackPointer].type = stack[stackPointer - 1].type; \
+        stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
+        stack[stackPointer - 2].type = stack[stackPointer - 3].type; \
+        stack[stackPointer - 3].type = stack[stackPointer].type; \
+    }\
     stackPointer++; \
 }
 
