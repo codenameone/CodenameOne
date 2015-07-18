@@ -6371,68 +6371,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void splitString(String source, char separator, ArrayList<String> out) {
         nativeInstance.splitString(source, separator, out);
     }
-
-    @Override
-    public Object startBackgroundService(final BackgroundService bgTask) {
-        
-        Runnable setupCallback = new Runnable() {
-
-            @Override
-            public void run() {
-                bgTask.setComplete(false);
-            }
-            
-        };
-        
-        Runnable completeCallback = new Runnable() {
-
-            @Override
-            public void run() {
-                bgTask.setComplete(true);
-            }
-            
-        };
-        long handle = nativeInstance.startBackgroundService(
-                bgTask.getName(),
-                setupCallback,
-                bgTask, 
-                completeCallback,
-                bgTask.getCleanup()
-        );
-        
-        NativeBackgroundService nsvc = new NativeBackgroundService();
-        nsvc.handle = handle;
-        nsvc.service = bgTask;
-        return nsvc;
-    }
-    
-    private class NativeBackgroundService {
-        BackgroundService service;
-        long handle;
-        
-        protected void finalize() {
-            if(handle != 0) {
-                nativeInstance.releasePeer(handle);
-                handle = 0;
-            }
-        }
-    }
-
-    @Override
-    public int getBackgroundServiceSupport() {
-        return BackgroundService.SUPPORT_LIMITED;
-    }
-
-    @Override
-    public long getTimeToBackgroundServiceExpiration(Object peer) {
-        return nativeInstance.getTimeToBackgroundServiceExpiration(((NativeBackgroundService)peer).handle);
-    }
-    
-    
-    
-    
-    
- 
    
 }
 

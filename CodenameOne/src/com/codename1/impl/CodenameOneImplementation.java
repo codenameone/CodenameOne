@@ -5254,54 +5254,6 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Starts a background service that is able to continue to run while the
-     * application is in the background.
-     * @param bgTask
-     * @return The peer service object that can be used in the getTimeToBackgroundServiceExpiration method.
-     */
-    public Object startBackgroundService(final BackgroundService bgTask) {
-        Runnable task = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    bgTask.run();
-                    bgTask.setComplete(true);
-                } finally {
-                    bgTask.getCleanup().run();
-                }
-            }
-        };
-        Display.getInstance().scheduleBackgroundTask(task);
-        /*
-        Timer timer = new Timer(bgTask.getName());
-        if (bgTask.getStartTime() != null) {
-            timer.schedule(task, bgTask.getStartTime());
-        } else if (bgTask.getInterval() > 0) {
-            timer.schedule(task, bgTask.getTimeout(), bgTask.getInterval());
-            return timer;
-        } else if (bgTask.getTimeout() > 0) {
-            timer.schedule(task, bgTask.getTimeout());
-        } else {
-            timer.schedule(task, 0);
-        }
-        
-        return timer;
-        */
-        return task;
-    }
-
-    public long getTimeToBackgroundServiceExpiration(Object peer) {
-        return -1;
-    }
-
-    public int getBackgroundServiceSupport() {
-        return BackgroundService.SUPPORT_EMULATED;
-    }
-
-    
-   
-    
     
     // END TRANSFORMATION METHODS--------------------------------------------------------------------
     

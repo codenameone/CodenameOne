@@ -532,13 +532,4 @@ public final class IOSNative {
 
     public native void googleLogout();
 
-    native long startBackgroundService(
-            String name,
-            Runnable setupCallback, 
-            Runnable task, 
-            Runnable completeCallback, 
-            Runnable cleanup
-    );
-
-    native long getTimeToBackgroundServiceExpiration(long handle);
 }
