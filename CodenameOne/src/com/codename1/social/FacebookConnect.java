@@ -192,4 +192,15 @@ public class FacebookConnect extends Login{
     }
     
 
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     * 
+     * @param appLinkUrl App Link for what should be opened when the recipient 
+     * clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     */ 
+    public void inviteFriends(String appLinkUrl, String previewImageUrl){
+        throw new RuntimeException("inviteFriends is implemented natively");
+    }
 }
