@@ -201,6 +201,15 @@ public class FacebookConnect extends Login{
      * @param previewImageUrl url to an image to be used in the invite, can be null
      */ 
     public void inviteFriends(String appLinkUrl, String previewImageUrl){
-        throw new RuntimeException("inviteFriends is implemented natively");
+    }
+    
+    /**
+     * Returns true if inviteFriends is implemented, it is supported on iOS and 
+     * Android
+     * 
+     * @return true if inviteFriends is implemented
+     */ 
+    public boolean isInviteFriendsSupported(){
+        return false;
     }
 }

@@ -196,6 +196,11 @@ public class FacebookImpl extends FacebookConnect {
         }
 
     }
+
+    @Override
+    public boolean isInviteFriendsSupported(){
+        return true;
+    }
     
     class FBCallback implements FacebookCallback{
         
