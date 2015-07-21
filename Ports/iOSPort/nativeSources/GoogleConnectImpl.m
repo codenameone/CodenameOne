@@ -114,11 +114,20 @@ void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG 
 }
 #else
 void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {}
+
+#ifdef NEW_CODENAME_ONE_VM
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoogleLoggedIn___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return JAVA_FALSE;
+    return 0;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getGoogleToken___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {return JAVA_NULL;}
+#else
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoogleLoggedIn__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return 0;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getGoogleToken__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {return JAVA_NULL;}
+#endif
 
 void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {}
 
