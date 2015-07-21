@@ -55,7 +55,14 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
     if (googleLoginCallback == NULL) {
         googleLoginCallback = instance;
         GPPSignIn *signIn = [GPPSignIn sharedInstance];
-        signIn.clientID = toNSString(CN1_THREAD_STATE_PASS_ARG get_field_com_codename1_social_GoogleConnect_clientId(googleLoginCallback));
+        JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        JAVA_OBJECT jClientID = virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.clientId"), JAVA_NULL);
+        if (jClientID == JAVA_NULL) {
+            googleLoginCallback = NULL;
+            NSLog(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
+            return;
+        }
+        signIn.clientID = toNSString(CN1_THREAD_STATE_PASS_ARG jClientID);
         NSString *scope = toNSString(CN1_THREAD_STATE_PASS_ARG get_field_com_codename1_social_GoogleConnect_scope(googleLoginCallback));
 
         if (scope != nil) {
@@ -86,6 +93,7 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authenti
             set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, googleLoginCallback);
         }
         set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+        googleLoginCallback = NULL;
     }
     
     
