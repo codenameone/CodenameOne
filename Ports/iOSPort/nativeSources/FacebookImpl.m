@@ -30,12 +30,11 @@
 
 JAVA_BOOLEAN publishPermission = 0;
 
-//#define INCLUDE_FACEBOOK
-#ifdef INCLUDE_FACEBOOK
+#ifdef INCLUDE_FACEBOOK_CONNECT
 #include "com_codename1_social_FacebookConnect.h"
 #include "com_codename1_social_LoginCallback.h"
 #include "com_codename1_social_FacebookImpl.h"
-#import "FBSession.h"
+#import "FBSDKLoginKit.h"
 
 #ifdef NEW_CODENAME_ONE_VM
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
@@ -48,38 +47,36 @@ extern void releaseCN1(JAVA_OBJECT o);
 #endif
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
-    retainCN1(CN1_THREAD_STATE_PASS_ARG instance);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        FBSession* s = [FBSession activeSession];
-        if(s == nil || !s.isOpen) {
-            [FBSession openActiveSessionWithReadPermissions:@[@"public_profile", @"email", @"user_friends"] allowLoginUI:YES
-                                completionHandler:^(FBSession *session,
-                                           FBSessionState status,
-                                           NSError *error) {
-                [FBSession setActiveSession:session];
-                if(status == FBSessionStateClosedLoginFailed || status == FBSessionStateOpen) {
+        FBSDKLoginManager *login = [[FBSDKLoginManager alloc] init];
+        [login logInWithReadPermissions:@[@"public_profile", @"email", @"user_friends"]  handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+            if (result.isCancelled) {
+                // Handle cancellations
 #ifdef NEW_CODENAME_ONE_VM
-                    set_field_com_codename1_social_FacebookImpl_loginCompleted(threadStateData, JAVA_TRUE, instance);
+                set_field_com_codename1_social_FacebookImpl_loginCancelled(threadStateData, JAVA_TRUE, instance);
 #else
-                    com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
-                    impl->fields.com_codename1_social_FacebookImpl.loginCompleted_ = TRUE;
+                com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
+                impl->fields.com_codename1_social_FacebookImpl.loginCancelled_ = TRUE;
 #endif
-                    releaseCN1(CN1_THREAD_STATE_PASS_ARG instance);
-                    return;
-                }
-            }];
-        }
-        releaseCN1(CN1_THREAD_STATE_PASS_ARG instance);
+            } else {
+#ifdef NEW_CODENAME_ONE_VM
+                set_field_com_codename1_social_FacebookImpl_loginCompleted(threadStateData, JAVA_TRUE, instance);
+#else
+                com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
+#endif
+                
+            }
+        }];
         POOL_END();
     });
+    
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFacebookLoggedIn__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     __block JAVA_BOOLEAN val = FALSE;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        FBSession* s = [FBSession activeSession];
-        val = s != nil && s.isOpen;
+        val = [FBSDKAccessToken currentAccessToken] != nil;
     });
     return val;
 }
@@ -88,7 +85,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE
     __block JAVA_OBJECT str = JAVA_NULL;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSString *accessToken = [[[FBSession activeSession] accessTokenData] accessToken];
+        NSString *accessToken = [[FBSDKAccessToken currentAccessToken] tokenString];
         str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG accessToken);
         POOL_END();
     });
@@ -97,72 +94,40 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getFacebookToken__(CN1_THREAD_STATE
 
 void com_codename1_impl_ios_IOSNative_facebookLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     dispatch_sync(dispatch_get_main_queue(), ^{
-        [FBSession.activeSession closeAndClearTokenInformation];
+        FBSDKLoginManager *mgr = [[FBSDKLoginManager alloc] init];
+        [mgr logOut];
     });
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codename1_social_LoginCallback(JAVA_OBJECT me, JAVA_OBJECT callback) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        FBSession* s = [FBSession activeSession];
-        if(s != nil && s.isOpen) {
-            NSArray *permissions = @[@"publish_actions"];
-            [s requestNewPublishPermissions:permissions
-                            defaultAudience:FBSessionDefaultAudienceEveryone
-                          completionHandler:^(FBSession *session,
-                                              NSError *error) {
-                              if(callback != JAVA_NULL) {
-#ifdef NEW_CODENAME_ONE_VM
-                                  if(error == nil) {
-                                      virtual_com_codename1_social_LoginCallback_loginSuccessful__(CN1_THREAD_GET_STATE_PASS_ARG callback);
-                                      publishPermission = 1;
-                                  } else {
-                                      virtual_com_codename1_social_LoginCallback_loginFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG callback, JAVA_NULL);
-                                  }
-#else
-                                  if(error == nil) {
-                                      (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
-                                      //com_codename1_social_LoginCallback_loginSuccessful__(callback);
-                                      publishPermission = 1;
-                                  } else {
-                                      //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
-                                      (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
-                                  }
-#endif
-                              }
-                          }];
+        FBSDKAccessToken *tok = [FBSDKAccessToken currentAccessToken];
+        if (tok != nil && [tok hasGranted:@"publish_actions"]) {
+            publishPermission = 1;
         } else {
-            [FBSession openActiveSessionWithPublishPermissions:[NSArray arrayWithObjects:@"publish_actions", nil] defaultAudience:FBSessionDefaultAudienceEveryone allowLoginUI:YES completionHandler:^(FBSession *session, FBSessionState state, NSError *error) {
+            FBSDKLoginManager *mgr = [[FBSDKLoginManager alloc] init];
+            [mgr logInWithPublishPermissions:@[@"publish_actions"] handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+                if(callback != JAVA_NULL) {
 #ifdef NEW_CODENAME_ONE_VM
-                if(error) {
-                    if(callback != JAVA_NULL) {
+                    if(error == nil) {
+                        virtual_com_codename1_social_LoginCallback_loginSuccessful__(CN1_THREAD_GET_STATE_PASS_ARG callback);
+                        publishPermission = 1;
+                    } else {
                         virtual_com_codename1_social_LoginCallback_loginFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG callback, JAVA_NULL);
                     }
-                    return;
-                }
-                if (FBSession.activeSession.isOpen) {
-                    if(callback != JAVA_NULL) {
-                        virtual_com_codename1_social_LoginCallback_loginSuccessful__(CN1_THREAD_GET_STATE_PASS_ARG callback);
-                    }
-                    publishPermission = 1;
-                }
 #else
-                    if(error) {
-                        if(callback != JAVA_NULL) {
-                            //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
-                            (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
-                        }
-                        return;
-                    }
-                    if (FBSession.activeSession.isOpen) {
-                        if(callback != JAVA_NULL) {
-                            (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
-                            //com_codename1_social_LoginCallback_loginSuccessful__(callback);
-                        }
+                    if(error == nil) {
+                        (*(void (*)(JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[7])(callback);
+                        //com_codename1_social_LoginCallback_loginSuccessful__(callback);
                         publishPermission = 1;
+                    } else {
+                        //com_codename1_social_LoginCallback_loginFailed___java_lang_String(callback, JAVA_NULL);
+                        (*(void (*)(JAVA_OBJECT, JAVA_OBJECT)) ((com_codename1_social_LoginCallback*) callback)->tib->vtable[6])(callback, JAVA_NULL);
                     }
 #endif
-                }];
+                }
+            }];
         }
         POOL_END();
     });

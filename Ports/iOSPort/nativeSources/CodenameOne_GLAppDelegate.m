@@ -45,6 +45,10 @@ extern UIView *editingComponent;
 #import "GooglePlus.h"
 #endif
 
+#ifdef INCLUDE_FACEBOOK_CONNECT
+#import "FBSDKCoreKit.h"
+#endif
+
 
 @implementation CodenameOne_GLAppDelegate
 
@@ -99,7 +103,13 @@ extern UIView *editingComponent;
 #endif
 
     //afterDidFinishLaunchingWithOptionsMarkerEntry
+    
+#ifdef INCLUDE_FACEBOOK_CONNECT
+    return [[FBSDKApplicationDelegate sharedInstance] application:application
+                                    didFinishLaunchingWithOptions:launchOptions];
+#else
     return YES;
+#endif
 }
 
 // implemented this way so this will compile on older versions of xcode
@@ -139,7 +149,7 @@ extern UIView *editingComponent;
     JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
     
-    #ifdef INCLUDE_GOOGLE_CONNECT
+#ifdef INCLUDE_GOOGLE_CONNECT
     
     // Handle Google Plus Login
     BOOL res = [GPPURLHandler handleURL:url
@@ -149,14 +159,23 @@ extern UIView *editingComponent;
         return res;
     }
     
-    #endif
+#endif
+#ifdef INCLUDE_FACEBOOK_CONNECT
+    BOOL fbRes = [[FBSDKApplicationDelegate sharedInstance] application:application
+                                                          openURL:url
+                                                sourceApplication:sourceApplication
+                                                       annotation:annotation];
+    if (fbRes) {
+        return fbRes;
+    }
+#endif
     
 #ifdef NEW_CODENAME_ONE_VM
     JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else
     JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #endif
-    //FACEBOOK_URL_BIND
+
     return b;
 }
 

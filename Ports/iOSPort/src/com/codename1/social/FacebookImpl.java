@@ -33,6 +33,7 @@ import com.codename1.ui.Display;
  */
 public class FacebookImpl extends FacebookConnect {
     boolean loginCompleted;
+    boolean loginCancelled;
     private static IOSNative nativeInterface;
     public static void init(Object n) {
         FacebookConnect.implClass = FacebookImpl.class;
@@ -47,16 +48,21 @@ public class FacebookImpl extends FacebookConnect {
 
     @Override
     public void login() {
+        loginCompleted = false;
+        loginCancelled = false;
         nativeInterface.facebookLogin(this);
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                while(!loginCompleted) {
+                while(!loginCompleted && !loginCancelled) {
                     try {
                         Thread.sleep(50);
                     } catch(InterruptedException ie) {}
                 }
             }
         });
+        if (loginCancelled) {
+            return;
+        }
         if(callback != null) {
             if(isLoggedIn()) {
                 FaceBookAccess.setToken(getToken());

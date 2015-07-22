@@ -42,6 +42,11 @@
 #import "GooglePlus.h"
 #endif
 
+//#define INCLUDE_FACEBOOK_CONNECT
+#ifdef INCLUDE_FACEBOOK_CONNECT
+#import "FBSDKCoreKit.h"
+#endif
+
 #define NOT_INCLUDE_ZOOZ
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
