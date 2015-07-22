@@ -3025,4 +3025,27 @@ UIPopoverController* popoverControllerInstance;
     int sectionWidth = 300;
     return sectionWidth;
 }
+
+#ifdef INCLUDE_FACEBOOK_CONNECT
+/*!
+ @abstract Sent to the delegate when the app invite completes without error.
+ @param appInviteDialog The FBSDKAppInviteDialog that completed.
+ @param results The results from the dialog.  This may be nil or empty.
+ */
+- (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didCompleteWithResults:(NSDictionary *)results {
+    
+    
+}
+
+/*!
+ @abstract Sent to the delegate when the app invite encounters an error.
+ @param appInviteDialog The FBSDKAppInviteDialog that completed.
+ @param error The error.
+ */
+- (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didFailWithError:(NSError *)error {
+    
+}
+#endif
 @end
+
+

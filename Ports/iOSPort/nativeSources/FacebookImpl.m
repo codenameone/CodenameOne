@@ -35,6 +35,9 @@ JAVA_BOOLEAN publishPermission = 0;
 #include "com_codename1_social_LoginCallback.h"
 #include "com_codename1_social_FacebookImpl.h"
 #import "FBSDKLoginKit.h"
+#import "FBSDKAppInviteContent.h"
+#import "FBSDKAppInviteDialog.h"
+
 
 #ifdef NEW_CODENAME_ONE_VM
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
@@ -138,7 +141,27 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions__(JAVA_OBJEC
     return publishPermission;
 }
 
+JAVA_VOID com_codename1_impl_ios_IOSNative_inviteFriends___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appLinkUrl, JAVA_OBJECT previewImageUrl) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        FBSDKAppInviteContent *content =[[FBSDKAppInviteContent alloc] init];
+        content.appLinkURL = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appLinkUrl)];
+        //optionally set previewImageURL
+        content.appInvitePreviewImageURL = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG previewImageUrl)];
+        
+        // present the dialog. Assumes self implements protocol `FBSDKAppInviteDialogDelegate`
+        [FBSDKAppInviteDialog showWithContent:content
+                                     delegate:[CodenameOne_GLViewController instance]];
+        POOL_END();
+    });
+}
+
+
 #else
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_inviteFriends___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appLinkUrl, JAVA_OBJECT previewImageUrl) {
+    
+}
 
 void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
 }

@@ -532,4 +532,6 @@ public final class IOSNative {
 
     public native void googleLogout();
 
+    public native void inviteFriends(String appLinkUrl, String previewImageUrl);
+
 }

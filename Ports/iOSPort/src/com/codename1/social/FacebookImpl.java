@@ -106,4 +106,29 @@ public class FacebookImpl extends FacebookConnect {
     public boolean hasPublishPermissions(){
         return nativeInterface.hasPublishPermissions();
     }
+    
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     * 
+     * @param appLinkUrl App Link for what should be opened when the recipient 
+     * clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     */ 
+    @Override
+    public void inviteFriends(String appLinkUrl, String previewImageUrl){
+        nativeInterface.inviteFriends(appLinkUrl, previewImageUrl);
+    }
+    
+    /**
+     * Returns true if inviteFriends is implemented, it is supported on iOS and 
+     * Android
+     * 
+     * @return true if inviteFriends is implemented
+     */ 
+    @Override
+    public boolean isInviteFriendsSupported(){
+        return true;
+    }
+    
 }
