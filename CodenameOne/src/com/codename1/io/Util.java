@@ -1229,4 +1229,31 @@ public class Util {
         }
         return cr.getResponseCode() == 200;
     }
+    
+    /**
+     * Shorthand method for Thread sleep that doesn't throw the stupid interrupted checked exception
+     * @param t the time
+     */
+    public static void sleep(int t) {
+        try {
+            Thread.sleep(t);
+        } catch(InterruptedException e) {
+        }
+    }
+    
+    
+    /**
+     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+     * includes the synchronized block to further reduce code clutter
+     * @param o the object to wait on
+     * @param t the time
+     */
+    public static void wait(Object o, int t) {
+        synchronized(o) {
+            try {
+                o.wait(t);
+            } catch(InterruptedException e) {
+            }
+        }
+    }    
 }
