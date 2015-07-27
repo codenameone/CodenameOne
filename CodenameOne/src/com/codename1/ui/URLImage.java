@@ -76,10 +76,7 @@ public class URLImage extends EncodedImage {
         }
     };
 
-    /**
-     * Scales the image to match to fill the area while preserving aspect ratio
-     */
-    public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ImageAdapter() {
+    static class ScaleToFill implements ImageAdapter {
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());
@@ -95,15 +92,25 @@ public class URLImage extends EncodedImage {
                                 Math.min(placeholderImage.getHeight(), tmp.getHeight()), true);
                     }
                 }
-                return EncodedImage.createFromImage(tmp, true);
+                tmp = postProcess(tmp);
+                return EncodedImage.createFromImage(tmp, tmp.isOpaque());
             }
             return downloadedImage;
         }
         
+        Image postProcess(Image i) {
+            return i;
+        }
+        
         public boolean isAsyncAdapter() {
             return true;
-        }
-    };
+        }        
+    }
+    
+    /**
+     * Scales the image to match to fill the area while preserving aspect ratio
+     */
+    public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ScaleToFill();
 
     private final EncodedImage placeholder;
     private final String url;
@@ -125,6 +132,24 @@ public class URLImage extends EncodedImage {
         this.fileSystemFile = fileSystemFile;
     }
 
+    /**
+     * Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the 
+     * exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
+     * of the imageMask!
+     * @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
+     * will be used as the reference size for the image and resulting images must be of the same size!
+     * @return the adapter
+     */
+    public static ImageAdapter createMaskAdapter(Image imageMask) {
+        final Object mask = imageMask.createMask();
+        return new ScaleToFill() {
+            @Override
+            Image postProcess(Image i) {
+                return i.applyMask(mask);
+            }
+        };
+    }
+    
     class DownloadCompleted implements ActionListener, Runnable {
         private EncodedImage adapt;
         private EncodedImage adaptedIns;
