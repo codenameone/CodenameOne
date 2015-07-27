@@ -127,8 +127,6 @@ public class FaceBookAccess {
      * 
      * @param al a listener that will receive at its source either a token for 
      * the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to 
-     * perform the authentication
      */
     public void showAuthentication(final ActionListener al) {
         createOAuth().showAuthentication(new ActionListener() {
@@ -731,7 +729,6 @@ public class FaceBookAccess {
      * @param targetList the list that should be updated when the data arrives
      * @param targetOffset the offset within the list to insert the image
      * @param targetKey the key for the hashtable in the target offset
-     * @param cacheId a unique identifier to be used to store the image into storage
      * @param toScale the scale of the image to put in the List or null
      * @param tempStorage if true place the image in a temp storage
      */
@@ -1333,6 +1330,14 @@ public class FaceBookAccess {
      */
     public static void setToken(String tok){
         token = tok;
+    }
+
+    /**
+     * Returns the Facebook authorization token that can be used for API access
+     * @return the token
+     */
+    public static String getToken() {
+        return token;
     }
     
     /**
