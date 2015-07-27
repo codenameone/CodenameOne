@@ -120,7 +120,7 @@ public class MorphTransition extends Transition {
             Object constraint = destParent.getLayout().getComponentConstraint(cc.dest);
             destParent.removeComponent(cc.dest);
             cc.placeholder.setX(cc.dest.getX());
-            cc.placeholder.setY(cc.dest.getY() - destForm.getTitleArea().getHeight());
+            cc.placeholder.setY(cc.dest.getY() - destForm.getContentPane().getY());
             cc.placeholder.setWidth(cc.dest.getWidth());
             cc.placeholder.setHeight(cc.dest.getHeight());
             cc.placeholder.setPreferredSize(new Dimension(cc.dest.getWidth(), cc.dest.getHeight()));
@@ -227,7 +227,10 @@ public class MorphTransition extends Transition {
             getSource().paintComponent(g);
 
             g.setAlpha(alpha);
-            getDestination().paintComponent(g);
+            byte bgT = getDestination().getUnselectedStyle().getBgTransparency();
+            getDestination().getUnselectedStyle().setBgTransparency(0);
+            getDestination().paintComponent(g, false);
+            getDestination().getUnselectedStyle().setBgTransparency(bgT);
             g.setAlpha(oldAlpha);
         } else {
             getDestination().paintComponent(g);
@@ -238,8 +241,8 @@ public class MorphTransition extends Transition {
         public CC(Component source, Component dest, Form sourceForm, Form destForm) {
             this.source = source;
             this.dest = dest;
-            int titleHeightSource = sourceForm.getTitleArea().getHeight();
-            int titleHeightDest = destForm.getTitleArea().getHeight();
+            int titleHeightSource = sourceForm.getContentPane().getY();
+            int titleHeightDest = sourceForm.getContentPane().getY();
             xMotion = Motion.createEaseInOutMotion(source.getAbsoluteX(), dest.getAbsoluteX(), duration);
             xMotion.start();
             yMotion = Motion.createEaseInOutMotion(source.getAbsoluteY() - titleHeightSource, dest.getAbsoluteY()  - titleHeightDest, duration);
