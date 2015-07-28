@@ -78,6 +78,8 @@ public class FontImage extends Image {
     private Font fnt;
     private String text;
     private int rotated;
+    private int backgroundColor;
+    private byte backgroundOpacity;
     
     /**
      * Default factor for image size, icons without a given size are sized as defaultSize X default font height.
@@ -115,6 +117,8 @@ public class FontImage extends Image {
      */
     public static FontImage create(String text, Style s) {
         FontImage f = new FontImage();
+        f.backgroundOpacity = s.getBgTransparency();
+        f.backgroundColor = s.getBgColor();
         f.text = text;
         f.color = s.getFgColor();
         int w = (int)(((float)Font.getDefaultFont().getHeight()) * defaultSize);
@@ -165,6 +169,12 @@ public class FontImage extends Image {
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldColor = g.getColor();
         Font oldFont = g.getFont();
+        
+        if(backgroundOpacity != 0) {
+            g.setColor(backgroundColor);
+            g.fillRect(0, 0, width, height, (byte)backgroundOpacity);
+        }
+        
         g.setColor(color);
         g.setFont(fnt);
         int w = fnt.stringWidth(text);
@@ -193,6 +203,12 @@ public class FontImage extends Image {
             return;
         }
         int oldColor = g.getColor();
+        
+        if(backgroundOpacity != 0) {
+            g.setColor(backgroundColor);
+            g.fillRect(0, 0, w, h, (byte)backgroundOpacity);
+        }        
+        
         Font oldFont = g.getFont();
         Font t = sizeFont(fnt, Math.min(h, w), padding);
         g.setColor(color);
