@@ -105,12 +105,12 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     com.codename1.ui.Display.DENSITY_HIGH,
                     com.codename1.ui.Display.DENSITY_VERY_HIGH,
                     com.codename1.ui.Display.DENSITY_HD,
-                    com.codename1.ui.Display.DENSITY_560,
-                    com.codename1.ui.Display.DENSITY_2HD,
-                    com.codename1.ui.Display.DENSITY_4K
+                    //com.codename1.ui.Display.DENSITY_560,
+                    //com.codename1.ui.Display.DENSITY_2HD,
+                    //com.codename1.ui.Display.DENSITY_4K
                 };
                 float[] WIDTHS = {
-                    176, 240, 360, 480, 640, 1024, 1500, 2000, 2500
+                    176, 240, 360, 480, 640, 1024 //, 1500, 2000, 2500
                 };
                 EncodedImage[] images = new EncodedImage[WIDTHS.length];
                 int imageCount = WIDTHS.length;
