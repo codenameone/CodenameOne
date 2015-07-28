@@ -27,6 +27,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.Resources;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -1436,5 +1437,49 @@ public class UIManager {
             return;
         }
         themelisteners.removeListener(l);
+    }
+    
+    /**
+     * This is a shorthand notation for boilerplate code for initializing the first theme in the given resource file
+     * and catching/doing nothing with the IOException since this would be invoked too early in the program
+     * where we would be out of options if something like that happens. Effectively this is the same as writing:
+     * <pre>
+        try {
+            theme = Resources.openLayered(resourceFile);
+            UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+        } catch(IOException e){
+            e.printStackTrace();
+        }
+     * </pre>
+     * @param resourceFile the name of the resource file starting with / and without the res extension
+     * @return the resource file or null in case of a failure
+     */
+    public static Resources initFirstTheme(String resourceFile) {
+        try {
+            Resources theme = Resources.openLayered(resourceFile);
+            UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+            return theme;
+        } catch(IOException e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    
+    /**
+     * Same as the initFirstTheme method, but unlike that method this allows specifying the theme resource name
+     * @param resourceFile the name of the resource file starting with / and without the res extension
+     * @param resName the name of the theme to use from the file if it contains more than one theme
+     * @return the resource file or null in case of a failure
+     */
+    public static Resources initNamedTheme(String resourceFile, String resName) {
+        try {
+            Resources theme = Resources.openLayered(resourceFile);
+            UIManager.getInstance().setThemeProps(theme.getTheme(resName));
+            return theme;
+        } catch(IOException e){
+            e.printStackTrace();
+        }
+        return null;
     }
 }
