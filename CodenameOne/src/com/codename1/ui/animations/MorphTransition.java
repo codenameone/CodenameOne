@@ -117,21 +117,16 @@ public class MorphTransition extends Transition {
             cc.placeholder = new Label();
             cc.placeholder.setVisible(false);
             Container destParent = cc.dest.getParent();
-            Object constraint = destParent.getLayout().getComponentConstraint(cc.dest);
-            destParent.removeComponent(cc.dest);
             cc.placeholder.setX(cc.dest.getX());
             cc.placeholder.setY(cc.dest.getY() - destForm.getContentPane().getY());
             cc.placeholder.setWidth(cc.dest.getWidth());
             cc.placeholder.setHeight(cc.dest.getHeight());
             cc.placeholder.setPreferredSize(new Dimension(cc.dest.getWidth(), cc.dest.getHeight()));
-            if(constraint != null) {
-                destParent.addComponent(constraint, cc.placeholder);
-            } else {
-                destParent.addComponent(cc.placeholder);
-            }
+            destParent.replace(cc.dest, cc.placeholder, null);
             destForm.getLayeredPane().addComponent(cc.dest);
             cc.originalContainer = cc.source.getParent();
             cc.originalConstraint = cc.originalContainer.getLayout().getComponentConstraint(cc.source);
+            cc.originalOffset = cc.originalContainer.getComponentIndex(cc.source);
             cc.originalContainer.removeComponent(cc.source);
             cc.originalContainer.getComponentForm().getLayeredPane().addComponent(cc.source);
         }
@@ -170,20 +165,22 @@ public class MorphTransition extends Transition {
                         continue;
                     }
                     Container p = c.placeholder.getParent();
-                    Object constraint = p.getLayout().getComponentConstraint(c.placeholder);
+                    c.dest.getParent().removeComponent(c.dest);
+                    /*Object constraint = p.getLayout().getComponentConstraint(c.placeholder);
                     p.removeComponent(c.placeholder);
                     c.dest.getParent().removeComponent(c.dest);
                     if(constraint != null) {
                         p.addComponent(constraint, c.dest);
                     } else {
                         p.addComponent(c.dest);
-                    }
+                    }*/
+                    p.replace(c.placeholder, c.dest, null);
 
                     c.source.getParent().removeComponent(c.source);
                     if(c.originalConstraint != null) {
-                        c.originalContainer.addComponent(c.originalConstraint, c.source);
+                        c.originalContainer.addComponent(c.originalOffset, c.originalConstraint, c.source);
                     } else {
-                        c.originalContainer.addComponent(c.source);
+                        c.originalContainer.addComponent(c.originalOffset, c.source);
                     }
                 }
                 
@@ -262,5 +259,6 @@ public class MorphTransition extends Transition {
         Motion hMotion;
         Object originalConstraint;
         Container originalContainer;
+        int originalOffset;
     }
 }
