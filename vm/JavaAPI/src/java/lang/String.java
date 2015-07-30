@@ -827,7 +827,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Returns the string representation of the Object argument.
      */
     public static java.lang.String valueOf(java.lang.Object obj){
-        return obj.toString();
+        return obj == null ? "null" : obj.toString();
     }
 
     @Override
