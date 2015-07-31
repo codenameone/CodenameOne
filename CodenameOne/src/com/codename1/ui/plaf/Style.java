@@ -1747,7 +1747,7 @@ public class Style {
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      * @param paddingUnit the paddingUnit to set
      */
-    public void setPaddingUnit(byte[] paddingUnit) {
+    public void setPaddingUnit(byte... paddingUnit) {
         this.paddingUnit = paddingUnit;
     }
 
@@ -1765,7 +1765,7 @@ public class Style {
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      * @param marginUnit the marginUnit to set
      */
-    public void setMarginUnit(byte[] marginUnit) {
+    public void setMarginUnit(byte... marginUnit) {
         this.marginUnit = marginUnit;
     }
 }

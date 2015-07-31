@@ -166,14 +166,6 @@ public class MorphTransition extends Transition {
                     }
                     Container p = c.placeholder.getParent();
                     c.dest.getParent().removeComponent(c.dest);
-                    /*Object constraint = p.getLayout().getComponentConstraint(c.placeholder);
-                    p.removeComponent(c.placeholder);
-                    c.dest.getParent().removeComponent(c.dest);
-                    if(constraint != null) {
-                        p.addComponent(constraint, c.dest);
-                    } else {
-                        p.addComponent(c.dest);
-                    }*/
                     p.replace(c.placeholder, c.dest, null);
 
                     c.source.getParent().removeComponent(c.source);
