@@ -24,8 +24,12 @@ package com.codename1.social;
 
 import com.codename1.io.AccessToken;
 import com.codename1.io.Oauth2;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import java.io.IOException;
 
 /**
  * The Login abstract base class is used to simplify Oauth2 authentications 
@@ -37,8 +41,11 @@ import com.codename1.ui.events.ActionListener;
  */
 public abstract class Login {
 
-    LoginCallback callback;
+    LoginCallback callback = new LoginCallBackProxy();
     
+    private LoginCallback loginCallback;
+    private boolean callbackEnabled = true;
+    private String validateErr = null;
     private AccessToken token;
 
     String oauth2URL;
@@ -121,6 +128,7 @@ public abstract class Login {
         } else {
             setAccessToken(null);
         }    
+        Preferences.delete(Login.this.getClass().getName() + "Token");
     }
 
     /**
@@ -185,6 +193,43 @@ public abstract class Login {
     }
 
     /**
+     * This method tries to validate the last access token if exists, if the 
+     * last token is not valid anymore it will try to login the user in order to
+     * get a fresh token
+     * The method blocks until a valid token has been granted
+     */ 
+    public void validateToken() throws IOException{
+        String token = Preferences.get(Login.this.getClass().getName() + "Token", null);
+        if(token == null){            
+            throw new RuntimeException("No token to validate");
+        }
+        if(!validateToken(token)){
+            callbackEnabled = false;
+            doLogin();            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+
+                public void run() {
+                    while(!callbackEnabled){
+                        Util.sleep(100);
+                    }
+                }
+            });
+            if(validateErr != null){
+                throw new IOException(validateErr);
+            }
+        }
+    }
+    
+    /**
+     * Returns true if the previous granted access token is still valid otherwise 
+     * false.
+     * 
+     * @param token the access token to check
+     * @return true of the token is valid
+     */ 
+    protected abstract boolean validateToken(String token);
+    
+    /**
      * Sets the Login access token
      */ 
     public void setAccessToken(AccessToken token) {
@@ -199,7 +244,7 @@ public abstract class Login {
      * callback
      */
     public void setCallback(LoginCallback lc) {
-        callback = lc;
+        loginCallback = lc;
     }
 
     
@@ -256,5 +301,31 @@ public abstract class Login {
         return auth;
     }
     
-    
+    class LoginCallBackProxy extends LoginCallback{
+        
+        public void loginSuccessful() {    
+            //store the access token upon login success for future use
+            Preferences.set(Login.this.getClass().getName() + "Token", getAccessToken().getToken());
+
+            if(callbackEnabled){
+                if(loginCallback != null){
+                    loginCallback.loginSuccessful();
+                }
+                return;
+            }
+            callbackEnabled = true;
+            validateErr = null;
+        }
+
+        public void loginFailed(String errorMessage) {
+            if(callbackEnabled){
+                if(loginCallback != null){
+                    loginCallback.loginFailed(errorMessage);
+                }        
+                return;
+            }
+            callbackEnabled = true;
+            validateErr = errorMessage;
+        }    
+    }
 }
