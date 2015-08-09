@@ -114,6 +114,14 @@ public class BorderLayout extends Layout {
     public BorderLayout() {
     }
 
+    /** 
+     * Creates a new instance of BorderLayout  with absolute behavior
+     * @param  behavior identical value as the setCenterBehavior method
+     */
+    public BorderLayout(int behavior) {
+        setCenterBehavior(behavior);
+    }
+
     /**
      * @inheritDoc
      */
