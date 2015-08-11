@@ -58,6 +58,17 @@ public class MultiList extends List {
         GenericListCellRenderer gn = new GenericListCellRenderer(sel, unsel);
         setRenderer(gn);
     }
+
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        ListCellRenderer gn = getRenderer();
+        if(gn instanceof GenericListCellRenderer){
+            ((GenericListCellRenderer)gn).deinitialize(this);
+        }
+    }
+    
+    
     
     private static Hashtable h(String fline, String sline) {
         Hashtable h = new Hashtable();

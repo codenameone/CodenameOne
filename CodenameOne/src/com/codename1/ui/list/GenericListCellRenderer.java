@@ -140,6 +140,12 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(unselectedEntries);
     }
 
+    void deinitialize(List l) {
+        removeSelectedEntriesListener(selectedEntries);
+        removeSelectedEntriesListener(unselectedEntries);
+        l.removeActionListener(mon);
+    }
+     
     /**
      * Updates the placeholder instances, this is useful for changing the URLImage placeholder in runtime as
      * might happen in the designer
@@ -156,6 +162,14 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
                     placeholders.put(n, (EncodedImage)((Label)e[iter]).getIcon());
                 }
+            }
+        }
+    }
+
+    private void removeSelectedEntriesListener(Component[] e) {
+        for(int iter = 0 ; iter < e.length ; iter++) {
+            if(e[iter] instanceof Button) {
+                ((Button)e[iter]).removeActionListener(mon);
             }
         }
     }
@@ -218,6 +232,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(selectedEntriesEven);
         addSelectedEntriesListener(unselectedEntriesEven);
     }
+    
+    
 
     private Component[] vectorToComponentArray(ArrayList v) {
         Component[] result = new Component[v.size()];
@@ -299,7 +315,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                             val = h.get(currentName);
                         }
                         val = updateModelValues(h, currentName, entries, iter, val);
-                    }
+                    }                    
                     setComponentValueWithTickering(entries[iter], val, list, cmp);
                     entries[iter].setFocus(lead || entries[iter].isFocusable());
                 }
