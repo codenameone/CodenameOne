@@ -528,6 +528,42 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertException(RuntimeException exception, Runnable expression) {
+        TestUtils.assertException(exception, expression);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertException(RuntimeException exception, Runnable expression, String message) {
+        TestUtils.assertException(exception, expression, message);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertNoException(Runnable expression) {
+        TestUtils.assertNoException(expression);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertNoException(Runnable expression, String message) {
+        TestUtils.assertNoException(expression, message);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
      * @see TestUtils
      */
     public void waitFor(final int millis) {
