@@ -18,7 +18,7 @@
 package java.util;
 
 public class Timer {
-    private boolean canceled;
+    boolean canceled;
     
     public Timer() {}
     
@@ -71,6 +71,7 @@ public class Timer {
     class T extends Thread {
         TimerTask task;
         public void run() {
+            task.parent = Timer.this;
             try {
                 task.runImpl();
             } catch(InterruptedException i) {
