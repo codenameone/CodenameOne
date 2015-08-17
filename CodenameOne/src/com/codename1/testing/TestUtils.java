@@ -1631,7 +1631,7 @@ public class TestUtils {
      */
     public static void assertNoException(Runnable expression) {
         if (verbose) {
-            log("assertException(" + expression + ")");
+            log("assertNoException(" + expression + ")");
         }
         try {
             expression.run();
@@ -1648,7 +1648,7 @@ public class TestUtils {
      */
     public static void assertNoException(Runnable expression, String errorMessage) {
         if (verbose) {
-            log("assertException(" + expression + ", " + errorMessage + ")");
+            log("assertNoException(" + expression + ", " + errorMessage + ")");
         }
         try {
             expression.run();
