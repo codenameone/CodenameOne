@@ -45,6 +45,10 @@ public abstract class TimerTask implements Runnable {
         if(repeatDelay > 0) {
             while(!canceled) {
                 Thread.sleep(repeatDelay);
+                if(parent != null && parent.canceled) {
+                    return;
+                }
+                
                 lastExecution = System.currentTimeMillis();
                 run();
             }
