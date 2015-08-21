@@ -23,12 +23,7 @@
 
 package com.codename1.tools.translator;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.AnnotationVisitor;
@@ -374,6 +369,7 @@ public class Parser extends ClassVisitor {
         System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
         String file = "Unknown File";
         try {
+            System.out.println("Iterate first..");
             for(ByteCodeClass bc : classes) {
                 // special case for object
                 if(bc.getClsName().equals("java_lang_Object")) {
@@ -387,24 +383,32 @@ public class Parser extends ClassVisitor {
                 }
                 bc.setBaseInterfacesObject(lst);
             }
+            System.out.println("Iterate second..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
-            }   
+            }
+            System.out.println("Mark deps..");
             ByteCodeClass.markDependencies(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
 
             // load the native sources (including user native code) 
+            System.out.println("Load natives..");
             readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
-            eliminateUnusedMethods();
+            //System.out.println("Eliminate unused..");
+            //eliminateUnusedMethods();
 
+            System.out.println("Generate common header..");
             generateClassAndMethodIndexHeader(outputDirectory);
+            System.out.println("Generate all classes..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 writeFile(bc.getClsName(), bc, outputDirectory);
             }
+            int created = PreservingFileOutputStream.total - PreservingFileOutputStream.preserved;
+            System.out.println("Updated/created: "+created+" files");
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -577,11 +581,55 @@ public class Parser extends ClassVisitor {
         
         return false;
     }
-    
+
+    static class PreservingFileOutputStream extends OutputStream {
+
+        static int total;
+        static int preserved;
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        File file;
+
+        public PreservingFileOutputStream(File file) throws FileNotFoundException {
+            this.file = file;
+            total++;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            baos.write(b);
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (file.exists() && file.length() == baos.size()) {
+                byte[] oldCopy = new byte[baos.size()];
+                FileInputStream fis = new FileInputStream(file);
+                fis.read(oldCopy);
+                fis.close();
+                final byte[] thisCopy = baos.toByteArray();
+                boolean equal = true;
+                for(int i=0; i<thisCopy.length; i++) {
+                    if (thisCopy[i] != oldCopy[i]) {
+                        equal = false;
+                        break;
+                    }
+                }
+                if (equal) {
+                    preserved++;
+                    return;
+                }
+            }
+            FileOutputStream x = new FileOutputStream(file);
+            baos.writeTo(x);
+            x.close();
+        }
+    }
+
     private static void writeFile(String clsName, ByteCodeClass cls, File outputDir) throws Exception {
         String fileName = clsName + "." + ByteCodeTranslator.output.extension();
-        
-        FileOutputStream outMain = new FileOutputStream(new File(outputDir, fileName));
+
+        PreservingFileOutputStream outMain = new PreservingFileOutputStream(new File(outputDir, fileName));
         
         // we also need to write the header file for iOS
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
@@ -589,7 +637,7 @@ public class Parser extends ClassVisitor {
             outMain.close();
             String headerName = clsName + ".h";
 
-            FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
+            PreservingFileOutputStream outHeader = new PreservingFileOutputStream(new File(outputDir, headerName));
             outHeader.write(cls.generateCHeader().getBytes());
 
             outHeader.close();
