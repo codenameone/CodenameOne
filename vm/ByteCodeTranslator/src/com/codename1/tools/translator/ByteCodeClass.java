@@ -118,6 +118,9 @@ public class ByteCodeClass {
             if(bc.clsName.equals("java_lang_Float")) {
                 bc.markDependent(lst);
             }
+            if(bc.clsName.equals("java_text_DateFormat")) {
+                bc.markDependent(lst);
+            }
             if(!bc.marked && bc.isUsedByNative()){
                 bc.markDependent(lst);
             }
