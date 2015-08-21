@@ -204,7 +204,7 @@ public class ByteCodeTranslator {
 
             Parser.writeOutput(srcRoot);
             
-            File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
+            File templateInfoPlist = new File(srcRoot, appName + "-Info.plist" + PreservingFileOutputStream.NEW_SUFFIX);
             copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
             
             File templatePch = new File(srcRoot, appName + "-Prefix.pch");
@@ -213,12 +213,12 @@ public class ByteCodeTranslator {
             File xmlvm = new File(srcRoot, "xmlvm.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
             
-            File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
+            File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata"+ PreservingFileOutputStream.NEW_SUFFIX);
             copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
             replaceInFile(projectWorkspaceData, "KitchenSink", appName);
             
             
-            File projectPbx = new File(xcproj, "project.pbxproj");
+            File projectPbx = new File(xcproj, "project.pbxproj"+ PreservingFileOutputStream.NEW_SUFFIX);
             copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));            
             
             String[] sourceFiles = srcRoot.list(new FilenameFilter() {
@@ -278,6 +278,11 @@ public class ByteCodeTranslator {
             arr.addAll(Arrays.asList(sourceFiles));
             
             for(String file : arr) {
+                if (file.endsWith(PreservingFileOutputStream.NEW_SUFFIX)) {
+                    file = file.substring(0, file.length()-PreservingFileOutputStream.NEW_SUFFIX.length());
+                } else {
+                    if (arr.contains(file + PreservingFileOutputStream.NEW_SUFFIX)) continue;   // remove duplicates
+                }
                 fileListEntry.append("		0");
                 currentValue++;
                 String fileOneValue = Integer.toHexString(currentValue).toUpperCase();
@@ -418,6 +423,9 @@ public class ByteCodeTranslator {
 
             String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
             replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+            PreservingFileOutputStream.finishWithNewFile(projectPbx);
+            PreservingFileOutputStream.finishWithNewFile(templateInfoPlist);
+            PreservingFileOutputStream.finishWithNewFile(projectWorkspaceData);
         } else {
             b.execute(sources, dest);
             Parser.writeOutput(dest);

@@ -51,10 +51,25 @@ public class Parser extends ClassVisitor {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
         }
-        ClassReader r = new ClassReader(new FileInputStream(sourceFile));
-        /*if(ByteCodeTranslator.verbose) {
-            System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
-        }*/
+        ClassReader r = new ClassReader(new FileInputStream(sourceFile)) {
+            String clsName;
+            @Override
+            protected Label readLabel(int offset, Label[] labels) {
+                if (clsName == null) {
+                    clsName = getClassName().replace('/', '_').replace('$', '_');
+                }
+                if (labels[offset] == null) {
+                    labels[offset] = new Label() {
+                        @Override
+                        public String toString() {
+                            // persistence of label names causes non-regeneration of resulting sources.
+                            return "L"+clsName+"___"+offset;
+                        }
+                    };
+                }
+                return labels[offset];
+            }
+        };
         Parser p = new Parser();
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
         if(p.clsName.startsWith("java_lang_annotation") || p.clsName.startsWith("java_lang_Deprecated")
@@ -317,10 +332,10 @@ public class Parser extends ClassVisitor {
         
         bld.append("\n\n#endif // __CN1_CLASS_METHOD_INDEX_H__\n");        
         
-        FileOutputStream fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
+        OutputStream fos = new PreservingFileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
         fos.write(bld.toString().getBytes("UTF-8"));
         fos.close();
-        fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
+        fos = new PreservingFileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
         fos.write(bldM.toString().getBytes("UTF-8"));
         fos.close();
     }
@@ -580,50 +595,6 @@ public class Parser extends ClassVisitor {
         
         
         return false;
-    }
-
-    static class PreservingFileOutputStream extends OutputStream {
-
-        static int total;
-        static int preserved;
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        File file;
-
-        public PreservingFileOutputStream(File file) throws FileNotFoundException {
-            this.file = file;
-            total++;
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-            baos.write(b);
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (file.exists() && file.length() == baos.size()) {
-                byte[] oldCopy = new byte[baos.size()];
-                FileInputStream fis = new FileInputStream(file);
-                fis.read(oldCopy);
-                fis.close();
-                final byte[] thisCopy = baos.toByteArray();
-                boolean equal = true;
-                for(int i=0; i<thisCopy.length; i++) {
-                    if (thisCopy[i] != oldCopy[i]) {
-                        equal = false;
-                        break;
-                    }
-                }
-                if (equal) {
-                    preserved++;
-                    return;
-                }
-            }
-            FileOutputStream x = new FileOutputStream(file);
-            baos.writeTo(x);
-            x.close();
-        }
     }
 
     private static void writeFile(String clsName, ByteCodeClass cls, File outputDir) throws Exception {
