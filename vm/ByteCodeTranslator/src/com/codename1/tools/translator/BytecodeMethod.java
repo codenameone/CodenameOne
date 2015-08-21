@@ -824,7 +824,12 @@ public class BytecodeMethod {
     }
     
     public void addLabel(Label l) {
-        addInstruction(new com.codename1.tools.translator.bytecodes.LabelInstruction(l));
+        addInstruction(new com.codename1.tools.translator.bytecodes.LabelInstruction(l) {
+            @Override
+            public String toString() {
+                return "BL_"+clsName+"__"+methodName+"__"+instructions.size();
+            }
+        });
     }
     
     public void addInvoke(int opcode, String owner, String name, String desc, boolean itf) {

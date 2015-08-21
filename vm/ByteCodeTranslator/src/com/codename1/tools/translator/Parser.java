@@ -37,6 +37,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
+import org.objectweb.asm.tree.LabelNode;
 
 /**
  *
@@ -59,13 +60,8 @@ public class Parser extends ClassVisitor {
                     clsName = getClassName().replace('/', '_').replace('$', '_');
                 }
                 if (labels[offset] == null) {
-                    labels[offset] = new Label() {
-                        @Override
-                        public String toString() {
-                            // persistence of label names causes non-regeneration of resulting sources.
-                            return "L"+clsName+"___"+offset;
-                        }
-                    };
+                    final String labelName = "L" + clsName + "___" + offset;
+                    labels[offset] = new MyLabel(labelName);
                 }
                 return labels[offset];
             }
@@ -632,7 +628,20 @@ public class Parser extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
         BytecodeMethod mtd = new BytecodeMethod(clsName, access, name, desc, signature, exceptions);
         cls.addMethod(mtd);
-        JSRInlinerAdapter a = new JSRInlinerAdapter(new MethodVisitorWrapper(super.visitMethod(access, name, desc, signature, exceptions), mtd), access, name, desc, signature, exceptions);
+        final int labelN = cls.getMethods().size();
+        JSRInlinerAdapter a = new JSRInlinerAdapter(Opcodes.ASM5,
+                new MethodVisitorWrapper(
+                        super.visitMethod(access, name, desc, signature, exceptions),
+                        mtd),
+                access, name, desc, signature, exceptions) {
+            @Override
+            protected LabelNode getLabelNode(Label l) {
+                if (!(l.info instanceof LabelNode)) {
+                    l.info = new LabelNode(new MyLabel("JSRL_"+labelN+"_"+l.toString()));
+                }
+                return (LabelNode) l.info;
+            }
+        };
         return a; 
     }
 
@@ -691,8 +700,28 @@ public class Parser extends ClassVisitor {
             cls.setFinalClass(true);
         }
         super.visit(version, access, name, signature, superName, interfaces); 
-    }    
-    
+    }
+
+    public static class MyLabel extends Label {
+        private final String labelName;
+
+        public MyLabel(String labelName) {
+            this.labelName = labelName;
+        }
+
+        int count = 0;
+
+        @Override
+        public String toString() {
+            // persistence of label names causes non-regeneration of resulting sources.
+            return labelName;
+        }
+    }
+
+
+
+
+
     class MethodVisitorWrapper extends MethodVisitor {
         private BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {

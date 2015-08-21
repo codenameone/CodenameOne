@@ -781,6 +781,7 @@ public class TextArea extends Component {
                 return;
             }
         }
+        System.out.println("Test5");
         Style style = getUnselectedStyle();
         rowStrings= new ArrayList();
         widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
