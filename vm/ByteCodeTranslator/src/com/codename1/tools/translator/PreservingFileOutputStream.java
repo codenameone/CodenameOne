@@ -87,7 +87,8 @@ public class PreservingFileOutputStream extends OutputStream {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Producing: " + to.getName());
         }
-        return to.delete() && from.renameTo(to);
+        to.delete();
+        return from.renameTo(to);
     }
 
     public static boolean finishWithNewFile(File newFile) throws IOException {

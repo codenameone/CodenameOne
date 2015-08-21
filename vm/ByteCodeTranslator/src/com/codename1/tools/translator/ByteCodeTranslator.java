@@ -61,8 +61,9 @@ public class ByteCodeTranslator {
         public abstract String extension();
     };
     public static OutputType output = OutputType.OUTPUT_TYPE_IOS;
-    public static boolean verbose = true;
-    
+    public static boolean verbose = Boolean.parseBoolean(System.getProperty("ByteCodeTranslator.verbose","true"));
+    public static boolean draft = Boolean.parseBoolean(System.getProperty("ByteCodeTranslator.draft","false"));
+
     ByteCodeTranslator() {
     }
     
@@ -145,6 +146,7 @@ public class ByteCodeTranslator {
         final String appVersion = args[6];
         final String appType = args[7];
         final String addFrameworks = args[8];
+        StringBuilder appFonts = new StringBuilder("\n");
         // we accept 3 arguments output type, input directory & output directory
         if(args[0].equalsIgnoreCase("csharp")) {
             output = OutputType.OUTPUT_TYPE_CSHARP;
@@ -223,8 +225,11 @@ public class ByteCodeTranslator {
             
             String[] sourceFiles = srcRoot.list(new FilenameFilter() {
                 @Override
-                public boolean accept(File pathname, String string) {
-                    return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
+                public boolean accept(File pathname, String filename) {
+                    if (filename.endsWith(".ttf")) {
+                        appFonts.append("<string>"+filename+"</string>\n");
+                    }
+                    return filename.endsWith(".bundle") || filename.endsWith(".xcdatamodeld") || !pathname.isHidden() && !filename.startsWith(".") && !"Images.xcassets".equals(filename);
                 }
             });
             
@@ -422,7 +427,12 @@ public class ByteCodeTranslator {
             }
 
             String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
-            replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+            replaceInFile(templateInfoPlist,
+                    "com.codename1pkg", appPackageName,
+                    "${PRODUCT_NAME}", appDisplayName,
+                    "VERSION_VALUE", appVersion,
+                    "VERSION_BUNDLE_VALUE", bundleVersion,
+                    "${APP_FONTS}", appFonts.toString());
             PreservingFileOutputStream.finishWithNewFile(projectPbx);
             PreservingFileOutputStream.finishWithNewFile(templateInfoPlist);
             PreservingFileOutputStream.finishWithNewFile(projectWorkspaceData);

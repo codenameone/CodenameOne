@@ -398,32 +398,33 @@ public class Parser extends ClassVisitor {
                 }
                 bc.setBaseInterfacesObject(lst);
             }
-            System.out.println("Iterate second..");
+            if(ByteCodeTranslator.verbose) System.out.println("Iterate second..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
             }
-            System.out.println("Mark deps..");
+            if(ByteCodeTranslator.verbose) System.out.println("Mark deps..");
             ByteCodeClass.markDependencies(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
 
             // load the native sources (including user native code) 
-            System.out.println("Load natives..");
+            if(ByteCodeTranslator.verbose) System.out.println("Load natives..");
             readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
-            //System.out.println("Eliminate unused..");
-            //eliminateUnusedMethods();
+            if(ByteCodeTranslator.verbose) System.out.println("Eliminate unused..");
+            if (!ByteCodeTranslator.draft)
+                eliminateUnusedMethods();
 
-            System.out.println("Generate common header..");
+            if(ByteCodeTranslator.verbose) System.out.println("Generate common header..");
             generateClassAndMethodIndexHeader(outputDirectory);
-            System.out.println("Generate all classes..");
+            if(ByteCodeTranslator.verbose) System.out.println("Generate all classes..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 writeFile(bc.getClsName(), bc, outputDirectory);
             }
             int created = PreservingFileOutputStream.total - PreservingFileOutputStream.preserved;
-            System.out.println("Updated/created: "+created+" files");
+            if(ByteCodeTranslator.verbose) System.out.println("Updated/created: "+created+" files");
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
