@@ -1093,6 +1093,21 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArguments(String key, String... value) {
+        if(value.length == 1) {
+            addArgument(key, value[0]);
+        } else {
+            addArgument(key, (String[])value);
+        }
+    }
+
+    /**
      * @return the contentType
      */
     public String getContentType() {
