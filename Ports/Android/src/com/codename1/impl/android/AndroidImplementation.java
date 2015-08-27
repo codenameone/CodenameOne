@@ -1745,6 +1745,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
+        if(key.equalsIgnoreCase("cn1_push_prefix")) {
+            boolean has = hasAndroidMarket();
+            if(has) {
+                return "gcm";
+            }
+            return defaultValue;
+        }
         if ("OS".equals(key)) {
             return "Android";
         }

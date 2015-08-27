@@ -4145,6 +4145,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String getProperty(String key, String defaultValue) {
+        if(key.equalsIgnoreCase("cn1_push_prefix")) {
+            return "ios";
+        }
         if(key.equalsIgnoreCase("Platform")) {
             return "iOS";
         }
