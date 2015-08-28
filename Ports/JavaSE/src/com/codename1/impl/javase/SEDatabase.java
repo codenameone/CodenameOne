@@ -67,9 +67,17 @@ public class SEDatabase extends Database{
     }
 
     @Override
+    protected void finalize() throws Throwable {
+        if(conn != null) {
+            System.out.println("**** WARNING! Database object was released by the GC without being closed first! This might cause crashes on iOS *****");
+        }
+    }
+
+    @Override
     public void close() throws IOException {
         try {
             conn.close();
+            conn = null;
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
