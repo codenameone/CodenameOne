@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
@@ -306,6 +307,7 @@ public class Toolbar extends Container {
         c = l.getRenderer().getListFocusComponent(l);
         c.setUIID("CommandFocus");
         l.setFixedSelection(List.FIXED_NONE_CYCLIC);
+        ((DefaultListCellRenderer)l.getRenderer()).setShowNumbers(false);
         return l;
     }
 
