@@ -220,7 +220,33 @@ public class Push {
      */
     public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", deviceKey);
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return cr.successful;
+    }
+    
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @param pushType the type for the push in the server, this is useful for sending hidden pushes (type 2) should default
+     * to 0 or 1
+     * @param deviceKey set of devices that should receive the push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     */
+    public static boolean sendPushMessage(String token, String body, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword, int pushType, String... deviceKey) {
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", pushType, deviceKey);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return cr.successful;
     }
@@ -249,7 +275,7 @@ public class Push {
      */
     public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
-        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, deviceKey);
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return cr.successful;
     }
@@ -270,7 +296,7 @@ public class Push {
      */
     public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", deviceKey));
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey));
     }
     
     /**
@@ -294,7 +320,7 @@ public class Push {
      */
     public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, deviceKey));
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey));
     }
     
     static class PushConnection extends ConnectionRequest {
@@ -326,13 +352,13 @@ public class Push {
     }
 
     private static PushConnection createPushMessage(String token, String body, boolean production, String googleAuthKey, 
-            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, String... deviceKeys) {
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, int type, String... deviceKeys) {
         PushConnection cr = new PushConnection();
         cr.setPost(true);
         cr.setUrl("https://push.codenameone.com/push/push");
         cr.addArgument("token", token);
         cr.addArguments("device", deviceKeys);
-        cr.addArgument("type", "1");
+        cr.addArgument("type", "" +type);
         cr.addArgument("auth", googleAuthKey);
         cr.addArgument("certPassword", iosCertificatePassword);
         cr.addArgument("cert", iosCertificateURL);
