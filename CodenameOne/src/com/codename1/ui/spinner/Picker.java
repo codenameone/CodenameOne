@@ -25,6 +25,7 @@ package com.codename1.ui.spinner;
 
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -50,6 +51,7 @@ public class Picker extends Button {
     private boolean showMeridiem;
     private Object metaData;
     private Object renderingPrototype;
+    private SimpleDateFormat formatter;
     
     /**
      * Default constructor
@@ -280,6 +282,12 @@ public class Picker extends Button {
             setText("...");
             return;
         }
+        
+        if(getFormatter() != null) {
+            setText(formatter.format(value));
+            return;
+        }
+        
         switch(type) {
             case Display.PICKER_TYPE_STRINGS:
                 value = getUIManager().localize(value.toString(), value.toString());
@@ -370,5 +378,23 @@ public class Picker extends Button {
      */
     public void setRenderingPrototype(Object renderingPrototype) {
         this.renderingPrototype = renderingPrototype;
+    }
+
+    /**
+     * Allows us to define a date format for the display of dates/times
+     * @return the defined formatter
+     */
+    public SimpleDateFormat getFormatter() {
+        return formatter;
+    }
+
+    /**
+     * Allows us to define a date format for the display of dates/times
+     * 
+     * @param formatter the new formatter
+     */
+    public void setFormatter(SimpleDateFormat formatter) {
+        this.formatter = formatter;
+        updateValue();
     }
 }
