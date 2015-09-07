@@ -183,6 +183,7 @@ public class Component implements Animation, StyleListener {
     private Style pressedStyle;
     private Style selectedStyle;
     private Style disabledStyle;
+    private Style allStyles;
     private Container parent;
     private boolean focused = false;
     private boolean handlesInput = false;
@@ -332,6 +333,18 @@ public class Component implements Animation, StyleListener {
                 cc.sameWidth = c;
             }
         }
+    }
+    
+    /**
+     * Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
+     * style will be meaningless and will return 0 values.
+     * @return a unified style object for the purpose of setting on object object instances
+     */
+    public Style getAllStyles() {
+        if(allStyles == null) {
+            allStyles = Style.createProxyStyle(getUnselectedStyle(), getSelectedStyle(), getPressedStyle(), getDisabledStyle());
+        }
+        return allStyles;
     }
     
     /**
