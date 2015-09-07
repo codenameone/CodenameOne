@@ -2051,7 +2051,7 @@ public class Form extends Container {
             return;
         }
         Container actual = getActualPane();
-        if (y >= actual.getY()) {
+        if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
@@ -2090,12 +2090,22 @@ public class Form extends Container {
                 }
             }
         } else {
-            Component cmp = getTitleArea().getComponentAt(x, y);
-            if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                cmp.pointerPressed(x, y);
-                tactileTouchVibe(x, y, cmp);
-            }   
-
+            if(y < actual.getY()) {
+                Component cmp = getTitleArea().getComponentAt(x, y);
+                if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                    cmp.pointerPressed(x, y);
+                    tactileTouchVibe(x, y, cmp);
+                }   
+            } else {
+                Component cmp = ((BorderLayout)super.getLayout()).getWest();
+                if(cmp != null) {
+                    cmp = ((Container)cmp).getComponentAt(x, y);
+                    if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                        cmp.pointerPressed(x, y);
+                        tactileTouchVibe(x, y, cmp);
+                    }   
+                }
+            }
         }
         initialPressX = x;
         initialPressY = y;
@@ -2168,6 +2178,21 @@ public class Form extends Container {
             return;
         }
         Container actual = getActualPane();
+        if(x < actual.getX()) {
+            // special case for sidemenu
+            Component cmp = ((BorderLayout)super.getLayout()).getWest();
+            if(cmp != null) {
+                cmp = ((Container)cmp).getComponentAt(x, y);
+                if (cmp != null && cmp.isEnabled()) {
+                    cmp.pointerDragged(x, y);
+                    cmp.repaint();
+                    if(cmp.isStickyDrag()) {
+                        stickyDrag = cmp;
+                    }
+                }
+            }
+            return;
+        }
         Component cmp = actual.getComponentAt(x, y);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -2204,6 +2229,21 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
+        if(x[0] < actual.getX()) {
+            // special case for sidemenu
+            Component cmp = ((BorderLayout)super.getLayout()).getWest();
+            if(cmp != null) {
+                cmp = ((Container)cmp).getComponentAt(x[0], y[0]);
+                if (cmp != null && cmp.isEnabled()) {
+                    cmp.pointerDragged(x, y);
+                    cmp.repaint();
+                    if(cmp.isStickyDrag()) {
+                        stickyDrag = cmp;
+                    }
+                }
+            }
+            return;
+        }
         Component cmp = actual.getComponentAt(x[0], y[0]);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -2363,7 +2403,7 @@ public class Form extends Container {
                 repaint();
             } else {
                 Container actual = getActualPane();
-                if (y >= actual.getY()) {
+                if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled()) {
                         if (cmp.hasLead) {
@@ -2386,9 +2426,19 @@ public class Form extends Container {
                         }
                     }
                 } else {
-                    Component cmp = getTitleArea().getComponentAt(x, y);
-                    if (cmp != null && cmp.isEnabled()) {
-                        cmp.pointerReleased(x, y);
+                    if(y < actual.getY()) {
+                        Component cmp = getTitleArea().getComponentAt(x, y);
+                        if (cmp != null && cmp.isEnabled()) {
+                            cmp.pointerReleased(x, y);
+                        }
+                    } else {
+                        Component cmp = ((BorderLayout)super.getLayout()).getWest();
+                        if(cmp != null) {
+                            cmp = ((Container)cmp).getComponentAt(x, y);
+                            if (cmp != null && cmp.isEnabled()) {
+                                cmp.pointerReleased(x, y);
+                            }
+                        }
                     }
                 }
             }
