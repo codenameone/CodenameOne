@@ -3311,9 +3311,9 @@ public final class Display {
      * 
      * @param firstName the Contact firstName
      * @param familyName the Contact familyName
-     * @param workPhone the Contact work phone or null
+     * @param officePhone the Contact work phone or null
      * @param homePhone the Contact home phone or null
-     * @param mobilePhone the Contact mobile phone or null
+     * @param cellPhone the Contact mobile phone or null
      * @param email the Contact email or null
      * 
      * @return the contact id if creation succeeded or null  if failed
