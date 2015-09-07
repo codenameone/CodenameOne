@@ -104,6 +104,20 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
+     * Short-hand for enclosing multiple components in a container typically a box layout
+     * @param l the layout
+     * @param cmp the components to enclose
+     * @return a newly created container containing the given components
+     */
+    public static Container encloseIn(Layout l, Component... cmp) {
+        Container cnt = new Container(l);
+        for(Component c : cmp) {
+            cnt.addComponent(c);
+        }
+        return cnt;
+    }
+    
+    /**
      * 
      * @inheritDoc
      */
