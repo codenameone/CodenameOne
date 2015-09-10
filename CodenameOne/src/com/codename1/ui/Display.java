@@ -3709,4 +3709,20 @@ public final class Display {
     public void setMultiKeyMode(boolean multiKeyMode) {
         this.multiKeyMode = multiKeyMode;
     }
+    
+    /**
+     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     * @param v time in milliseconds
+     */
+    public void setLongPointerPressInterval(int v) {
+        longPressInterval = v;
+    }
+
+    /**
+     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     * @return time in milliseconds
+     */
+    public int getLongPointerPressInterval() {
+        return longPressInterval;
+    }
 }
