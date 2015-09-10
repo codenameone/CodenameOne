@@ -129,6 +129,7 @@ public class Resources {
      */
     private static Object cachedResource;
     private static String lastLoadedName;
+    private static int lastLoadedDPI;
 
     private static boolean runtimeMultiImages;
     
@@ -704,7 +705,7 @@ public class Resources {
      */
     public static Resources open(String resource, int dpi) throws IOException {
         try {
-            if(lastLoadedName != null && lastLoadedName.equals(resource)) {
+            if(lastLoadedName != null && lastLoadedName.equals(resource) && lastLoadedDPI == dpi) {
                 Resources r = (Resources)Display.getInstance().extractHardRef(cachedResource);
                 if(r != null) {
                     return r;
@@ -722,6 +723,7 @@ public class Resources {
                 return r;
             }
             
+            lastLoadedDPI = dpi;
             lastLoadedName = resource;
             cachedResource = Display.getInstance().createSoftWeakRef(r);
             return r;
