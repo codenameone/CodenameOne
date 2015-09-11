@@ -27,6 +27,7 @@ public class Timer {
     }
     
     public void schedule(TimerTask task, Date time) {
+        schedule(task, time.getTime() - System.currentTimeMillis());
     }
     
     public void schedule(TimerTask task, Date firstTime, long period) {
