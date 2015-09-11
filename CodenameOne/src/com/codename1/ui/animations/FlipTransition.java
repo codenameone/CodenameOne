@@ -72,7 +72,7 @@ public class FlipTransition extends Transition {
      * Creates  a Flip Transition
      * 
      * @param bgColor the color to paint in the background when the transition 
-     * paints
+     * paints, use -1 to not paint a background color
      * @param duration the duration of the transition
      */ 
     public FlipTransition(int bgColor, int duration) {
@@ -180,6 +180,10 @@ public class FlipTransition extends Transition {
 
     @Override
     public void paint(Graphics g) {
+        // this can happen if a transition is cut short
+        if(destBuffer == null) {
+            return;
+        }
         int cx = g.getClipX();
         int cy = g.getClipY();
         int cw = g.getClipWidth();
