@@ -42,6 +42,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.messaging.Message;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -5253,7 +5254,6 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    
     // END TRANSFORMATION METHODS--------------------------------------------------------------------
     
     
@@ -5621,6 +5621,7 @@ public abstract class CodenameOneImplementation {
      * @param flashLights enable/disable notification flashing
      * @param args additional arguments to the notification
      * @return a platform native object that allows modifying notification state
+     * @deprecated use scheduleLocalNotification instead
      */
     public Object notifyStatusBar(String tickerText, String contentTitle,
             String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
@@ -6004,4 +6005,16 @@ public abstract class CodenameOneImplementation {
             out.add(buf.toString());
         }
     }
+
+    //METHODS FOR DEALING Local Notifications
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
+    }
+
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
+    }
+    
+    public void cancelLocalNotification(String notificationId) {
+    }
+    //ENDS METHODS FOR DEALING Local Notifications
+    
 }

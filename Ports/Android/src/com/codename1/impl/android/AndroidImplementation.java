@@ -115,6 +115,7 @@ import com.codename1.io.*;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
@@ -6340,6 +6341,99 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         return p;
+    }
+
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
+        
+        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notif.getId());        
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
+        
+        Intent contentIntent = new Intent();
+        contentIntent.setComponent(activity.getComponentName());
+        contentIntent.putExtra("LocalNotificationID", notif.getId());
+        PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
+        
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        
+        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
+        if(repeat == LocalNotification.REPEAT_NONE){
+            alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_FIFTEEN_MINUTES){
+            
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_HALF_HOUR){
+
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_HOUR){
+            
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_DAY){
+            
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_WEEK){
+            
+            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY * 7, pendingIntent);
+            
+        }
+    }
+
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
+        
+        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notif.getId());        
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
+        
+        Intent contentIntent = new Intent();
+        contentIntent.setComponent(activity.getComponentName());
+        contentIntent.putExtra("LocalNotificationID", notif.getId());
+        PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        
+        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, repeatInterval, pendingIntent);
+    }
+    
+    public void cancelLocalNotification(String notificationId) {
+        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notificationId);
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);        
+        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(pendingIntent);
+    }
+
+    static Bundle createBundleFromNotification(LocalNotification notif){
+        Bundle b = new Bundle();
+        b.putString("NOTIF_ID", notif.getId());
+        b.putString("NOTIF_TITLE", notif.getAlertTitle());
+        b.putString("NOTIF_BODY", notif.getAlertBody());
+        b.putString("NOTIF_SOUND", notif.getAlertSound());
+        b.putString("NOTIF_IMAGE", notif.getAlertImage());
+        b.putInt("NOTIF_NUMBER", notif.getBadgeNumber());
+        return b;
+    }
+    
+    static LocalNotification createNotificationFromBundle(Bundle b){
+        LocalNotification n = new LocalNotification();
+        n.setId(b.getString("NOTIF_ID"));
+        n.setAlertTitle(b.getString("NOTIF_TITLE"));
+        n.setAlertBody(b.getString("NOTIF_BODY"));
+        n.setAlertSound(b.getString("NOTIF_SOUND"));
+        n.setAlertImage(b.getString("NOTIF_IMAGE"));
+        n.setBadgeNumber(b.getInt("NOTIF_NUMBER"));
+        return n;
     }
     
 }

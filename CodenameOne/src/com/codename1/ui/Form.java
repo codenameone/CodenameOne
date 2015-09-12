@@ -2444,7 +2444,7 @@ public class Form extends Container {
             }
         } else {
             if (dragged.isDragAndDropInitialized()) {
-                dragged.dragFinished(x, y);
+                dragged.dragFinishedImpl(x, y);
                 dragged = null;
             } else {
                 dragged.pointerReleased(x, y);

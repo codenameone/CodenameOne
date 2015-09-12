@@ -122,7 +122,7 @@ public abstract class Layout {
      * doesn't take padding/margin etc. into account since that is checked by the 
      * caller
      * @param parent parent container
-     * @return true if there is a chance that this layout manager can fully obscure the background
+     * @return true if there is a chance that this layout manager can fully obscure the background, when in doubt return false...
      */
     public boolean obscuresPotential(Container parent) {
         return false;
