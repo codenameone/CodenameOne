@@ -533,5 +533,9 @@ public final class IOSNative {
     public native void googleLogout();
 
     public native void inviteFriends(String appLinkUrl, String previewImageUrl);
+    
+    native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType);
+
+    native void cancelLocalNotification(String id);
 
 }

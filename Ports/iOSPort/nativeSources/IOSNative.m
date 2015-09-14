@@ -6321,3 +6321,79 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
 }
 #endif
 
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int( CN1_THREAD_STATE_MULTI_ARG
+    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType
+                                                                                                                                                                     ) {
+    
+    UILocalNotification *notification = [[UILocalNotification alloc] init];
+    notification.alertBody = toNSString(CN1_THREAD_STATE_PASS_ARG alertBody);
+    if ([notification respondsToSelector:@selector(alertTitle)]) {
+        notification.alertTitle = toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
+    }
+    notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
+    notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
+    notification.timeZone = [NSTimeZone defaultTimeZone];
+    notification.applicationIconBadgeNumber = badgeNumber;
+    switch (repeatType) {
+        case 0:
+            notification.repeatInterval = nil;
+            break;
+        case 1:
+            notification.repeatInterval = NSSecondCalendarUnit;
+            break;
+        case 2:
+            notification.repeatInterval = NSMinuteCalendarUnit;
+            break;
+        case 3:
+            notification.repeatInterval = NSHourCalendarUnit;
+            break;
+        case 4:
+            notification.repeatInterval = NSDayCalendarUnit;
+            break;
+        case 5:
+            notification.repeatInterval = NSWeekCalendarUnit;
+            break;
+        default:
+            NSLog(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
+            notification.repeatInterval = nil;
+    }
+    
+    NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+    [dict setObject: toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) forKey: @"__ios_id__"];
+    
+    notification.userInfo = dict;
+    
+    
+    dispatch_sync(dispatch_get_main_queue(), ^{
+#ifdef __IPHONE_8_0
+        if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
+            [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
+            //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
+            //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
+            //                                           UIUserNotificationTypeSound categories:nil]];
+        }
+#endif
+        
+        [[UIApplication sharedApplication] scheduleLocalNotification: notification];
+        
+    });
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {
+    NSString *nsId = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        UIApplication *app = [UIApplication sharedApplication];
+        NSArray *eventArray = [app scheduledLocalNotifications];
+        for (int i=0; i<[eventArray count]; i++) {
+            UILocalNotification *n = [eventArray objectAtIndex:i];
+            NSDictionary *userInfo = n.userInfo;
+            NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey: @"__ios_id__"]];
+            if ([uid isEqualToString:uid]) {
+                [app cancelLocalNotification:n];
+            }
+        }
+    });
+}
+
+

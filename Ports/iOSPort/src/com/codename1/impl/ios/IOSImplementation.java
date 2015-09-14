@@ -78,6 +78,7 @@ import com.codename1.io.Cookie;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.media.MediaManager;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -6374,6 +6375,45 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.splitString(source, separator, out);
     }
    
+    public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
+        
+        nativeInstance.sendLocalNotification(
+                n.getId(),
+                n.getAlertTitle(),
+                n.getAlertBody(),
+                n.getAlertSound(),
+                n.getBadgeNumber(),
+                firstTime,
+                repeat
+        );
+        
+       
+    }
+
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
+        int repeatType = LocalNotification.REPEAT_NONE;
+        
+        if (repeatInterval <= 0) {
+            
+        } else if (repeatInterval <= 15 * 60 * 1000) {
+            repeatType = LocalNotification.REPEAT_FIFTEEN_MINUTES;
+        } else if (repeatInterval <= 30 * 60 * 1000) {
+            repeatType = LocalNotification.REPEAT_HALF_HOUR;
+        } else if (repeatInterval <= 60 * 60 * 1000) {
+            repeatType = LocalNotification.REPEAT_HOUR;
+        } else if (repeatInterval <= 24 * 60 * 60 * 1000 ) {
+            repeatType = LocalNotification.REPEAT_DAY;
+        } else/* if (repeatInterval <= 7 * 24 * 60 * 60 * 1000)*/ {
+            repeatType = LocalNotification.REPEAT_WEEK;
+        }
+        scheduleLocalNotification(notif, firstTime, repeatType);
+        
+    }
+    
+    public void cancelLocalNotification(String id) {
+         nativeInstance.cancelLocalNotification(id);
+    }
+
 }
 
 
