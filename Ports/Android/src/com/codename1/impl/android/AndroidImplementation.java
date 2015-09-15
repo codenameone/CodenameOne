@@ -6363,13 +6363,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(repeat == LocalNotification.REPEAT_NONE){
             alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
             
-        }else if(repeat == LocalNotification.REPEAT_FIFTEEN_MINUTES){
+        }else if(repeat == LocalNotification.REPEAT_MINUTE){
             
-            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
-            
-        }else if(repeat == LocalNotification.REPEAT_HALF_HOUR){
-
-            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
+            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60*1000*1000, pendingIntent);
             
         }else if(repeat == LocalNotification.REPEAT_HOUR){
             
@@ -6386,25 +6382,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
-        
-        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
-        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notif.getId());        
-        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
-        
-        Intent contentIntent = new Intent();
-        contentIntent.setComponent(activity.getComponentName());
-        contentIntent.putExtra("LocalNotificationID", notif.getId());
-        PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-
-        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
-        
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-        
-        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, repeatInterval, pendingIntent);
-    }
-    
     public void cancelLocalNotification(String notificationId) {
         Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
         notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notificationId);

@@ -3749,28 +3749,6 @@ public final class Display {
         }
         impl.scheduleLocalNotification(n, firstTime, repeat);
     }
-
-    /**
-     * Schedules a local notification to occur.
-     *
-     * @param n The notification to schedule.
-     * @param firstTime time in milliseconds when to schedule the notification
-     * @param repeatInterval time to repeat in milliseconds, notice if the time is too short
-     * the OS might decide to ignore this notification.
-     * It is not recommended to give a short interval (less then 10 minutes)
-     */
-    public void scheduleLocalNotification(LocalNotification n, long firstTime, long repeatInterval) {
-        if (n.getId() == null || n.getId().length() == 0) {
-            throw new IllegalArgumentException("Notification ID must be set");
-        }
-        if(firstTime < System.currentTimeMillis()){
-            throw new IllegalArgumentException("Cannot schedule a notification to a past time");        
-        }
-        if (n.getAlertSound() != null && n.getAlertSound().length() > 0 && !n.getAlertSound().startsWith("/notification_sound") ) {
-            throw new IllegalArgumentException("Alert sound file name must start with the 'notification_sound' prefix");
-        }
-        impl.scheduleLocalNotification(n, firstTime, repeatInterval);
-    }
     
     /**
      * Cancels a local notification by ID.

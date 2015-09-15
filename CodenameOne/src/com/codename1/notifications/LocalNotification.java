@@ -69,15 +69,9 @@ public class LocalNotification {
     
     /**
      * Constant used in {@link #setRepeatType(int) } to indicate that this
-     * notification should be repeated every 15 minutes.
+     * notification should be repeated every 1 minute.
      */
-    public static final int REPEAT_FIFTEEN_MINUTES=1;
-    
-    /**
-     * Constant used in {@link #setRepeatType(int) } to indicate that this
-     * notification should be repeated every half an hour.
-     */
-    public static final int REPEAT_HALF_HOUR=2;
+    public static final int REPEAT_MINUTE=1;
     
     /**
      * Constant used in {@link #setRepeatType(int) } to indicate that this
