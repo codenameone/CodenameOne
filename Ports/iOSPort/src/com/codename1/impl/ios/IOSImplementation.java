@@ -79,6 +79,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -98,7 +99,7 @@ import java.io.ByteArrayOutputStream;
  */
 public class IOSImplementation extends CodenameOneImplementation {
     public static IOSNative nativeInstance = new IOSNative();
-    
+    private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
     private static RestoreCallback restoreCallback;
     private int timeout = 120000;
@@ -5593,6 +5594,42 @@ public class IOSImplementation extends CodenameOneImplementation {
         pushCallback = callback;
     }
     
+    public static void setLocalNotificationCallback(LocalNotificationCallback callback) {
+        localNotificationCallback = callback;
+    }
+    
+    public static LocalNotificationCallback getLocalNotificationCallback() {
+        return localNotificationCallback;
+    }
+    
+    
+    public static void localNotificationReceived(final String notificationId) {
+        if (localNotificationCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (getLocalNotificationCallback() != null) {
+                        getLocalNotificationCallback().localNotificationReceived(notificationId);
+                    }
+                }
+            });
+        } else { // could be a race condition against the native code... Retry in 2 seconds
+            new Thread() {
+                public void run() {
+                    try {
+                        Thread.sleep(1500);
+                    } catch (InterruptedException ex) {
+                    }
+                    // prevent infinite loop
+                    if(pushCallback != null) {
+                        localNotificationReceived(notificationId);
+                    }
+                }
+            }.start();
+        }
+    }
+    
     public static void setMainClass(Object main) {
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
@@ -5602,6 +5639,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if(main instanceof RestoreCallback) {
             restoreCallback = (RestoreCallback)main;
+        }
+        if (main instanceof LocalNotificationCallback) {
+            setLocalNotificationCallback((LocalNotificationCallback) main);
         }
     }        
     
@@ -6390,25 +6430,7 @@ public class IOSImplementation extends CodenameOneImplementation {
        
     }
 
-    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
-        int repeatType = LocalNotification.REPEAT_NONE;
-        
-        if (repeatInterval <= 0) {
-            
-        } else if (repeatInterval <= 15 * 60 * 1000) {
-            repeatType = LocalNotification.REPEAT_FIFTEEN_MINUTES;
-        } else if (repeatInterval <= 30 * 60 * 1000) {
-            repeatType = LocalNotification.REPEAT_HALF_HOUR;
-        } else if (repeatInterval <= 60 * 60 * 1000) {
-            repeatType = LocalNotification.REPEAT_HOUR;
-        } else if (repeatInterval <= 24 * 60 * 60 * 1000 ) {
-            repeatType = LocalNotification.REPEAT_DAY;
-        } else/* if (repeatInterval <= 7 * 24 * 60 * 60 * 1000)*/ {
-            repeatType = LocalNotification.REPEAT_WEEK;
-        }
-        scheduleLocalNotification(notif, firstTime, repeatType);
-        
-    }
+   
     
     public void cancelLocalNotification(String id) {
          nativeInstance.cancelLocalNotification(id);

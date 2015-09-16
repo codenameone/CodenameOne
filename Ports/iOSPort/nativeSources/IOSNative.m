@@ -6340,9 +6340,6 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
             notification.repeatInterval = nil;
             break;
         case 1:
-            notification.repeatInterval = NSSecondCalendarUnit;
-            break;
-        case 2:
             notification.repeatInterval = NSMinuteCalendarUnit;
             break;
         case 3:

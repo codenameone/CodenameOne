@@ -6010,9 +6010,6 @@ public abstract class CodenameOneImplementation {
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
     }
 
-    public void scheduleLocalNotification(LocalNotification notif, long firstTime, long repeatInterval) {
-    }
-    
     public void cancelLocalNotification(String notificationId) {
     }
     //ENDS METHODS FOR DEALING Local Notifications
