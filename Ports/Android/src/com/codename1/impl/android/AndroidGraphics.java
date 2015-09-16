@@ -43,6 +43,7 @@ package com.codename1.impl.android;
 
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -52,6 +53,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
+import android.graphics.Shader;
 import com.codename1.ui.Stroke;
 
 import com.codename1.ui.Transform;
@@ -147,6 +149,24 @@ class AndroidGraphics {
         canvas.restore();
     }
 
+    void tileImage(Object img, int x, int y, int w, int h) {
+        Bitmap b = (Bitmap) img;
+        Rect dest = new Rect();
+        dest.top = 0;
+        dest.bottom = h;
+        dest.left = 0;
+        dest.right = w;
+        BitmapShader shader = new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+        Paint tilePainter = new Paint(paint);
+        tilePainter.setShader(shader);
+        tilePainter.setAntiAlias(false);
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.concat(getTransformMatrix());
+        canvas.drawRect(dest, tilePainter);
+        canvas.restore();
+    }
+    
     private Matrix getTransformMatrix(){
         if ( transformDirty ){
         	// Conversion from 4x4 to 3x3
@@ -478,5 +498,5 @@ class AndroidGraphics {
     public Transform getTransform() {
         return transform;
     }
-    
+
 }
