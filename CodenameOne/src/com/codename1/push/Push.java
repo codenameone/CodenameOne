@@ -333,6 +333,7 @@ public class Push {
                 if(error != null) {
                     // this is an error response...
                     Log.p(error);
+                    Log.p("Full error: " + data);
                     successful = false;
                 } else {
                     successful = true;

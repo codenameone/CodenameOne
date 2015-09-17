@@ -87,6 +87,10 @@ extern UIView *editingComponent;
 #ifdef INCLUDE_CN1_PUSH
     //[[UIApplication sharedApplication] cancelAllLocalNotifications]; // <-- WHY IS THIS HERE? -- removing it for now
     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+    if(launchOptions == nil) {
+        //afterDidFinishLaunchingWithOptionsMarkerEntry
+        return YES;
+    }
     NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
     if(userInfo == nil) {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
