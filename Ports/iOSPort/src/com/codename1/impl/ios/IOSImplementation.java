@@ -92,7 +92,6 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.util.LinkedList;
 
 /**
  *
@@ -123,7 +122,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private NativePathStroker globalPathStroker;
     
     private boolean isActive=false;
-    private final LinkedList<Runnable> onActiveListeners = new LinkedList<Runnable>();
+    private final ArrayList<Runnable> onActiveListeners = new ArrayList<Runnable>();
     
     
     /**
