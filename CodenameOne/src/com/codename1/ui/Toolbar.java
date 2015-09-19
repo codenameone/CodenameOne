@@ -358,7 +358,7 @@ public class Toolbar extends Container {
         }
         menu.setTransitionOutAnimator(transitionIn);
         menu.setTransitionInAnimator(transitionOut);
-        return menu.show(th, height - th, marginLeft, marginRight, true);
+        return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
     }
 
     /**
