@@ -1399,11 +1399,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
-        ((AndroidGraphics) graphics).tileImage(img, x, y, w, h);
-    }
-
-    @Override
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
         ((AndroidGraphics) graphics).drawLine(x1, y1, x2, y2);
     }

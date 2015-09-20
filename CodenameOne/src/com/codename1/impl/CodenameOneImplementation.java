@@ -1541,7 +1541,6 @@ public abstract class CodenameOneImplementation {
         int clipW = getClipWidth(graphics);
         int clipY = getClipY(graphics);
         int clipH = getClipHeight(graphics);
-        clipRect(graphics, x, y, w, h);
         for (int xPos = 0; xPos <= w; xPos += iW) {
             for (int yPos = 0; yPos < h; yPos += iH) {
                 int actualX = xPos + x;
@@ -1561,7 +1560,6 @@ public abstract class CodenameOneImplementation {
                 drawImage(graphics, img, actualX, actualY);
             }
         }
-        setClip(graphics, clipX, clipY, clipW, clipH);
         
     }
 
