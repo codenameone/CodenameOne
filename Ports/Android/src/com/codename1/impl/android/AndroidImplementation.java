@@ -6159,7 +6159,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isPerspectiveTransformSupported(Object graphics){
-    	return true;
+    	return android.os.Build.VERSION.SDK_INT >= 14;
     }
 
     @Override
