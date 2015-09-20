@@ -157,6 +157,9 @@ public class ResourceEditorApp extends SingleFrameApplication {
         JavaSEPortWithSVGSupport.setDesignMode(true);
         JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
         JavaSEPortWithSVGSupport.setShowEDTViolationStacks(false);
+        
+        // creates a deadlock between FX, Swing and CN1. Horrible horrible deadlock...
+        JavaSEPortWithSVGSupport.blockNativeBrowser = true;
         if(args.length > 0) {
             if(args[0].equalsIgnoreCase("-buildVersion")) {
                 Properties p = new Properties();

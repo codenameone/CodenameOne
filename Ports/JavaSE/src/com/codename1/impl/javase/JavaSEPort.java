@@ -160,7 +160,7 @@ import org.w3c.dom.NodeList;
 public class JavaSEPort extends CodenameOneImplementation {
 
     public final static boolean IS_MAC;
-
+    public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
     static {
@@ -6694,7 +6694,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isNativeBrowserComponentSupported() {
-        return fxExists;
+        return fxExists && !blockNativeBrowser;
         //return false;
     }
 

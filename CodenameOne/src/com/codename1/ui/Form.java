@@ -2101,6 +2101,7 @@ public class Form extends Container {
                 if(cmp != null) {
                     cmp = ((Container)cmp).getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                        cmp.initDragAndDrop(x, y);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                     }   

@@ -121,6 +121,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
     
+    private boolean isActive=false;
+    private final ArrayList<Runnable> onActiveListeners = new ArrayList<Runnable>();
+    
+    
     /**
      * A pool that will cause java objects to be retained if they are passed 
      * to a non-managed thread via a mechanism like dispatch_async
@@ -4179,6 +4183,64 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
+        if(key.equalsIgnoreCase("AppArg")) {
+            // We need special handling of AppArg to avoid race conditions.
+            // AppArg is guaranteed to be set by the time 
+            // applicationDidBecomeActive() is called, so in some cases
+            // calling AppArg inside the start() method of the lifecycle will
+            // get a stale value.
+            // See the lifecycle here:
+            // https://developer.apple.com/library/ios/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW13
+            if (!minimized && !isActive && Display.getInstance().isEdt()) {
+                // !minimized = applicationWillEnterForeground has already run
+                // !isActive = applicationDidBecomeActive hasn't been called yet.
+                // => We will do some "waiting" to give the AppArg a chance
+                // to be changed.
+                // We only defer access to AppArg if we are on the EDT
+                // to avoid a possible dead-lock when on the main thread
+                // The case we are concerned about is only when
+                // calling inside the start() method, so this will be
+                // on the EDT.
+                // In all other cases, this property should just return
+                // unhindered.
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        final Object lock = new Object();
+                        final boolean[] complete = new boolean[1];
+                        callOnActive(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                complete[0] = true;
+                                synchronized(lock) {
+                                    lock.notifyAll();
+                                }
+                            }
+
+                        });
+                        while (!complete[0]) {
+                            synchronized(lock) {
+                                try {
+                                    lock.wait(100); // Wait long enough for the url handler
+                                                    // to kick in.
+                                    // I think it's better just to skip and move on
+                                    // after 100ms rather than wait indefinitely just
+                                    // in case we are running in the background
+                                    break;
+                                } catch (InterruptedException ex) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+                   
+                return super.getProperty(key, defaultValue);
+            }
+            
+        }
+        
         return super.getProperty(key, defaultValue);
     }
 
@@ -5872,6 +5934,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationWillResignActive();
         }
+        instance.isActive = false;
     }
     
     /**
@@ -5944,10 +6007,39 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     /**
+     * Calls the given runnable when the app is active.  If the app is already
+     * active, it will call it immediatly.  If not, it will be called in
+     * applicationDidBecomeActive().
+     * This is used for getting the AppArg property in a way that avoids
+     * race conditions.
+     * @param r 
+     */
+    private void callOnActive(Runnable r) {
+        synchronized(onActiveListeners) {
+            if (isActive) {
+                r.run();
+            } else {
+                onActiveListeners.add(r);
+            }
+        }
+    }
+    
+    /**
      * Called as part of the transition from the background to the inactive state; 
      * here you can undo many of the changes made on entering the background.
      */
     public static void applicationDidBecomeActive() {
+        ArrayList<Runnable> callbacks = null;
+        synchronized(instance.onActiveListeners) {
+            instance.isActive = true;
+            callbacks = new ArrayList<Runnable>(instance.onActiveListeners.size());
+        
+            callbacks.addAll(instance.onActiveListeners);
+            instance.onActiveListeners.clear();
+        }
+        for (Runnable callback : callbacks) {
+            callback.run();
+        }
         minimized = false;
         if(instance.life != null) {
             instance.life.applicationDidBecomeActive();
