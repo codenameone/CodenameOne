@@ -1742,6 +1742,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public String getAppArg() {
+        if (super.getAppArg() != null) {
+            // This just maintains backward compatibility in case people are manually
+            // setting the AppArg in their properties.  It reproduces the general
+            // behaviour the existed when AppArg was just another Display property.
+            return super.getAppArg();
+        }
+        android.content.Intent intent = activity.getIntent();
+        if (intent != null) {
+            Uri u = intent.getData();
+            if (u != null) {
+                String scheme = intent.getScheme();
+                intent.setData(null);
+                if ("content".equals(scheme)) {
+                    try {
+                        InputStream attachment = activity.getContentResolver().openInputStream(u);
+                        if (attachment != null) {
+                            String name = getContentName(activity.getContentResolver(), u);
+                            if (name != null) {
+                                String filePath = getAppHomePath()
+                                        + getFileSystemSeparator() + name;
+                                File f = new File(filePath);
+                                OutputStream tmp = createFileOuputStream(f);
+                                byte[] buffer = new byte[1024];
+                                while (attachment.read(buffer) > 0) {
+                                    tmp.write(buffer);
+                                }
+                                tmp.close();
+                                attachment.close();
+                                return filePath;
+                            }
+                        }
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                    }
+                } else {
+                    String encodedPath = u.getEncodedPath();
+                    if (encodedPath != null && encodedPath.length() > 0) {
+                        return encodedPath;
+                    }
+                    return u.toString();
+                }
+            }
+        }
+        return null;
+    }
+    
+    
+
     /**
      * @inheritDoc
      */
@@ -1758,53 +1815,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if ("androidId".equals(key)) {
             return Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID);
-        }
-        
-        if ("AppArg".equals(key)) {
-            android.content.Intent intent = activity.getIntent();
-            if (intent != null) {
-                Uri u = intent.getData();
-                if (u != null) {
-                    String scheme = intent.getScheme();
-                    intent.setData(null);
-                    if ("content".equals(scheme)) {
-                        try {
-                            InputStream attachment = activity.getContentResolver().openInputStream(u);
-                            if (attachment != null) {
-                                String name = getContentName(activity.getContentResolver(), u);
-                                if (name != null) {
-                                    String filePath = getAppHomePath()
-                                            + getFileSystemSeparator() + name;
-                                    File f = new File(filePath);
-                                    OutputStream tmp = createFileOuputStream(f);
-                                    byte[] buffer = new byte[1024];
-                                    while (attachment.read(buffer) > 0) {
-                                        tmp.write(buffer);
-                                    }
-                                    tmp.close();
-                                    attachment.close();
-                                    return filePath;
-                                }
-                            }
-                        } catch (FileNotFoundException e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        }
-                    } else {
-                        String encodedPath = u.getEncodedPath();
-                        if (encodedPath != null && encodedPath.length() > 0) {
-                            return encodedPath;
-                        }
-                        return u.toString();
-                    }
-                }
-            }
         }
         
         if ("cellId".equals(key)) {

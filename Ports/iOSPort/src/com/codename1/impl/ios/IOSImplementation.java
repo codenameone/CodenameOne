@@ -4150,6 +4150,67 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String getAppArg() {
+        // We need special handling of AppArg to avoid race conditions.
+        // AppArg is guaranteed to be set by the time 
+        // applicationDidBecomeActive() is called, so in some cases
+        // calling AppArg inside the start() method of the lifecycle will
+        // get a stale value.
+        // See the lifecycle here:
+        // https://developer.apple.com/library/ios/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW13
+        if (!minimized && !isActive && Display.getInstance().isEdt()) {
+            // !minimized = applicationWillEnterForeground has already run
+            // !isActive = applicationDidBecomeActive hasn't been called yet.
+            // => We will do some "waiting" to give the AppArg a chance
+            // to be changed.
+            // We only defer access to AppArg if we are on the EDT
+            // to avoid a possible dead-lock when on the main thread
+            // The case we are concerned about is only when
+            // calling inside the start() method, so this will be
+            // on the EDT.
+            // In all other cases, this property should just return
+            // unhindered.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    final Object lock = new Object();
+                    final boolean[] complete = new boolean[1];
+                    callOnActive(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            complete[0] = true;
+                            synchronized(lock) {
+                                lock.notifyAll();
+                            }
+                        }
+
+                    });
+                    while (!complete[0]) {
+                        synchronized(lock) {
+                            try {
+                                lock.wait(100); // Wait long enough for the url handler
+                                                // to kick in.
+                                // I think it's better just to skip and move on
+                                // after 100ms rather than wait indefinitely just
+                                // in case we are running in the background
+                                break;
+                            } catch (InterruptedException ex) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+
+            
+        }
+        return super.getAppArg();
+    }
+
+    
+    
+    @Override
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
             return "ios";
@@ -4182,63 +4243,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
-        }
-        if(key.equalsIgnoreCase("AppArg")) {
-            // We need special handling of AppArg to avoid race conditions.
-            // AppArg is guaranteed to be set by the time 
-            // applicationDidBecomeActive() is called, so in some cases
-            // calling AppArg inside the start() method of the lifecycle will
-            // get a stale value.
-            // See the lifecycle here:
-            // https://developer.apple.com/library/ios/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW13
-            if (!minimized && !isActive && Display.getInstance().isEdt()) {
-                // !minimized = applicationWillEnterForeground has already run
-                // !isActive = applicationDidBecomeActive hasn't been called yet.
-                // => We will do some "waiting" to give the AppArg a chance
-                // to be changed.
-                // We only defer access to AppArg if we are on the EDT
-                // to avoid a possible dead-lock when on the main thread
-                // The case we are concerned about is only when
-                // calling inside the start() method, so this will be
-                // on the EDT.
-                // In all other cases, this property should just return
-                // unhindered.
-                Display.getInstance().invokeAndBlock(new Runnable() {
-                    @Override
-                    public void run() {
-                        final Object lock = new Object();
-                        final boolean[] complete = new boolean[1];
-                        callOnActive(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                complete[0] = true;
-                                synchronized(lock) {
-                                    lock.notifyAll();
-                                }
-                            }
-
-                        });
-                        while (!complete[0]) {
-                            synchronized(lock) {
-                                try {
-                                    lock.wait(100); // Wait long enough for the url handler
-                                                    // to kick in.
-                                    // I think it's better just to skip and move on
-                                    // after 100ms rather than wait indefinitely just
-                                    // in case we are running in the background
-                                    break;
-                                } catch (InterruptedException ex) {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                });
-                   
-                return super.getProperty(key, defaultValue);
-            }
-            
         }
         
         return super.getProperty(key, defaultValue);

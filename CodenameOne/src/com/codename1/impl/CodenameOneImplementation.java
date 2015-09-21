@@ -112,6 +112,7 @@ public abstract class CodenameOneImplementation {
     private String packageName;
     private static int pollingMillis = 3 * 60 * 60000;
     private Component editingText;
+    private String appArg;
     
     /**
      * Useful since the content of a single element touch event is often recycled
@@ -349,7 +350,15 @@ public abstract class CodenameOneImplementation {
             c.repaint();
         }
     }
-        
+      
+    public String getAppArg() {
+        return appArg;
+    }
+    
+    public void setAppArg(String arg) {
+        appArg = arg;
+    }
+    
     /**
      * Allows the implementation to refresh the text field
      */
