@@ -803,7 +803,7 @@ public class Dialog extends Form {
      * will dispose the form
      * @return the command pressed by the user
      */
-    public static Command show(String title, Component body, Command[] cmds) {
+    public static Command show(String title, Component body, Command... cmds) {
         return show(title, body, cmds, defaultDialogType, null);
     }
 
