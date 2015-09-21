@@ -6326,11 +6326,13 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType
                                                                                                                                                                      ) {
     
-/*    UILocalNotification *notification = [[UILocalNotification alloc] init];
+    UILocalNotification *notification = [[UILocalNotification alloc] init];
     notification.alertBody = toNSString(CN1_THREAD_STATE_PASS_ARG alertBody);
+#ifdef __IPHONE_8_2
     if ([notification respondsToSelector:@selector(alertTitle)]) {
         notification.alertTitle = toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
     }
+#endif
     notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
     notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
     notification.timeZone = [NSTimeZone defaultTimeZone];
@@ -6374,7 +6376,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         
         [[UIApplication sharedApplication] scheduleLocalNotification: notification];
         
-    });*/
+    });
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {
