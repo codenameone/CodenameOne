@@ -1582,6 +1582,82 @@ public class TestUtils {
     }
 
     /**
+     * Asserts that a certain exception is raised
+     *
+     * @param exception
+     * @param expression
+     */
+    public static void assertException(RuntimeException exception, Runnable expression) {
+        if (verbose) {
+            log("assertException(" + exception + ", " + expression + ")");
+        }
+        try {
+            expression.run();
+        } catch (RuntimeException failure) {
+            if (exception.getClass() != failure.getClass()) {
+                TestUtils.fail();
+            }
+            return;
+        }
+        TestUtils.fail();
+    }
+
+    /**
+     * Asserts that a certain exception is raised
+     *
+     * @param exception
+     * @param expression
+     * @param errorMessage
+     */
+    public static void assertException(RuntimeException exception, Runnable expression, String errorMessage) {
+        if (verbose) {
+            log("assertException(" + exception + ", " + expression + ", " + errorMessage + ")");
+        }
+        try {
+            expression.run();
+        } catch (RuntimeException failure) {
+            if (exception.getClass() != failure.getClass()) {
+                TestUtils.fail(errorMessage);
+            }
+            return;
+        }
+        TestUtils.fail(errorMessage);
+    }
+
+    /**
+     * Asserts that no exception is raised
+     *
+     * @param expression
+     */
+    public static void assertNoException(Runnable expression) {
+        if (verbose) {
+            log("assertNoException(" + expression + ")");
+        }
+        try {
+            expression.run();
+        } catch (RuntimeException failure) {
+            TestUtils.fail();
+        }
+    }
+
+    /**
+     * Asserts that no exception is raised
+     *
+     * @param expression
+     * @param errorMessage
+     */
+    public static void assertNoException(Runnable expression, String errorMessage) {
+        if (verbose) {
+            log("assertNoException(" + expression + ", " + errorMessage + ")");
+        }
+        try {
+            expression.run();
+        } catch (RuntimeException failure) {
+            TestUtils.fail(errorMessage);
+        }
+    }
+
+    /**
      * Verifies the current title is the same otherwise throws an exception
      * @param title the tile to verify
      */
