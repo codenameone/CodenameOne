@@ -441,6 +441,7 @@ public class Log {
      * Places a form with the log as a TextArea on the screen, this method can
      * be attached to appear at a given time or using a fixed global key. Using
      * this method might cause a problem with further log output
+     * @deprecated this method is an outdated method that's no longer supported
      */
     public static void showLog() {
         try {

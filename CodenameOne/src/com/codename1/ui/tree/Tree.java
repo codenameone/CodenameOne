@@ -238,11 +238,11 @@ public class Tree extends Container {
         nodeImage = nodeIcon;
     }
 
-    private Container expandNode(Component c) {
-        return expandNode(c, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+    private Container expandNode(boolean animate, Component c) {
+        return expandNodeImpl(animate, c);
     }
     
-    private Container expandNode(Component c, Transition t) {
+    private Container expandNodeImpl(boolean animate, Component c) {
         Container p = c.getParent().getLeadParent();
         if(p != null) {
             c = p;
@@ -255,10 +255,14 @@ public class Tree extends Container {
         Container dest = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         parent.addComponent(BorderLayout.CENTER, dest);
         buildBranch(o, depth, dest);
-        // prevent a race condition on node expansion contraction
-        parent.animateHierarchyAndWait(300);
-        if(multilineMode) {
-            revalidate();
+        if(isInitialized() && animate) {
+            // prevent a race condition on node expansion contraction
+            parent.animateHierarchyAndWait(300);
+            if(multilineMode) {
+                revalidate();
+            }
+        } else {
+            parent.revalidate();
         }
         return dest;
     }
@@ -268,7 +272,7 @@ public class Tree extends Container {
         return e != null && e.equals("true");
     }
     
-    private Container expandPathNode(Container parent, Object node) {
+    private Container expandPathNode(boolean animate, Container parent, Object node) {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
@@ -282,7 +286,7 @@ public class Tree extends Container {
                     if(isExpanded(current)) {
                         return (Container)bl.getCenter();
                     }
-                    return expandNode(current, null);
+                    return expandNodeImpl(animate, current);
                 }
             }
         }
@@ -314,9 +318,18 @@ public class Tree extends Container {
      * @param path the path to expand
      */
     public void expandPath(Object... path) {
+        expandPath(isInitialized(), path);
+    }
+    
+    /**
+     * Expands the tree path
+     * @param path the path to expand
+     * @param animate whether to animate expansion
+     */
+    public void expandPath(boolean animate, Object... path) {
         Container c = this;
         for(int iter = 0 ; iter < path.length ; iter++) {
-            c = expandPathNode(c, path[iter]);
+            c = expandPathNode(animate, c, path[iter]);
         }
     }
     
@@ -327,7 +340,7 @@ public class Tree extends Container {
     public void collapsePath(Object... path) {
         Container c = this;
         for(int iter = 0 ; iter < path.length - 1; iter++) {
-            c = expandPathNode(c, path[iter]);
+            c = expandPathNode(isInitialized(), c, path[iter]);
         }        
         collapsePathNode(c, path[path.length - 1]);
     }
@@ -546,7 +559,7 @@ public class Tree extends Container {
             if(e != null && e.equals("true")) {
                 collapseNode(c);
             } else {
-                expandNode(c);
+                expandNode(isInitialized(), c);
             }
         }
     }
