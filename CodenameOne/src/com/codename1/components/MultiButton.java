@@ -55,6 +55,15 @@ public class MultiButton extends Container {
     private String group;  
     
     /**
+     * Initializes a multibutton with the first line of text
+     * @param line1 first line of text
+     */
+    public MultiButton(String line1) {
+        this();
+        setTextLine1(line1);
+    }
+    
+    /**
      * Default constructor allowing the designer to create an instance of this class
      */
     public MultiButton() {

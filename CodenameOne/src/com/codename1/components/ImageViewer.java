@@ -531,7 +531,10 @@ public class ImageViewer extends Component {
             }
             return;
         }
-        g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+        // can happen in the GUI builder
+        if(image != null) {
+            g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+        }
     }
     
     /**

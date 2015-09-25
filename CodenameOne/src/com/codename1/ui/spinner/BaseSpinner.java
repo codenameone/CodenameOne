@@ -112,6 +112,10 @@ public abstract class BaseSpinner extends Container {
     }   
     
     private void paintOverlay(Graphics g) {
+        // can happen in the new GUI builder
+        if(getParent() == null) {
+            return;
+        }
         int x = getParent().getAbsoluteX();
         int y = getParent().getAbsoluteY();
         g.translate(x, y);

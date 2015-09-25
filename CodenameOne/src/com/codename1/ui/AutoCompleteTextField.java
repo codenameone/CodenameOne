@@ -51,7 +51,7 @@ public class AutoCompleteTextField extends TextField {
      * Constructor with completion suggestions
      * @param completion a String array of suggestion for completion
      */ 
-    public AutoCompleteTextField(String[] completion) {
+    public AutoCompleteTextField(String... completion) {
         this(new DefaultListModel<String>(completion));
     }
 

@@ -251,7 +251,7 @@ public class List<T> extends Component {
      *
      * @param items set of items placed into the list model
      */
-    public List(T[] items) {
+    public List(T... items) {
         this(new DefaultListModel(items));
     }
 

@@ -147,6 +147,15 @@ public class Table extends Container {
     }
 
     /**
+     * By default createCell/constraint won't be invoked for null values by overriding this method to return true
+     * you can replace this behavior
+     * @return false by default
+     */
+    protected boolean includeNullValues() {
+        return false;
+    }
+    
+    /**
      * Returns the selected column in the table
      *
      * @return the offset of the selected column in the table if a selection exists
@@ -193,7 +202,7 @@ public class Table extends Container {
                 Object value = model.getValueAt(r, c);
 
                 // null should be returned for spanned over values
-                if(value != null) {
+                if(value != null || includeNullValues()) {
                     boolean e = model.isCellEditable(r, c);
                     Component cell = createCellImpl(value, r, c, e);
                     if(cell != null) {
@@ -608,7 +617,9 @@ public class Table extends Container {
      */
     public void setTitleAlignment(int titleAlignment) {
         this.titleAlignment = titleAlignment;
-        repaint();
+        for(int iter = 0 ; iter < model.getColumnCount() ; iter++) {
+            listener.dataChanged(-1, iter);
+        }
     }
 
 
@@ -761,8 +772,15 @@ public class Table extends Container {
                 editingRow = -1;
                 return;
             }
-            Object value = model.getValueAt(row, column);
-            boolean e = model.isCellEditable(row, column);
+            Object value;
+            boolean e;
+            if(row < 0) {
+                e = false;
+                value = model.getColumnName(column);
+            } else {
+                value = model.getValueAt(row, column);
+                e = model.isCellEditable(row, column);
+            }
             Component cell = createCellImpl(value, row, column, e);
 
             TableLayout t = (TableLayout)getLayout();
