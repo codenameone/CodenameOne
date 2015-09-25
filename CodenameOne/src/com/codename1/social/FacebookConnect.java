@@ -27,6 +27,7 @@ import com.codename1.io.AccessToken;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
+import com.codename1.util.Callback;
 
 /**
  * Invokes the native bundled facebook SDK to login/logout of facebook, notice
@@ -203,6 +204,22 @@ public class FacebookConnect extends Login{
      * @param previewImageUrl url to an image to be used in the invite, can be null
      */ 
     public void inviteFriends(String appLinkUrl, String previewImageUrl){
+    }
+
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     * 
+     * @param appLinkUrl App Link for what should be opened when the recipient 
+     * clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     * @param cb a Callback to be used when we need to know if the Facebook invite was successful.
+     * If the invite was successful the onSucess method will be called
+     * If the user canceled the onError method will be called with error code -1.
+     * If an error occurred the onError method will be called with error code 0.
+     * 
+     */ 
+    public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
     }
     
     /**

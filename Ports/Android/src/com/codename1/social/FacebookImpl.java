@@ -27,6 +27,7 @@ import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.ui.Display;
+import com.codename1.util.Callback;
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
@@ -58,7 +59,7 @@ public class FacebookImpl extends FacebookConnect {
         permissions = new ArrayList<String>();
         String permissionsStr = Display.getInstance().getProperty("facebook_permissions", "");
         permissionsStr = permissionsStr.trim();
-        
+
         StringTokenizer token = new StringTokenizer(permissionsStr, ", ");
         if (token.countTokens() > 0) {
             try {
@@ -91,10 +92,10 @@ public class FacebookImpl extends FacebookConnect {
             return;
         }
         loginLock = true;
-        
-        LoginManager login = LoginManager.getInstance();        
+
+        LoginManager login = LoginManager.getInstance();
         final CallbackManager mCallbackManager = CallbackManager.Factory.create();
-        final CodenameOneActivity activity = (CodenameOneActivity)AndroidNativeUtil.getActivity();
+        final CodenameOneActivity activity = (CodenameOneActivity) AndroidNativeUtil.getActivity();
         activity.setIntentResultListener(new IntentResultListener() {
 
             @Override
@@ -116,7 +117,7 @@ public class FacebookImpl extends FacebookConnect {
     @Override
     public String getToken() {
         com.codename1.io.AccessToken t = getAccessToken();
-        if(t != null){
+        if (t != null) {
             return t.getToken();
         }
         return null;
@@ -125,17 +126,17 @@ public class FacebookImpl extends FacebookConnect {
     @Override
     public com.codename1.io.AccessToken getAccessToken() {
         AccessToken fbToken = AccessToken.getCurrentAccessToken();
-        if(fbToken != null){
+        if (fbToken != null) {
             String token = fbToken.getToken();
             Date ex = fbToken.getExpires();
             long diff = ex.getTime() - System.currentTimeMillis();
-            diff = diff/1000;
+            diff = diff / 1000;
             com.codename1.io.AccessToken cn1Token = new com.codename1.io.AccessToken(token, "" + diff);
             return cn1Token;
         }
         return null;
     }
-    
+
     @Override
     public void logout() {
         LoginManager login = LoginManager.getInstance();
@@ -147,10 +148,10 @@ public class FacebookImpl extends FacebookConnect {
             return;
         }
         loginLock = true;
-        
-        LoginManager login = LoginManager.getInstance();        
+
+        LoginManager login = LoginManager.getInstance();
         final CallbackManager mCallbackManager = CallbackManager.Factory.create();
-        final CodenameOneActivity activity = (CodenameOneActivity)AndroidNativeUtil.getActivity();
+        final CodenameOneActivity activity = (CodenameOneActivity) AndroidNativeUtil.getActivity();
         activity.setIntentResultListener(new IntentResultListener() {
 
             @Override
@@ -179,33 +180,87 @@ public class FacebookImpl extends FacebookConnect {
      */
     public boolean hasPublishPermissions() {
         AccessToken fbToken = AccessToken.getCurrentAccessToken();
-        if(fbToken != null && !fbToken.isExpired()){
+        if (fbToken != null && !fbToken.isExpired()) {
             return fbToken.getPermissions().contains(PUBLISH_PERMISSIONS);
         }
         return false;
     }
-   
+
     @Override
     public void inviteFriends(String appLinkUrl, String previewImageUrl) {
+        inviteFriends(appLinkUrl, previewImageUrl, null);
+    }
+    
+    @Override
+    public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
         if (AppInviteDialog.canShow()) {
             AppInviteContent content = new AppInviteContent.Builder()
                     .setApplinkUrl(appLinkUrl)
                     .setPreviewImageUrl(previewImageUrl)
                     .build();
-            AppInviteDialog.show(AndroidNativeUtil.getActivity(), content);
+            final CodenameOneActivity activity = (CodenameOneActivity) AndroidNativeUtil.getActivity();
+            if(cb == null){
+                AppInviteDialog.show(activity, content);
+            }else{
+                AppInviteDialog appInviteDialog = new AppInviteDialog(activity);
+                final CallbackManager mCallbackManager = CallbackManager.Factory.create();
+                activity.setIntentResultListener(new IntentResultListener() {
+
+                    @Override
+                    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+                        mCallbackManager.onActivityResult(requestCode, resultCode, data);
+                        activity.restoreIntentResultListener();
+                    }
+                });
+                appInviteDialog.registerCallback(mCallbackManager, new FacebookCallback<AppInviteDialog.Result>() {
+                    @Override
+                    public void onSuccess(AppInviteDialog.Result result) {
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cb.onSucess(null);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onCancel() {
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cb.onError(null, null, -1, "User Cancelled");
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(final FacebookException e) {
+                        Display.getInstance().callSerially(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cb.onError(null, e, 0, e.getMessage());
+                            }
+                        });
+                    }
+                });
+                appInviteDialog.show(content);
+            }
         }
 
     }
 
     @Override
-    public boolean isInviteFriendsSupported(){
+    public boolean isInviteFriendsSupported() {
         return true;
     }
-    
-    class FBCallback implements FacebookCallback{
-        
+
+    class FBCallback implements FacebookCallback {
+
         private LoginCallback cb;
-        
+
         public FBCallback(LoginCallback cb) {
             this.cb = cb;
         }
@@ -227,7 +282,7 @@ public class FacebookImpl extends FacebookConnect {
             cb.loginFailed(fe.getMessage());
             loginLock = false;
         }
-    
+
     }
 
 }
