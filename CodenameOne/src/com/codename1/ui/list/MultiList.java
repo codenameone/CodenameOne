@@ -49,7 +49,7 @@ public class MultiList extends List {
         sel = new MultiButton();
         unsel = new MultiButton();
     }
-    
+
     /**
      * @inheritDoc
      */

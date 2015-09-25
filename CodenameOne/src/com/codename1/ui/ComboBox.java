@@ -95,7 +95,7 @@ public class ComboBox<T> extends List<T> {
      * 
      * @param items set of items placed into the combo box model
      */
-    public ComboBox(Object[] items) {
+    public ComboBox(Object... items) {
         this(new DefaultListModel(items));
     }
 
