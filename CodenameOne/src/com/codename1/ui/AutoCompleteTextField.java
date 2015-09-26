@@ -408,15 +408,31 @@ public class AutoCompleteTextField extends TextField {
      */
     public Object getPropertyValue(String name) {
         if(name.equals("completion")) {
-            String[] r = new String[filter.getUnderlying().getSize()];
-            for(int iter = 0 ; iter < r.length ; iter++) {
-                r[iter] = (String)filter.getUnderlying().getItemAt(iter);
-            }
-            return r;
+            return getCompletion();
         }
         return null;
     }
 
+    /**
+     * Sets the completion values
+     * @param completion the completion values
+     */
+    public void setCompletion(String... completion) {
+        filter = new FilterProxyListModel<String>(new DefaultListModel<String>(completion));        
+    }
+    
+    /**
+     * Returns the completion values
+     * @return array of completion entries
+     */
+    public String[] getCompletion() {
+        String[] r = new String[filter.getUnderlying().getSize()];
+        for(int iter = 0 ; iter < r.length ; iter++) {
+            r[iter] = (String)filter.getUnderlying().getItemAt(iter);
+        }
+        return r;
+    }
+    
     /**
      * @inheritDoc
      */
