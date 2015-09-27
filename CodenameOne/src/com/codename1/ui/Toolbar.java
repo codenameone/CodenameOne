@@ -295,7 +295,7 @@ public class Toolbar extends Container {
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
-        sideMenu.addCommand(cmd, 0);
+        sideMenu.addCommand(cmd, 0);        
     }
 
     /**
@@ -607,8 +607,9 @@ public class Toolbar extends Container {
                             for (int j = 0; j < cnt.getComponentCount(); j++) {
                                 Component c = cnt.getComponentAt(j);
                                 if (c instanceof Button) {
+                                    //remove the menu button and add it last
                                     if (c.getClientProperty("overflow") != null) {
-                                        return;
+                                        cnt.removeComponent(c);
                                     }
                                 }
                             }
