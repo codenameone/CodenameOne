@@ -3242,14 +3242,16 @@ void com_codename1_impl_ios_IOSNative_deregisterPush__(CN1_THREAD_STATE_MULTI_AR
 }
 
 void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT number) {
-#ifdef INCLUDE_CN1_PUSH2
+// Removed this ifdef because we may need to badge the application even if push isn't supported.
+//#ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
         if(number == 0) {
-            [[UIApplication sharedApplication] cancelAllLocalNotifications];
+            // Removed this because there could be repeating notifications
+            //[[UIApplication sharedApplication] cancelAllLocalNotifications];
         }
         [UIApplication sharedApplication].applicationIconBadgeNumber = number;
     });
-#endif
+//#endif
 }
 
 
@@ -6327,12 +6329,36 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
                                                                                                                                                                      ) {
     
     UILocalNotification *notification = [[UILocalNotification alloc] init];
-    notification.alertBody = toNSString(CN1_THREAD_STATE_PASS_ARG alertBody);
-#ifdef __IPHONE_8_2
-    if ([notification respondsToSelector:@selector(alertTitle)]) {
-        notification.alertTitle = toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
-    }
+    NSString * msg = [NSString string];
+    NSString *tmpStr;
+    if (alertTitle != NULL) {
+        tmpStr = [msg stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
+        
+#ifndef CN1_USE_ARC
+        [msg release];
 #endif
+        msg = tmpStr;
+    }
+    if (alertBody != NULL) {
+        
+        tmpStr = [msg stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
+#ifndef CN1_USE_ARC
+        [msg release];
+#endif
+        msg = tmpStr;
+    }
+    tmpStr = [msg stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
+#ifndef CN1_USE_ARC
+    [msg release];
+#endif
+    msg = tmpStr;
+    notification.alertBody = msg;
+
+    //if ([notification respondsToSelector:@selector(alertTitle)]) {
+        //[notification setValue:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle) forKey:@"alertTitle"];
+        notification.alertTitle = toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
+    //}
+
     notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
     notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
     notification.timeZone = [NSTimeZone defaultTimeZone];
