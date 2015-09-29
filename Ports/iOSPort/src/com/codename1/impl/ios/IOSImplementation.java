@@ -1488,11 +1488,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng instanceof GlobalGraphics) {
+            int clipX = this.getClipX(graphics);
+            int clipY = this.getClipY(graphics);
+            int clipW = this.getClipWidth(graphics);
+            int clipH = this.getClipHeight(graphics);
+            this.clipRect(graphics, x, y, w, h);
             ng.checkControl();
             ng.applyTransform();
             ng.applyClip();
             NativeImage nm = (NativeImage)img;
             nativeInstance.nativeTileImageGlobal(nm.peer, ng.alpha, x, y, w, h);
+            this.setClip(graphics, clipX, clipY, clipW, clipH);
         } else {
             super.tileImage(graphics, img, x, y, w, h);
         }
