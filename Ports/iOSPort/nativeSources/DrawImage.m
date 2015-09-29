@@ -125,7 +125,7 @@ static GLuint getOGLProgram(){
 #if TARGET_IPHONE_SIMULATOR
     // for some lame reason, the simulator positions things just a tad different
     // than the device.  This is an attempt to play an out-of-tune piano.
-    dy=0.5;
+    dy=0;
 #endif
     
     GLfloat vertexes[] = {
