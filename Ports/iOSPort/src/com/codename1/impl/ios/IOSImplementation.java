@@ -2054,12 +2054,23 @@ public class IOSImplementation extends CodenameOneImplementation {
             // we don't need to allocate for the case of a cache hit
             recycle.peer = peer;
             recycle.txt = str;
+            
             Integer i = stringWidthCache.get(recycle);
             if(i != null) {
                 return i.intValue();
             }
             int val = nativeInstance.stringWidthNative(peer, str);
             FontStringCache c = new FontStringCache(str, peer);
+            if (stringWidthCache.size() > 10000) {
+                // If the cache grows too big, let's clear it out.
+                // We could use a more advanced algorithm, but right now
+                // I just want to fix possible memory leak.
+                
+                // Each FontStringCache object is 48 bytes.  So 48 x 10000 = 480K
+                // So we will allow a maximum footprint of 480K for this cache.
+                // When it reaches 480K, we'll just clear it out.
+                stringWidthCache.clear();
+            }
             stringWidthCache.put(c, new Integer(val));
             return val;
         }
