@@ -125,7 +125,8 @@ static GLuint getOGLProgram(){
 #if TARGET_IPHONE_SIMULATOR
     // for some lame reason, the simulator positions things just a tad different
     // than the device.  This is an attempt to play an out-of-tune piano.
-    dy=0.5;
+    dy=0;  // WTF:  Now the simulator seems to work correctly without a differential
+           // And have problems with a differential.
 #endif
     
     GLfloat vertexes[] = {
