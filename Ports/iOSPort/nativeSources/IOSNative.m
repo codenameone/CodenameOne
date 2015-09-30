@@ -6354,11 +6354,6 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     msg = tmpStr;
     notification.alertBody = msg;
 
-    //if ([notification respondsToSelector:@selector(alertTitle)]) {
-        //[notification setValue:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle) forKey:@"alertTitle"];
-        notification.alertTitle = toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
-    //}
-
     notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
     notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
     notification.timeZone = [NSTimeZone defaultTimeZone];
