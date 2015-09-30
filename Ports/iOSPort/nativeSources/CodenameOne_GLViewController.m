@@ -3027,6 +3027,8 @@ UIPopoverController* popoverControllerInstance;
 }
 
 #ifdef INCLUDE_FACEBOOK_CONNECT
+extern void com_codename1_social_FacebookImpl_inviteDidCompleteSuccessfully__(CN1_THREAD_STATE_SINGLE_ARG);
+extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_INT code, JAVA_OBJECT message);
 /*!
  @abstract Sent to the delegate when the app invite completes without error.
  @param appInviteDialog The FBSDKAppInviteDialog that completed.
@@ -3034,7 +3036,11 @@ UIPopoverController* popoverControllerInstance;
  */
 - (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didCompleteWithResults:(NSDictionary *)results {
     
-    
+    if (results != nil && [results objectForKey:@"completionGesture"] != nil && [@"cancel" isEqualToString:[results objectForKey:@"completionGesture"]]) {
+        com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG -1, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"User Canceled"));
+    } else {
+        com_codename1_social_FacebookImpl_inviteDidCompleteSuccessfully__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    }
 }
 
 /*!
@@ -3043,7 +3049,8 @@ UIPopoverController* popoverControllerInstance;
  @param error The error.
  */
 - (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didFailWithError:(NSError *)error {
-    
+    NSLog(@"%@", [error localizedDescription]);
+    com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG 0, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
 }
 #endif
 @end
