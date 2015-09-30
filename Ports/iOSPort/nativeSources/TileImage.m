@@ -40,7 +40,7 @@ static GLuint textureUniform;
 static GLuint colorUniform;
 static GLuint vertexCoordAtt;
 static GLuint textureCoordAtt;
-static const GLshort textureCoordinates[] = {
+static GLfloat textureCoordinates[] = {
     0, 1,
     1, 1,
     0, 0,
@@ -154,8 +154,6 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
     
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
-    GLErrorLog;
     glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
     GLErrorLog;
     glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
@@ -167,20 +165,56 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glUniform4fv(colorUniform, 1, color.v);
     GLErrorLog;
     
-    //glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    //GLErrorLog;
+    GLfloat* vertexes = malloc(8 * sizeof(GLfloat));
+    GLfloat* texCoords = malloc(8 * sizeof(GLfloat));
     
-    for (int xPos = 0; xPos <= width; xPos += imageWidth) {
+    int p2w = nextPowerOf2(imageWidth);
+    int p2h = nextPowerOf2(imageHeight);
+    
+    for (int xPos = 0; xPos < width; xPos += imageWidth) {
         for (int yPos = 0; yPos < height; yPos += imageHeight) {
-            GLfloat* vertexes = createVertexArray(x + xPos, y + yPos, imageWidth, imageHeight);
+            texCoords[0] = 0;
+            texCoords[1] = 1;
+            texCoords[2] = 1;
+            texCoords[3] = 1;
+            texCoords[4] = 0;
+            texCoords[5] = 0;
+            texCoords[6] = 1;
+            texCoords[7] = 0;
+            
+            vertexes[0] = x+xPos;
+            vertexes[1] = y+yPos;
+            vertexes[2] = vertexes[0] + p2w;
+            vertexes[3] = vertexes[1];
+            vertexes[4] = vertexes[0];
+            vertexes[5] = vertexes[1] + p2h;
+            vertexes[6] = vertexes[2];
+            vertexes[7] = vertexes[5];
+            
+            BOOL clipped = NO;
+            if (xPos + imageWidth > width) {
+                vertexes[2] = x + width;
+                vertexes[6] = x + width;
+                texCoords[2] = texCoords[6] = (float)(width-xPos)/ (float)p2w;
+                clipped = YES;
+            }
+            if (yPos + imageHeight > height) {
+                vertexes[5] = vertexes[7] = y + height;
+                texCoords[5] = texCoords[7] = (float)(height-yPos) / (float)p2h;
+            }
+            glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, texCoords);
+            GLErrorLog;
+            
             glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
             GLErrorLog;
             
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
             GLErrorLog;
-            free(vertexes);
         }
     }
+    
+    free(vertexes);
+    free(texCoords);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDisableVertexAttribArray(textureCoordAtt);
     GLErrorLog;
@@ -190,9 +224,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
-    //glUseProgram(CN1activeProgram);
-    //GLErrorLog;
+
 }
 
 #else
