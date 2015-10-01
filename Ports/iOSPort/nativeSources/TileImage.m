@@ -187,34 +187,43 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     int p2w = nextPowerOf2(imageWidth);
     int p2h = nextPowerOf2(imageHeight);
     
+    GLfloat wRatio = (GLfloat)imageWidth / (GLfloat)p2w;
+    GLfloat hRatio = (GLfloat)imageHeight / (GLfloat)p2h;
+    
+    GLfloat t0Y = 1.0 - hRatio;
+    GLfloat t0X = 0;
+    GLfloat t1Y = 1;
+    GLfloat t1X = wRatio;
+    
+    
     int tileOffset = 0;
     for (int xPos = 0; xPos < width; xPos += imageWidth) {
         for (int yPos = 0; yPos < height; yPos += imageHeight) {
-            texCoords[tileOffset+0] = 0;
-            texCoords[tileOffset+1] = 1;
-            texCoords[tileOffset+2] = 1;
-            texCoords[tileOffset+3] = 1;
-            texCoords[tileOffset+4] = 0;
-            texCoords[tileOffset+5] = 0;
+            texCoords[tileOffset+0] = t0X;//0;
+            texCoords[tileOffset+1] = t1Y;//1;
+            texCoords[tileOffset+2] = t1X;//1;
+            texCoords[tileOffset+3] = t1Y;//1;
+            texCoords[tileOffset+4] = t0X;//0;
+            texCoords[tileOffset+5] = t0Y;//0;
             
-            texCoords[tileOffset+6] = 0;  // Same as 4
-            texCoords[tileOffset+7] = 0;  // Same as 5
-            texCoords[tileOffset+8] = 1;  // Same as 2
-            texCoords[tileOffset+9] = 1;  // Same as 3
+            texCoords[tileOffset+6] = t0X;//0;  // Same as 4
+            texCoords[tileOffset+7] = t0Y;//0;  // Same as 5
+            texCoords[tileOffset+8] = t1X;//1;  // Same as 2
+            texCoords[tileOffset+9] = t1Y;//1;  // Same as 3
             
-            texCoords[tileOffset+10] = 1;
-            texCoords[tileOffset+11] = 0;
+            texCoords[tileOffset+10] = t1X;//1;
+            texCoords[tileOffset+11] = t0Y;//0;
             
             vertexes[tileOffset+0] = x+xPos;
             vertexes[tileOffset+1] = y+yPos;
-            vertexes[tileOffset+2] = vertexes[tileOffset+0] + p2w;
+            vertexes[tileOffset+2] = vertexes[tileOffset+0] + imageWidth;//p2w;
             vertexes[tileOffset+3] = vertexes[tileOffset+1];
             vertexes[tileOffset+4] = vertexes[tileOffset+0];
-            vertexes[tileOffset+5] = vertexes[tileOffset+1] + p2h;
+            vertexes[tileOffset+5] = vertexes[tileOffset+1] + imageHeight;//p2h;
             
             vertexes[tileOffset+6] = vertexes[tileOffset+0];        // Same as 4
-            vertexes[tileOffset+7] = vertexes[tileOffset+1] + p2h;  // Same as 5
-            vertexes[tileOffset+8] = vertexes[tileOffset+0] + p2w;  // Same as 2
+            vertexes[tileOffset+7] = vertexes[tileOffset+1] + imageHeight;//p2h;  // Same as 5
+            vertexes[tileOffset+8] = vertexes[tileOffset+0] + imageWidth;//p2w;  // Same as 2
             vertexes[tileOffset+9] = vertexes[tileOffset+1];        // Same as 3
             
             vertexes[tileOffset+10] = vertexes[tileOffset+2];
@@ -222,11 +231,11 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
             
             if (xPos + imageWidth > width) {
                 vertexes[tileOffset+2] = vertexes[tileOffset+8] =  vertexes[tileOffset+10] = x + width;
-                texCoords[tileOffset+2] = texCoords[tileOffset+8] = texCoords[tileOffset+10] = (float)(width-xPos)/ (float)p2w;
+                texCoords[tileOffset+2] = texCoords[tileOffset+8] = texCoords[tileOffset+10] = (GLfloat)(width-xPos)/ (GLfloat)p2w;
             }
             if (yPos + imageHeight > height) {
                 vertexes[tileOffset+5] = vertexes[tileOffset+7] = vertexes[tileOffset+11] = y + height;
-                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = (float)(height-yPos) / (float)p2h;
+                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = (GLfloat)(height-yPos) / (GLfloat)p2h;
             }
             
             tileOffset += 12;
