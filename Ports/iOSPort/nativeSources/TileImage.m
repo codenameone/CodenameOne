@@ -235,7 +235,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
             }
             if (yPos + imageHeight > height) {
                 vertexes[tileOffset+5] = vertexes[tileOffset+7] = vertexes[tileOffset+11] = y + height;
-                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = (GLfloat)(height-yPos) / (GLfloat)p2h;
+                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = 1.0 - (GLfloat)(height-yPos) / (GLfloat)p2h;
             }
             
             tileOffset += 12;
