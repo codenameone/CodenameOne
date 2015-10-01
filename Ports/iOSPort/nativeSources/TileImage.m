@@ -136,11 +136,18 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
 }
 #ifdef USE_ES2
 -(void)execute {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
     int imageWidth = (int)[[img getImage] size].width;
     int imageHeight = (int)[[img getImage] size].height;
+    
+    if (imageWidth <=0 || imageHeight <= 0) {
+        return;
+    }
     GLuint tex = [img getTexture:imageWidth texHeight:imageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
@@ -165,53 +172,75 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glUniform4fv(colorUniform, 1, color.v);
     GLErrorLog;
     
-    GLfloat* vertexes = malloc(8 * sizeof(GLfloat));
-    GLfloat* texCoords = malloc(8 * sizeof(GLfloat));
+    int numTiles = ceil((float)width / (float)imageWidth) * ceil((float)height / (float)imageHeight);
+    
+    // For tileImage we use GL_TRIANGLES instead of TRIANGLE_STRIP because it is easier to batch and
+    // connect texture coordinates to vertex coordinates.  This means that each quad requires 6 coordinates
+    // instead of 4 - but we can batch all tiles in a single drawArrays call which should more than
+    // make up for the extra overhead.
+    
+    GLfloat* vertexes = malloc(12 * numTiles * sizeof(GLfloat));
+    GLfloat* texCoords = malloc(12 * numTiles * sizeof(GLfloat));
+    
+
     
     int p2w = nextPowerOf2(imageWidth);
     int p2h = nextPowerOf2(imageHeight);
     
+    int tileOffset = 0;
     for (int xPos = 0; xPos < width; xPos += imageWidth) {
         for (int yPos = 0; yPos < height; yPos += imageHeight) {
-            texCoords[0] = 0;
-            texCoords[1] = 1;
-            texCoords[2] = 1;
-            texCoords[3] = 1;
-            texCoords[4] = 0;
-            texCoords[5] = 0;
-            texCoords[6] = 1;
-            texCoords[7] = 0;
+            texCoords[tileOffset+0] = 0;
+            texCoords[tileOffset+1] = 1;
+            texCoords[tileOffset+2] = 1;
+            texCoords[tileOffset+3] = 1;
+            texCoords[tileOffset+4] = 0;
+            texCoords[tileOffset+5] = 0;
             
-            vertexes[0] = x+xPos;
-            vertexes[1] = y+yPos;
-            vertexes[2] = vertexes[0] + p2w;
-            vertexes[3] = vertexes[1];
-            vertexes[4] = vertexes[0];
-            vertexes[5] = vertexes[1] + p2h;
-            vertexes[6] = vertexes[2];
-            vertexes[7] = vertexes[5];
+            texCoords[tileOffset+6] = 0;  // Same as 4
+            texCoords[tileOffset+7] = 0;  // Same as 5
+            texCoords[tileOffset+8] = 1;  // Same as 2
+            texCoords[tileOffset+9] = 1;  // Same as 3
             
-            BOOL clipped = NO;
+            texCoords[tileOffset+10] = 1;
+            texCoords[tileOffset+11] = 0;
+            
+            vertexes[tileOffset+0] = x+xPos;
+            vertexes[tileOffset+1] = y+yPos;
+            vertexes[tileOffset+2] = vertexes[tileOffset+0] + p2w;
+            vertexes[tileOffset+3] = vertexes[tileOffset+1];
+            vertexes[tileOffset+4] = vertexes[tileOffset+0];
+            vertexes[tileOffset+5] = vertexes[tileOffset+1] + p2h;
+            
+            vertexes[tileOffset+6] = vertexes[tileOffset+0];        // Same as 4
+            vertexes[tileOffset+7] = vertexes[tileOffset+1] + p2h;  // Same as 5
+            vertexes[tileOffset+8] = vertexes[tileOffset+0] + p2w;  // Same as 2
+            vertexes[tileOffset+9] = vertexes[tileOffset+1];        // Same as 3
+            
+            vertexes[tileOffset+10] = vertexes[tileOffset+2];
+            vertexes[tileOffset+11] = vertexes[tileOffset+5];
+            
             if (xPos + imageWidth > width) {
-                vertexes[2] = x + width;
-                vertexes[6] = x + width;
-                texCoords[2] = texCoords[6] = (float)(width-xPos)/ (float)p2w;
-                clipped = YES;
+                vertexes[tileOffset+2] = vertexes[tileOffset+8] =  vertexes[tileOffset+10] = x + width;
+                texCoords[tileOffset+2] = texCoords[tileOffset+8] = texCoords[tileOffset+10] = (float)(width-xPos)/ (float)p2w;
             }
             if (yPos + imageHeight > height) {
-                vertexes[5] = vertexes[7] = y + height;
-                texCoords[5] = texCoords[7] = (float)(height-yPos) / (float)p2h;
+                vertexes[tileOffset+5] = vertexes[tileOffset+7] = vertexes[tileOffset+11] = y + height;
+                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = (float)(height-yPos) / (float)p2h;
             }
-            glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, texCoords);
-            GLErrorLog;
             
-            glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
-            GLErrorLog;
-            
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            GLErrorLog;
+            tileOffset += 12;
         }
     }
+    
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, texCoords);
+    GLErrorLog;
+    
+    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
+    GLErrorLog;
+    
+    glDrawArrays(GL_TRIANGLES, 0, 6 * numTiles);
+    GLErrorLog;
     
     free(vertexes);
     free(texCoords);

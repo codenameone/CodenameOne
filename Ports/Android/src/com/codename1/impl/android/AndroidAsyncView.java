@@ -541,6 +541,21 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
 
         @Override
+        public void tileImage(final Object img, final int x, final int y, final int w, final int h) {
+            final int alph = alpha;
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    Paint p = underlying.getPaint();
+                    underlying.setPaint(imagePaint);
+                    imagePaint.setAlpha(alph);
+                    underlying.tileImage(img, x, y, w, h);
+                    underlying.setPaint(p);
+                }
+            });
+        }
+        
+        @Override
         public void drawImage(final Object img, final int x, final int y, final int w, final int h) {
             final int alph = alpha;
             pendingRenderingOperations.add(new AsyncOp(clip) {
