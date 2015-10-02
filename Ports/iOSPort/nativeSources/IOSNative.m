@@ -4942,7 +4942,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getSocketAvailableInput___long(CN1_THR
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_readFromSocketStream___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG socket) {
     POOL_BEGIN();
     SocketImpl* impl = (BRIDGE_CAST SocketImpl*)((void *)socket);
-    JAVA_OBJECT b = nsDataToByteArr([impl readFromStream]);
+    NSData *d = [impl readFromStream];
+    if (d == nil) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT b = nsDataToByteArr(d);
     POOL_END();
     return b;
 }
