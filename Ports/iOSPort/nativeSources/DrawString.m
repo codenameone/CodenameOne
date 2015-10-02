@@ -174,21 +174,26 @@ static GLuint getOGLProgram(){
     
     GLfloat vertexes[] = {
         x, y,
-        x + p2w, y,
-        x, y + p2h,
-        x + p2w, y + p2h
+        x + w, y,
+        x, y + h,
+        x + w, y + h
     };
     
-    //static const GLshort textureCoordinates[] = {
-    //    0, 1,
-    //    1, 1,
-    //    0, 0,
-    //    1, 0,
-    //};
+    GLfloat nY = 1.0;
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - (GLfloat)h / (GLfloat)p2h;
+    GLfloat eX = (GLfloat)w/(GLfloat)p2w;
+    
+    GLfloat textureCoordinates[] = {
+        wX, nY,
+        eX, nY,
+        wX, sY,
+        eX, sY
+    };
     
     //_glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
     //GLErrorLog;
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, textureCoordinates);
     GLErrorLog;
     
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);

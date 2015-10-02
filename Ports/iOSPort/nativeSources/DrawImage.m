@@ -103,21 +103,21 @@ static GLuint getOGLProgram(){
     
     //_glEnable(GL_TEXTURE_2D);
     
-    float w = width;
-    float h = height;
-    float actualImageWidth = [img getImage].size.width;
-    float actualImageHeight = [img getImage].size.height;
-    float actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
-    float actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    //float w = width;
+    //float h = height;
+    GLfloat actualImageWidth = [img getImage].size.width;
+    GLfloat actualImageHeight = [img getImage].size.height;
+    GLfloat actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+    GLfloat actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
     GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, tex);
     GLErrorLog;
-    float blankPixelsW = actualImageWidthP2 - actualImageWidth;
-    float blankPixelsH = actualImageHeightP2 - actualImageHeight;
-    w += ceil(blankPixelsW * w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
-    h += ceil(blankPixelsH * h/ actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
+    //float blankPixelsW = actualImageWidthP2 - actualImageWidth;
+    //float blankPixelsH = actualImageHeightP2 - actualImageHeight;
+    //w += ceil(blankPixelsW * w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
+    //h += ceil(blankPixelsH * h/ actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
     
     // offset from y coord... to deal with differences between simulator and
     // device
@@ -131,9 +131,21 @@ static GLuint getOGLProgram(){
     
     GLfloat vertexes[] = {
         x, y+dy,
-        x + w, y+dy,
-        x, y + h,
-        x + w, y + h
+        x + width, y+dy,
+        x, y + height,
+        x + width, y + height
+    };
+    
+    GLfloat nY = 1.0;
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - actualImageHeight / actualImageHeightP2;
+    GLfloat eX = actualImageWidth/actualImageWidthP2;
+    
+    GLfloat textureCoordinates[] = {
+        wX, nY,
+        eX, nY,
+        wX, sY,
+        eX, sY
     };
     //NSLog(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
     
@@ -154,7 +166,7 @@ static GLuint getOGLProgram(){
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
 
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, textureCoordinates);
     GLErrorLog;
     
     glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
