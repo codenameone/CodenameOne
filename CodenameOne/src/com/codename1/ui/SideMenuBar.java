@@ -937,7 +937,7 @@ public class SideMenuBar extends MenuBar {
                 if (cmp.getParent() != null) {
                     cmp.getParent().removeAll();
                 }
-                if (c.getClientProperty(COMMAND_ACTIONABLE) != null) {
+                if (c.getClientProperty(COMMAND_ACTIONABLE) != null && c.getClientProperty(COMMAND_ACTIONABLE).equals(Boolean.TRUE)) {
                     Container cnt = new Container(new BorderLayout());
                     cnt.addComponent(BorderLayout.CENTER, cmp);
                     Button btn = createTouchCommandButton(c);
