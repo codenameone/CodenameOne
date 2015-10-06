@@ -1458,6 +1458,7 @@ public class UIManager {
         try {
             Resources theme = Resources.openLayered(resourceFile);
             UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+            Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
             e.printStackTrace();
@@ -1476,6 +1477,7 @@ public class UIManager {
         try {
             Resources theme = Resources.openLayered(resourceFile);
             UIManager.getInstance().setThemeProps(theme.getTheme(resName));
+            Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
             e.printStackTrace();

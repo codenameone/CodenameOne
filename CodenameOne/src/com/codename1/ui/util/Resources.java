@@ -76,6 +76,11 @@ public class Resources {
     static final byte MAGIC_PASSWORD = (byte)0xFE;
 
     /**
+     * This variable is used by new GUI builder apps to keep track of the applications resources
+     */
+    private static Resources globalResources;
+    
+    /**
      * @return the failOnMissingTruetype
      */
     public static boolean isFailOnMissingTruetype() {
@@ -1688,5 +1693,23 @@ public class Resources {
             ex.printStackTrace();
         }
         return null;
+    }
+    
+    /**
+     * Global resources are used by new GUI builder apps to keep track of the applications resources
+     * 
+     * @param res the resource object used by default in the GUI builder forms
+     */
+    public static void setGlobalResources(Resources res) {
+        globalResources = res;
+    }
+    
+    /**
+     * Global resources are used by new GUI builder apps to keep track of the applications resources
+     * 
+     * @return the resource object used by default in the GUI builder forms
+     */
+    public static Resources getGlobalResources() {
+        return globalResources;
     }
 }

@@ -482,7 +482,8 @@ public class NetworkManager {
     }
 
     /**
-     * Shuts down the network thread 
+     * Shuts down the network thread, this will trigger failures if you have network requests
+     * @deprecated This method is for internal use only
      */
     public void shutdown() {
         running = false;
