@@ -3891,10 +3891,10 @@ public class Component implements Animation, StyleListener {
                     getScrollDimension().getWidth()) {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
-            if(!isScrollableY()){
+            if(!isScrollableY() && getScrollY() > 0){
                 setScrollY(0);
             }
-            if(!isScrollableX()){
+            if(!isScrollableX() && getScrollX() > 0){
                 setScrollX(0);
             }
         }

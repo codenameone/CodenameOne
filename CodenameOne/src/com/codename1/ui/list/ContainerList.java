@@ -445,7 +445,12 @@ public class ContainerList extends Container {
                 fireActionEvent(new ActionEvent(ContainerList.this, keyCode));
             }
         }
-        
+                
+        @Override
+        public Dimension getPreferredSize() {
+            return calcPreferredSize();
+        }
+
         public Dimension calcPreferredSize() {
             Component c = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
             if(getWidth() <= 0) {
