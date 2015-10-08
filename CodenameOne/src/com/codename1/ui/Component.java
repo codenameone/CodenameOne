@@ -2487,12 +2487,15 @@ public class Component implements Animation, StyleListener {
      * @return a component drop target or null if no drop target is available at that coordinate
      */
     private Component findDropTarget(Component source, int x, int y) {
-        Component c = getComponentForm().findDropTargetAt(x, y);
-        while(c != null) {
-            if(c.isDropTarget() && c.draggingOver(source, x - c.getAbsoluteX() - c.getScrollX(), y- c.getAbsoluteY() - c.getScrollY())) {
-                return c;
+        Form f = getComponentForm();
+        if(f != null) {
+            Component c = f.findDropTargetAt(x, y);
+            while(c != null) {
+                if(c.isDropTarget() && c.draggingOver(source, x - c.getAbsoluteX() - c.getScrollX(), y- c.getAbsoluteY() - c.getScrollY())) {
+                    return c;
+                }
+                c = c.getParent();
             }
-            c = c.getParent();
         }
         return null;
     }
