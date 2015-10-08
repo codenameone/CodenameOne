@@ -39,6 +39,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
@@ -1216,9 +1217,12 @@ public final class Display {
             } else {
                 r.run();
             }
+        } catch(RuntimeException re) {
+            Log.e(re);
+            throw re;
         } finally {
             this.dropEvents = false;
-        }
+        } 
     }
 
     /**
