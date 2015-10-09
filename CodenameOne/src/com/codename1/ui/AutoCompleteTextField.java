@@ -317,6 +317,11 @@ public class AutoCompleteTextField extends TextField {
             popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
+        if(f.getToolbar() != null) {
+            // we need to add the status bar which is now missing from the titlebar entry
+            Style s = getUIManager().getComponentStyle("StatusBar");
+            topMargin += s.getPadding(TOP) + s.getPadding(BOTTOM);
+        }
         popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
         popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
