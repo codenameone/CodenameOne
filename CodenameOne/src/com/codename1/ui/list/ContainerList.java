@@ -102,6 +102,7 @@ public class ContainerList extends Container {
         for(int iter = 0 ; iter < getComponentCount() ; iter++) {
             getComponentAt(iter).setShouldCalcPreferredSize(true);
         }
+        setScrollSize(null);
         if(isInitialized()) {
             revalidate();
         }
@@ -448,6 +449,7 @@ public class ContainerList extends Container {
                 
         @Override
         public Dimension getPreferredSize() {
+            ContainerList.this.setScrollSize(null);
             return calcPreferredSize();
         }
 
