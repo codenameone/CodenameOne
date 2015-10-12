@@ -75,6 +75,24 @@ public class ContainerList extends Container {
         init(m);
     }
 
+    @Override
+    public Dimension getScrollDimension() {
+        return calcPreferredSize();
+    }
+
+    @Override
+    protected Dimension calcScrollSize() {
+        Dimension d = super.calcScrollSize(); 
+        if(getComponentCount() > 0) {
+            Component c = getComponentAt(getComponentCount() - 1);
+            int h = c.getY() + c.getHeight();
+            if(h > d.getHeight()) {
+                d.setHeight(h);
+            }
+        }
+        return d;
+    }
+    
     private void init(ListModel m) {
         setModel(m);
         setUIID("ContainerList");

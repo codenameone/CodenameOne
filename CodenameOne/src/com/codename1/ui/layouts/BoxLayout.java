@@ -95,7 +95,9 @@ public class BoxLayout extends Layout{
                     if(y >= cmpBottom && !parent.isScrollableY()){
                         cmpH = 0;
                     }else if(y + cmpH - parent.getStyle().getPadding(false, Component.TOP) > cmpBottom){
-                        cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
+                        if(!parent.isScrollableY()) {
+                            cmpH = cmpBottom - y - stl.getMargin(false, Component.BOTTOM);
+                        }
                     }
                     cmp.setHeight(cmpH);
                     cmp.setX(x + stl.getMargin(parent.isRTL(), Component.LEFT));
