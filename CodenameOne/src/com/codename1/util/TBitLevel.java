@@ -55,10 +55,38 @@ class TBitLevel {
             }
         }
         // Subtracting all sign bits
-        bLength -= TBigDecimal.numberOfLeadingZeros(highDigit);
+        bLength -= numberOfLeadingZeros(highDigit);
         return bLength;
     }
 
+    static int numberOfLeadingZeros(int i) {
+        if (i == 0) {
+            return 32;
+        }
+        int n = 0;
+        if (i >>> 16 != 0) {
+            i >>>= 16;
+            n |= 16;
+        }
+        if (i >>> 8 != 0) {
+            i >>>= 8;
+            n |= 8;
+        }
+        if (i >>> 4 != 0) {
+            i >>>= 4;
+            n |= 4;
+        }
+        if (i >>> 2 != 0) {
+            i >>>= 2;
+            n |= 2;
+        }
+        if (i >>> 1 != 0) {
+            i >>>= 1;
+            n |= 1;
+        }
+        return 32 - n - 1;
+    }
+    
     /** @see TBigInteger#bitCount() */
     static int bitCount(TBigInteger val) {
         int bCount = 0;
