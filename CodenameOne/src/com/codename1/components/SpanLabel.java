@@ -57,6 +57,7 @@ public class SpanLabel extends Container {
         setUIID("Container");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
+        text.setColumns(text.getText().length() + 1);
         text.setUIID("Label");
         text.setEditable(false);
         text.setFocusable(false);
