@@ -794,6 +794,10 @@ public class Form extends Container {
      * Returns true if the given dest component is in the column of the source component
      */
     private boolean isInSameColumn(Component source, Component dest) {
+        // workaround for NPE
+        if(source == null || dest == null) {
+            return false;
+        }
         return Rectangle.intersects(source.getAbsoluteX(), 0,
                 source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),
                 dest.getWidth(), dest.getHeight());
