@@ -190,6 +190,9 @@ public class ImageViewer extends Component {
         } else {
             image.lock();
         }
+        if(image.isAnimation()) {
+            getComponentForm().registerAnimated(this);
+        }
         eagerLock();
     }
     
