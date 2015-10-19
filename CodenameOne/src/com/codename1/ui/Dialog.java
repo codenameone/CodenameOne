@@ -570,105 +570,7 @@ public class Dialog extends Form {
      */
     protected void autoAdjust(int w, int h) {
         if (autoAdjustDialogSize) {
-            Component contentPane = super.getContentPane();
-            Component title = super.getTitleComponent();
-            int prefHeight = contentPane.getPreferredH();
-            int prefWidth = contentPane.getPreferredW();
-            Style contentPaneStyle = contentPane.getStyle();
-            Style titleStyle = title.getStyle();
-
-            // if the dialog is packed we can scale it far more accurately based on intention
-            if (position != null) {
-                int menuHeight = 0;
-                if (getSoftButtonCount() > 1) {
-                    Component menuBar = getSoftButton(0).getParent();
-                    Style menuStyle = menuBar.getStyle();
-                    menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
-                }
-                prefWidth = Math.min(prefWidth, w);
-                h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
-                int topBottom = Math.max(0, (h - prefHeight) / 2);
-                int leftRight = Math.max(0, (w - prefWidth) / 2);
-                int top = topBottom, bottom = topBottom;
-                int left = leftRight, right = leftRight;
-
-                if (position.equals(BorderLayout.EAST)) {
-                    left = Math.max(0, w - prefWidth);
-                    right = 0;
-                } else {
-                    if (position.equals(BorderLayout.WEST)) {
-                        right = 0;
-                        left = Math.max(0, w - prefWidth);
-                    } else {
-                        if (position.equals(BorderLayout.NORTH)) {
-                            top = 0;
-                            bottom = Math.max(0, h - prefHeight);
-                        } else {
-                            if (position.equals(BorderLayout.SOUTH)) {
-                                top = Math.max(0, h - prefHeight);
-                                bottom = 0;
-                            }
-                        }
-                    }
-                }
-
-                titleStyle.setMargin(Component.TOP, 0, true);
-                titleStyle.setMargin(Component.BOTTOM, 0, true);
-                titleStyle.setMargin(Component.LEFT, 0, true);
-                titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                contentPaneStyle.setMargin(Component.TOP, top, true);
-                contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                contentPaneStyle.setMargin(Component.LEFT, left, true);
-                contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                return;
-            } else {
-                int oldW = getWidth();
-                int oldH = getHeight();
-                if (oldW != w || oldH != h) {
-                    // try to preserve the old size of the dialog if we still have room for it...
-                    if(prefWidth <= w && prefHeight <= h) {
-                        float oldLeftRightDistRatio = 1;
-                        if(left + right != 0) {
-                            oldLeftRightDistRatio = ((float)left) / ((float)left + right);
-                        }
-                        float oldTopBottomDistRatio = 1;
-                        if(left + right != 0) {
-                            oldTopBottomDistRatio = ((float)top) / ((float)top + bottom);
-                        }
-                        top = Math.max(0, (int)((h - prefHeight) * oldTopBottomDistRatio));
-                        left = Math.max(0, (int)((w - prefWidth) * oldLeftRightDistRatio));
-                        bottom = Math.max(0, (h - prefHeight) - top);
-                        right = Math.max(0, (w - prefWidth) - left);
-
-                        titleStyle.setMargin(Component.TOP, 0, true);
-                        titleStyle.setMargin(Component.BOTTOM, 0, true);
-                        titleStyle.setMargin(Component.LEFT, 0, true);
-                        titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                        contentPaneStyle.setMargin(Component.TOP, top, true);
-                        contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                        contentPaneStyle.setMargin(Component.LEFT, left, true);
-                        contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                        return;
-                    } else {
-                        float ratioW = ((float) w) / ((float) oldW);
-                        float ratioH = ((float) h) / ((float) oldH);
-
-                        Style s = getDialogStyle();
-
-                        s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
-                        s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
-                        s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
-                        s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
-
-                        titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
-                        titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
-                        titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
-                        return;
-                    }
-                }
-            }
+            growOrShrinkImpl(w, h);
         }
     }
     
@@ -1779,5 +1681,115 @@ public class Dialog extends Form {
             Display.getInstance().repaint(cmp);
         }
     }
-    
+
+    /**
+     * Allows a dialog component to grow or shrink to its new preferred size
+     */
+    public void growOrShrink() {
+        getDialogComponent().setShouldCalcPreferredSize(true);
+        growOrShrinkImpl(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        forceRevalidate();
+    }
+
+    private void growOrShrinkImpl(int w, int h) {
+        Component contentPane = super.getContentPane();
+        Component title = super.getTitleComponent();
+        int prefHeight = contentPane.getPreferredH();
+        int prefWidth = contentPane.getPreferredW();
+        Style contentPaneStyle = contentPane.getStyle();
+        Style titleStyle = title.getStyle();
+
+        // if the dialog is packed we can scale it far more accurately based on intention
+        if (position != null) {
+            int menuHeight = 0;
+            if (getSoftButtonCount() > 1) {
+                Component menuBar = getSoftButton(0).getParent();
+                Style menuStyle = menuBar.getStyle();
+                menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+            }
+            prefWidth = Math.min(prefWidth, w);
+            h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
+            int topBottom = Math.max(0, (h - prefHeight) / 2);
+            int leftRight = Math.max(0, (w - prefWidth) / 2);
+            int top = topBottom, bottom = topBottom;
+            int left = leftRight, right = leftRight;
+
+            if (position.equals(BorderLayout.EAST)) {
+                left = Math.max(0, w - prefWidth);
+                right = 0;
+            } else {
+                if (position.equals(BorderLayout.WEST)) {
+                    right = 0;
+                    left = Math.max(0, w - prefWidth);
+                } else {
+                    if (position.equals(BorderLayout.NORTH)) {
+                        top = 0;
+                        bottom = Math.max(0, h - prefHeight);
+                    } else {
+                        if (position.equals(BorderLayout.SOUTH)) {
+                            top = Math.max(0, h - prefHeight);
+                            bottom = 0;
+                        }
+                    }
+                }
+            }
+
+            titleStyle.setMargin(Component.TOP, 0, true);
+            titleStyle.setMargin(Component.BOTTOM, 0, true);
+            titleStyle.setMargin(Component.LEFT, 0, true);
+            titleStyle.setMargin(Component.RIGHT, 0, true);
+
+            contentPaneStyle.setMargin(Component.TOP, top, true);
+            contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+            contentPaneStyle.setMargin(Component.LEFT, left, true);
+            contentPaneStyle.setMargin(Component.RIGHT, right, true);
+            return;
+        } else {
+            int oldW = getWidth();
+            int oldH = getHeight();
+            if (oldW != w || oldH != h) {
+                // try to preserve the old size of the dialog if we still have room for it...
+                if(prefWidth <= w && prefHeight <= h) {
+                    float oldLeftRightDistRatio = 1;
+                    if(left + right != 0) {
+                        oldLeftRightDistRatio = ((float)left) / ((float)left + right);
+                    }
+                    float oldTopBottomDistRatio = 1;
+                    if(left + right != 0) {
+                        oldTopBottomDistRatio = ((float)top) / ((float)top + bottom);
+                    }
+                    top = Math.max(0, (int)((h - prefHeight) * oldTopBottomDistRatio));
+                    left = Math.max(0, (int)((w - prefWidth) * oldLeftRightDistRatio));
+                    bottom = Math.max(0, (h - prefHeight) - top);
+                    right = Math.max(0, (w - prefWidth) - left);
+
+                    titleStyle.setMargin(Component.TOP, 0, true);
+                    titleStyle.setMargin(Component.BOTTOM, 0, true);
+                    titleStyle.setMargin(Component.LEFT, 0, true);
+                    titleStyle.setMargin(Component.RIGHT, 0, true);
+
+                    contentPaneStyle.setMargin(Component.TOP, top, true);
+                    contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+                    contentPaneStyle.setMargin(Component.LEFT, left, true);
+                    contentPaneStyle.setMargin(Component.RIGHT, right, true);
+                    return;
+                } else {
+                    float ratioW = ((float) w) / ((float) oldW);
+                    float ratioH = ((float) h) / ((float) oldH);
+
+                    Style s = getDialogStyle();
+
+                    s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
+                    s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
+                    s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
+                    s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
+
+                    titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
+                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
+                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
+                    return;
+                }
+            }
+        }
+    }
 }
