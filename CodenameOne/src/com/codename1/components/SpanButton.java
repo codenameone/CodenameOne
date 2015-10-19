@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
@@ -177,7 +178,22 @@ public class SpanButton extends Container {
     public String getIconPosition() {
         return (String)getLayout().getComponentConstraint(actualButton);
     }
+
+    /**
+     * Sets the command for the component
+     * @param cmd the command
+     */
+    public void setCommand(Command cmd) {
+        actualButton.setCommand(cmd);
+    }
     
+    /**
+     * Returns the command instance of the button
+     * @return the command instance of the button
+     */
+    public Command getCommand() {
+        return actualButton.getCommand();
+    }
 
     /**
      * @inheritDoc
