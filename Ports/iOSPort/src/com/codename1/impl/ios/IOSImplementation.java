@@ -5168,7 +5168,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         NetworkConnection n = (NetworkConnection)connection;
         n.body = new FileBackedOutputStream();
-        return n.body;
+        return new BufferedOutputStream(n.body);
     }
 
     /**
