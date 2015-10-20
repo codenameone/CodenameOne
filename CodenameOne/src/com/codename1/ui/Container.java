@@ -147,6 +147,46 @@ public class Container extends Component implements Iterable<Component>{
         }
         return super.getUIManager();
     }
+
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param cmp the component to add
+     * @return this for call chaining
+     */
+    public Container add(Component cmp) {
+        addComponent(cmp);
+        return this;
+    }
+    
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param constraint the layout constraint if applicable
+     * @param cmp the component to add
+     * @return this for call chaining
+     */
+    public Container add(Object constraint, Component cmp) {
+        addComponent(constraint, cmp);
+        return this;
+    }
+    
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param label a component that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+     * @return this for call chaining
+     */
+    public Container add(String label) {
+        return add(new Label(label));
+    }
+    
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param constraint the layout constraint if applicable
+     * @param label a component that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+     * @return this for call chaining
+     */
+    public Container add(Object constraint, String label) {
+        return add(constraint, new Label(label));
+    }
     
     /**
      * Allows replacing the UIManager in a component hierarchy to update the look and feel

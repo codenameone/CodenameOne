@@ -249,7 +249,34 @@ public class TextField extends TextArea {
         setUIID("TextField");
         setSingleLineTextArea(true);
     }
+
+    /**
+     * Construct text field with a hint
+     * 
+     * @param text the text of the field
+     * @param hint the hint string
+     */
+    public TextField(String text, String hint) {
+        this(text);
+        setHint(hint);
+    }
     
+
+    /**
+     * Construct text field with a hint, columns and constraint values
+     * 
+     * @param text the text of the field
+     * @param hint the hint string
+     * @param columns columns value
+     * @param constraint the constraint value
+     */
+    public TextField(String text, String hint, int columns, int constraint) {
+        this(text);
+        setHint(hint);
+        setColumns(columns);
+        setConstraint(constraint);
+    }
+
     /**
      * Performs a backspace operation
      */

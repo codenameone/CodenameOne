@@ -431,6 +431,20 @@ public class TextArea extends Component {
     }
     
     /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't an integer this number will be returned
+     * @return the int value of the text field
+     */
+    public int getAsInt(int invalid) {
+        try {
+            return Integer.parseInt(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
+    }
+    
+    /**
      * Returns true if this area is editable
      * 
      * @return true if this area is editable
