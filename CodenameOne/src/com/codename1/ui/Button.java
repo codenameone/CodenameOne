@@ -124,11 +124,13 @@ public class Button extends Label {
             removeActionListener(this.cmd);
         }
         this.cmd = cmd;
-        setText(cmd.getCommandName());
-        setIcon(cmd.getIcon());
-        setEnabled(cmd.isEnabled());
-        updateCommand();
-        addActionListener(cmd);
+        if(cmd != null) {
+            setText(cmd.getCommandName());
+            setIcon(cmd.getIcon());
+            setEnabled(cmd.isEnabled());
+            updateCommand();
+            addActionListener(cmd);
+        }
     }
 
     /**
