@@ -27,6 +27,7 @@ package com.codename1.designer;
 import com.l2fprod.common.swing.JOutlookBar;
 import com.codename1.ui.resource.util.CodenameOneComponentWrapper;
 import com.codename1.ui.CodenameOneAccessor;
+import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Accessor;
@@ -82,6 +83,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.EventObject;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
@@ -135,6 +137,7 @@ import org.jdesktop.swingx.tree.DefaultXTreeCellRenderer;
  * @author Shai Almog
  */
 public class UserInterfaceEditor extends BaseForm {
+    public static boolean exportToNewGuiBuilderMode = false;
     private javax.swing.Timer repainter;
     private static final Object PROPERTIES_DIFFER_IN_VALUE = new Object();
     private static final DataFlavor CODENAMEONE_COMPONENT_FLAVOR = new DataFlavor(com.codename1.ui.Component.class, "CodenameOne Component");
@@ -3085,6 +3088,11 @@ public class UserInterfaceEditor extends BaseForm {
         }
     }
     
+    public static ArrayList<String> actionEventNames;
+    public static ArrayList<String> listNames;
+    public static HashMap<String, Class> componentNames;
+    public static HashMap<Command, String> navigationCommands;
+    
     public static void persistToXML(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, StringBuilder build, EditableResources res, String indent) {
         persistToXML(containerInstance, cmp, build, res, indent, null);
     }
@@ -3098,6 +3106,31 @@ public class UserInterfaceEditor extends BaseForm {
             build.append(xmlize(cmp.getName()));
         } 
         build.append("\" ");
+        
+        if(exportToNewGuiBuilderMode) {
+            String cmpName = ResourceEditorView.normalizeFormName(cmp.getName());
+            Class cls = componentNames.get(cmpName);
+            if(cls == null) {
+                componentNames.put(cmpName, cmp.getClass());
+            } else {
+                if(cls != cmp.getClass()) {
+                    componentNames.put(cmpName, com.codename1.ui.Component.class);
+                }
+            }
+            if(cmp instanceof List) {
+                listNames.add(cmp.getName());
+            }
+            if(cmp instanceof com.codename1.ui.Button || cmp instanceof com.codename1.ui.TextArea || 
+                    cmp instanceof com.codename1.ui.Slider || 
+                    cmp instanceof com.codename1.ui.List || cmp instanceof com.codename1.components.MultiButton || 
+                    cmp instanceof com.codename1.components.SpanButton || cmp instanceof com.codename1.components.OnOffSwitch || 
+                    cmp instanceof com.codename1.ui.Calendar || cmp instanceof com.codename1.ui.list.ContainerList) {
+                // add action listener XML 
+                actionEventNames.add(cmp.getName());
+                build.append(" actionEvent=\"true\" ");
+            }            
+        }
+        
         if(cmp.getClientProperty("cn1$Properties") != null) {
             String[] p = ((String)cmp.getClientProperty("cn1$Properties")).split(",");
             if(p.length > 0) {
@@ -3183,6 +3216,15 @@ public class UserInterfaceEditor extends BaseForm {
             build.append("commandBack=\"");
             build.append(cmp.getComponentForm().getBackCommand() == cmd);
             build.append("\" ");
+            
+            if(exportToNewGuiBuilderMode) {
+                /*build.append(" hasCode=\"true\" varName=\"");
+                if(cmd.getCommandName() == null || cmd.getCommandName().length() == 0) {
+                    
+                } else {
+                    
+                }*/
+            }
         }
         
         if(isPropertyModified(cmp, PROPERTY_LABEL_FOR)) {
