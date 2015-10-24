@@ -356,7 +356,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         pIn.close();
         
         if(props.getProperty("guiResource") == null) {
-            System.out.println("Not a legacy GUI builder project!");
+            System.out.println("Not a legacy GUI builder project!\nConversion failed!");
             System.exit(1);
             return;
         }
@@ -715,6 +715,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         FileOutputStream pOut = new FileOutputStream(propertiesFile);
         props.store(pOut, "Updated by GUI builder migration wizard");
         pOut.close();
+        System.out.println("Conversion completed successfully!");
         System.exit(0);
     }
 
