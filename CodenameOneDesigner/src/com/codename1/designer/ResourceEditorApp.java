@@ -401,10 +401,12 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("        if(res != null) {\n");
         stateMachineBaseSource.append("            setResourceFilePath(resPath);\n");
         stateMachineBaseSource.append("            setResourceFile(res);\n");
+        stateMachineBaseSource.append("            Resources.setGlobalResources(res);");
         stateMachineBaseSource.append("            initVars(res);\n");
         stateMachineBaseSource.append("            return showForm(getFirstFormName(), null);\n");
         stateMachineBaseSource.append("        } else {\n");
         stateMachineBaseSource.append("            Form f = (Form)createContainer(resPath, getFirstFormName());\n");
+        stateMachineBaseSource.append("            Resources.setGlobalResources(fetchResourceFile());");
         stateMachineBaseSource.append("            initVars(fetchResourceFile());\n");
         stateMachineBaseSource.append("            beforeShow(f);\n");
         stateMachineBaseSource.append("            f.show();\n");
@@ -450,7 +452,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("            return f;\n");
         stateMachineBaseSource.append("        } catch(Exception err) {\n");
         stateMachineBaseSource.append("            err.printStackTrace();\n");
-        stateMachineBaseSource.append("            throw new RuntimeException(\"Form not found\");\n");
+        stateMachineBaseSource.append("            throw new RuntimeException(\"Form not found: \" + resourceName);\n");
         stateMachineBaseSource.append("        }\n");
         stateMachineBaseSource.append("    }\n\n");
         stateMachineBaseSource.append("    protected void beforeShow(Form f) {\n");
@@ -493,7 +495,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("            if(n != null && n.equals(componentName)) {\n");
         stateMachineBaseSource.append("                return c;\n");
         stateMachineBaseSource.append("            }\n");
-        stateMachineBaseSource.append("            if(c instanceof Container) {\n");
+        stateMachineBaseSource.append("            if(c instanceof Container && ((Container)c).getLeadComponent() == null) {\n");
         stateMachineBaseSource.append("                c = findByName__(componentName, (Container)c);\n");
         stateMachineBaseSource.append("                if(c != null) {\n");
         stateMachineBaseSource.append("                    return c;\n");
@@ -506,15 +508,15 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("    }\n\n");
         stateMachineBaseSource.append("    public void handleComponentAction__(Component c, ActionEvent event) {\n");
         stateMachineBaseSource.append("    }\n\n");
-        stateMachineBaseSource.append("    protected void processCommand(ActionEvent ev, Command cmd) {\n");
-        stateMachineBaseSource.append("    }\n\n");
         stateMachineBaseSource.append("    public void processCommand__(ActionEvent ev, Command cmd) {\n");
+        stateMachineBaseSource.append("        processCommand(ev, cmd);\n");
         stateMachineBaseSource.append("    }\n\n");
 
         StringBuilder formNameMapBuilder = new StringBuilder("static {");
         StringBuilder invokeFormExitBuilder = new StringBuilder("    private void invokeFormExit__(Form f) {\n");
         
         UserInterfaceEditor.componentNames = new HashMap<String, Class>();
+        UserInterfaceEditor.commandList = new ArrayList<ActionCommand>();
 
         for(String uiName : res.getUIResourceNames()) {
             System.out.println("Processing: " + uiName);
@@ -554,7 +556,6 @@ public class ResourceEditorApp extends SingleFrameApplication {
             
             UserInterfaceEditor.actionEventNames = new ArrayList<String>();
             UserInterfaceEditor.listNames = new ArrayList<String>();
-            UserInterfaceEditor.navigationCommands = new HashMap<Command, String>();
             UserInterfaceEditor.persistToXML(cnt, cnt, bld, res, "");
             w.write(bld.toString());
             w.flush();
@@ -614,6 +615,10 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 prePostCode += "        generated.StateMachineBase.instance.post";
                 prePostCode += normalizedUiName;
                 prePostCode += "__(this);\n    }\n";
+
+                prePostCode += "    protected void actionCommand(com.codename1.ui.Command cmd) {\n";
+                prePostCode += "        generated.StateMachineBase.instance.processCommand__(new com.codename1.ui.events.ActionEvent(cmd), cmd);\n";
+                prePostCode += "    }\n\n";
             } else {
                 if(cnt instanceof com.codename1.ui.Form) {
                     w.write("Form");
@@ -623,6 +628,10 @@ public class ResourceEditorApp extends SingleFrameApplication {
                     prePostCode += "__(this);\n        super.show();\n        generated.StateMachineBase.instance.post";
                     prePostCode += normalizedUiName;
                     prePostCode += "__(this);\n    }\n";
+
+                    prePostCode += "    protected void actionCommand(com.codename1.ui.Command cmd) {\n";
+                    prePostCode += "        generated.StateMachineBase.instance.processCommand__(new com.codename1.ui.events.ActionEvent(cmd), cmd);\n";
+                    prePostCode += "    }\n\n";
                 } else {
                     w.write("Container");
                     prePostCode = "";
@@ -648,23 +657,25 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 w.write("generated.StateMachineBase.instance.on");
                 w.write(normalizedUiName);
                 w.write("_");
-                w.write(actionListenerNames);
+                String normalizedActionListenerName = ResourceEditorView.normalizeFormName(actionListenerNames);
+                w.write(normalizedActionListenerName);
                 w.write("Action__((com.codename1.ui.Component)ev.getSource(), ev);\n    }\n\n");
                 stateMachineBaseSource.append("    protected void on");
                 stateMachineBaseSource.append(normalizedUiName);
                 stateMachineBaseSource.append("_");
-                stateMachineBaseSource.append(actionListenerNames);
+                stateMachineBaseSource.append(normalizedActionListenerName);
                 stateMachineBaseSource.append("Action(Component cmp, ActionEvent ev) {\n    }\n\n");
                 stateMachineBaseSource.append("    public void on");
                 stateMachineBaseSource.append(normalizedUiName);
                 stateMachineBaseSource.append("_");
-                stateMachineBaseSource.append(actionListenerNames);
+                stateMachineBaseSource.append(normalizedActionListenerName);
                 stateMachineBaseSource.append("Action__(Component cmp, ActionEvent ev) {\n        on");
                 stateMachineBaseSource.append(normalizedUiName);
                 stateMachineBaseSource.append("_");
-                stateMachineBaseSource.append(actionListenerNames);
+                stateMachineBaseSource.append(normalizedActionListenerName);
                 stateMachineBaseSource.append("Action(cmp, ev);\n    }\n\n");
             }
+                        
             w.write(prePostCode);
             w.write("}\n");
             
@@ -678,11 +689,17 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append(formNameMapBuilder);
         stateMachineBaseSource.append(invokeFormExitBuilder);
 
+        ArrayList<String> uniqueNames = new ArrayList<String>();
         for(String cmpName : UserInterfaceEditor.componentNames.keySet()) {            
+            String nomName = ResourceEditorView.normalizeFormName(cmpName);
+            if(uniqueNames.contains(nomName)) {
+                continue;
+            }
+            uniqueNames.add(nomName);
             stateMachineBaseSource.append("    public ");
             stateMachineBaseSource.append(UserInterfaceEditor.componentNames.get(cmpName).getName());
             stateMachineBaseSource.append(" find");
-            stateMachineBaseSource.append(cmpName);
+            stateMachineBaseSource.append(nomName);
             stateMachineBaseSource.append("(Component root) {\n        return (");
             stateMachineBaseSource.append(UserInterfaceEditor.componentNames.get(cmpName).getName());
             stateMachineBaseSource.append(")findByName(\"");
@@ -691,15 +708,89 @@ public class ResourceEditorApp extends SingleFrameApplication {
             stateMachineBaseSource.append("    public ");
             stateMachineBaseSource.append(UserInterfaceEditor.componentNames.get(cmpName).getName());
             stateMachineBaseSource.append(" find");
-            stateMachineBaseSource.append(cmpName);
+            stateMachineBaseSource.append(nomName);
             stateMachineBaseSource.append("() {\n        return (");
             stateMachineBaseSource.append(UserInterfaceEditor.componentNames.get(cmpName).getName());
             stateMachineBaseSource.append(")findByName(\"");
             stateMachineBaseSource.append(cmpName);
             stateMachineBaseSource.append("\", Display.getInstance().getCurrent());\n    }\n\n");            
         }
+
+        ArrayList<Integer> commandIdsAdded = new ArrayList<Integer>();
+        ArrayList<String> commandNamesAdded = new ArrayList<String>();
+        for(ActionCommand cmd : UserInterfaceEditor.commandList) {
+            String formName = (String)cmd.getClientProperty("FORMNAME");
+            if(formName == null) {
+                continue;
+            }
+            String normalizedCommandName = ResourceEditorView.normalizeFormName(formName) +
+                    ResourceEditorView.normalizeFormName(cmd.getCommandName());
+            if(commandNamesAdded.contains(normalizedCommandName)) {
+                continue;
+            }
+            if(commandIdsAdded.contains(cmd.getId())) {
+                continue;
+            }
+            commandIdsAdded.add(cmd.getId());
+            commandNamesAdded.add(normalizedCommandName);
+            stateMachineBaseSource.append("    public static final int COMMAND_");
+            stateMachineBaseSource.append(normalizedCommandName);
+            stateMachineBaseSource.append(" = ");
+            stateMachineBaseSource.append(cmd.getId());
+            stateMachineBaseSource.append(";\n\n    protected boolean on");
+            stateMachineBaseSource.append(normalizedCommandName);
+            stateMachineBaseSource.append("() {\n        return false;\n    }\n\n");
+        }
+
+        stateMachineBaseSource.append("    protected void processCommand(ActionEvent ev, Command cmd) {\n");
+        stateMachineBaseSource.append("        switch(cmd.getId()) {\n");
+        
+        commandIdsAdded.clear();
+        commandNamesAdded.clear();
+
+        for(ActionCommand cmd : UserInterfaceEditor.commandList) {
+            String formName = (String)cmd.getClientProperty("FORMNAME");
+            if(formName == null) {
+                continue;
+            }
+            String normalizedCommandName = ResourceEditorView.normalizeFormName(formName) +
+                    ResourceEditorView.normalizeFormName(cmd.getCommandName());
+            if(commandNamesAdded.contains(normalizedCommandName)) {
+                continue;
+            }
+            if(commandIdsAdded.contains(cmd.getId())) {
+                continue;
+            }
+            commandIdsAdded.add(cmd.getId());
+            commandNamesAdded.add(normalizedCommandName);
+            stateMachineBaseSource.append("\n        case COMMAND_");
+            stateMachineBaseSource.append(normalizedCommandName);
+            stateMachineBaseSource.append(":\n");
+            
+            if(cmd.getAction() != null && cmd.getAction().length() > 0) {
+                if(!cmd.getAction().startsWith("$")) {
+                    stateMachineBaseSource.append("            showForm(\"");                    
+                    stateMachineBaseSource.append(cmd.getAction());                    
+                    stateMachineBaseSource.append("\", null);\n");                    
+                }
+            }
+            
+            stateMachineBaseSource.append("            if(on");
+            stateMachineBaseSource.append(normalizedCommandName);
+            stateMachineBaseSource.append("()) {\n");
+            stateMachineBaseSource.append("                ev.consume();\n");
+            stateMachineBaseSource.append("                return;\n");
+            stateMachineBaseSource.append("            }\n");
+            stateMachineBaseSource.append("            break;\n\n");
+        }
+        stateMachineBaseSource.append("        }\n");
+        stateMachineBaseSource.append("        if(ev.getComponent() != null) {\n");
+        stateMachineBaseSource.append("            handleComponentAction(ev.getComponent(), ev);\n");
+        stateMachineBaseSource.append("        }\n");
+        stateMachineBaseSource.append("    }\n\n");
         
         stateMachineBaseSource.append("\n}\n");
+        
         
         FileOutputStream sbout = new FileOutputStream(stateMachineBase);
         sbout.write(stateMachineBaseSource.toString().getBytes("UTF-8"));

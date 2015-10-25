@@ -3091,7 +3091,8 @@ public class UserInterfaceEditor extends BaseForm {
     public static ArrayList<String> actionEventNames;
     public static ArrayList<String> listNames;
     public static HashMap<String, Class> componentNames;
-    public static HashMap<Command, String> navigationCommands;
+    public static ArrayList<ActionCommand> commandList;
+    private static int commandCounter;
     
     public static void persistToXML(com.codename1.ui.Container containerInstance, com.codename1.ui.Component cmp, StringBuilder build, EditableResources res, String indent) {
         persistToXML(containerInstance, cmp, build, res, indent, null);
@@ -3108,7 +3109,7 @@ public class UserInterfaceEditor extends BaseForm {
         build.append("\" ");
         
         if(exportToNewGuiBuilderMode) {
-            String cmpName = ResourceEditorView.normalizeFormName(cmp.getName());
+            String cmpName = cmp.getName();
             Class cls = componentNames.get(cmpName);
             if(cls == null) {
                 componentNames.put(cmpName, cmp.getClass());
@@ -3218,12 +3219,24 @@ public class UserInterfaceEditor extends BaseForm {
             build.append("\" ");
             
             if(exportToNewGuiBuilderMode) {
-                /*build.append(" hasCode=\"true\" varName=\"");
+                build.append(" varName=\"");
+                String varName;
                 if(cmd.getCommandName() == null || cmd.getCommandName().length() == 0) {
-                    
+                    varName = ResourceEditorView.normalizeFormName(cmd.getCommandName());
+                    build.append(varName);
                 } else {
-                    
-                }*/
+                    varName = "Command" + commandCounter;
+                    build.append(varName);
+                    commandCounter++;
+                }
+                build.append("\" ");
+                String action = cmd.getAction();
+                if(action != null) {
+                    if(cmp.getComponentForm() != null) {
+                        commandList.add(cmd);
+                        cmd.putClientProperty("FORMNAME", cmp.getComponentForm().getName());
+                    }
+                }
             }
         }
         
@@ -3483,6 +3496,12 @@ public class UserInterfaceEditor extends BaseForm {
                             if(frm.getBackCommand() != null && !hasBackCommand(frm, frm.getBackCommand())) {
                                 build.append("<command name=\"");
                                 ActionCommand cmd = (ActionCommand)frm.getBackCommand();
+                                if(exportToNewGuiBuilderMode) {
+                                    if(cmp.getComponentForm() != null) {
+                                        commandList.add(cmd);
+                                        cmd.putClientProperty("FORMNAME", cmp.getComponentForm().getName());
+                                    }
+                                }
                                 build.append(xmlize(cmd.getCommandName()));
                                 build.append("\" ");
                                 if(cmd.getIcon() != null) {
@@ -3524,6 +3543,12 @@ public class UserInterfaceEditor extends BaseForm {
                             } 
                             for(int iter = frm.getCommandCount() - 1 ; iter >= 0 ; iter--) {
                                 ActionCommand cmd = (ActionCommand)frm.getCommand(iter);
+                                if(exportToNewGuiBuilderMode) {
+                                    if(cmp.getComponentForm() != null) {
+                                        commandList.add(cmd);
+                                        cmd.putClientProperty("FORMNAME", cmp.getComponentForm().getName());
+                                    }
+                                }
                                 build.append("<command name=\"");
                                 build.append(xmlize(cmd.getCommandName()));
                                 build.append("\" ");
