@@ -444,6 +444,14 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("        try {\n");
         stateMachineBaseSource.append("            Form f = (Form)formNameToClassHashMap.get(resourceName).newInstance();\n");
         stateMachineBaseSource.append("            Form current = Display.getInstance().getCurrent();\n");
+        stateMachineBaseSource.append("            if(current != null && isBackCommandEnabled() && allowBackTo(resourceName)) {\n");
+        stateMachineBaseSource.append("                f.putClientProperty(\"previousForm\", current);\n");
+        stateMachineBaseSource.append("                setBackCommand(f, new Command(getBackCommandText(current.getTitle())) {\n");
+        stateMachineBaseSource.append("                    public void actionPerformed(ActionEvent evt) {\n");
+        stateMachineBaseSource.append("                          back(null);\n");
+        stateMachineBaseSource.append("                    }\n");
+        stateMachineBaseSource.append("                });\n");
+        stateMachineBaseSource.append("            }\n");
         stateMachineBaseSource.append("            if(sourceCommand != null && current != null && current.getBackCommand() == sourceCommand) {\n");
         stateMachineBaseSource.append("                f.showBack();\n");
         stateMachineBaseSource.append("            } else {\n");
@@ -510,6 +518,13 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("    }\n\n");
         stateMachineBaseSource.append("    public void processCommand__(ActionEvent ev, Command cmd) {\n");
         stateMachineBaseSource.append("        processCommand(ev, cmd);\n");
+        stateMachineBaseSource.append("    }\n\n");
+        stateMachineBaseSource.append("    public void back() {\n");
+        stateMachineBaseSource.append("        back(null);\n");
+        stateMachineBaseSource.append("    }\n\n");
+        stateMachineBaseSource.append("    public void back(Component sourceComponent) {\n");
+        stateMachineBaseSource.append("        Form current = (Form)Display.getInstance().getCurrent().getClientProperty(\"previousForm\");\n");
+        stateMachineBaseSource.append("        current.showBack();\n");
         stateMachineBaseSource.append("    }\n\n");
 
         StringBuilder formNameMapBuilder = new StringBuilder("static {");
