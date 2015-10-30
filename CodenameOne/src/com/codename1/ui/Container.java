@@ -95,6 +95,10 @@ public class Container extends Component implements Iterable<Component>{
      */
     public static Container encloseIn(Layout l, Component cmp, Object cons) {
         Container cnt = new Container(l);
+        if(cons instanceof Component) {
+            // this got sent to the wong method by dumb compiler...
+            return cnt.add(cmp).add((Component)cons);
+        }
         if(cons != null) {
             cnt.addComponent(cons, cmp);
         } else {

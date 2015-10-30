@@ -87,14 +87,18 @@ public class Label extends Component {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
-    Label(String text, String uiid) {
+    /** 
+     * Constructs a new label with the specified string of text and uiid
+     * 
+     * @param text the string that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(String text, String uiid) {
         noBind = true;
         this.text = text;
         localize();
         setFocusable(false);
 
-        // moved this to the UIManager initializations
-        //setAlignment(CENTER);
         setUIID(uiid);
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
