@@ -2623,6 +2623,13 @@ static BOOL skipNextTouch = NO;
     com_codename1_impl_ios_IOSImplementation_locationUpdate__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+- (void)locationManager:(CLLocationManager *)manager didEnterRegion:(CLRegion *)region {
+    com_codename1_impl_ios_IOSImplementation_onGeofenceEnter___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [region identifier]));
+}
+ 
+- (void)locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region {
+    com_codename1_impl_ios_IOSImplementation_onGeofenceExit___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [region identifier]));
+}
 
 extern UIPopoverController* popoverController;
 extern int popoverSupported();

@@ -301,9 +301,13 @@ public final class IOSNative {
     native double getLocationVelocity(long location);
     native long getLocationTimeStamp(long location);
 
-    native void startUpdatingLocation(long clLocation);
+    native void startUpdatingLocation(long clLocation, int priority);
     native void stopUpdatingLocation(long clLocation);
+    native void startUpdatingBackgroundLocation(long clLocation);
+    native void stopUpdatingBackgroundLocation(long clLocation);
     
+    native void addGeofencing(long clLocation, double lat, double lng, double radius, long expiration, String id);
+    native void removeGeofencing(long clLocation, String id);
     
     // capture
     native void captureCamera(boolean movie);

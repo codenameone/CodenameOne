@@ -77,6 +77,9 @@ import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import com.codename1.location.Geofence;
+import com.codename1.location.GeofenceListener;
+import com.codename1.location.LocationRequest;
 import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
@@ -92,6 +95,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+
 
 /**
  *
@@ -2208,15 +2212,59 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     class Loc extends LocationManager {
         private long peer;
-        private boolean locationUpdating;
-
+        private boolean locationUpdating, backgroundLocationUpdating;
+        private static final String PREFS_BACKGROUND_LOCATION_LISTENER_CLASS = "ios.backgroundLocationListener";
+        private static final String PREFS_BACKGROUND_LOCATION_UPDATING = "ios.backgroundLocationUpdating";
+        private static final String PREFS_GEOFENCE_LISTENER_CLASS = "ios.geofenceListenerClass";
+        private LocationListener backgroundLocationListenerInstance;
+        private Map<String,String> geofenceListeners;
+        private Map<String,Long> geofenceExpirations;
+        
         protected void finalize() throws Throwable {
             //super.finalize();
             if(peer != 0) {
                 nativeInstance.releasePeer(peer);
             }
         }
+        
+        LocationListener getBackgroundLocationListenerInstance() {
+            if (backgroundLocationListenerInstance == null) {
+                Class cls = getBackgroundLocationListener();
+                if (cls != null) {
+                    try {
+                        backgroundLocationListenerInstance = (LocationListener)cls.newInstance();
+                    } catch (Throwable t) {
+                        Log.e(t);
+                        throw new RuntimeException(t.getMessage());
+                    }
+                }
+            }
+            return backgroundLocationListenerInstance;
+        }
+        
+        @Override
+        public Class getBackgroundLocationListener() {
+            Class superVal = super.getBackgroundLocationListener();
+            if (superVal == null && !"".equals(Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, ""))) {
+                String backgroundLocationListenerClassName = Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, "");
+                try {
+                    Class backgroundLocationListenerClass = (Class)Class.forName(backgroundLocationListenerClassName);
+                    super.setBackgroundLocationListener(backgroundLocationListenerClass);
+                } catch (Throwable t) {}
+            }
+            return super.getBackgroundLocationListener(); //To change body of generated methods, choose Tools | Templates.
+        }
 
+        @Override
+        public void setBackgroundLocationListener(Class locationListener) {
+            if (locationListener != null) {
+                Preferences.set(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, locationListener.getCanonicalName());
+            } else {
+                Preferences.set(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, null);
+            }
+            super.setBackgroundLocationListener(locationListener); //To change body of generated methods, choose Tools | Templates.
+        }
+        
         private long getLocation() {
             if(peer < 0) {
                 return peer;
@@ -2230,10 +2278,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             return peer;
         }
 
+        /**
+         * If the app is running in the background and a background listener
+         * is registered, and active, then this will return the background listener
+         * instance.  Otherwise this should return the regular location listener.
+         * @return 
+         */
+        public LocationListener getActiveLocationListener() {
+            if (Display.getInstance().isMinimized() 
+                    && Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false)
+                    && getBackgroundLocationListenerInstance() != null) {
+                return getBackgroundLocationListenerInstance();
+            } else {
+                return getLocationListener();
+            }
+        }
+        
         public LocationListener getLocationListener() {
             return super.getLocationListener();
         }
-        
+ 
         @Override
         public Location getCurrentLocation() {
             long p = getLocation();
@@ -2271,6 +2335,104 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         }
+
+        private Map<String,String> geofenceListeners() {
+            if (geofenceListeners == null) {
+                if (Storage.getInstance().exists("ios.geofenceListeners")) {
+                    geofenceListeners = (Map)Storage.getInstance().readObject("ios.geofenceListeners");
+                } else {
+                    geofenceListeners = new HashMap<String,String>();
+                }
+            }
+            return geofenceListeners;
+        }
+        
+        private Map<String,Long> geofenceExpirations() {
+            if (geofenceExpirations == null) {
+                if (Storage.getInstance().exists("ios.geofenceExpirations")) {
+                    geofenceExpirations = (Map)Storage.getInstance().readObject("ios.geofenceExpirations");
+                } else {
+                    geofenceExpirations = new HashMap<String,Long>();
+                }
+            }
+            return geofenceExpirations;
+        }
+        
+        private void synchronizeGeofenceListeners() {
+            if (geofenceListeners != null) {
+                Storage.getInstance().writeObject("ios.geofenceListeners", geofenceListeners);
+            }
+        }
+        private void synchronizeGeofenceExpirations() {
+            if (geofenceExpirations != null) {
+                Storage.getInstance().writeObject("ios.geofenceExpirations", geofenceExpirations);
+            }
+        }
+        
+        GeofenceListener getGeofenceListener(String id) {
+            if (geofenceListeners().containsKey(id)) {
+                Class cls = null;
+                try {
+                    cls = Class.forName(geofenceListeners.get(id)); 
+                    if (cls == null) {
+                        return null;
+                    }
+                    return (GeofenceListener)cls.newInstance();
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+                
+            }
+            return null;
+        }
+        
+        synchronized void clearExpiredGeofences() {
+            List<String> toRemove = new ArrayList<String>();
+            for (String id : geofenceExpirations().keySet()) {
+                if (geofenceExpirations().get(id) < System.currentTimeMillis()) {
+                    toRemove.add(id);
+                }
+            }
+            for (String id : toRemove) {
+                geofenceListeners().remove(id);
+                geofenceExpirations().remove(id);
+                nativeInstance.removeGeofencing(peer, id);
+            }
+            if (!toRemove.isEmpty()) {
+                synchronizeGeofenceExpirations();
+                synchronizeGeofenceListeners();
+            }
+            
+        }
+        
+        @Override
+        public void addGeoFencing(Class GeofenceListenerClass, Geofence gf) {
+            clearExpiredGeofences();
+            
+            if (gf.getExpiration() > 0) {
+                long expiresAt = System.currentTimeMillis() + gf.getExpiration();
+                geofenceExpirations().put(gf.getId(), expiresAt);
+                synchronizeGeofenceExpirations();
+            }
+            geofenceListeners().put(gf.getId(), GeofenceListenerClass.getCanonicalName());
+            synchronizeGeofenceListeners();
+            nativeInstance.addGeofencing(peer, gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius(), gf.getExpiration(), gf.getId());
+            super.addGeoFencing(GeofenceListenerClass, gf); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void removeGeoFencing(String id) {
+            geofenceListeners().remove(id);
+            geofenceExpirations().remove(id);
+            synchronizeGeofenceListeners();
+            synchronizeGeofenceExpirations();
+            nativeInstance.removeGeofencing(peer, id);
+        }
+
+        @Override
+        public boolean isGeofenceSupported() {
+            return true;
+        }
         
         @Override
         protected void bindListener() {
@@ -2280,7 +2442,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 locationUpdating = true;
-                nativeInstance.startUpdatingLocation(p);
+                int priority = LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
+                if (this.getRequest() != null) {
+                    priority = this.getRequest().getPriority();
+                }
+                nativeInstance.startUpdatingLocation(p, priority);
             }
         }
 
@@ -2295,7 +2461,52 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.stopUpdatingLocation(p);
             }
         }
+        
+        @Override
+        protected void bindBackgroundListener() {
+            //boolean backgroundLocationUpdatingPref = Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+            if (!backgroundLocationUpdating) {
+                long p = getLocation();
+                if(p <= 0) {
+                    return;
+                }
+                Preferences.set(PREFS_BACKGROUND_LOCATION_UPDATING, true);
+                backgroundLocationUpdating = true;
+                nativeInstance.startUpdatingBackgroundLocation(p);
+            }
+        }
+        
+        /**
+         * Method called specially when the app is started with the significant
+         * location change service.  It shoudl start up the location listener
+         * to receive location updates while in the background.
+         */
+        void startBackgroundListener() {
+            // This should kick start the background listener
+            // and significant change service.
+            getBackgroundLocationListenerInstance();
+            
+        }
 
+        @Override
+        protected void clearBackgroundListener() {
+            //boolean backgroundLocationUpdating = Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+            if(backgroundLocationUpdating) {
+                long p = getLocation();
+                if(p <= 0) {
+                    return;
+                }
+                Preferences.set(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+                backgroundLocationUpdating = false;
+                nativeInstance.stopUpdatingBackgroundLocation(p);
+            }
+        }
+
+        @Override
+        public boolean isBackgroundLocationSupported() {
+            return true;
+        }
+        
         @Override
         public Location getLastKnownLocation() {
             return getCurrentLocation();
@@ -2309,7 +2520,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void locationUpdate() {
         if(lm != null) {
-            final LocationListener ls = lm.getLocationListener();
+            final LocationListener ls = lm.getActiveLocationListener();
             lm.setStatus();
             if(ls != null) {
                 Display.getInstance().callSerially(new Runnable() {
@@ -2321,7 +2532,46 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
     }
+    
+    public static void onGeofenceEnter(final String id) {
+        if (lm != null) {
+            final GeofenceListener ls = lm.getGeofenceListener(id);
+            if (ls != null) {
+                Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        ls.onEntered(id);
+                    }
+                    
+                });
+            }
+            lm.clearExpiredGeofences();
+        }
+    }
+    
+    public static void onGeofenceExit(final String id) {
+        if (lm != null) {
+            final GeofenceListener ls = lm.getGeofenceListener(id);
+            if (ls != null) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        ls.onExit(id);
+                    }
+                    
+                });
+            }
+            lm.clearExpiredGeofences();
+        }
+    }
+    
+    public static void appDidLaunchWithLocation() {
+        ((Loc)LocationManager.getLocationManager()).startBackgroundListener();
+        
+    }
+    
     public LocationManager getLocationManager() {
         if(lm == null) {
             lm = new Loc();
@@ -2353,6 +2603,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             captureCallback = null;
         }
     }
+    
     
     public void captureAudio(ActionListener response) {
         String p = FileSystemStorage.getInstance().getAppHomePath();
@@ -5978,6 +6229,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }        
     }
     
+    
     /**
      * Use this method to release shared resources, save user data, invalidate 
      * timers, and store enough application state information to restore your 
@@ -6019,6 +6271,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationWillEnterForeground();
         }
+        
     }
     
     /**

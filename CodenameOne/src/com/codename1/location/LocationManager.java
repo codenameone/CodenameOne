@@ -229,6 +229,8 @@ public abstract class LocationManager {
      * Use Display.isMinimized() to know if the app is currently running.
      * if isGeofenceSupported() returns false this method does nothing
      * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
+     * 
      * @param listener a Class that implements the GeofenceListener interface 
      * this class must have an empty constructor
      * @param gf a Geofence to track
@@ -239,6 +241,8 @@ public abstract class LocationManager {
     /**
      * Stop tracking a Geofence
      * if isGeofenceSupported() returns false this method does nothing
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
      * 
      * @param id a Geofence id to stop tracking
      */ 
@@ -262,6 +266,10 @@ public abstract class LocationManager {
 
     /**
      * Gets the LocationListener class that handles background location updates.
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the
+     * <code>ios.background_modes</code> build hint with a value that includes 
+     * "location" for background locations to work.</p>
      */ 
     protected Class getBackgroundLocationListener() {
         return backgroundlistener;
@@ -302,6 +310,8 @@ public abstract class LocationManager {
     /**
      * Returns true if the platform is able to track background location.
      * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for background locations to work.</p>
+     * 
      * @return true if platform supports background location
      */ 
     public boolean isBackgroundLocationSupported(){
@@ -310,6 +320,8 @@ public abstract class LocationManager {
 
     /**
      * Returns true if the platform supports Geofence
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
      * 
      * @return true if platform supports Geofence
      */ 

@@ -53,6 +53,9 @@
 #import "ZooZ.h"
 #endif
 
+//#define BACKGROUND_LOCATION_ENABLED
+#define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
+
 #define IOS8_LOCATION_WARNING NSLog(@"As of iOS8, location services requires the ios.locationUsageDescription build hint to be set.");
 
 
