@@ -155,8 +155,8 @@ public class SideMenuBar extends MenuBar {
         if (b != null && !b.transitionRunning) {
             b.parent.addShowListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    callback.run();
                     b.parent.removeShowListener(this);
+                    callback.run();
                 }
             });
             b.closeMenu();
