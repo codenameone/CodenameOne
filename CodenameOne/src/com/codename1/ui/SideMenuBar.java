@@ -916,6 +916,10 @@ public class SideMenuBar extends MenuBar {
      * @return the Component to display on the navigation
      */
     protected Container createSideNavigationComponent(Vector commands, String placement) {
+        return createSideNavigationPanel(commands, placement);
+    }
+    
+    Container createSideNavigationPanel(Vector commands, String placement) {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container bar = new Container();
@@ -996,6 +1000,7 @@ public class SideMenuBar extends MenuBar {
             return main;
         }
     }
+    
 
     /**
      * @inheritDoc

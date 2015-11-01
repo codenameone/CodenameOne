@@ -526,9 +526,26 @@ public class Toolbar extends Container {
         }
 
     }
+    
+    /**
+     * Creates the side navigation component with the Commands.
+     *
+     * @param commands the Command objects
+     * @return the Component to display on the side navigation
+     */
+    protected Container createSideNavigationComponent(Vector commands, String placement) {
+        return sideMenu.createSideNavigationPanel(commands, placement);
+    }
+    
 
     class ToolbarSideMenu extends SideMenuBar {
 
+        @Override
+        protected Container createSideNavigationComponent(Vector commands, String placement) {
+            return Toolbar.this.createSideNavigationComponent(commands, placement);
+        }
+
+        
         @Override
         protected Container getTitleAreaContainer() {
             return Toolbar.this;
