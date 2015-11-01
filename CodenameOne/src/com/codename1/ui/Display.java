@@ -1672,14 +1672,19 @@ public final class Display {
             if (this.dropEvents) {
                 return;
             }
-            inputEventStack[inputEventStackPointer] = type;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = x;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = y;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
-            inputEventStackPointer++;
+            try {
+                inputEventStack[inputEventStackPointer] = type;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = x;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = y;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                inputEventStackPointer++;
+            } catch(ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
             lock.notify();
         }        
     }
