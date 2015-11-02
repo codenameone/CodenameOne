@@ -25,6 +25,7 @@
 #import "DrawStringTextureCache.h"
 #include "xmlvm.h"
 
+extern float scaleValue;
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
@@ -124,7 +125,10 @@ static GLuint getOGLProgram(){
     glUseProgram(getOGLProgram());
     GLuint textureName = [DrawStringTextureCache checkCache:str f:font c:color a:255];
     int w = (int)[str sizeWithFont:font].width;
-    int h = (int)[font lineHeight];
+    
+    // Add one point to the height to prevent cutting off bottom in some fonts
+    // E.g. Caecilia Bold_8986
+    int h = (int)ceil([font lineHeight]+1.0*scaleValue);
     int p2w = nextPowerOf2(w);
     int p2h = nextPowerOf2(h);
     glEnableVertexAttribArray(vertexCoordAtt);
