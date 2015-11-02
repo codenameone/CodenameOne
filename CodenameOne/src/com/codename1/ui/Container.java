@@ -175,11 +175,20 @@ public class Container extends Component implements Iterable<Component>{
     
     /**
      * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     * @param label a component that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+     * @param label a string that will be wrapped as a label, this is equivalent to calling add(new Label(l))
      * @return this for call chaining
      */
     public Container add(String label) {
         return add(new Label(label));
+    }
+    
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param img an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+     * @return this for call chaining
+     */
+    public Container add(Image img) {
+        return add(new Label(img));
     }
     
     /**
@@ -190,6 +199,16 @@ public class Container extends Component implements Iterable<Component>{
      */
     public Container add(Object constraint, String label) {
         return add(constraint, new Label(label));
+    }
+    
+    /**
+     * Simpler version of addComponent that allows chaining the calls for shorter syntax
+     * @param constraint the layout constraint if applicable
+     * @param img an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+     * @return this for call chaining
+     */
+    public Container add(Object constraint, Image img) {
+        return add(constraint, new Label(img));
     }
     
     /**

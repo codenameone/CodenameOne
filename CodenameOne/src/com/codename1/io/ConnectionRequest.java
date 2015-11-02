@@ -31,12 +31,15 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.StringUtil;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -165,7 +168,8 @@ public class ConnectionRequest implements IOProgressListener {
     private static boolean cookiesEnabledDefault = true;
     private boolean cookiesEnabled = cookiesEnabledDefault;
     private int chunkedStreamingLen = -1;
-
+    private Exception failureException;
+    private int failureErrorCode;
     private String destinationFile;
     private String destinationStorage;
     
@@ -696,6 +700,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void handleException(Exception err) {
         if(killed || failSilently) {
+            failureException = err;
             return;
         }
         err.printStackTrace();
@@ -722,6 +727,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void handleErrorResponseCode(int code, String message) {
         if(failSilently) {
+            failureErrorCode = code;
             return;
         }
         if(responseCodeListeners != null) {
@@ -1665,5 +1671,30 @@ public class ConnectionRequest implements IOProgressListener {
         this.chunkedStreamingLen = chunklen;
     }
    
-    
+
+    /**
+     * Utility method that returns a JSON structure or throws an IOException in case of a failure.
+     * This method blocks the EDT legally and can be used synchronously. Notice that this method assumes
+     * all JSON data is UTF-8
+     * @param url the URL hosing the JSON
+     * @return map data
+     * @throws IOException in case of an error
+     */
+    public static Map<String, Object> fetchJSON(String url) throws IOException {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setFailSilently(true);
+        cr.setPost(false);
+        cr.setUrl(url);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        if(cr.getResponseData() == null) {
+            if(cr.failureException != null) {
+                throw new IOException(cr.failureException.toString());
+            } else {
+                throw new IOException("Server returned error code: " + cr.failureErrorCode);
+            }
+        }
+        JSONParser jp = new JSONParser();
+        Map<String, Object> result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
+        return result;
+    }
 }

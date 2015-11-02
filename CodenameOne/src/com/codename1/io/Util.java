@@ -59,8 +59,6 @@ public class Util {
 
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
-    private static boolean xmlVMInstanceofBug;
-    private static boolean xmlVMInstanceofBugTested;
 
     static {
         register("EncodedImage", EncodedImage.class);
@@ -329,11 +327,6 @@ public class Util {
             return;
         }
         
-        if(!xmlVMInstanceofBugTested) {
-            xmlVMInstanceofBug = Display.getInstance().getPlatformName().equals("ios");
-            xmlVMInstanceofBugTested = true;
-        }
-
         if(instanceofObjArray(o)) {
             Object[] v = (Object[])o;
             out.writeUTF("ObjectArray");

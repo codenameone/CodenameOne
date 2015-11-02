@@ -610,4 +610,13 @@ public class BorderLayout extends Layout {
     public boolean obscuresPotential(Container parent) {
         return getCenter() != null;
     }
+    
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container center(Component center) {
+        return Container.encloseIn(new BorderLayout(), center, BorderLayout.CENTER);
+    }
 }

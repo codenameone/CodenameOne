@@ -298,6 +298,20 @@ public class URLImage extends EncodedImage {
     public boolean isAnimation() {
         return repaintImage || imageData == null;
     }
+    
+    /**
+     * Creates an image the will be downloaded on the fly as necessary with RESIZE_SCALE_TO_FILL as
+     * the default behavior
+     * 
+     * @param placeholder the image placeholder is shown as the image is loading/downloading 
+     * and serves as the guideline to the size of the downloaded image.
+     * @param storageFile the file in storage to which the image will be stored
+     * @param url the url from which the image is fetched
+     * @return a URLImage that will initialy just delegate to the placeholder
+     */
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url) {
+        return createToStorage(placeholder, storageFile, url, RESIZE_SCALE_TO_FILL);
+    }
 
     /**
      * Creates an image the will be downloaded on the fly as necessary

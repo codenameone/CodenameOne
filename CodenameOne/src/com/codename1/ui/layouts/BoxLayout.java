@@ -211,4 +211,23 @@ public class BoxLayout extends Layout{
     public boolean equals(Object o) {
         return super.equals(o) && axis == ((BoxLayout)o).axis;
     }
+    
+    /**
+     * The equivalent of Container.enclose() with a box layout Y
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseY(Component... cmps) {
+        return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS), cmps);
+    }
+
+    
+    /**
+     * The equivalent of Container.enclose() with a box layout X
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseX(Component... cmps) {
+        return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS), cmps);
+    }
 }

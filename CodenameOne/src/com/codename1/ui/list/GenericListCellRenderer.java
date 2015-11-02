@@ -37,6 +37,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.URLImage;
 import com.codename1.ui.animations.Animation;
@@ -528,6 +529,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             }
             if(cmp instanceof RadioButton) {
                 ((RadioButton)cmp).setSelected(isSelectedValue(value));
+                return;
+            }
+            if(cmp instanceof Slider) {
+                ((Slider)cmp).setProgress(((Integer)value).intValue());
                 return;
             }
 
