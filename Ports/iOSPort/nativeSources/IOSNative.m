@@ -2101,9 +2101,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         moviePlayerInstance.useApplicationAudioSession = NO;
-#ifndef CN1_USE_ARC
-        [moviePlayerInstance retain];
-#endif
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];

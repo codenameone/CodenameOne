@@ -2942,18 +2942,20 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public Component getVideoComponent() {
-            if(uri != null) {
-                moviePlayerPeer = nativeInstance.createVideoComponent(uri);
-                component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
-            } else {
-                try {
-                    byte[] data = toByteArray(stream);
-                    Util.cleanup(stream);
-                    moviePlayerPeer = nativeInstance.createVideoComponent(data);
+            if (component == null) {
+                if(uri != null) {
+                    moviePlayerPeer = nativeInstance.createVideoComponent(uri);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                    return new Label("Error loading video " + ex);
+                } else {
+                    try {
+                        byte[] data = toByteArray(stream);
+                        Util.cleanup(stream);
+                        moviePlayerPeer = nativeInstance.createVideoComponent(data);
+                        component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                        return new Label("Error loading video " + ex);
+                    }
                 }
             }
             return component;
