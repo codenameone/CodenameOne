@@ -1200,6 +1200,7 @@ public class Util {
         cr.setPost(false);
         cr.setFailSilently(true);
         cr.setUrl(url);
+        cr.setDuplicateSupported(true);
         if(callback != null) {
             cr.addResponseListener(callback);
         }
