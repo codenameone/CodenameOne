@@ -22,24 +22,22 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
-import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.concurrent.Worker;
 import javafx.concurrent.Worker.State;
 import javafx.embed.swing.SwingFXUtils;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.image.WritableImage;
 import javafx.scene.web.WebView;
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
@@ -65,6 +63,8 @@ public class SEBrowserComponent extends PeerComponent {
         this.frm = f;
         this.panel = fx;
 
+        web.getEngine().setUserDataDirectory(new File(FileSystemStorage.getInstance().getAppHomePath()));
+        
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 cnt = new JPanel();
@@ -77,13 +77,22 @@ public class SEBrowserComponent extends PeerComponent {
         web.getEngine().getLoadWorker().messageProperty().addListener(new ChangeListener<String>() {
             @Override
             public void changed(ObservableValue<? extends String> ov, String t, String t1) {
-                if (t1.startsWith("Loading http:")) {
+                if (t1.startsWith("Loading http:") || t1.startsWith("Loading file:") || t1.startsWith("Loading https:")) {
                     String url = t1.substring("Loading ".length());
                     if (!url.equals(currentURL)) {
                         p.fireWebEvent("onStart", new ActionEvent(url));
                     }
                     currentURL = url;
+                } else if ("Loading complete".equals(t1)) {
+                    
                 }
+            }
+        });
+        
+        web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
+            @Override
+            public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
+                System.out.println("Received exception: "+t1.getMessage());
             }
         });
 
@@ -95,11 +104,13 @@ public class SEBrowserComponent extends PeerComponent {
                     p.fireWebEvent("onStart", new ActionEvent(url));
                 } else if (newState == State.RUNNING) {
                     p.fireWebEvent("onLoadResource", new ActionEvent(url));
+                    
                 } else if (newState == State.SUCCEEDED) {
                     if (!p.isNativeScrollingEnabled()) {
                         web.getEngine().executeScript("document.body.style.overflow='hidden'");
                     }
                     p.fireWebEvent("onLoad", new ActionEvent(url));
+                    
                 }
                 currentURL = url;
                 repaint();
@@ -409,4 +420,5 @@ public class SEBrowserComponent extends PeerComponent {
 
     void exposeInJavaScript(Object o, String name) {
     }
+    
 }
