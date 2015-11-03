@@ -5947,6 +5947,17 @@ public abstract class CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
     }
     
+    private void mkdirs(FileSystemStorage fs, String path) {
+        int lastPos = path.lastIndexOf('/');
+        if (lastPos >= 0) {
+            mkdirs(fs, path.substring(0, lastPos));
+        }
+        if (!fs.exists(path)) {
+            mkdir(path);
+        }
+        
+    }
+    
     /**
      * Installs a tar file from the build server into the file system storage so it can be used with respect for hierarchy
      */
@@ -5969,7 +5980,7 @@ public abstract class CodenameOneImplementation {
                     String path = tardir + name;
                     String dir = path.substring(0,path.lastIndexOf('/'));
                     if (!fs.exists(dir)) {
-                        fs.mkdir(dir);
+                        mkdirs(fs, dir);
                     }
 
                     OutputStream os = fs.openOutputStream(tardir + name);
