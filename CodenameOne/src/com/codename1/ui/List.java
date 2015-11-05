@@ -1327,7 +1327,8 @@ public class List<T> extends Component {
         Rectangle selectedPos = new Rectangle();
         calculateComponentPosition(getCurrentSelected(), width, selectedPos, rendererSize, getElementSize(true, true), true);
         Dimension size = selectedPos.getSize();
-        if(shouldRendererSelectedEntry) {
+        int curSel = getCurrentSelected();
+        if(shouldRendererSelectedEntry && curSel > -1 && curSel < model.getSize()) {
             Component selected = renderer.getListCellRendererComponent(this, model.getItemAt(getCurrentSelected()), getCurrentSelected(), true);
             renderComponentBackground(g, selected, selectedPos.getX(), selectedPos.getY(), size.getWidth(), size.getHeight());
         }
