@@ -1248,7 +1248,9 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THR
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
-    [fm createDirectoryAtPath:ns attributes:nil];
+    if (![fm createDirectoryAtPath:ns attributes:nil]) {
+        NSLog(@"Failed to create directory %@", ns);
+    }
 #ifndef CN1_USE_ARC
     [fm release];
 #endif
@@ -6385,7 +6387,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
 JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int( CN1_THREAD_STATE_MULTI_ARG
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType
                                                                                                                                                                      ) {
-    /*
+    
     UILocalNotification *notification = [[UILocalNotification alloc] init];
     NSString * msg = [NSString string];
     NSString *tmpStr;
@@ -6455,7 +6457,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         
         [[UIApplication sharedApplication] scheduleLocalNotification: notification];
         
-    });*/
+    });
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {
