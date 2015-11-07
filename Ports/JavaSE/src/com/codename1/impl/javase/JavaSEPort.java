@@ -7567,7 +7567,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
 
-        File u = new File(f.getParent(), "src" + File.separator + "html");
+        File u = new File(f.getParent(), "build" + File.separator + "classes"+ File.separator + "html");
+        if (!u.exists()) {
+            u = new File(f.getParent(), "src" + File.separator + "html");
+        }
         String base = u.toURI().toURL().toExternalForm(); 
         if(base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);

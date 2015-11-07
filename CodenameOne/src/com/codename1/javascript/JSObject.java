@@ -23,6 +23,7 @@
 package com.codename1.javascript;
 
 
+import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 
 /**
@@ -483,9 +484,9 @@ public class JSObject {
      * See @ref JavascriptContext.set() for a conversion table of the Java to
      * Javascript type conversions.
      */
-    public void set(String key, Object js){
+    public void set(String key, Object js, boolean async){
         if ( js instanceof JSFunction ){
-            this.addCallback(key, (JSFunction)js);
+            this.addCallback(key, (JSFunction)js, async);
             return;
         }
         if ( key.indexOf("'") == 0 ){
@@ -497,32 +498,63 @@ public class JSObject {
         context.set(key, js);
     }
     
-    public void setInt(String key, int value){
-        set(key, new Double(value));
+    public void set(String key, Object js) {
+        set(key, js, false);
     }
     
-    public void setDouble(String key, double value){
-        set(key, new Double(value));
+    public void setInt(String key, int value, boolean async){
+        set(key, new Double(value), async);
+    }
+    public void setInt(String key, int value) {
+        set(key, value, false);
     }
     
-    public void setBoolean(String key, boolean value){
+    public void setDouble(String key, double value, boolean async){
+        set(key, new Double(value), async);
+    }
+    
+    public void setDouble(String key, double value) {
+        set(key, value, false);
+    }
+    
+    public void setBoolean(String key, boolean value, boolean async){
         set(key, value ? Boolean.TRUE : Boolean.FALSE);
     }
     
-    public void set(int index, Object js){
-        context.set(toJSPointer()+"["+index+"]", js);
+    public void setBoolean(String key, boolean value) {
+        setBoolean(key, value, false);
     }
     
-    public void setInt(int index, int value){
-        set(index, new Double(value));
+    public void set(int index, Object js, boolean async){
+        context.set(toJSPointer()+"["+index+"]", js, async);
     }
     
-    public void setDouble(int index, double value){
-        set(index, new Double(value));
+    public void set(int index, Object js) {
+        set(index, js, false);
     }
     
-    public void setBoolean(int index, boolean value){
-        set(index, value ? Boolean.TRUE : Boolean.FALSE);
+    public void setInt(int index, int value, boolean async){
+        set(index, new Double(value), async);
+    }
+    
+    public void setInt(int index, int value) {
+        set(index, value, false);
+    }
+    
+    public void setDouble(int index, double value, boolean async){
+        set(index, new Double(value), async);
+    }
+    
+    public void setDouble(int index, double value) {
+        set(index, value, false);
+    }
+    
+    public void setBoolean(int index, boolean value, boolean async){
+        set(index, value ? Boolean.TRUE : Boolean.FALSE, async);
+    }
+    
+    public void setBoolean(int index, boolean value) {
+        setBoolean(index, value, false);
     }
 
     /**
@@ -539,8 +571,17 @@ public class JSObject {
      * @param js
      * @return 
      */
-    private String exec(String js){
-        return context.browser.executeAndReturnString(js);
+    private String exec(String js, boolean async){
+        if (async) {
+            context.browser.execute(js);
+            return null;
+        } else {
+            return context.browser.executeAndReturnString(js);
+        }
+    }
+    
+    private String exec(String js) {
+       return exec(js, false);
     }
     
     /**
@@ -554,8 +595,8 @@ public class JSObject {
      * @param func A JSFunction callback that will be called when the generated
      * Javascript proxy method is called.
      */
-    void addCallback(String key, JSFunction func ){
-        context.addCallback(this, key, func);
+    void addCallback(String key, JSFunction func, boolean async){
+        context.addCallback(this, key, func, async);
     }
     
     /**
@@ -563,9 +604,14 @@ public class JSObject {
      * @param key The name of the property on the underlying Javascript object
      * that is to be deleted.
      */
-    void removeCallback(String key){
-        context.removeCallback(this, key);
+    void removeCallback(String key, boolean async){
+        context.removeCallback(this, key, async);
     }
+    
+    void removeCallback(String key) {
+        removeCallback(key, false);
+    }
+    
     
     /**
      * Calls a method on the underlying Javascript object.
@@ -582,8 +628,16 @@ public class JSObject {
         
     }
     
+    public void callAsync(String key, Object[] params, Callback callback) {
+        context.callAsync(this, this, params, callback);
+    }
+    
     public Object call(String key){
         return call(key, new Object[]{});
+    }
+    
+    public void callAsync(String key, Callback callback) {
+        callAsync(key, new Object[]{}, callback);
     }
     
     public int callInt(String key){
@@ -591,17 +645,43 @@ public class JSObject {
         return d.intValue();
     }
     
+    public void callIntAsync(String key, final Callback<Integer> callback) {
+        callDoubleAsync(key, new Callback<Double>() {
+
+            public void onSucess(Double value) {
+                callback.onSucess(value.intValue());
+            }
+
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                callback.onError(sender, err, errorCode, errorMessage);
+            }
+            
+        });
+    }
+    
     public double callDouble(String key){
         Double d = (Double)call(key);
         return d.doubleValue();
+    }
+    
+    public void callDoubleAsync(String key, Callback<Double> callback) {
+        callAsync(key, callback);
     }
     
     public String callString(String key){
         return (String)call(key);
     }
     
+    public void callStringAsync(String key, Callback<String> callback) {
+        callAsync(key, callback);
+    }
+    
     public JSObject callObject(String key){
         return (JSObject)call(key);
+    }
+    
+    public void callObjectAsync(String key, Callback<JSObject> callback) {
+        callAsync(key, callback);
     }
     
     /**
@@ -632,5 +712,8 @@ public class JSObject {
     }
     
    
+    public void callAsync(Object[] params, Callback callback) {
+        context.callAsync(this, context.getWindow(), params, callback);
+    }
     
 }
