@@ -65,7 +65,7 @@ public class SEBrowserComponent extends PeerComponent {
         this.frm = f;
         this.panel = fx;
 
-        web.getEngine().setUserDataDirectory(new File(FileSystemStorage.getInstance().getAppHomePath()));
+        web.getEngine().setUserDataDirectory(new File(JavaSEPort.getAppHomeDir()));
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
