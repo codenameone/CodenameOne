@@ -4659,6 +4659,56 @@ public class Component implements Animation, StyleListener {
     public Object getComponentState() {
         return null;
     }
+
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
+     * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
+     * hide a component within the UI.
+     * 
+     * @param b true to hide the component and false to show it
+     * @param changeUiid indicates whether the UIID should be changed as well
+     */
+    public void setHidden(boolean b, boolean changeUiid) {
+        if(b) {
+            if(!sizeRequestedByUser) {
+                if(changeUiid) {
+                    String uiid = getUIID();
+                    putClientProperty("cn1$hiddenUIID", uiid);
+                    setUIID("Container");
+                }
+                setPreferredSize(new Dimension());
+            }
+        } else {
+            setPreferredSize(null);
+            if(changeUiid) {
+                String uiid = (String)getClientProperty("cn1$hiddenUIID");
+                if(uiid != null) {
+                    setUIID(uiid);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
+     * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
+     * hide a component within the UI.
+     * 
+     * @param b true to hide the component and false to show it
+     */
+    public void setHidden(boolean b) {
+        setHidden(b, true);
+    }    
+    
+    /**
+     * Returns true if the component was explicitly hidden by the user
+     * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
+     */
+    public boolean isHidden() {
+        return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
+    }
     
     /**
      * If getComponentState returned a value the setter can update the value and restore
