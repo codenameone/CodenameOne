@@ -4662,29 +4662,24 @@ public class Component implements Animation, StyleListener {
 
     /**
      * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
-     * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
-     * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
-     * hide a component within the UI.
+     * This method also optionally sets the margin to 0 so the component will be truly hidden
      * 
      * @param b true to hide the component and false to show it
-     * @param changeUiid indicates whether the UIID should be changed as well
+     * @param changeMargin indicates margin should be set to 0
      */
-    public void setHidden(boolean b, boolean changeUiid) {
+    public void setHidden(boolean b, boolean changeMargin) {
         if(b) {
             if(!sizeRequestedByUser) {
-                if(changeUiid) {
-                    String uiid = getUIID();
-                    putClientProperty("cn1$hiddenUIID", uiid);
-                    setUIID("Container");
+                if(changeMargin) {
+                    getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
             }
         } else {
             setPreferredSize(null);
-            if(changeUiid) {
-                String uiid = (String)getClientProperty("cn1$hiddenUIID");
-                if(uiid != null) {
-                    setUIID(uiid);
+            if(changeMargin) {
+                if(getUnselectedStyle().getMargin(LEFT) == 0) {
+                    setUIID(getUIID());
                 }
             }
         }
