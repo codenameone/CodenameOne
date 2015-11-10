@@ -4659,6 +4659,51 @@ public class Component implements Animation, StyleListener {
     public Object getComponentState() {
         return null;
     }
+
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * This method also optionally sets the margin to 0 so the component will be truly hidden
+     * 
+     * @param b true to hide the component and false to show it
+     * @param changeMargin indicates margin should be set to 0
+     */
+    public void setHidden(boolean b, boolean changeMargin) {
+        if(b) {
+            if(!sizeRequestedByUser) {
+                if(changeMargin) {
+                    getAllStyles().setMargin(0, 0, 0, 0);
+                }
+                setPreferredSize(new Dimension());
+            }
+        } else {
+            setPreferredSize(null);
+            if(changeMargin) {
+                if(getUnselectedStyle().getMargin(LEFT) == 0) {
+                    setUIID(getUIID());
+                }
+            }
+        }
+    }
+    
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
+     * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
+     * hide a component within the UI.
+     * 
+     * @param b true to hide the component and false to show it
+     */
+    public void setHidden(boolean b) {
+        setHidden(b, true);
+    }    
+    
+    /**
+     * Returns true if the component was explicitly hidden by the user
+     * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
+     */
+    public boolean isHidden() {
+        return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
+    }
     
     /**
      * If getComponentState returned a value the setter can update the value and restore

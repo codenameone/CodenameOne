@@ -36,7 +36,9 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Worker.State;
 import javafx.embed.swing.SwingFXUtils;
+import javafx.event.EventHandler;
 import javafx.scene.image.WritableImage;
+import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -63,7 +65,7 @@ public class SEBrowserComponent extends PeerComponent {
         this.frm = f;
         this.panel = fx;
 
-        web.getEngine().setUserDataDirectory(new File(FileSystemStorage.getInstance().getAppHomePath()));
+        web.getEngine().setUserDataDirectory(new File(JavaSEPort.getAppHomeDir()));
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -89,10 +91,33 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
         
+        web.getEngine().setOnAlert(new EventHandler<WebEvent<String>>() {
+
+            @Override
+            public void handle(WebEvent<String> t) {
+                System.out.println(t.getData());
+                String msg = t.getData();
+                if (msg.startsWith("!cn1_message:")) {
+                    p.fireWebEvent("onMessage", new ActionEvent(msg.substring("!cn1_message:".length())));
+                }
+            }
+            
+        });
+        
         web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
             @Override
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
                 System.out.println("Received exception: "+t1.getMessage());
+                if (ov.getValue() != null) {
+                    ov.getValue().printStackTrace();
+                }
+                if (t != ov.getValue() && t != null) {
+                    t.printStackTrace();
+                }
+                if (t1 != ov.getValue() && t1 != t && t1 != null) {
+                    t.printStackTrace();
+                }
+                
             }
         });
 

@@ -29,6 +29,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import java.util.Hashtable;
 import java.util.ArrayList; 
@@ -54,6 +55,8 @@ import java.util.Random;
  * @author shannah
  */
 public class JavascriptContext  {
+    
+    private int callbackId=0;
     
     /**
      * Flag to enable/disable logging to a debug log.
@@ -145,6 +148,8 @@ public class JavascriptContext  {
     private Random cleanupRandomizer = new Random();
     private double cleanupProbability = 0.1;
     
+    private JSObject window;
+    
     
     /**
      * Creates a Javascript context for the given BrowserComponent.
@@ -205,7 +210,7 @@ public class JavascriptContext  {
                         "delete "+lt+"[id];"+
                     "}"+
                 "}";
-        exec(js);
+        exec(js, true);
     }
     
     /**
@@ -235,6 +240,10 @@ public class JavascriptContext  {
     }
     
     
+    private synchronized String exec(String js){
+        return exec(js, false);
+    }
+    
     /**
      * Executes a Javascript string and returns the string.  It is synchronized
      * to disallow multiple threads from running javascript on the same BrowserComponent.
@@ -244,11 +253,16 @@ public class JavascriptContext  {
      * @param js
      * @return The string result of executing the Javascript string.
      */
-    private synchronized String exec(String js){
+    private synchronized String exec(String js, boolean async){
         if ( DEBUG ){
             //Log.p("About to execute "+js);
         }
-        return browser.executeAndReturnString(installCode()+"("+js+")");
+        if (async) {
+            browser.execute(installCode()+"("+js+")");
+            return null;
+        } else {
+            return browser.executeAndReturnString(installCode()+"("+js+")");
+        }
     }
     
     /**
@@ -347,6 +361,29 @@ public class JavascriptContext  {
         }
     }
     
+    public JSObject getWindow() {
+        if (window == null) {
+            window = (JSObject)this.get("window");
+        }
+        return window;
+    }
+    
+    public void getAsync(String javascript, final Callback callback) {
+        final String callbackMethod = "callback$$"+callbackId;
+        getWindow().set(callbackMethod, new JSFunction() {
+
+            public void apply(JSObject self, Object[] args) {
+                callback.onSucess(args[0]);
+                getWindow().set(callbackMethod, null, true);
+            }
+            
+        });
+        String js2 = callbackMethod+"("+javascript+")";
+        exec(js2, true);
+        
+        
+    }
+    
     /**
      * Sets a Javascript value given a compatible Java object value.  This is an abstraction
      * upon javascript to execute <code>key = value</code>.
@@ -430,6 +467,35 @@ public class JavascriptContext  {
         exec(lhs+"="+rhs);
     }
     
+    public void set(String key, Object value, boolean async) {
+        if (async) {
+            setAsync(key, value);
+            
+        } else {
+            set(key, value);
+        }
+    }
+    
+    public void setAsync(String key, Object value) {
+        String lhs = key;
+        String rhs = "undefined";
+      
+        if ( String.class.isInstance(value)){
+            String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
+            escaped = StringUtil.replaceAll(escaped, "'", "\\'");
+            rhs = "'"+escaped+"'";
+        } else if ( value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double ){
+            rhs =value.toString();
+        } else if ( JSObject.class.isInstance(value)){
+            rhs = ((JSObject)value).toJSPointer();
+        } else if (value instanceof Boolean){
+            rhs = ((Boolean)value).booleanValue()?"true":"false";
+        } else {
+            rhs = "null";
+        }
+        
+        exec(lhs+"="+rhs, true);
+    }
     
     /**
      * Calls the appropriate callback method given a URL that was received 
@@ -449,7 +515,7 @@ public class JavascriptContext  {
     private void dispatchCallback(final String request){
         Runnable r = new Runnable(){
             public void run(){
-                String command = request.substring(request.indexOf(":")+1);
+                String command = request.substring(request.indexOf("/!cn1command/")+"/!cn1command/".length());
                 // Get the callback id
                 String objMethod = command.substring(0, command.indexOf("?"));
                 command = command.substring(command.indexOf("?")+1);
@@ -504,8 +570,8 @@ public class JavascriptContext  {
     private class NavigationCallback implements BrowserNavigationCallback {
 
         public boolean shouldNavigate(String url) {
-            
-            if ( url.indexOf("cn1command:") == 0 ){
+            System.out.println("In shouldNavigate");
+            if ( url.indexOf("/!cn1command/") != -1 ){
                 //.. Handle the cn1 callbacks
                 dispatchCallback(url);
                 return false;
@@ -579,7 +645,7 @@ public class JavascriptContext  {
      * @param callback The callback that is to be executed when source.method() is 
      * executed in Javascript.
      */
-    void addCallback(JSObject source, String method, JSFunction callback){
+    void addCallback(JSObject source, String method, JSFunction callback, boolean async){
         String key = source.toJSPointer()+"."+method;
         callbacks.put(key, callback);
         
@@ -587,7 +653,7 @@ public class JavascriptContext  {
         //String lookup = LOOKUP_TABLE;
         String self = source.toJSPointer();
         String js = self+"."+method+"=function(){"+
-                "var len=arguments.length;var url='cn1command:"+self+"."+method+"?'; "+
+                "var len=arguments.length;var url='/!cn1command/"+self+"."+method+"?'; "+
                 "for (var i=0; i<len; i++){"+
                     "var val = arguments[i]; var strval=val;"+
                     "if ( (typeof(val) == 'object') || (typeof(val) == 'function')){ "+
@@ -605,7 +671,7 @@ public class JavascriptContext  {
                 //"console.log('About to try to load '+url); var el = document.createElement('iframe'); el.setAttribute('src', url); document.body.appendChild(el); el.parentNode.removeChild(el); console.log(el); el = null"+
             "}";
         //String js2 = self+"."+method+"=function(){console.log('This is the alternate java native call method');}";
-        exec(js);
+        exec(js, async);
            
         
     }
@@ -616,11 +682,15 @@ public class JavascriptContext  {
      *  as a method.
      * @param method The name of the method that will be removed from the callback. 
      */
-    void removeCallback(JSObject source, String method){
+    void removeCallback(JSObject source, String method, boolean async){
         String key = source.toJSPointer()+"."+method;
         callbacks.remove(key);
         String js = "delete "+source.toJSPointer()+"."+method;
-        exec(js);
+        exec(js, async);
+    }
+    
+    void removeCallback(JSObject source, String method) {
+        removeCallback(source, method, false);
     }
     
     /**
@@ -676,6 +746,10 @@ public class JavascriptContext  {
     public Object call(JSObject func, JSObject self, Object[] params){
         return call(func.toJSPointer(), self, params);
     }
+    
+    public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
+        callAsync(func.toJSPointer(), self, params, callback);
+    }
     /**
      * Calls a Javascript function with the given parameters.  This would translate
      * roughly into executing the following javascript:
@@ -693,7 +767,16 @@ public class JavascriptContext  {
      * @return Returns the return value converted to the corresponding Java
      * object type.
      */
-    public Object call(String jsFunc, JSObject self, Object[] params){
+    public Object call(String jsFunc, JSObject self, Object[] params) {
+        return call(jsFunc, self, params, false, null);
+        
+    }
+    
+    public void callAsync(String jsFunc, JSObject self, Object[] params, Callback callback) {
+        call(jsFunc, self, params, true, callback);
+    }
+    
+    public Object call(String jsFunc, JSObject self, Object[] params, boolean async, Callback callback){
         String var = RETURN_VAR+"_call";
         String js = var+"=("+jsFunc+").call("+self.toJSPointer();
         int len = params.length;
@@ -727,19 +810,24 @@ public class JavascriptContext  {
         // javascript adjusts the window.location or doesn't cause a 
         // result for some reason.
         try {
-            exec(var+"=undefined");
+            exec(var+"=undefined", async);
         } catch (Exception ex){
             Log.e(new RuntimeException("Failed to execute javascript "+var+"=undefined.  The error was "+ex.getMessage()));
             return null;
         }
         try {
-            exec(js);
+            exec(js, async);
         } catch (Exception ex){
             Log.e(new RuntimeException("Failed to execute javascript "+js+".  The error was "+ex.getMessage()));
             return null;
         }
         try {
-            return get(var);
+            if (async) {
+                getAsync(var, callback);
+                return null;
+            } else {
+                return get(var);
+            }
         } catch (Exception ex){
             Log.e(new RuntimeException("Failed to get the javascript variable "+var+".  The error was "+ex.getMessage()));
             return null;
