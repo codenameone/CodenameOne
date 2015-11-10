@@ -355,7 +355,8 @@ public class CodenameOneActivity extends Activity {
         this.menu = menu;
         // By returning true we signal let Android know that we want the menu
         // to be displayed
-        return nativeMenu;
+        final Form currentForm = Display.getInstance().getCurrent();
+        return currentForm != null && nativeMenu;
     }
 
     @Override
