@@ -255,9 +255,11 @@ public class JavascriptContext  {
      */
     private synchronized String exec(String js, boolean async){
         if ( DEBUG ){
-            //Log.p("About to execute "+js);
+            Log.p("About to execute("+async+") "+js);
+            //browser.execute("console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])");
         }
         if (async) {
+            
             browser.execute(installCode()+"("+js+")");
             return null;
         } else {
@@ -570,8 +572,8 @@ public class JavascriptContext  {
     private class NavigationCallback implements BrowserNavigationCallback {
 
         public boolean shouldNavigate(String url) {
-            System.out.println("In shouldNavigate");
-            if ( url.indexOf("/!cn1command/") != -1 ){
+            //System.out.println("In shouldNavigate "+url);
+            if ( !url.startsWith("javascript:") && url.indexOf("/!cn1command/") != -1 ){
                 //.. Handle the cn1 callbacks
                 dispatchCallback(url);
                 return false;
