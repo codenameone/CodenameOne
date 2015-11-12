@@ -267,7 +267,7 @@ public final class IOSNative {
     native long openConnection(String url, int timeout);
     native void connect(long peer);
     native void setMethod(long peer, String mtd);
-    
+    native void setChunkedStreamingMode(long peer, int len);
     native int getResponseCode(long peer);
 
     native String getResponseMessage(long peer);

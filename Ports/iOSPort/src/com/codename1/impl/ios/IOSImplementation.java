@@ -4999,7 +4999,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
-
+    
     public static void appendData(long peer, byte[] data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
@@ -5185,6 +5185,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean ensureConnectionLock;
         String error;
         public final Object LOCK = new Object();
+        
+        
+        public void setChunkedStreamingMode(int len) {
+            nativeInstance.setChunkedStreamingMode(peer, len);
+        }
         
         public void ensureConnection() throws IOException {
             synchronized(LOCK) {
@@ -5404,6 +5409,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new NetworkConnection(nativeInstance.openConnection(url, timeout));
     }
 
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void setChunkedStreamingMode(Object connection, int bufferLen) {
+        ((NetworkConnection)connection).setChunkedStreamingMode(bufferLen);
+    }
+    
     /**
      * @inheritDoc
      */

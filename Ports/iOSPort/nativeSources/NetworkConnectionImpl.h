@@ -29,6 +29,7 @@
     int responseCode;
     NSDictionary* allHeaderFields;
     NSURLConnection *connection;
+    int chunkedStreamingLen;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout;
@@ -47,5 +48,6 @@
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection;
 - (int)getResponseHeaderCount;
 - (NSString*)getResponseHeaderName:(int)offset;
+-(void)setChunkedStreamingLen:(int)len;
 
 @end
