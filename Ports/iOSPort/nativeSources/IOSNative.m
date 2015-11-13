@@ -2916,6 +2916,23 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
         return;
     }
     CFArrayRef allPeople = ABAddressBookCopyArrayOfAllPeople(addressBook);
+    CFMutableArrayRef peopleMutable = CFArrayCreateMutableCopy(
+        kCFAllocatorDefault,
+        CFArrayGetCount(allPeople),
+        allPeople
+    );
+
+
+    CFArraySortValues(
+        peopleMutable,
+        CFRangeMake(0, CFArrayGetCount(peopleMutable)),
+        (CFComparatorFunction) ABPersonComparePeopleByName,
+        (void *)(NSUInteger)ABPersonGetSortOrdering()
+    );
+
+    CFRelease(allPeople);
+    allPeople = peopleMutable;
+    
     if(includeNumbers) {
         CFIndex nPeople = ABAddressBookGetPersonCount(addressBook);
         int responseCount = 0;
@@ -2924,8 +2941,8 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
             ABMultiValueRef numbers = ABRecordCopyValue(ref, kABPersonPhoneProperty);
             
             if(numbers != nil && ABMultiValueGetCount(numbers) > 0) {
-                responseCount++;
                 data[responseCount] = ABRecordGetRecordID(ref);
+                responseCount++;
             }
         }
         
