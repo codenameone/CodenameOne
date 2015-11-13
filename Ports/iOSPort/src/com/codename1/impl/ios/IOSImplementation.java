@@ -382,14 +382,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(current.isFormBottomPaddingEditingMode()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                        current.revalidate();
+                        if (current != null) {
+                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            current.revalidate();
+                        }
                     }
                 });
             } else {
-                current.revalidate();
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (current != null) {
+                            current.revalidate();
+                        }
+                    }
+                });
             }
         }
     }
