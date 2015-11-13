@@ -89,9 +89,22 @@ public class Contact {
      * @return Display Name
      */
     public String getDisplayName() {
+        if (displayName == null || "".equals(displayName)) {
+            if (familyName != null && firstName != null) {
+                displayName = familyName + ", " + firstName;
+            } else if (getPrimaryPhoneNumber() != null) {
+                displayName = getPrimaryPhoneNumber();
+            } else if (getPrimaryEmail() != null) {
+                displayName = getPrimaryEmail();
+            } else if (getFirstName() != null) {
+                displayName = getFirstName();
+            } else if (getFamilyName() != null) {
+                displayName = getFamilyName();
+            }
+        }
         return displayName;
     }
-
+        
     /**
      * Gets the Contact Emails, the Hashtable contains key/value pairs where
      * the key is a String which represents the type of the Email, types can
