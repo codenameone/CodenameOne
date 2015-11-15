@@ -4758,8 +4758,53 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTrueTypeSupported() {
-        // TODO
         return true;
+    }
+
+    @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+    
+    
+
+    private String nativeFontName(String fontName) {
+        if(fontName != null && fontName.startsWith("native:")) {
+            if("native:MainThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLight";
+            }
+            if("native:MainLight".equals(fontName)) {
+                return "HelveticaNeue-Light";
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return "HelveticaNeue-Medium";
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return "HelveticaNeue-Bold";
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return "HelveticaNeue-CondensedBlack";
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLightItalic";
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return "HelveticaNeue-LightItalic";
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return "HelveticaNeue-MediumItalic";
+            }
+            
+            if("native:ItalicBold".equals(fontName) || "native:ItalicBlack".equals(fontName)) {
+                return "HelveticaNeue-BoldItalic";
+            }
+        }            
+        return fontName;
     }
 
     @Override
@@ -4768,7 +4813,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
         fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
         fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
-        fnt.name = fontName;
+        fnt.name = nativeFontName(fontName);
         fnt.peer = nativeInstance.createTruetypeFont(fontName);
         return fnt;
     }

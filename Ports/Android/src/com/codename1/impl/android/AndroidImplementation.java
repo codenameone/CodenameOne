@@ -973,7 +973,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+    
+    private Typeface fontToRoboto(String fontName) {
+            if("native:MainThin".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.NORMAL);
+            }
+            if("native:MainLight".equals(fontName)) {
+                return Typeface.create("sans-serif-light", Typeface.NORMAL);
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return Typeface.create("sans-serif", Typeface.NORMAL);
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return Typeface.create("sans-serif-condensed", Typeface.BOLD);
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return Typeface.create("sans-serif-black", Typeface.BOLD);
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return Typeface.create("sans-serif", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicBold".equals(fontName)) {
+                return Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC);
+            }
+            
+            if("native:ItalicBlack".equals(fontName)) {
+                return Typeface.create("sans-serif-black", Typeface.BOLD_ITALIC);
+            }
+            
+            throw new IllegalArgumentException("Unsupported native font type: " + fontName);
+    }
+
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
+        if(fontName.startsWith("native:")) {
+            Typeface t = fontToRoboto(fontName);
+            TextPaint newPaint = new TextPaint();
+            newPaint.setAntiAlias(true);
+            newPaint.setSubpixelText(true);
+            newPaint.setTypeface(t);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
+                    com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
+        }
         Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
         if(t == null) {
             throw new RuntimeException("Font not found: " + fileName);

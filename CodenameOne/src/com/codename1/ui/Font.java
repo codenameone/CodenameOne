@@ -186,17 +186,29 @@ public class Font {
     /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
-     * order to be detectable. The file name should contain no slashes or any such value.<br/>
+     * order to be detectable. The file name should contain no slashes or any such value.<br />
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
-     * to use the font name matching the weight, so the weight argument to derive will be ignored!
-     *
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!<br />
+     * This system also supports a special "native:" prefix that uses system native fonts e.g. HelveticaNeue
+     * on iOS and Roboto on Android. It supports the following types:
+     * native:MainThin, native:MainLight, native:MainRegular, native:MainBold, native:MainBlack,
+     * native:ItalicThin, native:ItalicLight, native:ItalicRegular, native:ItalicBold, native:ItalicBlack.
+     * <b>Important</b> due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
+     * In the simulator you will always see Roboto and not the device font
+     * 
      * @param fontName the name of the font
      * @param fileName the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
-        if(fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf"))) {
-            throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
+        if(fontName.startsWith("native:")) {
+            if(!Display.getInstance().getImplementation().isNativeFontSchemeSupported()) {
+                return null;
+            }
+        } else {
+            if(fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf"))) {
+                throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
+            }
         }
         Object font = Display.getInstance().getImplementation().loadTrueTypeFont(fontName, fileName);
         if(font == null) {

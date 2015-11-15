@@ -2723,6 +2723,15 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Indicates whether the implementation supports loading a font "natively" to handle one of the common
+     * native prefixes
+     * @return true if the "native:" prefix is supported by loadTrueTypeFont
+     */
+    public boolean isNativeFontSchemeSupported() {
+        return false;
+    }
+    
+    /**
      * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
      * will only work in the case of truetype fonts!
      * @param font the native font instance

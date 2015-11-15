@@ -4119,14 +4119,71 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+    
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        File fontFile;
-        if (baseResourceDir != null) {
-            fontFile = new File(baseResourceDir, fileName);
-        } else {
-            fontFile = new File("src", fileName);
-        }
+        File fontFile = null;
         try {
+            if(fontName.startsWith("native:")) {
+                String res; 
+                switch(fontName) {
+                    case "native:MainThin":
+                        res = "Thin";
+                        break;
+
+                    case "native:MainLight":
+                        res = "Light";
+                        break;
+
+                    case "native:MainRegular":
+                        res = "Medium";
+                        break;
+
+                    case "native:MainBold":
+                        res = "Bold";
+                        break;
+
+                    case "native:MainBlack":
+                        res = "Black";
+                        break;
+
+                    case "native:ItalicThin":
+                        res = "ThinItalic";
+                        break;
+
+                    case "native:ItalicLight": 
+                        res = "LightItalic";
+                        break;
+
+                    case "native:ItalicRegular":
+                        res = "Italic";
+                        break;
+
+                    case "native:ItalicBold":
+                        res = "BoldItalic";
+                        break;
+
+                    case "native:ItalicBlack":
+                        res = "BlackItalic";
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unsupported native font type: " + fontName);
+                }
+                InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                if(is != null) {
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    is.close();
+                    return fnt;
+                }
+            }
+            if (baseResourceDir != null) {
+                fontFile = new File(baseResourceDir, fileName);
+            } else {
+                fontFile = new File("src", fileName);
+            }
             if (fontFile.exists()) {
                 FileInputStream fs = new FileInputStream(fontFile);
                 java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
@@ -4154,7 +4211,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
             throw new RuntimeException(err);
         }
-        throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
+        if(fontFile != null) {
+            throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
+        }
+        throw new RuntimeException("The file wasn't found: " + fontName);
     }
 
     @Override
