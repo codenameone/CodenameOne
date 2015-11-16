@@ -122,6 +122,43 @@ public class Label extends Component {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
+
+    /** 
+     * Constructs a new label with the specified icon and UIID
+     * 
+     * @param icon the image that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(Image icon, String uiid) {
+        this("", uiid);
+        this.icon = icon;
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /** 
+     * Constructs a new label with the specified icon text and UIID
+     * 
+     * @param text the text of the label
+     * @param icon the image that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(String text, Image icon, String uiid) {
+        this(text, uiid);
+        this.icon = icon;
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /** 
+     * Constructs a new label with the specified icon and text
+     * 
+     * @param text the text of the label
+     * @param icon the image that the label presents.
+     */
+    public Label(String text, Image icon) {
+        this(text);
+        this.icon = icon;
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
     
     /**
      * @inheritDoc

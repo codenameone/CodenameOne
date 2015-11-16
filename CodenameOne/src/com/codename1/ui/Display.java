@@ -3775,5 +3775,12 @@ public final class Display {
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
     }
-        
+
+    /**
+     * Allows detecting development mode so debugging code and special cases can be used to simplify flow
+     * @return true if we are running in the simulator, false otherwise
+     */
+    public boolean isSimulator() {
+        return impl.isSimulator();
+    }
 }

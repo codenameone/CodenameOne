@@ -6036,6 +6036,14 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /**
+     * Allows detecting development mode so debugging code and special cases can be used to simplify flow
+     * @return true if we are running in the simulator, false otherwise
+     */
+    public boolean isSimulator() {
+        return false;
+    }
+    
     //METHODS FOR DEALING Local Notifications
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
     }
