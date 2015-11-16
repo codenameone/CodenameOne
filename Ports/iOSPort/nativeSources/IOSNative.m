@@ -2050,7 +2050,27 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
     return returnString;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *moviePlayer, JAVA_INT callbackId) {
+    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:MPMoviePlayerPlaybackDidFinishNotification object:moviePlayer
+    queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
+        /*
+         * I'm not sure if we need to handle the callback differently in different cases
+         * but if we do, this code is a guideline on how we would do this
+        int reason = [[[notification userInfo] valueForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
+        if (reason == MPMovieFinishReasonPlaybackEnded) {
+            //movie finished playin
+        }else if (reason == MPMovieFinishReasonUserExited) {
+            //user hit the done button
+        }else if (reason == MPMovieFinishReasonPlaybackError) {
+            //error
+        }
+         * */
+        com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
+    }];
+    com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2062,6 +2082,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
             u = [NSURL URLWithString:s];
         }
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
@@ -2072,13 +2093,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+
+
+void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG observerPeer) {
+    [[NSNotificationCenter defaultCenter] removeObserver:(void *)observerPeer];
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG str)];
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
-        
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
 #ifndef AUTO_PLAY_VIDEO
         moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
 #endif
@@ -2087,7 +2114,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2109,6 +2136,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
         NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
         moviePlayerInstance.useApplicationAudioSession = NO;
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
@@ -2119,7 +2147,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2141,18 +2169,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
         NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
 #ifndef AUTO_PLAY_VIDEO
         moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
 #endif
-#ifndef CN1_USE_ARC
-        [moviePlayerInstance retain];
-#endif
+//#ifndef CN1_USE_ARC
+//        [moviePlayerInstance retain];
+//#endif
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2166,10 +2195,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1
         NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
         moviePlayerInstance.useApplicationAudioSession = NO;
-#ifndef CN1_USE_ARC
-        [moviePlayerInstance retain];
-#endif
+//#ifndef CN1_USE_ARC
+//        [moviePlayerInstance retain];
+//#endif
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
@@ -2179,7 +2209,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2193,9 +2223,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
         NSURL *u = [NSURL fileURLWithPath:path];
         
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
-#ifndef CN1_USE_ARC
-        [moviePlayerInstance retain];
-#endif
+        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
+// No need to retain the instance.  Its reference count is already 1 after the alloc call.
+//#ifndef CN1_USE_ARC
+//        [moviePlayerInstance retain];
+//#endif
 #ifndef AUTO_PLAY_VIDEO
         moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
 #endif
@@ -5830,29 +5862,30 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long_R_java_lang_St
     return com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STATE_PASS_ARG instanceObject, peer);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
-    return com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, str);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG instanceObject, str, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
-    return com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, str);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG instanceObject, str, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
-    return com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, dataObject);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_PASS_ARG instanceObject, dataObject, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject) {
-    return com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, dataObject);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_PASS_ARG instanceObject, dataObject, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
-    return com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long__int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
-    return com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    return com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData, onCompletionCallbackId);
 }
+
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     return com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_PASS_ARG instanceObject, peer);

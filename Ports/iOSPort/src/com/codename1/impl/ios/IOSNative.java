@@ -210,12 +210,12 @@ public final class IOSNative {
 
     native String getBrowserURL(long browserPeer);
     
-    native long createVideoComponent(String url);
-    native long createVideoComponent(byte[] video);
-    native long createVideoComponentNSData(long video);
-    native long createNativeVideoComponent(String url);
-    native long createNativeVideoComponent(byte[] video);
-    native long createNativeVideoComponentNSData(long video);
+    native long createVideoComponent(String url, int onCompletionCallbackId);
+    native long createVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createVideoComponentNSData(long video, int onCompletionCallbackId);
+    native long createNativeVideoComponent(String url, int onCompletionCallbackId);
+    native long createNativeVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createNativeVideoComponentNSData(long video, int onCompletionCallbackId);
 
     native void startVideoComponent(long peer); 
     
@@ -541,5 +541,11 @@ public final class IOSNative {
     native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType);
 
     native void cancelLocalNotification(String id);
+
+    /**
+     * Removes an observer from NSNotificationCenter
+     * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
+     */
+    native void removeNotificationCenterObserver(long nsObserverPeer);
 
 }
