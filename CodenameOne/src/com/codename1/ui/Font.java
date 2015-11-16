@@ -184,6 +184,15 @@ public class Font {
     }
 
     /**
+     * Indicates whether the implementation supports loading a font "natively" to handle one of the common
+     * native prefixes
+     * @return true if the "native:" prefix is supported by loadTrueTypeFont
+     */
+    public static boolean isNativeFontSchemeSupported() {
+        return Display.getInstance().getImplementation().isNativeFontSchemeSupported();
+    }
+    
+    /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
      * order to be detectable. The file name should contain no slashes or any such value.<br />
