@@ -58,6 +58,19 @@ public class FlowLayout extends Layout{
         this.orientation = orientation;
     }
 
+
+    /**
+     * Creates a new instance of FlowLayout with the given orientation one of
+     * LEFT, RIGHT or CENTER and the vertical orientation
+     *
+     * @param orientation the orientation value
+     * @param valign the vertical orientation one of Component.TOP/BOTTOM/CENTER
+     */
+    public FlowLayout(int orientation, int valign) {
+        this.orientation = orientation;
+        this.valign = valign;
+    }
+
     /**
      * @inheritDoc
      */
@@ -374,5 +387,90 @@ public class FlowLayout extends Layout{
         return super.equals(o) && ((FlowLayout)o).orientation == orientation &&
                 ((FlowLayout)o).valign == valign &&
                 ((FlowLayout)o).fillRows == fillRows;
+    }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseIn(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(), cmps);
+    }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenter(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
+    }
+
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRight(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
+    }
+
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+    }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
+    }
+
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
+    }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
+    }
+
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
     }
 }
