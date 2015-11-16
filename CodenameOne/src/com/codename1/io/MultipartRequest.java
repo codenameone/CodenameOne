@@ -189,7 +189,7 @@ public class MultipartRequest extends ConnectionRequest {
                 length += baseTextLength;
                 length += key.length();
                 if(ignoreEncoding.contains(key)) {
-                    length += ((String)value).length(); 
+                    length += value.toString().getBytes().length; 
                 } else {
                     length += Util.encodeBody((String)value).length();
                 }
