@@ -326,7 +326,7 @@ public class TableLayout extends Layout {
             boolean rtl = parent.isRTL();
 
             columnSizes = new int[columns];
-            if(modifableColumnSize == null) {
+            if(modifableColumnSize == null || columns != modifableColumnSize.length) {
                 modifableColumnSize = new boolean[columns];
             }
             columnPositions = new int[columns];

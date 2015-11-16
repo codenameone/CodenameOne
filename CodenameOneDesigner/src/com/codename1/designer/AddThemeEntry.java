@@ -85,6 +85,11 @@ public class AddThemeEntry extends javax.swing.JPanel {
 
     public static int BACKGROUND_VALUES_GRADIENT_ARRAY_OFFSET = 19;
 
+    private static final String[] BUILTIN_TRUE_TYPE_FONTS = {
+        "native:MainThin", "native:MainLight", "native:MainRegular", "native:MainBold", "native:MainBlack",
+        "native:ItalicThin", "native:ItalicLight", "native:ItalicRegular", "native:ItalicBold","native:ItalicBlack"
+    };
+    
     public static final byte[] BACKGROUND_VALUES = {
         Style.BACKGROUND_IMAGE_SCALED,
         Style.BACKGROUND_IMAGE_SCALED_FILL,
@@ -178,15 +183,19 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 }
             });
             if(fontFiles == null) {
-                fontFiles = new String[0];
+                fontFiles = BUILTIN_TRUE_TYPE_FONTS;
+                String[] arr = new String[1 + BUILTIN_TRUE_TYPE_FONTS.length];
+                System.arraycopy(BUILTIN_TRUE_TYPE_FONTS, 0, arr, 1, BUILTIN_TRUE_TYPE_FONTS.length);
+                fontFiles = arr;
             } else {
-                String[] arr = new String[fontFiles.length + 1];
+                String[] arr = new String[fontFiles.length + 1 + BUILTIN_TRUE_TYPE_FONTS.length];
                 System.arraycopy(fontFiles, 0, arr, 1, fontFiles.length);
+                System.arraycopy(BUILTIN_TRUE_TYPE_FONTS, 0, arr, 1 + fontFiles.length, BUILTIN_TRUE_TYPE_FONTS.length);
                 fontFiles = arr;
             }
             trueTypeFont.setModel(new DefaultComboBoxModel(fontFiles));
         } else {
-            trueTypeFont.setModel(new DefaultComboBoxModel(new String[0]));
+            trueTypeFont.setModel(new DefaultComboBoxModel(BUILTIN_TRUE_TYPE_FONTS));
         }
         
         try {
@@ -609,6 +618,12 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     trueTypeFont.setSelectedItem(ed.getFontFile().getName());
                     trueTypeFontSizeOption.setSelectedIndex(ed.getSizeSetting());
                     trueTypeFontSizeValue.setValue(new Double(ed.getActualSize()));
+                } else {
+                    if(ed.getNativeFontName() != null) {
+                        trueTypeFont.setSelectedItem(ed.getNativeFontName());
+                        trueTypeFontSizeOption.setSelectedIndex(ed.getSizeSetting());
+                        trueTypeFontSizeValue.setValue(new Double(ed.getActualSize()));
+                    }
                 }
             }
             return;
@@ -877,8 +892,14 @@ public class AddThemeEntry extends javax.swing.JPanel {
                 if(trueTypeFont.getSelectedIndex() > 0) {
                     Font sys = Font.createSystemFont(FONT_FACE_VALUES[fontFace.getSelectedIndex()],
                             FONT_STYLE_VALUES[fontStyle.getSelectedIndex()], FONT_SIZE_VALUES[fontSize.getSelectedIndex()]);
-                    v = new EditorTTFFont(new File(ResourceEditorView.getLoadedFile().getParentFile(), (String)trueTypeFont.getSelectedItem()), 
-                            trueTypeFontSizeOption.getSelectedIndex(), ((Number)trueTypeFontSizeValue.getValue()).floatValue(), sys);
+                    String selectedItem = (String)trueTypeFont.getSelectedItem();
+                    if(selectedItem.startsWith("native:")) {
+                        v = new EditorTTFFont(selectedItem, 
+                                trueTypeFontSizeOption.getSelectedIndex(), ((Number)trueTypeFontSizeValue.getValue()).floatValue(), sys);
+                    } else {
+                        v = new EditorTTFFont(new File(ResourceEditorView.getLoadedFile().getParentFile(), selectedItem), 
+                                trueTypeFontSizeOption.getSelectedIndex(), ((Number)trueTypeFontSizeValue.getValue()).floatValue(), sys);
+                    }
                 } else {
                     v = Font.createSystemFont(FONT_FACE_VALUES[fontFace.getSelectedIndex()],
                             FONT_STYLE_VALUES[fontStyle.getSelectedIndex()], FONT_SIZE_VALUES[fontSize.getSelectedIndex()]);

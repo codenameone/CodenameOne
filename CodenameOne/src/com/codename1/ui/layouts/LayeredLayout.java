@@ -105,4 +105,13 @@ public class LayeredLayout extends Layout {
     public boolean obscuresPotential(Container parent) {
         return true;
     }
+    
+    /**
+     * Shorthand for Container.encloseIn(new LayeredLayout(), cmps); 
+     * @param cmps the components to add to a new layered layout container
+     * @return a newly created layered layout
+     */
+    public static Container encloseIn(Component... cmps) {
+        return Container.encloseIn(new LayeredLayout(), cmps);
+    }
 }

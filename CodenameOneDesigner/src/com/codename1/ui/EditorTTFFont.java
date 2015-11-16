@@ -23,6 +23,8 @@
 package com.codename1.ui;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Font class implementing the new TTF functionality from Codename One where applicable
@@ -35,6 +37,7 @@ public class EditorTTFFont extends Font {
     private Font actualFont;
     private int sizeSetting;
     private float actualSize;
+    private String nativeFontName;
     public EditorTTFFont(File fontFile, int sizeSetting, float actualSize, Font systemFont) {
         this.fontFile = fontFile;
         this.sizeSetting = sizeSetting;
@@ -42,11 +45,75 @@ public class EditorTTFFont extends Font {
         this.systemFont = systemFont;
         refresh();
     }
+    
+    public EditorTTFFont(String nativeFontName, int sizeSetting, float actualSize, Font systemFont) {
+        this.nativeFontName = nativeFontName;
+        this.sizeSetting = sizeSetting;
+        this.actualSize = actualSize;
+        this.systemFont = systemFont;
+        refresh();
+    }
 
     public void refresh() {
-        if(fontFile != null && fontFile.exists()) {
+        if(fontFile != null && fontFile.exists() || nativeFontName != null) {
             try {
-                java.awt.Font f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fontFile);
+                java.awt.Font f;
+                if(nativeFontName != null) {
+                    String res; 
+                    switch(nativeFontName) {
+                        case "native:MainThin":
+                            res = "Thin";
+                            break;
+
+                        case "native:MainLight":
+                            res = "Light";
+                            break;
+
+                        case "native:MainRegular":
+                            res = "Medium";
+                            break;
+
+                        case "native:MainBold":
+                            res = "Bold";
+                            break;
+
+                        case "native:MainBlack":
+                            res = "Black";
+                            break;
+
+                        case "native:ItalicThin":
+                            res = "ThinItalic";
+                            break;
+
+                        case "native:ItalicLight": 
+                            res = "LightItalic";
+                            break;
+
+                        case "native:ItalicRegular":
+                            res = "Italic";
+                            break;
+
+                        case "native:ItalicBold":
+                            res = "BoldItalic";
+                            break;
+
+                        case "native:ItalicBlack":
+                            res = "BlackItalic";
+                            break;
+                        default:
+                            throw new IllegalArgumentException("Unsupported native font type: " + nativeFontName);
+                    }
+                    InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                    try {
+                        f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                        is.close();
+                    } catch(Exception err) {
+                        err.printStackTrace();
+                        return;
+                    }
+                } else {
+                    f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fontFile);                    
+                }
                 switch(sizeSetting) {
                     case 0:
                         f = f.deriveFont((float)
@@ -93,6 +160,10 @@ public class EditorTTFFont extends Font {
         return fontFile;
     }
 
+    public String getNativeFontName() {
+        return nativeFontName;
+    }
+    
     /**
      * @return the sizeSetting
      */
@@ -122,8 +193,11 @@ public class EditorTTFFont extends Font {
     public boolean equals(Object o) {
         if(o instanceof EditorTTFFont) {
             EditorTTFFont f = (EditorTTFFont)o;
-            if(fontFile == null) {
+            if(fontFile == null && nativeFontName == null) {
                 return f.systemFont.equals(systemFont) && f.fontFile == null;
+            }
+            if(nativeFontName != null) {
+                return f.systemFont.equals(systemFont) && nativeFontName.equals(f.nativeFontName) && f.actualSize == actualSize && f.sizeSetting == sizeSetting;
             }
             return f.systemFont.equals(systemFont) && fontFile.equals(f.fontFile) && f.actualSize == actualSize && f.sizeSetting == sizeSetting;
         }

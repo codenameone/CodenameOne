@@ -9,7 +9,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.codename1pkg.${PRODUCT_NAME:rfc1034identifier}</string>
 	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
+	<string>5.1.1</string>
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
