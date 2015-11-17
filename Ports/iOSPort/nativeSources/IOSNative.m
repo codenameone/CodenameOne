@@ -4628,6 +4628,7 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     repaintUI();
 }
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
 #else
