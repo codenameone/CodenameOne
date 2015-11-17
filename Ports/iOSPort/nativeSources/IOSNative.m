@@ -4612,7 +4612,11 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     NSArray *itemArray = [[NSArray alloc] initWithObjects:cancelBtn, flexSpace, titleButton, flexSpace, doneBtn, nil];
     
     [pickerToolbar setItems:itemArray animated:YES];
-    [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
+    if(isIPad() || isIOS7()) {
+        [pickerView setFrame:CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height)];
+    } else {
+        [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
+    }
     [pickerView setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
     [fakeActionSheet addSubview:pickerToolbar];
     [fakeActionSheet addSubview:pickerView];
