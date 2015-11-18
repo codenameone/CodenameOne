@@ -131,7 +131,11 @@ public final class IOSNative {
 
     native void flashBacklight(int duration);
 
-    native boolean isMinimized();
+    // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+    // tracking on the java side.  It caused the app to still be minimized inside start()
+    // method.  
+    // Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+    //native boolean isMinimized();
     
     native boolean minimizeApplication();
 

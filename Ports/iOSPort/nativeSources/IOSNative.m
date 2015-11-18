@@ -1480,12 +1480,16 @@ void com_codename1_impl_ios_IOSNative_flashBacklight___int(CN1_THREAD_STATE_MULT
     //XMLVM_END_WRAPPER
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
-{
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isMinimized__]
-    return !([[UIApplication sharedApplication] applicationState] == UIApplicationStateActive);
-    //XMLVM_END_WRAPPER
-}
+// SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+// tracking on the java side.  It caused the app to still be minimized inside start()
+// method.  
+// Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+//JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+//{
+//    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isMinimized__]
+//    return !([[UIApplication sharedApplication] applicationState] == UIApplicationStateActive);
+//    //XMLVM_END_WRAPPER
+//}
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_minimizeApplication__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
@@ -5813,10 +5817,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int_R_
     return com_codename1_impl_ios_IOSNative_getResponseHeaderName___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, peer, offset);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
-{
-    return com_codename1_impl_ios_IOSNative_isMinimized__(CN1_THREAD_STATE_PASS_ARG instanceObject);
-}
+// SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+// tracking on the java side.  It caused the app to still be minimized inside start()
+// method.  
+// Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+//JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMinimized___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+//{
+//    return com_codename1_impl_ios_IOSNative_isMinimized__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+//}
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_minimizeApplication___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
