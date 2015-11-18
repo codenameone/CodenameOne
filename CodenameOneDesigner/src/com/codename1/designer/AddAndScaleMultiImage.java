@@ -97,61 +97,65 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         for(File f : files) {
             try {
                 BufferedImage bi = ImageIO.read(f);
-                EditableResources.MultiImage newImage = new EditableResources.MultiImage();
-                
-                int[] DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
-                    com.codename1.ui.Display.DENSITY_LOW,
-                    com.codename1.ui.Display.DENSITY_MEDIUM,
-                    com.codename1.ui.Display.DENSITY_HIGH,
-                    com.codename1.ui.Display.DENSITY_VERY_HIGH,
-                    com.codename1.ui.Display.DENSITY_HD,
-                    //com.codename1.ui.Display.DENSITY_560,
-                    //com.codename1.ui.Display.DENSITY_2HD,
-                    //com.codename1.ui.Display.DENSITY_4K
-                };
-                float[] WIDTHS = {
-                    176, 240, 360, 480, 640, 1024 //, 1500, 2000, 2500
-                };
-                EncodedImage[] images = new EncodedImage[WIDTHS.length];
-                int imageCount = WIDTHS.length;
-                
-                for(int iter = 0 ; iter < DPIS.length ; iter++) {
-                    if(iter == sourceResolution) {
-                        images[iter] = EncodedImage.create(scale(bi, bi.getWidth(), bi.getHeight()));
-                    } else {
-                        float sourceWidth = WIDTHS[sourceResolution];
-                        float destWidth = WIDTHS[iter];
-                        int h = (int)(((float)bi.getHeight()) * destWidth / sourceWidth);
-                        int w = (int)(((float)bi.getWidth()) * destWidth / sourceWidth);
-                        images[iter] = EncodedImage.create(scale(bi, w, h));
-                    }
-                }
-
-                if(imageCount > 0) {
-                    int offset = 0;
-                    EncodedImage[] result = new EncodedImage[imageCount];
-                    int[] resultDPI = new int[imageCount];
-                    for(int iter = 0 ; iter < images.length ; iter++) {
-                        if(images[iter] != null) {
-                            result[offset] = images[iter];
-                            resultDPI[offset] = DPIS[iter];
-                            offset++;
-                        }
-                    }
-                    newImage.setDpi(resultDPI);
-                    newImage.setInternalImages(result);
-                    String destName = f.getName();
-                    int count = 1;
-                    while(res.containsResource(destName)) {
-                        destName = f.getName() + " " + count;
-                        count++;
-                    }
-                    res.setMultiImage(destName, newImage);
-                }
+                generateMulti(sourceResolution, bi, f.getName(), res);
             } catch (IOException ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Error reading file: " + f, "IO Error", JOptionPane.ERROR_MESSAGE);
             }
+        }
+    }
+
+    public static void generateMulti(int sourceResolution, BufferedImage bi, String name, EditableResources res) throws IOException {
+        EditableResources.MultiImage newImage = new EditableResources.MultiImage();
+        
+        int[] DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
+            com.codename1.ui.Display.DENSITY_LOW,
+            com.codename1.ui.Display.DENSITY_MEDIUM,
+            com.codename1.ui.Display.DENSITY_HIGH,
+            com.codename1.ui.Display.DENSITY_VERY_HIGH,
+            com.codename1.ui.Display.DENSITY_HD,
+            //com.codename1.ui.Display.DENSITY_560,
+            //com.codename1.ui.Display.DENSITY_2HD,
+            //com.codename1.ui.Display.DENSITY_4K
+        };
+        float[] WIDTHS = {
+            176, 240, 360, 480, 640, 1024 //, 1500, 2000, 2500
+        };
+        EncodedImage[] images = new EncodedImage[WIDTHS.length];
+        int imageCount = WIDTHS.length;
+        
+        for(int iter = 0 ; iter < DPIS.length ; iter++) {
+            if(iter == sourceResolution) {
+                images[iter] = EncodedImage.create(scale(bi, bi.getWidth(), bi.getHeight()));
+            } else {
+                float sourceWidth = WIDTHS[sourceResolution];
+                float destWidth = WIDTHS[iter];
+                int h = (int)(((float)bi.getHeight()) * destWidth / sourceWidth);
+                int w = (int)(((float)bi.getWidth()) * destWidth / sourceWidth);
+                images[iter] = EncodedImage.create(scale(bi, w, h));
+            }
+        }
+        
+        if(imageCount > 0) {
+            int offset = 0;
+            EncodedImage[] result = new EncodedImage[imageCount];
+            int[] resultDPI = new int[imageCount];
+            for(int iter = 0 ; iter < images.length ; iter++) {
+                if(images[iter] != null) {
+                    result[offset] = images[iter];
+                    resultDPI[offset] = DPIS[iter];
+                    offset++;
+                }
+            }
+            newImage.setDpi(resultDPI);
+            newImage.setInternalImages(result);
+            String destName = name;
+            int count = 1;
+            while(res.containsResource(destName)) {
+                destName = name + " " + count;
+                count++;
+            }
+            res.setMultiImage(destName, newImage);
         }
     }
 
@@ -213,7 +217,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         }
     }
 
-    private byte[] scale(BufferedImage bi, int w, int h) throws IOException {
+    private static byte[] scale(BufferedImage bi, int w, int h) throws IOException {
         BufferedImage scaled = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = scaled.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
