@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -189,7 +190,11 @@ public class MultipartRequest extends ConnectionRequest {
                 length += baseTextLength;
                 length += key.length();
                 if(ignoreEncoding.contains(key)) {
-                    length += ((String)value).length(); 
+                    try {
+                        length += value.toString().getBytes("UTF-8").length;
+                    } catch (UnsupportedEncodingException ex) {
+                        length += value.toString().getBytes().length;
+                    }
                 } else {
                     length += Util.encodeBody((String)value).length();
                 }

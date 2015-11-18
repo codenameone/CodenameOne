@@ -131,7 +131,11 @@ public final class IOSNative {
 
     native void flashBacklight(int duration);
 
-    native boolean isMinimized();
+    // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+    // tracking on the java side.  It caused the app to still be minimized inside start()
+    // method.  
+    // Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+    //native boolean isMinimized();
     
     native boolean minimizeApplication();
 
@@ -210,12 +214,12 @@ public final class IOSNative {
 
     native String getBrowserURL(long browserPeer);
     
-    native long createVideoComponent(String url);
-    native long createVideoComponent(byte[] video);
-    native long createVideoComponentNSData(long video);
-    native long createNativeVideoComponent(String url);
-    native long createNativeVideoComponent(byte[] video);
-    native long createNativeVideoComponentNSData(long video);
+    native long createVideoComponent(String url, int onCompletionCallbackId);
+    native long createVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createVideoComponentNSData(long video, int onCompletionCallbackId);
+    native long createNativeVideoComponent(String url, int onCompletionCallbackId);
+    native long createNativeVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createNativeVideoComponentNSData(long video, int onCompletionCallbackId);
 
     native void startVideoComponent(long peer); 
     
@@ -541,5 +545,11 @@ public final class IOSNative {
     native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType);
 
     native void cancelLocalNotification(String id);
+
+    /**
+     * Removes an observer from NSNotificationCenter
+     * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
+     */
+    native void removeNotificationCenterObserver(long nsObserverPeer);
 
 }
