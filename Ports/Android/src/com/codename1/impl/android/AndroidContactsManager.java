@@ -433,7 +433,8 @@ public class AndroidContactsManager {
     
     public Contact[] getAllContacts(Activity activity, boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         HashMap<String,Contact> contacts = new HashMap<String, Contact>();
-
+        ArrayList sortedContacts = new ArrayList();
+        
         String selection = null;
         if (withNumbers) {
             selection = ContactsContract.Contacts.HAS_PHONE_NUMBER + "=1";
@@ -451,7 +452,10 @@ public class AndroidContactsManager {
             Contact contact = new Contact();
             contact.setId(contactId);
             contact.setEmails(new Hashtable());
+            //the contacts hash is for faster lookups and the sortedContacts will keep the order sorted
             Contact old = contacts.put(contactId, contact);
+            sortedContacts.add(contact);
+            
             String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
             contact.setDisplayName(name);
             if(includesPicture){
@@ -683,8 +687,8 @@ public class AndroidContactsManager {
             }
             addrCur.close();
         }
-        Contact[] contactsArray = new Contact[contacts.values().size()];
-        contacts.values().toArray(contactsArray);
+        Contact[] contactsArray = new Contact[sortedContacts.size()];
+        sortedContacts.toArray(contactsArray);
         return contactsArray;
     }
 }
