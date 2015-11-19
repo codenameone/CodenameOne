@@ -28,12 +28,16 @@ import com.codename1.ui.Display;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
+import com.codename1.ui.EditorTTFFont;
+import com.codename1.ui.Font;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilderOverride;
 import java.awt.Image;
 import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -49,7 +53,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Properties;
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 import org.jdesktop.application.Application;
 import org.jdesktop.application.SingleFrameApplication;
@@ -270,6 +276,35 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 if("List".equalsIgnoreCase(ui)) {
                     importRes(res, "ListOfItems");
                     generate(res, f);
+                } else {
+                    if("NewHi".equalsIgnoreCase(ui)) {
+                        importImage("android-icon.png", res);
+                        importImage("apple-icon.png", res);
+                        importImage("windows-icon.png", res);
+                        importImage("duke-no-logos.png", res);
+                        Map m = res.getTheme("Theme");
+                        m.put("GetStarted.fgColor", "ffffff");
+                        m.put("GetStarted.sel#fgColor", "ffffff");
+                        m.put("GetStarted.press#fgColor", "ffffff");
+                        m.put("GetStarted.bgColor", "339900");
+                        m.put("GetStarted.sel#bgColor", "339900");
+                        m.put("GetStarted.press#bgColor", "339900");
+                        m.put("GetStarted.transparency", "255");
+                        m.put("GetStarted.sel#transparency", "255");
+                        m.put("GetStarted.press#transparency", "255");
+                        Integer centerAlign = new Integer(4);
+                        m.put("GetStarted.align", centerAlign);
+                        m.put("GetStarted.sel#align", centerAlign);
+                        m.put("GetStarted.press#align", centerAlign);
+                        m.put("GetStarted.padding", "1,1,1,1");
+                        m.put("GetStarted.padUnit", new byte[] {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+                        m.put("GetStarted.sel#padding", "1,1,1,1");
+                        m.put("GetStarted.sel#padUnit", new byte[] {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+                        m.put("GetStarted.press#padding", "1,1,1,1");
+                        m.put("GetStarted.press#padUnit", new byte[] {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+                        m.put("GetStarted.font", new EditorTTFFont("native:MainLight", 3, 2.5f, Font.createSystemFont(Font.FACE_SYSTEM,
+                                Font.STYLE_PLAIN, Font.SIZE_MEDIUM)));
+                    }
                 }
             }
         }
@@ -279,6 +314,15 @@ public class ResourceEditorApp extends SingleFrameApplication {
         os.close();
     }
 
+    private static void importImage(String path, EditableResources res) {
+        try {
+            BufferedImage bi = ImageIO.read(ResourceEditorApp.class.getResourceAsStream("/" + path));
+            AddAndScaleMultiImage.generateMulti(4, bi, path, res);
+        } catch(IOException err) {
+            err.printStackTrace();
+        }
+    }
+    
     private static String convertToVarName(String s) {
         StringBuilder sb = new StringBuilder();
         if(!Character.isJavaIdentifierStart(s.charAt(0))) {

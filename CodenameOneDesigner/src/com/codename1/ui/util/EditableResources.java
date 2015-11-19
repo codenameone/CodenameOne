@@ -1799,7 +1799,7 @@ public class EditableResources extends Resources implements TreeModel {
     
     com.codename1.ui.Font createTrueTypeFont(com.codename1.ui.Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         // workaround for NPE in case of people doing stupid things like moving the res file.
-        if(ResourceEditorView.getLoadedFile() == null) {
+        if(ResourceEditorView.getLoadedFile() == null && !fileName.startsWith("native:")) {
             return f;
         }
         if(fileName.startsWith("native:")) {
