@@ -25,6 +25,7 @@ package com.codename1.components;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -116,6 +117,13 @@ public class InfiniteProgress extends Component {
     protected Dimension calcPreferredSize() {
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
+            if(animation == null) {
+                int size = Display.getInstance().convertToPixels(12, true);
+                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_REFRESH, 
+                        FontImage.getMaterialDesignFont(), 0x777777, size, size);
+                fi.setPadding(0);
+                animation = fi;
+            }
         }
         if(animation == null) {
             return new Dimension(100, 100);

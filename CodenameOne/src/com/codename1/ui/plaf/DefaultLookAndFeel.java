@@ -37,6 +37,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Rectangle;
@@ -1549,6 +1550,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         g.setColor(oldColor);
     }
      
+     private FontImage getDefaultRefreshIcon() {
+            Style s = new Style(UIManager.getInstance().getComponentStyle("Label"));
+            s.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE));
+            return FontImage.createMaterial(FontImage.MATERIAL_ARROW_UPWARD, s);
+     }
 
     /**
      * @inheritDoc
@@ -1575,7 +1581,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 {
                     i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
                     if(i == null) {
-                        i = Resources.getSystemResource().getImage("refresh-icon.png");
+                        i = getDefaultRefreshIcon();
                     }
                 }
  
@@ -1634,7 +1640,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
-                i = Resources.getSystemResource().getImage("refresh-icon.png");
+                i = getDefaultRefreshIcon();
             }
             i = i.rotate(180);
             ((Label) pullDown).setIcon(i);
@@ -1644,7 +1650,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             releaseToRefresh.setUIID("PullToRefresh");
             Image i = UIManager.getInstance().getThemeImageConstant("pullToRefreshImage");
             if(i == null) {
-                i = Resources.getSystemResource().getImage("refresh-icon.png");
+                i = getDefaultRefreshIcon();
             }
             ((Label) releaseToRefresh).setIcon(i);
         }
@@ -1736,6 +1742,22 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     setCheckBoxImages(checkSel, checkUnsel);
                 }
             }
+        } else {
+            UIManager uim = UIManager.getInstance();
+            Style unsel = uim.getComponentStyle("CheckBox");
+            Style sel = uim.getComponentSelectedStyle("CheckBox");
+            Style dis = uim.getComponentCustomStyle("CheckBox", "dis");
+            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);
+            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
+            if(focus) {
+                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, sel);
+                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
+                setCheckBoxFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
+            } else {
+                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, unsel);
+                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, unsel);
+                setCheckBoxImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
+            }            
         }
     }
 
@@ -1757,6 +1779,22 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 } else {
                     setRadioButtonImages(radioSel, radioUnsel, disSel, disUnsel);
                 }
+            }
+        } else {
+            UIManager uim = UIManager.getInstance();
+            Style unsel = uim.getComponentStyle("RadioButton");
+            Style sel = uim.getComponentSelectedStyle("RadioButton");
+            Style dis = uim.getComponentCustomStyle("RadioButton", "dis");
+            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);
+            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
+            if(focus) {
+                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, sel);
+                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
+                setRadioButtonFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
+            } else {
+                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, unsel);
+                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, unsel);
+                setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
     }

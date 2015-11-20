@@ -220,7 +220,7 @@ public class SideMenuBar extends MenuBar {
         if (i != null) {
             ob.setIcon(i);
         } else {
-            ob.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU);
         }
         Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {
@@ -789,7 +789,7 @@ public class SideMenuBar extends MenuBar {
             if (i != null) {
                 rightSideButton.setIcon(i);
             } else {
-                rightSideButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+                FontImage.setMaterialIcon(rightSideButton, FontImage.MATERIAL_MENU);
             }
             Image p = (Image) uim.getThemeImageConstant("rightSideMenuPressImage");
             if (p != null) {
