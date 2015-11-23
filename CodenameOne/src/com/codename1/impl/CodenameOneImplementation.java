@@ -3377,12 +3377,31 @@ public abstract class CodenameOneImplementation {
      * (can also use rtsp:// if supported on the platform)
      * 
      * @return Media a Media Object that can be used to control the playback 
-     * of the media or null if background playing is not supported on the platform
+     * of the media
      * 
      * @throws IOException if creation of media from the given URI has failed
      */ 
     public Media createBackgroundMedia(String uri) throws IOException {
-        return null;
+        if(uri.startsWith("jar://")){
+            uri = uri.substring(6);
+            if(!uri.startsWith("/")){
+                uri = "/" + uri;
+            }
+            InputStream is = getResourceAsStream(this.getClass(), uri);
+            String mime = "";
+            if(uri.endsWith(".mp3")){
+                mime = "audio/mp3";
+            }else if(uri.endsWith(".wav")){
+                mime = "audio/x-wav";            
+            }else if(uri.endsWith(".amr")){
+                mime = "audio/amr";            
+            }else if(uri.endsWith(".3gp")){
+                mime = "audio/3gpp";            
+            }
+
+            return createMedia(is, mime, null);
+        }
+        return createMedia(uri, false, null);
     }
 
     /**

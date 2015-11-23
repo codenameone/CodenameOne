@@ -44,7 +44,7 @@ public class MediaManager {
      * (can also use rtsp:// if supported on the platform)
      * 
      * @return Media a Media Object that can be used to control the playback 
-     * of the media or null if background playing is not supported on the platform
+     * of the media
      * 
      * @throws IOException if creation of media from the given URI has failed
      */ 
