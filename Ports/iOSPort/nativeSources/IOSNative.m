@@ -3303,7 +3303,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
     });
 }
 
-
+extern int pendingRemoteNotificationRegistrations;
 
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
@@ -3338,6 +3338,7 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
                 
                 // Finally call the desired method with proper settings
                 if (settingsInstance) {
+                    pendingRemoteNotificationRegistrations++;
                     [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
                 }
             }
