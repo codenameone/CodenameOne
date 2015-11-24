@@ -133,6 +133,7 @@ extern UIView *editingComponent;
 // implemented this way so this will compile on older versions of xcode
 - (void)application:(UIApplication *)application didRegisterUserNotificationSettings:(id)notificationSettings {
     if (pendingRemoteNotificationRegistrations > 0) {
+        pendingRemoteNotificationRegistrations--;
         Class uiApp = NSClassFromString(@"UIApplication");
         UIApplication* uiAppInstance = [UIApplication sharedApplication];
         SEL sel = NSSelectorFromString(@"registerForRemoteNotifications");
