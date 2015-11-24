@@ -119,7 +119,7 @@ public class InfiniteProgress extends Component {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
             if(animation == null) {
                 int size = Display.getInstance().convertToPixels(12, true);
-                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_REFRESH, 
+                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_CACHED, 
                         FontImage.getMaterialDesignFont(), 0x777777, size, size);
                 fi.setPadding(0);
                 animation = fi;
