@@ -529,11 +529,19 @@ public class Font {
        return false;
    }
    
-   public int getAscent(){
+   /**
+    * The ascent is the amount by which the character ascends above the baseline. 
+    * @return the ascent in pixels
+    */
+   public int getAscent() {
        return Display.getInstance().getImplementation().getFontAscent(font);
    }
    
-   public int getDescent(){
+   /**
+    * The descent is the amount by which the character descends below the baseline
+    * @return the descent in pixels
+    */
+   public int getDescent() {
        return Display.getInstance().getImplementation().getFontDescent(font);
    }
 }

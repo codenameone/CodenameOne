@@ -119,10 +119,10 @@ public class InfiniteProgress extends Component {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
             if(animation == null) {
                 int size = Display.getInstance().convertToPixels(12, true);
-                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_CACHED, 
+                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW, 
                         FontImage.getMaterialDesignFont(), 0x777777, size, size);
                 fi.setPadding(0);
-                animation = fi;
+                animation = fi.toImage();
             }
         }
         if(animation == null) {
@@ -144,7 +144,6 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             return;
         }
-        angle += 16;
         int v = angle % 360;
         Style s = getStyle();
         /*if(g.isAffineSupported()) {
@@ -153,11 +152,18 @@ public class InfiniteProgress extends Component {
             g.resetAffine();
         } else {*/
         
-        Integer angle = new Integer(v);
-        Image rotated = cache.get(angle);
-        if(rotated == null) {
+        Image rotated;
+        if(animation instanceof FontImage) {
+            angle += 6;
             rotated = animation.rotate(v);
-            cache.put(v, rotated);
+        } else {
+            angle += 16;
+            Integer angle = new Integer(v);
+            rotated = cache.get(angle);
+            if(rotated == null) {
+                rotated = animation.rotate(v);
+                cache.put(v, rotated);
+            }
         }
         g.drawImage(rotated, getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));            
         //}
