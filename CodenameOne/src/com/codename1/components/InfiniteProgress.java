@@ -137,7 +137,7 @@ public class InfiniteProgress extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
-        if (Display.getInstance().getCurrent() != this.getComponentForm()) {
+        if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) {
             return;
         }
         super.paint(g);
