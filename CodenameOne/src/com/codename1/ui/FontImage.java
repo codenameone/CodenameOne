@@ -4724,7 +4724,7 @@ public class FontImage extends Image {
             int tY = g.getTranslateY();
             g.translate(-tX, -tY);
             g.rotate((float) Math.toRadians(rotated % 360), tX + x + width / 2, tY + y + height / 2);
-            g.drawString(text, tX + x + width / 2 - w / 2, tY + y);
+            g.drawString(text, tX + x + width / 2 - w / 2, tY + y + height / 2 - h / 2);
             g.resetAffine();
             g.translate(tX, tY);
         } else {
