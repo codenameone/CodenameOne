@@ -106,7 +106,7 @@ public class InfiniteProgress extends Component {
             return false;
         }
         // reduce repaint thrushing of the UI from the infinite progress
-        boolean val = super.animate() || tick % 4 == 0;
+        boolean val = super.animate() || tick % 3 == 0;
         tick++;
         return val;
     }
@@ -118,7 +118,7 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
             if(animation == null) {
-                int size = Display.getInstance().convertToPixels(12, true);
+                int size = Display.getInstance().convertToPixels(7, true);
                 FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW, 
                         FontImage.getMaterialDesignFont(), 0x777777, size, size);
                 fi.setPadding(0);
