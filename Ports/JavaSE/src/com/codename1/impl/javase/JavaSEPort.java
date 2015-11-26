@@ -160,6 +160,7 @@ import org.w3c.dom.NodeList;
 public class JavaSEPort extends CodenameOneImplementation {
 
     public final static boolean IS_MAC;
+    private static boolean isIOS;
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
@@ -1341,6 +1342,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             Display.getInstance().setProperty("User-Agent", ua);
 
+            isIOS = props.getProperty("systemFontFamily", "Arial").toLowerCase().contains("helvetica");
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
@@ -4128,12 +4130,56 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isNativeFontSchemeSupported() {
         return true;
     }
+
+    private String nativeFontName(String fontName) {
+        if(fontName != null && fontName.startsWith("native:")) {
+            if("native:MainThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLight";
+            }
+            if("native:MainLight".equals(fontName)) {
+                return "HelveticaNeue-Light";
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return "HelveticaNeue-Medium";
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return "HelveticaNeue-Bold";
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return "HelveticaNeue-CondensedBlack";
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLightItalic";
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return "HelveticaNeue-LightItalic";
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return "HelveticaNeue-MediumItalic";
+            }
+            
+            if("native:ItalicBold".equals(fontName) || "native:ItalicBlack".equals(fontName)) {
+                return "HelveticaNeue-BoldItalic";
+            }
+        }            
+        return null;
+    }
     
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         File fontFile = null;
         try {
             if(fontName.startsWith("native:")) {
+                if(IS_MAC || isIOS) {
+                    String nn = nativeFontName(fontName);
+                    java.awt.Font nf = new java.awt.Font(nn, java.awt.Font.PLAIN, medianFontSize);
+                    return nf;
+                }
                 String res; 
                 switch(fontName) {
                     case "native:MainThin":
