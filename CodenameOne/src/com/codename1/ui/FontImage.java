@@ -4499,7 +4499,7 @@ public class FontImage extends Image {
      */
     public static Font getMaterialDesignFont() {
         if (materialDesignFont == null) {
-            materialDesignFont = Font.createTrueTypeFont("Material Icons Regular", "material-design-font.ttf");
+            materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");
         }
         return materialDesignFont;
     }
