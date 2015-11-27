@@ -19,7 +19,7 @@
           <Group type="102" alignment="0" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="1" attributes="0">
-                  <Component id="jScrollPane1" alignment="0" pref="287" max="32767" attributes="0"/>
+                  <Component id="jScrollPane1" alignment="0" max="32767" attributes="0"/>
                   <Group type="102" alignment="0" attributes="0">
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
@@ -76,78 +76,80 @@
       <Properties>
         <Property name="editable" type="boolean" value="true"/>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="71">
+          <StringArray count="73">
             <StringItem index="0" value="alwaysTensileBool"/>
             <StringItem index="1" value="centeredPopupBool"/>
             <StringItem index="2" value="checkBoxCheckDisImage"/>
             <StringItem index="3" value="checkBoxCheckedImage"/>
-            <StringItem index="4" value="checkBoxUncheckDisImage"/>
-            <StringItem index="5" value="checkBoxUncheckedImage"/>
-            <StringItem index="6" value="comboImage"/>
-            <StringItem index="7" value="commandBehavior"/>
-            <StringItem index="8" value="ComponentGroupBool"/>
-            <StringItem index="9" value="defaultCommandImage"/>
-            <StringItem index="10" value="dialogButtonCommandsBool"/>
-            <StringItem index="11" value="dialogPosition"/>
-            <StringItem index="12" value="dialogTransitionIn"/>
-            <StringItem index="13" value="dialogTransitionInImage"/>
-            <StringItem index="14" value="dialogTransitionOut"/>
-            <StringItem index="15" value="dialogTransitionOutImage"/>
-            <StringItem index="16" value="disabledColor"/>
-            <StringItem index="17" value="dlgCommandButtonSizeInt"/>
-            <StringItem index="18" value="dlgCommandGridBool"/>
-            <StringItem index="19" value="dlgSlideDirection"/>
-            <StringItem index="20" value="dlgSlideInDirBool"/>
-            <StringItem index="21" value="dlgSlideOutDirBool"/>
-            <StringItem index="22" value="fadeScrollBarBool"/>
-            <StringItem index="23" value="fadeScrollEdgeBool"/>
-            <StringItem index="24" value="fadeScrollEdgeInt"/>
-            <StringItem index="25" value="firstCharRTLBool"/>
-            <StringItem index="26" value="fixedSelectionInt"/>
-            <StringItem index="27" value="formTransitionIn"/>
-            <StringItem index="28" value="formTransitionInImage"/>
-            <StringItem index="29" value="formTransitionOut"/>
-            <StringItem index="30" value="formTransitionOutImage"/>
-            <StringItem index="31" value="hideEmptyTitleBool"/>
-            <StringItem index="32" value="ignorListFocusBool"/>
-            <StringItem index="33" value="includeNativeBool"/>
-            <StringItem index="34" value="listItemGapInt"/>
-            <StringItem index="35" value="menuHeightPercent"/>
-            <StringItem index="36" value="menuPrefSizeBool"/>
-            <StringItem index="37" value="menuSlideDirection"/>
-            <StringItem index="38" value="menuSlideInDirBool"/>
-            <StringItem index="39" value="menuSlideOutDirBool"/>
-            <StringItem index="40" value="menuTransitionIn"/>
-            <StringItem index="41" value="menuTransitionInImage"/>
-            <StringItem index="42" value="menuTransitionOut"/>
-            <StringItem index="43" value="menuTransitionOutImage"/>
-            <StringItem index="44" value="menuWidthPercent"/>
-            <StringItem index="45" value="otherPopupRendererBool"/>
-            <StringItem index="46" value="PackTouchMenuBool"/>
-            <StringItem index="47" value="popupCancelBodyBool"/>
-            <StringItem index="48" value="popupTitleBool"/>
-            <StringItem index="49" value="pureTouchBool"/>
-            <StringItem index="50" value="radioSelectedDisImage"/>
-            <StringItem index="51" value="radioSelectedImage"/>
-            <StringItem index="52" value="radioUnselectedDisImage"/>
-            <StringItem index="53" value="radioUnselectedImage"/>
-            <StringItem index="54" value="rendererShowsNumbersBool"/>
-            <StringItem index="55" value="reverseSoftButtonsBool"/>
-            <StringItem index="56" value="sideMenuImage"/>
-            <StringItem index="57" value="slideDirection"/>
-            <StringItem index="58" value="slideInDirBool"/>
-            <StringItem index="59" value="slideOutDirBool"/>
-            <StringItem index="60" value="snapGridBool"/>
-            <StringItem index="61" value="tabPlacementInt"/>
-            <StringItem index="62" value="tabsFillRowsBool"/>
-            <StringItem index="63" value="tabsGridBool"/>
-            <StringItem index="64" value="textCmpVAlignInt"/>
-            <StringItem index="65" value="textFieldCursorColorInt"/>
-            <StringItem index="66" value="tickerSpeedInt"/>
-            <StringItem index="67" value="tintColor"/>
-            <StringItem index="68" value="touchCommandFillBool"/>
-            <StringItem index="69" value="touchCommandFlowBool"/>
-            <StringItem index="70" value="transitionSpeedInt"/>
+            <StringItem index="4" value="checkBoxCheckedFocusImage"/>
+            <StringItem index="5" value="checkBoxUncheckDisImage"/>
+            <StringItem index="6" value="checkBoxUncheckedImage"/>
+            <StringItem index="7" value="checkBoxUncheckedFocusImage"/>
+            <StringItem index="8" value="comboImage"/>
+            <StringItem index="9" value="commandBehavior"/>
+            <StringItem index="10" value="ComponentGroupBool"/>
+            <StringItem index="11" value="defaultCommandImage"/>
+            <StringItem index="12" value="dialogButtonCommandsBool"/>
+            <StringItem index="13" value="dialogPosition"/>
+            <StringItem index="14" value="dialogTransitionIn"/>
+            <StringItem index="15" value="dialogTransitionInImage"/>
+            <StringItem index="16" value="dialogTransitionOut"/>
+            <StringItem index="17" value="dialogTransitionOutImage"/>
+            <StringItem index="18" value="disabledColor"/>
+            <StringItem index="19" value="dlgCommandButtonSizeInt"/>
+            <StringItem index="20" value="dlgCommandGridBool"/>
+            <StringItem index="21" value="dlgSlideDirection"/>
+            <StringItem index="22" value="dlgSlideInDirBool"/>
+            <StringItem index="23" value="dlgSlideOutDirBool"/>
+            <StringItem index="24" value="fadeScrollBarBool"/>
+            <StringItem index="25" value="fadeScrollEdgeBool"/>
+            <StringItem index="26" value="fadeScrollEdgeInt"/>
+            <StringItem index="27" value="firstCharRTLBool"/>
+            <StringItem index="28" value="fixedSelectionInt"/>
+            <StringItem index="29" value="formTransitionIn"/>
+            <StringItem index="30" value="formTransitionInImage"/>
+            <StringItem index="31" value="formTransitionOut"/>
+            <StringItem index="32" value="formTransitionOutImage"/>
+            <StringItem index="33" value="hideEmptyTitleBool"/>
+            <StringItem index="34" value="ignorListFocusBool"/>
+            <StringItem index="35" value="includeNativeBool"/>
+            <StringItem index="36" value="listItemGapInt"/>
+            <StringItem index="37" value="menuHeightPercent"/>
+            <StringItem index="38" value="menuPrefSizeBool"/>
+            <StringItem index="39" value="menuSlideDirection"/>
+            <StringItem index="40" value="menuSlideInDirBool"/>
+            <StringItem index="41" value="menuSlideOutDirBool"/>
+            <StringItem index="42" value="menuTransitionIn"/>
+            <StringItem index="43" value="menuTransitionInImage"/>
+            <StringItem index="44" value="menuTransitionOut"/>
+            <StringItem index="45" value="menuTransitionOutImage"/>
+            <StringItem index="46" value="menuWidthPercent"/>
+            <StringItem index="47" value="otherPopupRendererBool"/>
+            <StringItem index="48" value="PackTouchMenuBool"/>
+            <StringItem index="49" value="popupCancelBodyBool"/>
+            <StringItem index="50" value="popupTitleBool"/>
+            <StringItem index="51" value="pureTouchBool"/>
+            <StringItem index="52" value="radioSelectedDisImage"/>
+            <StringItem index="53" value="radioSelectedImage"/>
+            <StringItem index="54" value="radioUnselectedDisImage"/>
+            <StringItem index="55" value="radioUnselectedImage"/>
+            <StringItem index="56" value="rendererShowsNumbersBool"/>
+            <StringItem index="57" value="reverseSoftButtonsBool"/>
+            <StringItem index="58" value="sideMenuImage"/>
+            <StringItem index="59" value="slideDirection"/>
+            <StringItem index="60" value="slideInDirBool"/>
+            <StringItem index="61" value="slideOutDirBool"/>
+            <StringItem index="62" value="snapGridBool"/>
+            <StringItem index="63" value="tabPlacementInt"/>
+            <StringItem index="64" value="tabsFillRowsBool"/>
+            <StringItem index="65" value="tabsGridBool"/>
+            <StringItem index="66" value="textCmpVAlignInt"/>
+            <StringItem index="67" value="textFieldCursorColorInt"/>
+            <StringItem index="68" value="tickerSpeedInt"/>
+            <StringItem index="69" value="tintColor"/>
+            <StringItem index="70" value="touchCommandFillBool"/>
+            <StringItem index="71" value="touchCommandFlowBool"/>
+            <StringItem index="72" value="transitionSpeedInt"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="constant" noResource="true"/>
@@ -180,7 +182,7 @@
       <SubComponents>
         <Component class="javax.swing.JEditorPane" name="help">
           <Properties>
-            <Property name="contentType" type="java.lang.String" value="text/html"/>
+            <Property name="contentType" type="java.lang.String" value="text/html" noResource="true"/>
             <Property name="editable" type="boolean" value="false"/>
             <Property name="name" type="java.lang.String" value="help" noResource="true"/>
           </Properties>

@@ -4898,7 +4898,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
         fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
         fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
-        fnt.name = nativeFontName(fontName);
+        fontName = nativeFontName(fontName);
+        fnt.name = fontName;
         fnt.peer = nativeInstance.createTruetypeFont(fontName);
         return fnt;
     }

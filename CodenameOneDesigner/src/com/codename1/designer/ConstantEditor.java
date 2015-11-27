@@ -65,9 +65,11 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("changeTabOnFocusBool","Usefull for feature phones, allows changing the tab when the focus changes immediately without pressing a key");
         helpMap.put("checkBoxCheckDisImage","CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxCheckedImage", "CheckBox image to use instead of Codename One drawing it on its own");
+        helpMap.put("checkBoxCheckedFocusImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxOppositeSideBool","Indicates the check box should be drawn on the opposite side to the text and not next to the text");
         helpMap.put("checkBoxUncheckDisImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxUncheckedImage", "CheckBox image to use instead of Codename One drawing it on its own");
+        helpMap.put("checkBoxUncheckedFocusImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("comboImage", "Combo image to use instead of Codename One drawing it on its own");
         helpMap.put("commandBehavior", "Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native");
         helpMap.put("ComponentGroupBool", "Enables component group which allows components to be logically grouped together so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. Its disabled by default thus leaving its usage up to the designer.");
@@ -267,7 +269,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         jLabel1.setName("jLabel1"); // NOI18N
 
         constant.setEditable(true);
-        constant.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "alwaysTensileBool", "centeredPopupBool", "checkBoxCheckDisImage", "checkBoxCheckedImage", "checkBoxUncheckDisImage", "checkBoxUncheckedImage", "comboImage", "commandBehavior", "ComponentGroupBool", "defaultCommandImage", "dialogButtonCommandsBool", "dialogPosition", "dialogTransitionIn", "dialogTransitionInImage", "dialogTransitionOut", "dialogTransitionOutImage", "disabledColor", "dlgCommandButtonSizeInt", "dlgCommandGridBool", "dlgSlideDirection", "dlgSlideInDirBool", "dlgSlideOutDirBool", "fadeScrollBarBool", "fadeScrollEdgeBool", "fadeScrollEdgeInt", "firstCharRTLBool", "fixedSelectionInt", "formTransitionIn", "formTransitionInImage", "formTransitionOut", "formTransitionOutImage", "hideEmptyTitleBool", "ignorListFocusBool", "includeNativeBool", "listItemGapInt", "menuHeightPercent", "menuPrefSizeBool", "menuSlideDirection", "menuSlideInDirBool", "menuSlideOutDirBool", "menuTransitionIn", "menuTransitionInImage", "menuTransitionOut", "menuTransitionOutImage", "menuWidthPercent", "otherPopupRendererBool", "PackTouchMenuBool", "popupCancelBodyBool", "popupTitleBool", "pureTouchBool", "radioSelectedDisImage", "radioSelectedImage", "radioUnselectedDisImage", "radioUnselectedImage", "rendererShowsNumbersBool", "reverseSoftButtonsBool", "sideMenuImage", "slideDirection", "slideInDirBool", "slideOutDirBool", "snapGridBool", "tabPlacementInt", "tabsFillRowsBool", "tabsGridBool", "textCmpVAlignInt", "textFieldCursorColorInt", "tickerSpeedInt", "tintColor", "touchCommandFillBool", "touchCommandFlowBool", "transitionSpeedInt" }));
+        constant.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "alwaysTensileBool", "centeredPopupBool", "checkBoxCheckDisImage", "checkBoxCheckedImage", "checkBoxCheckedFocusImage", "checkBoxUncheckDisImage", "checkBoxUncheckedImage", "checkBoxUncheckedFocusImage", "comboImage", "commandBehavior", "ComponentGroupBool", "defaultCommandImage", "dialogButtonCommandsBool", "dialogPosition", "dialogTransitionIn", "dialogTransitionInImage", "dialogTransitionOut", "dialogTransitionOutImage", "disabledColor", "dlgCommandButtonSizeInt", "dlgCommandGridBool", "dlgSlideDirection", "dlgSlideInDirBool", "dlgSlideOutDirBool", "fadeScrollBarBool", "fadeScrollEdgeBool", "fadeScrollEdgeInt", "firstCharRTLBool", "fixedSelectionInt", "formTransitionIn", "formTransitionInImage", "formTransitionOut", "formTransitionOutImage", "hideEmptyTitleBool", "ignorListFocusBool", "includeNativeBool", "listItemGapInt", "menuHeightPercent", "menuPrefSizeBool", "menuSlideDirection", "menuSlideInDirBool", "menuSlideOutDirBool", "menuTransitionIn", "menuTransitionInImage", "menuTransitionOut", "menuTransitionOutImage", "menuWidthPercent", "otherPopupRendererBool", "PackTouchMenuBool", "popupCancelBodyBool", "popupTitleBool", "pureTouchBool", "radioSelectedDisImage", "radioSelectedImage", "radioUnselectedDisImage", "radioUnselectedImage", "rendererShowsNumbersBool", "reverseSoftButtonsBool", "sideMenuImage", "slideDirection", "slideInDirBool", "slideOutDirBool", "snapGridBool", "tabPlacementInt", "tabsFillRowsBool", "tabsGridBool", "textCmpVAlignInt", "textFieldCursorColorInt", "tickerSpeedInt", "tintColor", "touchCommandFillBool", "touchCommandFlowBool", "transitionSpeedInt" }));
         constant.setName("constant"); // NOI18N
         constant.addActionListener(formListener);
 
@@ -279,7 +281,7 @@ public class ConstantEditor extends javax.swing.JPanel {
 
         jScrollPane1.setName("jScrollPane1"); // NOI18N
 
-        help.setContentType("text/html");
+        help.setContentType("text/html"); // NOI18N
         help.setEditable(false);
         help.setName("help"); // NOI18N
         jScrollPane1.setViewportView(help);
@@ -302,7 +304,7 @@ public class ConstantEditor extends javax.swing.JPanel {
             .add(layout.createSequentialGroup()
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(org.jdesktop.layout.GroupLayout.LEADING, jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 287, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, jScrollPane1)
                     .add(org.jdesktop.layout.GroupLayout.LEADING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
