@@ -919,18 +919,31 @@ public class SideMenuBar extends MenuBar {
         return createSideNavigationPanel(commands, placement);
     }
     
-    Container createSideNavigationPanel(Vector commands, String placement) {
+    /**
+     * Creates an empty side navigation panel.
+     */ 
+    protected Container constructSideNavigationComponent(){
+        return constructSideNavigationPanel();
+    }
+    
+    Container constructSideNavigationPanel(){
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        menu.setUIID("SideNavigationPanel");
+        menu.setScrollableY(true);
+        return menu;
+    }
+    
+    Container createSideNavigationPanel(Vector commands, String placement) {
+        Container menu = constructSideNavigationComponent();
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container bar = new Container();
             bar.setUIID("StatusBarSideMenu");
             menu.addComponent(bar);
         }
-        menu.setUIID("SideNavigationPanel");
-        menu.setScrollableY(true);
         if (!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
             menu.setTensileDragEnabled(false);
         }
+        
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
             if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {
