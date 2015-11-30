@@ -1655,8 +1655,8 @@ extern GLKMatrix4 CN1transformMatrix;
 }
 
 BOOL patch = NO;
-int keyboardSlideOffset;
-int keyboardHeight;
+int keyboardSlideOffset=0;
+int keyboardHeight=0;
 - (void)keyboardWillHide:(NSNotification *)n
 {
     @synchronized([CodenameOne_GLViewController instance]) {
@@ -1675,34 +1675,18 @@ int keyboardHeight;
     // to use the new space.
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeHidden__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
-    if(!modifiedViewHeight) {
-        return;
-    }
 #ifdef NEW_CODENAME_ONE_VM
     repaintUI();
 #else
     com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
-    NSDictionary* userInfo = [n userInfo];
-    
-    // get the size of the keyboard
-    CGRect keyboardEndFrame;
-    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
-    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
-    
-    keyboardHeight = keyboardFrame.size.height;
     
     // resize the scrollview
     CGRect viewFrame = self.view.frame;
-    // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-    
     int patchSize = 3;
     if(isIOS8()) {
         patchSize = 2;
     }
-    
-    keyboardSlideOffset = 0;
-
     
     // https://github.com/codenameone/CodenameOne/issues/1074
 #ifdef __IPHONE_7_0
@@ -1714,35 +1698,34 @@ int keyboardHeight;
     
     if(patch) {
         if (isIOS8()) {
-            viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
+            viewFrame.origin.y -= keyboardSlideOffset / patchSize * upsideDownMultiplier;
         } else {
             if(displayHeight > displayWidth) {
-                 viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
+                 viewFrame.origin.y -= keyboardSlideOffset / patchSize * upsideDownMultiplier;
             } else {
-                viewFrame.origin.x -= keyboardHeight / patchSize * upsideDownMultiplier;
+                viewFrame.origin.x += keyboardSlideOffset / patchSize * upsideDownMultiplier;
             }
         }
     } else {
         if (isIOS8()) {
-            viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
+            viewFrame.origin.y -= keyboardSlideOffset * upsideDownMultiplier;
         } else {
             if(displayHeight > displayWidth) {
-                viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
+                viewFrame.origin.y -= keyboardSlideOffset * upsideDownMultiplier;
             } else {
-                viewFrame.origin.x -= keyboardHeight * upsideDownMultiplier;
+                viewFrame.origin.x += keyboardSlideOffset * upsideDownMultiplier;
             }
         }
     }
-    /*float y = editingComponent.frame.origin.y;
-     y += keyboardSize.height;
-     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
-    
+    keyboardHeight = 0;
+    keyboardSlideOffset = 0;
     [UIView beginAnimations:nil context:NULL];
     [UIView setAnimationBeginsFromCurrentState:YES];
     [UIView setAnimationDuration:0.3];
     [self.view setFrame:viewFrame];
     [UIView commitAnimations];
 }
+
 
 BOOL prefersStatusBarHidden = NO;
 
@@ -1757,29 +1740,25 @@ BOOL prefersStatusBarHidden = NO;
         modifiedViewHeight = NO;
         return;
     }
-    NSDictionary* userInfo = [n userInfo];
-    
+    NSDictionary *userInfo = [n userInfo];
+    CGSize kbSize = [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue].size;
     // get the size of the keyboard
-    CGRect keyboardEndFrame;
-    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
-    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
+    //CGRect keyboardEndFrame;
+    //[[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
 
-    keyboardHeight = keyboardFrame.size.height;
+    //CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
+
+    JAVA_INT deltaHeight = kbSize.height - keyboardHeight;
+    keyboardHeight = (JAVA_INT)kbSize.height;
     vkbHeight = (JAVA_INT)keyboardHeight;
-    vkbWidth = (JAVA_INT)keyboardFrame.size.width;
+    vkbWidth = (JAVA_INT)kbSize.width;
     
     // Callback to Java for async editing so that it can resize the form to account for the
     // keyboard taking up space.
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
-    // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
-    if (keyboardIsShown) {
-        return;
-    }
-    
     // resize the noteView
     CGRect viewFrame = self.view.frame;
-    // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
     
     patch = NO;
     keyboardSlideOffset = 0;
@@ -1811,35 +1790,32 @@ BOOL prefersStatusBarHidden = NO;
 #endif
     if(patch) {
         if (isIOS8()){
-            viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
+            viewFrame.origin.y -= (deltaHeight / patchSize) * upsideDownMultiplier;
             keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
         } else {
             if(displayHeight > displayWidth) {
-                viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
+                viewFrame.origin.y -= (deltaHeight / patchSize) * upsideDownMultiplier;
                 keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
             } else {
-                viewFrame.origin.x += (keyboardHeight / patchSize) * upsideDownMultiplier;
+                viewFrame.origin.x += (deltaHeight / patchSize) * upsideDownMultiplier;
                 keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
             }
         }
     } else {
         if (isIOS8()){
-            viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+            viewFrame.origin.y -= deltaHeight * upsideDownMultiplier;
             keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
         } else {
             if(displayHeight > displayWidth) {
-                viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
+                viewFrame.origin.y -= deltaHeight * upsideDownMultiplier;
                 keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
             } else {
-                viewFrame.origin.x += keyboardHeight * upsideDownMultiplier;
+                viewFrame.origin.x += deltaHeight * upsideDownMultiplier;
                 keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
             }
         }
     }
     
-    /*float y = editingComponent.frame.origin.y;
-     y -= keyboardSize.height;
-     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
     
     [UIView beginAnimations:nil context:NULL];
     [UIView setAnimationBeginsFromCurrentState:YES];
@@ -1849,6 +1825,7 @@ BOOL prefersStatusBarHidden = NO;
     
     keyboardIsShown = YES;
 }
+
 
 
 - (void)dealloc
