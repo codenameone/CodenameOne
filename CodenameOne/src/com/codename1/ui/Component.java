@@ -1605,8 +1605,9 @@ public class Component implements Animation, StyleListener {
 
     /**
      * Returns the scrollable parent of this component
+     * @return the component itself or its parent which is scrollable
      */
-    protected Component getScrollable() {
+    public Component getScrollable() {
         if(isScrollable()) {
             return this;
         }
