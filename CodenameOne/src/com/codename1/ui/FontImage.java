@@ -4593,6 +4593,7 @@ public class FontImage extends Image {
     private int rotated;
     private int backgroundColor;
     private byte backgroundOpacity;
+    private int opacity=-1;
 
     /**
      * Default factor for image size, icons without a given size are sized as
@@ -4649,6 +4650,7 @@ public class FontImage extends Image {
         f.backgroundColor = s.getBgColor();
         f.text = text;
         f.color = s.getFgColor();
+        f.opacity = s.getOpacity();
         f.fnt = fnt;
         int w = Math.max(f.getHeight(), f.fnt.stringWidth(text)) + (f.padding * 2);
         f.width = w;
@@ -4707,8 +4709,13 @@ public class FontImage extends Image {
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
         Font oldFont = g.getFont();
 
+        if (opacity > 0 ) {
+            g.setAlpha(opacity);
+        }
+        
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
             g.fillRect(x, y, width, height, (byte) backgroundOpacity);
@@ -4732,6 +4739,7 @@ public class FontImage extends Image {
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
     }
 
     /**
