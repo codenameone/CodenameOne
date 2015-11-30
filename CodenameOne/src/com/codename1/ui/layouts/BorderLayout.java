@@ -619,4 +619,41 @@ public class BorderLayout extends Layout {
     public static Container center(Component center) {
         return Container.encloseIn(new BorderLayout(), center, BorderLayout.CENTER);
     }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the north
+     * @param north the north component
+     * @return the created component
+     */
+    public static Container north(Component north) {
+        return Container.encloseIn(new BorderLayout(), north, BorderLayout.NORTH);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the south
+     * @param south the south component
+     * @return the created component
+     */
+    public static Container south(Component south) {
+        return Container.encloseIn(new BorderLayout(), south, BorderLayout.SOUTH);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the east
+     * @param east the east component
+     * @return the created component
+     */
+    public static Container east(Component east) {
+        return Container.encloseIn(new BorderLayout(), east, BorderLayout.EAST);
+    }
+
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the west
+     * @param west the west component
+     * @return the created component
+     */
+    public static Container west(Component west) {
+        return Container.encloseIn(new BorderLayout(), west, BorderLayout.WEST);
+    }
 }
