@@ -1675,7 +1675,7 @@ int keyboardHeight;
     // to use the new space.
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeHidden__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
-    if(!modifiedViewHeight) {
+    if(!modifiedViewHeight || isVKBAlwaysOpen()) {
         return;
     }
 #ifdef NEW_CODENAME_ONE_VM
@@ -1773,7 +1773,7 @@ BOOL prefersStatusBarHidden = NO;
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
-    if (keyboardIsShown) {
+    if (keyboardIsShown || isVKBAlwaysOpen()) {
         return;
     }
     
