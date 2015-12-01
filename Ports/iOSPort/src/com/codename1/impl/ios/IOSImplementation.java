@@ -385,6 +385,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if (current != null) {
                             current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                             current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            Component focused = current.getFocused();
+                            if (focused != null) {
+                                focused.requestFocus();
+                            }
                             current.revalidate();
                         }
                     }
@@ -393,6 +397,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
+                            Component focused = current.getFocused();
+                            if (focused != null) {
+                                focused.requestFocus();
+                            }
                             current.revalidate();
                         }
                     }
