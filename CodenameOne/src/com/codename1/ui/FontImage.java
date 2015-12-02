@@ -4499,8 +4499,12 @@ public class FontImage extends Image {
      */
     public static Font getMaterialDesignFont() {
         if (materialDesignFont == null) {
-            materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");
-        }
+            if(Font.isTrueTypeFileSupported()) {
+                materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");
+            } else {
+                materialDesignFont = Font.getDefaultFont();
+            }
+        } 
         return materialDesignFont;
     }
 
@@ -4511,9 +4515,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(Label l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
 
     /**
@@ -4523,9 +4529,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(MultiButton l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
     
     /**
@@ -4535,9 +4543,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(SpanButton l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
     
     /**
@@ -4593,6 +4603,7 @@ public class FontImage extends Image {
     private int rotated;
     private int backgroundColor;
     private byte backgroundOpacity;
+    private int opacity=-1;
 
     /**
      * Default factor for image size, icons without a given size are sized as
@@ -4649,6 +4660,7 @@ public class FontImage extends Image {
         f.backgroundColor = s.getBgColor();
         f.text = text;
         f.color = s.getFgColor();
+        f.opacity = s.getOpacity();
         f.fnt = fnt;
         int w = Math.max(f.getHeight(), f.fnt.stringWidth(text)) + (f.padding * 2);
         f.width = w;
@@ -4668,6 +4680,9 @@ public class FontImage extends Image {
     }
 
     private static Font sizeFont(Font fnt, int w, int padding) {
+        if(!Font.isTrueTypeFileSupported()) {
+            return Font.getDefaultFont();
+        }
         int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         w -= paddingPixels;
         int h = fnt.getHeight();
@@ -4707,8 +4722,13 @@ public class FontImage extends Image {
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
         Font oldFont = g.getFont();
 
+        if (opacity > 0 ) {
+            g.setAlpha(opacity);
+        }
+        
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
             g.fillRect(x, y, width, height, (byte) backgroundOpacity);
@@ -4732,6 +4752,7 @@ public class FontImage extends Image {
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
     }
 
     /**

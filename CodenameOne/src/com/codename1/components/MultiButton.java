@@ -106,6 +106,34 @@ public class MultiButton extends Container {
     }
     
     /**
+     * Changes the layout so the lines of the button are grouped together
+     * @param l true to group the lines together
+     */
+    public void setLinesTogetherMode(boolean l) {
+        if(l != isLinesTogetherMode()) {
+            if(l) {
+                firstRow.getParent().removeComponent(firstRow);
+                Container p = secondRow.getParent();
+                p.addComponent(0, firstRow);
+                Container pp = p.getParent();
+                pp.removeComponent(p);
+                pp.addComponent(BorderLayout.CENTER, p);
+            } else {
+                secondRow.getParent().removeComponent(secondRow);
+                thirdRow.getParent().addComponent(0, secondRow);
+            }
+        }
+    }
+    
+    /**
+     * Indicates if the lines are grouped together on this button
+     * @return 
+     */
+    public boolean isLinesTogetherMode() {
+        return firstRow.getParent() == secondRow.getParent();
+    }
+    
+    /**
      * Allows us to gain direct access to the icon component so we can set it directly without going
      * via the other methods, this is especially useful for classes such as the ImageDownloadService
      * which can then update the icon seamlessly.

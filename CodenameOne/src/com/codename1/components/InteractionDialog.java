@@ -277,8 +277,8 @@ public class InteractionDialog extends Container {
      * @param rect the screen rectangle to which the popup should point
      */
     public void showPopupDialog(Rectangle rect) {
-        if(getDialogUIID().equals("Dialog")) {
-            setDialogUIID("PopupDialog");
+        if(getUIID().equals("Dialog")) {
+            setUIID("PopupDialog");
             if(getTitleComponent().getUIID().equals("DialogTitle")) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
@@ -321,14 +321,14 @@ public class InteractionDialog extends Container {
         // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
 
-        Style contentPaneStyle = getDialogStyle();
+        Style contentPaneStyle = getStyle();
 
         boolean restoreArrow = false;
-        if(manager.isThemeConstant(getDialogUIID()+ "ArrowBool", false)) {
-            Image t = manager.getThemeImageConstant(getDialogUIID() + "ArrowTopImage");
-            Image b = manager.getThemeImageConstant(getDialogUIID() + "ArrowBottomImage");
-            Image l = manager.getThemeImageConstant(getDialogUIID() + "ArrowLeftImage");
-            Image r = manager.getThemeImageConstant(getDialogUIID() + "ArrowRightImage");
+        if(manager.isThemeConstant(getUIID()+ "ArrowBool", false)) {
+            Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
+            Image b = manager.getThemeImageConstant(getUIID() + "ArrowBottomImage");
+            Image l = manager.getThemeImageConstant(getUIID() + "ArrowLeftImage");
+            Image r = manager.getThemeImageConstant(getUIID() + "ArrowRightImage");
             Border border = contentPaneStyle.getBorder();
             if(border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
@@ -342,12 +342,12 @@ public class InteractionDialog extends Container {
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
         
-        int availableHeight = Display.getInstance().getDisplayHeight()  - title.getPreferredH();
-        int availableWidth = Display.getInstance().getDisplayWidth();
+        Form f = Display.getInstance().getCurrent();
+        int availableHeight = f.getLayeredPane().getHeight();
+        int availableWidth = f.getLayeredPane().getWidth();
         int width = Math.min(availableWidth, prefWidth);
         int x = 0;
         int y = 0;
-        Command result;
 
         boolean showPortrait = Display.getInstance().isPortrait();
 
@@ -377,14 +377,14 @@ public class InteractionDialog extends Container {
             }
             if(rect.getY() < availableHeight / 2) {
                 // popup downwards
-                y = rect.getY() + rect.getSize().getHeight();
+                y = rect.getY();
                 int height = Math.min(prefHeight, availableHeight - y);
-                show(y, availableHeight - height - y, x, availableWidth - width - x);
+                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
             } else {
                 // popup upwards
                 int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
-                y = rect.getY() - height;
-                show(y, availableHeight - height - y, x, availableWidth - width - x);
+                y = rect.getY() + rect.getHeight() + - height;
+                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
@@ -420,9 +420,9 @@ public class InteractionDialog extends Container {
             }
         }
 
-        if(restoreArrow) {
+        /*if(restoreArrow) {
             contentPaneStyle.getBorder().clearImageBorderSpecialTile();
-        }
+        }*/
     }
 
     /**

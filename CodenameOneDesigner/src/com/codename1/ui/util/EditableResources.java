@@ -108,7 +108,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 6;
+    private static final short MINOR_VERSION = 7;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -1008,6 +1008,11 @@ public class EditableResources extends Resources implements TreeModel {
                             if(key.endsWith("transparency")) {
                                 bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
                                 continue;
+                            }
+                            
+                            if(key.endsWith("opacity")) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
                             } 
 
                             // if this is a padding or margin then we will have the 4 values as bytes
@@ -1845,6 +1850,11 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeByte(Integer.parseInt((String)theme.get(key)));
                 continue;
             } 
+            
+            if (key.endsWith("opacity")) {
+                output.writeInt(Integer.parseInt((String)theme.get(key)));
+                continue;
+            }
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("padding") || key.endsWith("margin")) {

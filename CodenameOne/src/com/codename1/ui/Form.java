@@ -66,7 +66,7 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Form extends Container {
-
+    private boolean globalAnimationLock;
     private Painter glassPane;
     private Container layeredPane;
     private Container contentPane;
@@ -150,6 +150,11 @@ public class Form extends Container {
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
+    
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     */
+    private TextArea editOnShow;
             
     /**
      * Default constructor creates a simple form
@@ -305,6 +310,27 @@ public class Form extends Container {
         return getContentPane().isAlwaysTensile();
     }
 
+    /**
+     * Allows grabbing a flag that is used by convention to indicate that you are running an exclusive animation.
+     * This is used by some code to prevent collision between optional animation
+     * 
+     * @return whether the lock was acquired or not
+     */
+    public boolean grabAnimationLock() {
+        if(globalAnimationLock) {
+            return false;
+        }
+        globalAnimationLock = true;
+        return true;
+    }
+    
+    /**
+     * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     */
+    public void releaseAnimationLock() {
+        globalAnimationLock = false;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -1577,6 +1603,9 @@ public class Form extends Container {
         onShowCompleted();
         if (showListener != null) {
             showListener.fireActionEvent(new ActionEvent(this));
+        }
+        if(editOnShow != null) {
+            editOnShow.startEditingAsync();
         }
     }
 
@@ -3131,5 +3160,21 @@ public class Form extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @return the component instance
+     */
+    public TextArea getEditOnShow() {
+        return editOnShow;
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @param editOnShow text component to edit when the form is shown
+     */
+    public void setEditOnShow(TextArea editOnShow) {
+        this.editOnShow = editOnShow;
     }
 }
