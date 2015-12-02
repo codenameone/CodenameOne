@@ -4499,8 +4499,12 @@ public class FontImage extends Image {
      */
     public static Font getMaterialDesignFont() {
         if (materialDesignFont == null) {
-            materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");
-        }
+            if(Font.isTrueTypeFileSupported()) {
+                materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");
+            } else {
+                materialDesignFont = Font.getDefaultFont();
+            }
+        } 
         return materialDesignFont;
     }
 
@@ -4511,9 +4515,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(Label l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
 
     /**
@@ -4523,9 +4529,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(MultiButton l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
     
     /**
@@ -4535,9 +4543,11 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(SpanButton l, char icon) {
-        Style s = new Style(l.getUnselectedStyle());
-        s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-        l.setIcon(FontImage.create("" + icon, s));
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
     }
     
     /**
@@ -4670,6 +4680,9 @@ public class FontImage extends Image {
     }
 
     private static Font sizeFont(Font fnt, int w, int padding) {
+        if(!Font.isTrueTypeFileSupported()) {
+            return Font.getDefaultFont();
+        }
         int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         w -= paddingPixels;
         int h = fnt.getHeight();

@@ -48,6 +48,15 @@ public class SpanButton extends Container {
         this("");
     }
     
+    /**
+     * Constructor accepting default text and uiid for the text
+     * @param txt the text
+     * @param textUiid the new text UIID
+     */
+    public SpanButton(String txt, String textUiid) {
+        this(txt);
+        text.setUIID(textUiid);
+    }
     
     /**
      * Constructor accepting default text
