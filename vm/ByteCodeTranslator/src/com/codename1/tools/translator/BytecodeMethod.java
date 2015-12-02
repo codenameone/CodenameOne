@@ -1278,7 +1278,7 @@ public class BytecodeMethod {
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of binary integer operator");
                             }
-                            sb.append("stack[stackPointer++].data.i = ")
+                            sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ")
                                     .append(leftLiteral).append(operator).append(rightLiteral)
                                     .append("; /* ").append(opName).append(" Optimized */\n");
                             
