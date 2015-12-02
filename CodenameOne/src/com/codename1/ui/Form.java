@@ -997,6 +997,11 @@ public class Form extends Container {
      * @param title the form title
      */
     public void setTitle(String title) {
+        if(toolbar != null){
+            toolbar.setTitle(title);
+            return;
+        }
+            
         this.title.setText(title);
 
         if (!Display.getInstance().isNativeTitle()) {

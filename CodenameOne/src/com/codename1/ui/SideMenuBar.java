@@ -380,11 +380,19 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)rightCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
+                
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(rightCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
                     Component east = bl.getEast();
                     if (east == null) {
@@ -437,12 +445,19 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)leftCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
                 
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(leftCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
                     Component west = bl.getWest();
                     if (west == null) {
