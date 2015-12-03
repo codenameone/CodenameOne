@@ -2713,6 +2713,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MUL
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] systemVersion]);
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
@@ -5967,6 +5971,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID___R_java_lang_String(CN1_TH
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
