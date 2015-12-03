@@ -1000,6 +1000,11 @@ public class BytecodeMethod {
         boolean hasInstructions = false; 
         for(int iter = 0 ; iter < instructionCount - 1 ; iter++) {
             Instruction current = instructions.get(iter);
+            if (current.isOptimized()) {
+                // This instruction has already been optimized
+                // we should skip it and proceed to the next one
+                continue;
+            }
             Instruction next = instructions.get(iter + 1);
 
             int currentOpcode = current.getOpcode();
@@ -1111,7 +1116,8 @@ public class BytecodeMethod {
                 case Opcodes.IF_ICMPNE:
                 case Opcodes.IF_ICMPGT:
                 case Opcodes.IF_ICMPEQ:
-                case Opcodes.IF_ICMPGE:
+                case Opcodes.IF_ICMPGE: {
+                    
                     if (iter > 1) {
                         Instruction leftArg = instructions.get(iter-2);
                         Instruction rightArg = instructions.get(iter-1);
@@ -1168,7 +1174,7 @@ public class BytecodeMethod {
                             instructions.remove(iter-2);
                             //instructions.remove(iter-2);
                             iter-=2;
-                            instructionCount -= 2;
+                            //instructionCount -= 2;
                             StringBuilder sb = new StringBuilder();
                             String operator = null;
                             String opName = null;
@@ -1192,11 +1198,14 @@ public class BytecodeMethod {
                             
                             sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" Optimized */ ");
                             jmp.setCustomCompareCode(sb.toString());
+                            jmp.setOptimized(true);
+                            instructionCount = instructions.size();
+                            
                         }
                         
                     }
                 break;
-                    
+                }   
                     /* Try to optimize if statements that just use constants
                    and local variables so that they don't need the intermediate
                    push and pop from the stack.
@@ -1204,7 +1213,7 @@ public class BytecodeMethod {
                 case Opcodes.IMUL:
                 case Opcodes.IDIV:
                 case Opcodes.IADD:
-                case Opcodes.ISUB:
+                case Opcodes.ISUB: {
                 
                     if (iter > 1) {
                         Instruction leftArg = instructions.get(iter-2);
@@ -1278,16 +1287,127 @@ public class BytecodeMethod {
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of binary integer operator");
                             }
-                            sb.append("stack[stackPointer++].data.i = ")
+                            sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ")
                                     .append(leftLiteral).append(operator).append(rightLiteral)
                                     .append("; /* ").append(opName).append(" Optimized */\n");
-                            
-                            instructions.add(iter, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
-                            
+                            Instruction newInst = new CustomIntruction(sb.toString(), sb.toString(), dependentClasses);
+                            newInst.setOptimized(true);
+                            instructions.add(iter, newInst);
+                            instructionCount = instructions.size();
                         }
                         
                     }
                 break;
+                }
+                
+                case Opcodes.INVOKEVIRTUAL:
+                case Opcodes.INVOKESTATIC:
+                case Opcodes.INVOKESPECIAL:
+                case Opcodes.INVOKEINTERFACE: {
+                    if (current instanceof Invoke) {
+                        Invoke inv = (Invoke)current;
+                        List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
+                        int numArgs = invocationArgs.size();
+                        if (iter >= numArgs) {
+                            String[] argLiterals = new String[numArgs];
+                            for (int i=0; i<numArgs; i++) {
+                                Instruction instr = instructions.get(iter-numArgs+i);
+                                if (instr instanceof VarOp) {
+                                    VarOp var = (VarOp)instr;
+                                    switch (instr.getOpcode()) {
+                                        case Opcodes.ALOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.o";
+                                            break;
+                                        }
+                                        case Opcodes.ILOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.i";
+                                            break;
+                                        }
+                                        case Opcodes.ACONST_NULL: {
+                                            argLiterals[i] = "JAVA_NULL";
+                                            break;
+                                        }
+                                        case Opcodes.DLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.d";
+                                            break;
+                                        }
+                                        case Opcodes.FLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.f";
+                                            break;
+                                        }
+                                        case Opcodes.LLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.l";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_0: {
+                                            argLiterals[i] = "0";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_1: {
+                                            argLiterals[i] = "1";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_2: {
+                                            argLiterals[i] = "2";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_3: {
+                                            argLiterals[i] = "3";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_4: {
+                                            argLiterals[i] = "4";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_5: {
+                                            argLiterals[i] = "5";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_M1: {
+                                            argLiterals[i] = "-1";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_0: {
+                                            argLiterals[i] = "(JAVA_LONG)0";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_1: {
+                                            argLiterals[i] = "(JAVA_LONG)1";
+                                            break;
+                                        }
+
+
+                                    }
+                                }
+                            }
+                            
+                            
+                            // Check to make sure that we have all the args as literals.
+                            boolean missingLiteral = false;
+                            for (String lit : argLiterals) {
+                                if (lit == null) {
+                                    missingLiteral = true;
+                                    break;
+                                }
+                            }
+                            
+                            // We have all of the arguments as literals.  Let's
+                            // add them to our invoke instruction.
+                            if (!missingLiteral) {
+                                
+                                for (int i=0; i< numArgs; i++) {
+                                    instructions.remove(iter-numArgs);
+                                    inv.setLiteralArg(i, argLiterals[i]);
+                                }
+                                inv.setOptimized(true);
+                                iter = 0;
+                                instructionCount = instructions.size();
+                            }
+                        }
+                    }
+                    break;
+                }
+                    
                 case Opcodes.ICONST_0:
                     if(constReturn(Opcodes.IRETURN, 0, nextOpcode, iter)) {
                         iter = 0;

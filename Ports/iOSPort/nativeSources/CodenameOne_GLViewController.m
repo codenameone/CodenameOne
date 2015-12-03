@@ -1754,6 +1754,9 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
+    // Hide the datepicker if it is currently showing.
+    [self datePickerCancel];
+    
     if(editingComponent == nil) {
         modifiedViewHeight = NO;
         return;
@@ -2907,14 +2910,16 @@ extern JAVA_LONG defaultDatePickerDate;
 }
 
 - (void)datePickerCancel {
-    com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
-    currentDatePickerDate = nil;
-    pickerStringArray = nil;
-    NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
-    UIView* v = (UIView*)[arr objectAtIndex:0];
-    [v removeFromSuperview];
-    currentActionSheet = nil;
-    repaintUI();
+    if (currentActionSheet != nil) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
+        currentDatePickerDate = nil;
+        pickerStringArray = nil;
+        NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
+        UIView* v = (UIView*)[arr objectAtIndex:0];
+        [v removeFromSuperview];
+        currentActionSheet = nil;
+        repaintUI();
+    }
 }
 
 - (void)datePickerDismiss {
