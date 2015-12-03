@@ -472,6 +472,23 @@ public class InPlaceEditView extends FrameLayout {
         }
     }
 
+    public static void stopEdit() {
+        if (sInstance != null) {
+            sInstance.endEditing(REASON_UNDEFINED, false);
+        }
+    }
+
+    private static void releaseEdit() {
+        if (sInstance != null) {
+            ViewParent p = sInstance.getParent();
+            if (p != null) {
+                ((ViewGroup) p).removeView(sInstance);
+            }
+            sInstance = null;
+        }
+    }
+    
+    
     public static void reLayoutEdit() {
         if (sInstance != null && sInstance.mEditText != null) {
 
@@ -562,6 +579,12 @@ public class InPlaceEditView extends FrameLayout {
         if(sInstance != null && sInstance.mLastEditText != null && sInstance.mLastEditText.mTextArea == textArea){
             String retVal = sInstance.mLastEditText.getText().toString();
             sInstance.mLastEditText = null;
+            impl.activity.runOnUiThread(new Runnable() {
+
+                public void run() {
+                    releaseEdit();
+                }
+            });
             return retVal;
         }else{
             return initialText;
