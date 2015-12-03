@@ -743,6 +743,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void saveTextEditingState() {
         stopEditing();
     }
+    
+    @Override
+    public void stopTextEditing() {    
+        saveTextEditingState();
+    }
 
     protected void setLastSizeChangedWH(int w, int h) {
         // not used?
@@ -1928,6 +1933,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if("OSVer".equals(key)) {
             return "" + android.os.Build.VERSION.RELEASE;
+        }
+        if("DeviceName".equals(key)) {
+            return "" + android.os.Build.MODEL;
         }
         try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
