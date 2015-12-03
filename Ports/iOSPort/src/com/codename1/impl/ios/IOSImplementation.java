@@ -4599,6 +4599,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         if("OSVer".equals(key)) {
             return nativeInstance.getOSVersion();
         }
+        if("DeviceName".equals(key)) {
+            return nativeInstance.getDeviceName();
+        }
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
