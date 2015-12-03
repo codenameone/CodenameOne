@@ -445,6 +445,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         editString(cmp, maxSize, constraint, text, i);
                     }
                 });
+                return;
             }
         }
         Form parentForm = cmp.getComponentForm();
