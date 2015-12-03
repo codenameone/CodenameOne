@@ -4175,7 +4175,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         File fontFile = null;
         try {
             if(fontName.startsWith("native:")) {
-                if(IS_MAC || isIOS) {
+                if(IS_MAC && isIOS) {
                     String nn = nativeFontName(fontName);
                     java.awt.Font nf = new java.awt.Font(nn, java.awt.Font.PLAIN, medianFontSize);
                     return nf;
