@@ -292,6 +292,7 @@ public final class IOSNative {
     
     native String getUDID();
     native String getOSVersion();
+    native String getDeviceName();
     
     // location manager
     native long createCLLocation();
