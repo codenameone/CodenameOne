@@ -718,7 +718,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 // Must be called from the UI thread
-                InPlaceEditView.endEdit();
+                InPlaceEditView.stopEdit();
 
                 synchronized (flag) {
                     flag[0] = true;
