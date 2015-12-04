@@ -314,8 +314,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(textEditorHidden) {
             return false;
         }
-        return c == currentEditing;
-        //return super.isEditingText(c);
+        //return c == currentEditing;
+        return super.isEditingText(c);
     }
 
     @Override
@@ -323,8 +323,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         /*if(textEditorHidden) {
             return false;
         }*/
-        return currentEditing != null;
-        //return super.isEditingText();
+        //return currentEditing != null;
+        return super.isEditingText();
     }
 
     @Override
@@ -499,39 +499,28 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
-    private boolean editingInProgress;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
         if (currentEditing == cmp) {
             // we are already editing this one, so we don't need to do anything here.
             return;
         }
-        
-        
         try {
-            if (!isAsyncEditMode()) {
-                if (editingInProgress) {
-                    synchronized (EDITING_LOCK) {
-                        if (currentEditing != null && currentEditing instanceof TextArea) {
-                            Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
-                        }
-                        currentEditing = null;
-                        EDITING_LOCK.notify();
-                    }
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-                        public void run() {
-                            synchronized (EDITING_LOCK) {
-                                while (editingInProgress) {
-                                    Util.wait(EDITING_LOCK, 200);
-                                }
-                                editingInProgress = true;
-                            }
-                        }
-                    });
+            if (currentEditing != null && currentEditing instanceof TextArea) {
+                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
+                currentEditing = null;
+                callHideTextEditor();
+                synchronized(EDITING_LOCK) {
+                    EDITING_LOCK.notify();
                 }
-
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Display.getInstance().editString(cmp, maxSize, constraint, text, i);
+                    }
+                });
+                return;
             }
             
-            if(!cmp.hasFocus()) {
+           if(!cmp.hasFocus()) {
                 doNotHideTextEditorSemaphore++;
                 try {
                     cmp.requestFocus();
@@ -543,19 +532,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            editString(cmp, maxSize, constraint, text, i);
+                            Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                         }
                     });
                     return;
                 }
             }
-            
-            if (isAsyncEditMode() && currentEditing != null && currentEditing != cmp && currentEditing instanceof TextArea) {
-                // fire action event when editing and pressing the next text field
-                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
-            }
-            
-            editingInProgress = true;
             
             Form parentForm = cmp.getComponentForm();
             if(!parentForm.isFormBottomPaddingEditingMode()) {
@@ -674,6 +656,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return;
             }
             editNext = false;
+            
             Display.getInstance().invokeAndBlock(new Runnable() {
                 @Override
                 public void run() {
@@ -687,6 +670,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
             });
+            
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
                 cmp.getComponentForm().revalidate();
             }
@@ -695,10 +679,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 TextEditUtil.editNextTextArea();
             }
         } finally {
-            synchronized (EDITING_LOCK) {
-                editingInProgress = false;
-                EDITING_LOCK.notify();
-            }
+            
         }
     }
     
@@ -718,6 +699,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 ((TextField)instance.currentEditing).fireDoneEvent();
                             }
                             instance.currentEditing = null;
+                            instance.callHideTextEditor();
                             EDITING_LOCK.notify();
                         }
                     } else {
