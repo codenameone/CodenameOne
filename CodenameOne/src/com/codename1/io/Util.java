@@ -1014,7 +1014,7 @@ public class Util {
     public static int readAll(InputStream i, byte b[]) throws IOException {
         int len = b.length;
         int n = 0;
-    	while (n < len) {
+        while (n < len) {
             int count = i.read(b, n, len - n);
             if (count < 0) {
                 return n;
