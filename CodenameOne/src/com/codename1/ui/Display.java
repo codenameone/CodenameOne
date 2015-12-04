@@ -1288,6 +1288,7 @@ public final class Display {
         if(current == newForm){
             current.revalidate();
             current.repaint();
+            current.onShowCompletedImpl();
             return;
         }
         
