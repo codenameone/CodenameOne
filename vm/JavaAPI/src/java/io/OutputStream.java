@@ -36,6 +36,7 @@ public abstract class OutputStream{
      * The close method of OutputStream does nothing.
      */
     public void close() throws java.io.IOException{
+        flush();
     }
 
     /**

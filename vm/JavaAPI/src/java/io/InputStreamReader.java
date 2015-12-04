@@ -61,6 +61,7 @@ public class InputStreamReader extends java.io.Reader{
             o.write(buffer, 0, size);
             size = i.read(buffer);
         }
+        o.close();
     }
     
     /**
@@ -119,6 +120,9 @@ public class InputStreamReader extends java.io.Reader{
             complete();
             cbufferOff = 0;
         }
+        if(cbufferOff == cbuffer.length) {
+            return -1;
+        }
         int count = 0;
         while(cbufferOff < cbuffer.length && len > count) {
             cbuf[off] = cbuffer[cbufferOff];
@@ -128,15 +132,6 @@ public class InputStreamReader extends java.io.Reader{
         }
         if(count == len) {
             return count;
-        }
-        if(count < len && cbufferOff == cbuffer.length) {
-            cbuffer = null;
-            cbufferOff = 0;
-            int val = read(cbuf, off, len - count);
-            if(val == -1) {
-                return count;
-            }
-            return count + val;
         }
         return count; 
     }
