@@ -385,6 +385,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if (current != null) {
                             current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                             current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            
+                            if (instance.currentEditing != null) {
+                                instance.currentEditing.requestFocus();
+                            }
+                            
                             current.revalidate();
                         }
                     }
@@ -393,6 +398,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
+                            if (instance.currentEditing != null) {
+                                instance.currentEditing.requestFocus();
+                            }
                             current.revalidate();
                         }
                     }
@@ -425,28 +433,55 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
+    private boolean editingInProgress;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
-        if(isAsyncEditMode() && currentEditing != null && currentEditing != cmp && cmp instanceof TextArea) {
-            // fire action event when editing and pressing the next text field
-            Display.getInstance().onEditingComplete(cmp, ((TextArea)cmp).getText());
+        if (currentEditing == cmp) {
+            // we are already editing this one, so we don't need to do anything here.
+            return;
         }
-        if(!cmp.hasFocus()) {
-            cmp.requestFocus();
-            if(isAsyncEditMode()) {
-                // flush the EDT so the focus will work...
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        editString(cmp, maxSize, constraint, text, i);
+        try {
+            if (!isAsyncEditMode()) {
+                if (editingInProgress) {
+                    synchronized (EDITING_LOCK) {
+                        if (currentEditing != null && currentEditing instanceof TextArea) {
+                            Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
+                        }
+                        currentEditing = null;
+                        EDITING_LOCK.notify();
                     }
-                });
-                return;
+                    Display.getInstance().invokeAndBlock(new Runnable() {
+                        public void run() {
+                            synchronized (EDITING_LOCK) {
+                                while (editingInProgress) {
+                                    Util.wait(EDITING_LOCK, 200);
+                                }
+                                editingInProgress = true;
+                            }
+                        }
+                    });
+                }
+
+            } else if (isAsyncEditMode() && currentEditing != null && currentEditing != cmp && currentEditing instanceof TextArea) {
+                // fire action event when editing and pressing the next text field
+                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
             }
-        }
-        Form parentForm = cmp.getComponentForm();
-        if(!parentForm.isFormBottomPaddingEditingMode()) {
-            Boolean b = (Boolean)cmp.getClientProperty("ios.async");
-            if(isAsyncEditMode() && b == null) {
-                // check whether the parent has a scrollable parent
+            
+            editingInProgress = true;
+            if(!cmp.hasFocus()) {
+                cmp.requestFocus();
+                if(isAsyncEditMode()) {
+                    // flush the EDT so the focus will work...
+
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            editString(cmp, maxSize, constraint, text, i);
+                        }
+                    });
+                    return;
+                }
+            }
+            Form parentForm = cmp.getComponentForm();
+            if(!parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
                 while(p != null) {
                     if(p.isScrollableY()) {
@@ -455,163 +490,164 @@ public class IOSImplementation extends CodenameOneImplementation {
                     p = p.getParent();
                 }
                 // no scrollabel parent automatically configure the text field for legacy mode
-                if(p == null) {
-                    b = Boolean.FALSE;
-                    cmp.putClientProperty("ios.async", b);
-                    Display.getInstance().setProperty("ios.async", "true");
-                }
-            }
-            if(b != null) {
-                nativeInstance.setAsyncEditMode(b.booleanValue());
+                nativeInstance.setAsyncEditMode(p != null);
+                
             } else {
-                String a = Display.getInstance().getProperty("ios.async", null);
-                if(a != null) {
-                    nativeInstance.setAsyncEditMode(a.equals("true"));
+                nativeInstance.setAsyncEditMode(true);
+            }
+
+            textEditorHidden = false;
+            currentEditing = (TextArea)cmp;
+
+            //register the edited TextArea to support moving to the next field
+            TextEditUtil.setCurrentEditComponent(cmp); 
+
+            final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
+            boolean forceSlideUpTmp = false;
+            final Form current = Display.getInstance().getCurrent();
+            if(current instanceof Dialog && !isTablet()) {
+                // special case, if we are editing a small dialog we want to move it
+                // so the bottom of the dialog shows within the screen. This is
+                // described in issue 505
+                Dialog dlg = (Dialog)current;
+                Component c = dlg.getDialogComponent();
+                if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
+                        c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
+                    forceSlideUpTmp = true;
                 }
             }
-        } 
-        
-        textEditorHidden = false;
-        currentEditing = (TextArea)cmp;
-        
-        //register the edited TextArea to support moving to the next field
-        TextEditUtil.setCurrentEditComponent(cmp); 
-
-        final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
-        boolean forceSlideUpTmp = false;
-        final Form current = Display.getInstance().getCurrent();
-        if(current instanceof Dialog && !isTablet()) {
-            // special case, if we are editing a small dialog we want to move it
-            // so the bottom of the dialog shows within the screen. This is
-            // described in issue 505
-            Dialog dlg = (Dialog)current;
-            Component c = dlg.getDialogComponent();
-            if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
-                    c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
-                forceSlideUpTmp = true;
-            }
-        }
-        final boolean forceSlideUp = forceSlideUpTmp;
-
-        if(isAsyncEditMode()) {
-            // revalidate the parent since the size of form is now larger due to the vkb
-            if(current.isFormBottomPaddingEditingMode()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
-                        current.forceRevalidate();
-                    }
-                });
+            final boolean forceSlideUp = forceSlideUpTmp;
+            
+            if(isAsyncEditMode()) {
+                // revalidate the parent since the size of form is now larger due to the vkb
+                if(current.isFormBottomPaddingEditingMode()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
+                            current.forceRevalidate();
+                        }
+                    });
+                } else {
+                    current.revalidate();
+                }
             } else {
-                current.revalidate();
+                cmp.repaint();
             }
-        } else {
-            cmp.repaint();
-        }
-        
-        // give the repaint one cycle to "do its magic...
-        final Style stl = currentEditing.getStyle();
-        final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                int x = cmp.getAbsoluteX() + cmp.getScrollX();
-                int y = cmp.getAbsoluteY() + cmp.getScrollY();
-                int w = cmp.getWidth();
-                int h = cmp.getHeight();
-                int pt = stl.getPadding(false, Component.TOP);
-                int pb = stl.getPadding(false, Component.BOTTOM);
-                int pl = stl.getPadding(rtl, Component.LEFT);
-                int pr = stl.getPadding(rtl, Component.RIGHT);
-                if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
-                    switch(currentEditing.getVerticalAlignment()) {
-                        case TextArea.CENTER:
-                            if(h > cmp.getPreferredH()) {
-                                y += (h / 2 - cmp.getPreferredH() / 2);
-                            }
-                            break;
-                        case TextArea.BOTTOM:
-                            if(h > cmp.getPreferredH()) {
-                                y += (h - cmp.getPreferredH());
-                            }
-                            break;
+            
+            // give the repaint one cycle to "do its magic...
+            final Style stl = currentEditing.getStyle();
+            final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    int x = cmp.getAbsoluteX() + cmp.getScrollX();
+                    int y = cmp.getAbsoluteY() + cmp.getScrollY();
+                    int w = cmp.getWidth();
+                    int h = cmp.getHeight();
+                    int pt = stl.getPadding(false, Component.TOP);
+                    int pb = stl.getPadding(false, Component.BOTTOM);
+                    int pl = stl.getPadding(rtl, Component.LEFT);
+                    int pr = stl.getPadding(rtl, Component.RIGHT);
+                    if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
+                        switch(currentEditing.getVerticalAlignment()) {
+                            case TextArea.CENTER:
+                                if(h > cmp.getPreferredH()) {
+                                    y += (h / 2 - cmp.getPreferredH() / 2);
+                                }
+                                break;
+                            case TextArea.BOTTOM:
+                                if(h > cmp.getPreferredH()) {
+                                    y += (h - cmp.getPreferredH());
+                                }
+                                break;
+                        }
+                    }
+                    String hint = null;
+                    if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
+                        hint = currentEditing.getHint();
+                    }
+                    if(isAsyncEditMode()) {
+                        // request focus triggers a scroll which flicks the textEditorHidden flag
+                        cmp.requestFocus();
+                        textEditorHidden = false;
+                    }
+                    boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                    if ( currentEditing != null ){
+                        nativeInstance.editStringAt(x,
+                                y,
+                                w,
+                                h,
+                                fnt.peer, currentEditing.isSingleLineTextArea(),
+                                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
+                                stl.getFgColor(), 0,//peer, 
+                                pt,
+                                pb,
+                                pl,
+                                pr, hint, showToolbar);
                     }
                 }
-                String hint = null;
-                if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
-                    hint = currentEditing.getHint();
-                }
-                if(isAsyncEditMode()) {
-                    // request focus triggers a scroll which flicks the textEditorHidden flag
-                    cmp.requestFocus();
-                    textEditorHidden = false;
-                }
-                boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
-                if ( currentEditing != null ){
-                    nativeInstance.editStringAt(x,
-                            y,
-                            w,
-                            h,
-                            fnt.peer, currentEditing.isSingleLineTextArea(),
-                            currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                            stl.getFgColor(), 0,//peer, 
-                            pt,
-                            pb,
-                            pl,
-                            pr, hint, showToolbar);
-                }
+            });
+            if(isAsyncEditMode()) {
+                return;
             }
-        });
-        if(isAsyncEditMode()) {
-            return;
-        }
-        editNext = false;
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            @Override
-            public void run() {
-                synchronized(EDITING_LOCK) {
-                    while(instance.currentEditing == cmp) {
-                        try {
-                            EDITING_LOCK.wait(20);
-                        } catch (InterruptedException ex) {
+            editNext = false;
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized(EDITING_LOCK) {
+                        while(instance.currentEditing == cmp) {
+                            try {
+                                EDITING_LOCK.wait(20);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 }
+            });
+            if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
+                cmp.getComponentForm().revalidate();
             }
-        });
-        if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-            cmp.getComponentForm().revalidate();
-        }
-        if(editNext) {
-            editNext = false;
-            TextEditUtil.editNextTextArea();
+            if(editNext) {
+                editNext = false;
+                TextEditUtil.editNextTextArea();
+            }
+        } finally {
+            synchronized (EDITING_LOCK) {
+                editingInProgress = false;
+                EDITING_LOCK.notify();
+            }
         }
     }
     
     // callback for native code!
-    public static void editingUpdate(String s, int cursorPositon, boolean finished) {
-        if(instance.currentEditing != null) {
-            if(finished) {
-                editNext = cursorPositon == -2;
-                synchronized(EDITING_LOCK) {
-                    instance.currentEditing.setText(s);
-                    Display.getInstance().onEditingComplete(instance.currentEditing, s);
-                    if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
-                        ((TextField)instance.currentEditing).fireDoneEvent();
+    public static void editingUpdate(final String s, final int cursorPositon, final boolean finished) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if(instance.currentEditing != null) {
+                    if(finished) {
+                        editNext = cursorPositon == -2;
+                        synchronized(EDITING_LOCK) {
+                            instance.currentEditing.setText(s);
+                            Display.getInstance().onEditingComplete(instance.currentEditing, s);
+                            if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
+                                ((TextField)instance.currentEditing).fireDoneEvent();
+                            }
+                            instance.currentEditing = null;
+                            EDITING_LOCK.notify();
+                        }
+                    } else {
+                        instance.currentEditing.setText(s);
                     }
-                    instance.currentEditing = null;
-                    EDITING_LOCK.notify();
+                    if(instance.currentEditing instanceof TextField && cursorPositon > -1) {
+                        ((TextField)instance.currentEditing).setCursorPosition(cursorPositon);
+                    }
+                } else {
+                    System.out.println("Editing null component!!" + s);
                 }
-            } else {
-                instance.currentEditing.setText(s);
             }
-            if(instance.currentEditing instanceof TextField && cursorPositon > -1) {
-                ((TextField)instance.currentEditing).setCursorPosition(cursorPositon);
-            }
-        } else {
-            System.out.println("Editing null component!!" + s);
-        }
+        });
+        
     }
 
     public void releaseImage(Object image) {

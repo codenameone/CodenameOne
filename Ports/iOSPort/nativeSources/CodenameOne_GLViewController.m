@@ -1657,6 +1657,54 @@ extern GLKMatrix4 CN1transformMatrix;
 BOOL patch = NO;
 int keyboardSlideOffset;
 int keyboardHeight;
+
+#ifdef CN1_NEW_KEYBOARD_HANDLING
+- (void)keyboardWillHide:(NSNotification *)n
+{
+    @synchronized([CodenameOne_GLViewController instance]) {
+        [currentTarget removeAllObjects];
+    }
+    keyboardIsShown = NO;
+    
+    // vkbHeight and vkbWidth may be redundant with keyboardWidth value
+    // These are exposed in Java by the getVKBWidth() and getVKBHeight()
+    // native methods, and are used to calculate padding for bottom form padding keyboard.
+    vkbHeight = 0;
+    vkbWidth = 0;
+    keyboardHeight = 0;
+    
+    // Callback to java to handle case when keyboard is hidden -- for async editing
+    // with bottom form padding currently so that the form can readjust its padding
+    // to use the new space.
+    com_codename1_impl_ios_IOSImplementation_keyboardWillBeHidden__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    
+    CGRect viewFrame = self.view.frame;
+    
+    if (!vkbAlwaysOpen && viewFrame.origin.y != 0) {
+        viewFrame.origin.y = 0;
+        // https://github.com/codenameone/CodenameOne/issues/1074
+#ifdef __IPHONE_7_0
+        if (isIOS7()) {
+            prefersStatusBarHidden = NO;
+            [self setNeedsStatusBarAppearanceUpdate];
+        }
+#endif
+        [UIView beginAnimations:nil context:NULL];
+        [UIView setAnimationBeginsFromCurrentState:YES];
+        [UIView setAnimationDuration:0.3];
+        [self.view setFrame:viewFrame];
+        [UIView commitAnimations];
+        
+    }
+    
+#ifdef NEW_CODENAME_ONE_VM
+    repaintUI();
+#else
+    com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#endif
+ }
+
+#else
 - (void)keyboardWillHide:(NSNotification *)n
 {
     @synchronized([CodenameOne_GLViewController instance]) {
@@ -1744,12 +1792,66 @@ int keyboardHeight;
     [UIView commitAnimations];
 }
 
+#endif
+
 BOOL prefersStatusBarHidden = NO;
 
 - (BOOL) prefersStatusBarHidden {
     return prefersStatusBarHidden;
 }
 
+#ifdef CN1_NEW_KEYBOARD_HANDLING
+- (void)keyboardWillShow:(NSNotification *)n
+{
+    // Hide the datepicker if it is currently showing.
+    [self datePickerCancel];
+    
+    if(editingComponent == nil) {
+        return;
+    }
+    NSDictionary* userInfo = [n userInfo];
+    
+    // get the size of the keyboard
+    CGRect keyboardEndFrame;
+    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
+    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
+    
+    keyboardHeight = keyboardFrame.size.height;
+    vkbHeight = (JAVA_INT)keyboardHeight;
+    vkbWidth = (JAVA_INT)keyboardFrame.size.width;
+    
+    // Callback to Java for async editing so that it can resize the form to account for the
+    // keyboard taking up space.
+    com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    
+    if (!vkbAlwaysOpen) {
+        // resize the noteView
+        CGRect viewFrame = self.view.frame;
+        
+        keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH);
+        if(keyboardSlideOffset <  0) {
+            //https://github.com/codenameone/CodenameOne/issues/1074
+#ifdef __IPHONE_7_0
+            if (isIOS7()) {
+                prefersStatusBarHidden = YES;
+                [self setNeedsStatusBarAppearanceUpdate];
+            }
+#endif
+            viewFrame.origin.y = keyboardSlideOffset;
+            [UIView beginAnimations:nil context:NULL];
+            [UIView setAnimationBeginsFromCurrentState:YES];
+            [UIView setAnimationDuration:0.3];
+            [self.view setFrame:viewFrame];
+            [UIView commitAnimations];
+            
+            
+            
+        }
+    }
+    keyboardIsShown = YES;
+}
+
+#else
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
@@ -1852,7 +1954,7 @@ BOOL prefersStatusBarHidden = NO;
     
     keyboardIsShown = YES;
 }
-
+#endif
 
 - (void)dealloc
 {
