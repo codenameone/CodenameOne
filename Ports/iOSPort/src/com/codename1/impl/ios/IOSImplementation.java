@@ -286,8 +286,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isAsyncEditMode();
     }
     
+    // This is a bit of a hack to work around the fact that setScrollY() automatically
+    // calls hideTextEditor when async editing is enabled.  Sometimes we want to
+    // just scroll the text field into view and don't want this to happen.
+    private int doNotHideTextEditorSemaphore=0;
+    
     @Override
     public void hideTextEditor() {
+        if (doNotHideTextEditorSemaphore > 0) {
+            return;
+        }
         if(textEditorHidden) {
             return;
         }
@@ -436,7 +444,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                     public void run() {
                         if (current != null) {
                             if (instance.currentEditing != null) {
-                                instance.currentEditing.requestFocus();
+                                instance.doNotHideTextEditorSemaphore++;
+                                try {
+                                    instance.currentEditing.requestFocus();
+                                } finally {
+                                    instance.doNotHideTextEditorSemaphore--;
+                                }
                             }
                             current.revalidate();
                         }
@@ -476,6 +489,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             // we are already editing this one, so we don't need to do anything here.
             return;
         }
+        
+        
         try {
             if (!isAsyncEditMode()) {
                 if (editingInProgress) {
@@ -498,14 +513,15 @@ public class IOSImplementation extends CodenameOneImplementation {
                     });
                 }
 
-            } else if (isAsyncEditMode() && currentEditing != null && currentEditing != cmp && currentEditing instanceof TextArea) {
-                // fire action event when editing and pressing the next text field
-                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
             }
             
-            editingInProgress = true;
             if(!cmp.hasFocus()) {
-                cmp.requestFocus();
+                doNotHideTextEditorSemaphore++;
+                try {
+                    cmp.requestFocus();
+                } finally {
+                    doNotHideTextEditorSemaphore--;
+                }
                 if(isAsyncEditMode()) {
                     // flush the EDT so the focus will work...
 
@@ -517,6 +533,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
             }
+            
+            if (isAsyncEditMode() && currentEditing != null && currentEditing != cmp && currentEditing instanceof TextArea) {
+                // fire action event when editing and pressing the next text field
+                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
+            }
+            
+            editingInProgress = true;
+            
             Form parentForm = cmp.getComponentForm();
             if(!parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
@@ -606,7 +630,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     if(isAsyncEditMode()) {
                         // request focus triggers a scroll which flicks the textEditorHidden flag
-                        cmp.requestFocus();
+                        doNotHideTextEditorSemaphore++;
+                        try {
+                            cmp.requestFocus();
+                        } finally {
+                            doNotHideTextEditorSemaphore--;
+                        }
                         textEditorHidden = false;
                     }
                     boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
