@@ -53,6 +53,9 @@
 #import "ZooZ.h"
 #endif
 
+// Flag to enable experimental new keyboard handling.
+#define CN1_NEW_KEYBOARD_HANDLING 1
+
 //#define BACKGROUND_LOCATION_ENABLED
 #define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
 

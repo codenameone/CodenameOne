@@ -385,12 +385,49 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if (current != null) {
                             current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                             current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                            
-                            if (instance.currentEditing != null) {
-                                instance.currentEditing.requestFocus();
-                            }
-                            
                             current.revalidate();
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if (instance.currentEditing != null) {
+                                        TextArea cmp = instance.currentEditing;
+                                        final Style stl = cmp.getStyle();
+                                        final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+                                        instance.currentEditing.requestFocus();
+                                        int x = cmp.getAbsoluteX() + cmp.getScrollX();
+                                        int y = cmp.getAbsoluteY() + cmp.getScrollY();
+                                        int w = cmp.getWidth();
+                                        int h = cmp.getHeight();
+                                        int pt = stl.getPadding(false, Component.TOP);
+                                        int pb = stl.getPadding(false, Component.BOTTOM);
+                                        int pl = stl.getPadding(rtl, Component.LEFT);
+                                        int pr = stl.getPadding(rtl, Component.RIGHT);
+                                        if(cmp.isSingleLineTextArea()) {
+                                            switch(cmp.getVerticalAlignment()) {
+                                                case TextArea.CENTER:
+                                                    if(h > cmp.getPreferredH()) {
+                                                        y += (h / 2 - cmp.getPreferredH() / 2);
+                                                    }
+                                                    break;
+                                                case TextArea.BOTTOM:
+                                                    if(h > cmp.getPreferredH()) {
+                                                        y += (h - cmp.getPreferredH());
+                                                    }
+                                                    break;
+                                            }
+                                        }
+                                        nativeInstance.resizeNativeTextView(x,
+                                                y,
+                                                w,
+                                                h,
+                                                pt,
+                                                pr,
+                                                pb,
+                                                pl
+                                        );
+
+                                    }
+                                }
+                            });
                         }
                     }
                 });
@@ -619,6 +656,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
     }
+    
+    
     
     // callback for native code!
     public static void editingUpdate(final String s, final int cursorPositon, final boolean finished) {

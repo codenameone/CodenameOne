@@ -372,6 +372,37 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                                                                    padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
     POOL_END();
 }
+extern float scaleValue;
+extern int editComponentPadTop, editComponentPadLeft;
+extern float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
+void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT padTop, JAVA_INT padRight, JAVA_INT padBottom, JAVA_INT padLeft) {
+    POOL_BEGIN();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            float scale = scaleValue;
+            CGRect existingBounds = editingComponent.frame;
+            NSString *currText = ((UITextField*)editingComponent).text;
+
+            editCompoentX = (x + padLeft) / scale;
+            editCompoentY = (y + padTop) / scale;
+            editComponentPadTop = padTop;
+            editComponentPadLeft = padLeft;
+            if (scale > 1) {
+                editCompoentY -= 1.5;
+            } else {
+                editCompoentY -= 1;
+            }
+            editCompoentW = (w - padLeft - padRight) / scale;
+            editCompoentH = (h - padTop - padBottom) / scale;
+            CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
+            editingComponent.frame = rect;
+        }
+        POOL_END();
+    });
+    
+    POOL_END();
+}
 
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
