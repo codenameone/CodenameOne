@@ -1107,7 +1107,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         newPaint.setTypeface(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
-        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
+        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
 
