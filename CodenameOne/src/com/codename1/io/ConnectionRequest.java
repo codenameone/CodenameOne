@@ -742,7 +742,9 @@ public class ConnectionRequest implements IOProgressListener {
             retry();
         } else {
             retrying = false;
-            killed = true;
+            if(!isReadResponseForErrors()){
+                killed = true;
+            }
         }
     }
 
