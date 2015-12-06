@@ -75,6 +75,20 @@ public class UITimer {
     }
     
     /**
+     * Convenience method to schedule a UITimer more easily
+     * @param timeMillis the time from now in milliseconds
+     * @param repeat whether the timer repeats
+     * @param parent  the form to which the timer is bound
+     * @param r callback when the timer elapses
+     * @return 
+     */
+    public static UITimer timer(int timeMillis, boolean repeat, Form parent, Runnable r) {
+        UITimer uit = new UITimer(r);
+        uit.schedule(timeMillis, repeat, parent);
+        return uit;
+    }
+    
+    /**
      * Stops executing the timer
      */
     public void cancel() {
