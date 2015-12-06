@@ -1096,10 +1096,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
-        if ((weight & Font.STYLE_BOLD) != 0) {
+        if ((weight & Font.STYLE_BOLD) != 0 || type.isBold()) {
             fontstyle |= Typeface.BOLD;
         }
-        if ((weight & Font.STYLE_ITALIC) != 0) {
+        if ((weight & Font.STYLE_ITALIC) != 0 || type.isItalic()) {
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
