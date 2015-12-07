@@ -300,7 +300,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         Form current = getCurrentForm();
-        if(current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
             current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
             current.forceRevalidate();
         } 
@@ -346,7 +346,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
-                        if(f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
                             f.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                             f.forceRevalidate();
                             return;
@@ -431,12 +431,28 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
+            final Component currentEditingFinal = instance.currentEditing;
             if(current.isFormBottomPaddingEditingMode()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
-                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            /*if (waitForAnimationLock(current)) {
+                                current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                                current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                                
+                                current.getContentPane().animateLayoutAndWait(225);
+                                current.revalidate();
+                                current.releaseAnimationLock();
+                            } else {*/
+                                current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                                current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                                
+                                current.revalidate();
+                            //}
+                            if (current != Display.getInstance().getCurrent() || currentEditingFinal != instance.currentEditing) {
+                                // After the animation the form may have changed...
+                                return;
+                            }
                             current.revalidate();
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
@@ -500,12 +516,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
-        if (currentEditing == cmp) {
-            // we are already editing this one, so we don't need to do anything here.
-            return;
-        }
+        
         try {
-            if (currentEditing != null && currentEditing instanceof TextArea) {
+            if (currentEditing != cmp && currentEditing != null && currentEditing instanceof TextArea) {
                 Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
                 currentEditing = null;
                 callHideTextEditor();
@@ -577,6 +590,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             final boolean forceSlideUp = forceSlideUpTmp;
             
+            /*
             if(isAsyncEditMode()) {
                 // revalidate the parent since the size of form is now larger due to the vkb
                 if(current.isFormBottomPaddingEditingMode()) {
@@ -592,8 +606,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             } else {
                 cmp.repaint();
-            }
-            
+            }*/
+            cmp.repaint();
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
@@ -701,6 +715,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                             instance.currentEditing = null;
                             instance.callHideTextEditor();
                             EDITING_LOCK.notify();
+                        }
+                        Form current = Display.getInstance().getCurrent();
+                        if (current != null && current.isFormBottomPaddingEditingMode()) {
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                         }
                     } else {
                         instance.currentEditing.setText(s);
@@ -843,6 +861,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void setIosMode(String l) {
         iosMode = l;
     }
+    
+    private static boolean waitForAnimationLock(Form f) {
+        while (!f.grabAnimationLock()) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.sleep(20);
+                }
+            });
+        }
+        boolean obtained =  Display.getInstance().getCurrent() == f;
+        if (!obtained) {
+            f.releaseAnimationLock();
+        }
+        return obtained;
+    }
+    
+    
     
     /**
      * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method

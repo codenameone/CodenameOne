@@ -189,6 +189,9 @@ BOOL isVKBAlwaysOpen() {
     if(vkbAlwaysOpen) {
         if(isIOS8() && !isIPad() && displayWidth > displayHeight) {
             return NO;
+        } else if (!isIPad() && ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeLeft || [[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeRight)) {
+            // iOS 7 needs a more specific check to find out if we are in landscape mode
+            return NO;
         }
         return YES;
     }
@@ -1654,6 +1657,40 @@ extern GLKMatrix4 CN1transformMatrix;
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
 }
 
+CGFloat getOriginY() {
+    int statusbarHeight = 20;
+    if(isIOS7()) {
+        statusbarHeight = 0;
+    }
+    if (isIOS7()) {
+        return [CodenameOne_GLViewController instance].view.frame.origin.y;
+    } else {
+        if (displayHeight > displayWidth) {
+            return [CodenameOne_GLViewController instance].view.frame.origin.y * upsideDownMultiplier - ((upsideDownMultiplier == -1) ? 0 : statusbarHeight);
+        } else {
+            return -[CodenameOne_GLViewController instance].view.frame.origin.x * upsideDownMultiplier - ((upsideDownMultiplier == 1) ? 0 : statusbarHeight);
+        }
+    }
+}
+
+CGRect setOriginY(CGFloat y, CGRect frame) {
+    int statusbarHeight = 20;
+    if(isIOS7()) {
+        statusbarHeight = 0;
+    }
+    if (isIOS7()) {
+        frame.origin.y = y;
+    } else {
+        if (displayHeight > displayWidth) {
+            frame.origin.y = y * upsideDownMultiplier + ((upsideDownMultiplier == -1) ? 0 : statusbarHeight);
+        } else {
+            frame.origin.x = -y * upsideDownMultiplier + ((upsideDownMultiplier == 1) ? 0 : statusbarHeight);
+        }
+    }
+    return frame;
+}
+
+
 BOOL patch = NO;
 int keyboardSlideOffset;
 int keyboardHeight;
@@ -1672,6 +1709,10 @@ int keyboardHeight;
     vkbHeight = 0;
     vkbWidth = 0;
     keyboardHeight = 0;
+    //int statusbarHeight = 20;
+    //if(isIOS7()) {
+    //    statusbarHeight = 0;
+    //}
     
     // Callback to java to handle case when keyboard is hidden -- for async editing
     // with bottom form padding currently so that the form can readjust its padding
@@ -1680,8 +1721,8 @@ int keyboardHeight;
     
     CGRect viewFrame = self.view.frame;
     
-    if (!vkbAlwaysOpen && viewFrame.origin.y != 0) {
-        viewFrame.origin.y = 0;
+    if (!isVKBAlwaysOpen() && getOriginY() != 0) {
+        viewFrame = setOriginY(0, viewFrame);
         // https://github.com/codenameone/CodenameOne/issues/1074
 #ifdef __IPHONE_7_0
         if (isIOS7()) {
@@ -1703,6 +1744,7 @@ int keyboardHeight;
     com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #endif
  }
+
 
 #else
 - (void)keyboardWillHide:(NSNotification *)n
@@ -1814,21 +1856,31 @@ BOOL prefersStatusBarHidden = NO;
     // get the size of the keyboard
     CGRect keyboardEndFrame;
     [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
-    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
+    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame fromView:nil];
     
     keyboardHeight = keyboardFrame.size.height;
     vkbHeight = (JAVA_INT)keyboardHeight;
     vkbWidth = (JAVA_INT)keyboardFrame.size.width;
+    //int statusbarHeight = 20;
+    //if(isIOS7()) {
+    //    statusbarHeight = 0;
+    //}
+    
+    keyboardFrame.origin.y += getOriginY();// - statusbarHeight;
     
     // Callback to Java for async editing so that it can resize the form to account for the
     // keyboard taking up space.
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
-    if (!vkbAlwaysOpen) {
+    if (!isVKBAlwaysOpen()) {
         // resize the noteView
         CGRect viewFrame = self.view.frame;
         
-        keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH);
+        if (keyboardFrame.origin.y > 0) {
+            keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH);
+        } else {
+            keyboardSlideOffset = 0;
+        }
         if(keyboardSlideOffset <  0) {
             //https://github.com/codenameone/CodenameOne/issues/1074
 #ifdef __IPHONE_7_0
@@ -1837,19 +1889,19 @@ BOOL prefersStatusBarHidden = NO;
                 [self setNeedsStatusBarAppearanceUpdate];
             }
 #endif
-            viewFrame.origin.y = keyboardSlideOffset;
+            viewFrame = setOriginY(keyboardSlideOffset, viewFrame);
             [UIView beginAnimations:nil context:NULL];
             [UIView setAnimationBeginsFromCurrentState:YES];
             [UIView setAnimationDuration:0.3];
             [self.view setFrame:viewFrame];
-            [UIView commitAnimations];
-            
-            
-            
+            [UIView commitAnimations];  
+        } else {
+            keyboardSlideOffset = 0;
         }
     }
     keyboardIsShown = YES;
 }
+
 
 #else
 
@@ -2150,14 +2202,14 @@ BOOL prefersStatusBarHidden = NO;
     upsideDownMultiplier = 1;
     switch (orientationLock) {
         case 0:
-            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
                 upsideDownMultiplier = -1;
             }
             return YES;
             
         case 1:
             if(interfaceOrientation == UIInterfaceOrientationPortrait) {
-                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
                     upsideDownMultiplier = -1;
                 }
                 return YES;
@@ -2165,8 +2217,8 @@ BOOL prefersStatusBarHidden = NO;
             return NO;
             
         default:
-            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
-                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationMaskPortraitUpsideDown) {
+            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
+                if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
                     upsideDownMultiplier = -1;
                 }
                 return YES;
@@ -2591,7 +2643,7 @@ static BOOL skipNextTouch = NO;
             UITouch* currentTouch = [ts objectAtIndex:iter];
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
-            yArray[iter] = (int)currentPoint.y * scaleValue - keyboardSlideOffset;
+            yArray[iter] = (int)currentPoint.y * scaleValue;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
@@ -2690,7 +2742,8 @@ static BOOL skipNextTouch = NO;
         yArray[0] = (int)point.y * scaleValue;
     }
     if(!isVKBAlwaysOpen()) {
-        [self foldKeyboard:point];
+        CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
+        [self foldKeyboard:scaledPoint];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();

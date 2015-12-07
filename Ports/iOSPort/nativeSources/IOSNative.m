@@ -4985,9 +4985,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 }
 
 
+extern BOOL isVKBAlwaysOpen();
 extern BOOL vkbAlwaysOpen;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return vkbAlwaysOpen;
+    return isVKBAlwaysOpen();
 }
 
 extern int vkbHeight;
