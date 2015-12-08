@@ -6,6 +6,18 @@ ParparVM is the VM developed by Codename One to replace the defunct [XMLVM](http
 originally built. We took our extensive experience both in JIT's and native OS development and built something
 that is both simple, concervative and performant. 
 
+## Usage
+The ByteCodeTranslator and JavaAPI projects are designed as a NetBeans project although it should be possible to work with any Java IDE or ant directly. It requires asm 5.0.3 which you can find in the [cn1-binaries](http://github.com/codenameone/cn1-binaries) project.
+
+You can run the translation process using:
+```bash
+ java -jar ByteCodeTranslator.jar ios path_to_stub_class:path_to/vm/JavaAPI/build/classes;path_to_your_classes  dest_build_dir MainClassName com.package.name "Title For Project" "1.0" ios none
+```
+
+Once the translation process succeeds you should have a valid xcode project that you can run and use as usual. You will need a Mac for this to work.
+
+The main class name is expected to have a `public static void main(String[])` method and it is assumed to reside in the `com.package.name` directory.
+
 ## Why Another VM for iOS?
 
 There are many VM's on the market and a few open source ones but none of the ones that translate to C are actively maintained.
@@ -61,11 +73,36 @@ that prevents the compiler from truly optimizing away some cases.
 We have handcoded optimization methods that optimize away common use cases, e.g. getters/setters are effectively free
 under ParparVM. But this work should probably be extended further.
 
+## Java Level Support
+
+We aimed the VM at Java 5 support and overlay the Java 8 support with retrolambda, it should work for some Java 8 syntax out of the box simply because of ASM's ability to parse newer class files. 
+
+The API is relatively limited in scope to keep the size low, we would like to add additional API's ideally with very concise implementations to avoid bringing over the full JDK.
+
 ## Relation To Codename One
 
 ParparVM is used by Codename One internally, its open source and we have no intention to change that. 
 
-Parpar has no dependency on Codename One itself that we know of.
+Parpar has no dependency on Codename One itself that we know of but some might exist inadvertantly since Codename One is the only target we have.
+
+## Support
+
+We try to answer all [questions tagged codenameone on stackoverflow](http://stackoverflow.com/tags/codenameone) but since these questions might be esoteric its possible that we won't be able to answer some of them. The Codename One discussion group is generally aimed at Codename One development and not at using the source code/native. Since these are advanced topics they might dillute the discussion there.
+
+## Areas Of Interest
+#### Performance
+We would like to improve the performance of the VM further while keeping source/binary size down and reducing compilation time (tall order). This can be accomplished by:
+
+  - Additional optimization options - stack elimination, method init elimination.
+  - Exception processing - currently we don't rely on CPU code for exception detection. We can rely on some processor specific behavior to implement null pointer, array index out of bounds etc.
+  - Better dead code elimination and better inlining logic
+  - Better handling of interfaces which have a big overhead
+
+#### Crash handling
+Currently VM crashes arn't graceful, it should be pretty easy to extract VM state and log it to a file that can be used on next launch. Since most of the code related to the stack tracking is in C it should be accessible and easy to log this on a crash.
+
+#### Ports
+When we started this work we envisioned a C# compilation target as well. However, with the changes to Windows Phone 8 C might be a better target for Windows development. Porting the VM to other OS's could be very interesting, we tried to keep the code portable but quite a few things are specific to Objective-C it should be possible to adapt most of those things.
 
 ## The Name
 
