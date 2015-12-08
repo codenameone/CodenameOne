@@ -386,8 +386,8 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 
             editCompoentX = (x + padLeft) / scale;
             editCompoentY = (y + padTop) / scale;
-            editComponentPadTop = padTop;
-            editComponentPadLeft = padLeft;
+            editComponentPadTop = padTop / scale;
+            editComponentPadLeft = padLeft / scale;
             if (scale > 1) {
                 editCompoentY -= 1.5;
             } else {

@@ -387,7 +387,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             TextArea cmp = instance.currentEditing;
             final Style stl = cmp.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
-            instance.currentEditing.requestFocus();
+            instance.doNotHideTextEditorSemaphore++;
+            try {
+                instance.currentEditing.requestFocus();
+            } finally {
+                instance.doNotHideTextEditorSemaphore--;
+            }
             int x = cmp.getAbsoluteX() + cmp.getScrollX();
             int y = cmp.getAbsoluteY() + cmp.getScrollY();
             int w = cmp.getWidth();
@@ -410,6 +415,18 @@ public class IOSImplementation extends CodenameOneImplementation {
                         break;
                 }
             }
+            
+            int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
+            
+            if (h > maxH ) {
+                // For text areas, we don't want the keyboard to cover part of the 
+                // typing region.  So we will try to size the component to 
+                // to only go up to the top edge of the keyboard
+                // that should allow the OS to enable scrolling properly.... at least
+                // in theory.
+                h = maxH;
+            }
+            
             nativeInstance.resizeNativeTextView(x,
                     y,
                     w,
@@ -436,23 +453,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
-                            /*if (waitForAnimationLock(current)) {
-                                current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                                current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                                
-                                current.getContentPane().animateLayoutAndWait(225);
-                                current.revalidate();
-                                current.releaseAnimationLock();
-                            } else {*/
-                                current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                                current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                                
-                                current.revalidate();
-                            //}
-                            if (current != Display.getInstance().getCurrent() || currentEditingFinal != instance.currentEditing) {
-                                // After the animation the form may have changed...
-                                return;
-                            }
+                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                             current.revalidate();
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
@@ -697,6 +699,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
+    // Callback for native code
+    public static void resizeNativeTextComponentCallback() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                updateNativeTextEditorFrame();
+            }
+        });
+    }
     
     
     // callback for native code!
